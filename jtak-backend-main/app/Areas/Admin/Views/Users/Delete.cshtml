@@ -1,0 +1,38 @@
+﻿@using App.Resources
+@model App.Shared.Entities.UserDto
+
+<div class="content-heading">
+    <div>
+        @_Common.Delete
+        <small>Delete User.</small>
+    </div>
+</div>
+<div class="container-fluid">
+        <div class="card card-default">
+            <div class="card-body">
+                <dl class="dl-horizontal">
+                    <dt>
+                        @Html.DisplayNameFor(model => model.FirstName)
+                    </dt>
+                    <dd>
+                        @Html.DisplayFor(model => model.FirstName)
+                    </dd>
+                    <dt>
+                        @Html.DisplayNameFor(model => model.LastName)
+                    </dt>
+                    <dd>
+                        @Html.DisplayFor(model => model.LastName)
+                    </dd>
+                </dl>
+            </div>
+            <div class="card-footer text-right">
+                <form asp-action="Delete">
+                    <input type="hidden" asp-for="Id" />
+                    <div class="btn-group">
+                        <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+                        <input type="submit" value="@_Common.Delete" class="btn btn-danger" />
+                    </div>
+                </form>
+            </div>
+        </div>
+</div>

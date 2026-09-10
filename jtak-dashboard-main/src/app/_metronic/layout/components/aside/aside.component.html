@@ -1,0 +1,33 @@
+<div class="aside-logo flex-column-auto" id="kt_aside_logo">
+  <a routerLink="/dashboard" class="jtak-brand" aria-label="JTAK dashboard home">
+    <span class="jtak-brand-mark" aria-hidden="true">J</span>
+    <span class="jtak-brand-copy logo"><strong>JTAK</strong><small>Operations</small></span>
+  </a>
+
+  <ng-container *ngIf="asideMinimize">
+    <button id="kt_aside_toggle" type="button" class="btn btn-icon w-auto px-0 aside-toggle"
+      data-kt-toggle="true" data-kt-toggle-state="active" data-kt-toggle-target="body"
+      data-kt-toggle-name="aside-minimize" aria-label="Collapse navigation">
+      <span [inlineSVG]="'./assets/media/icons/duotune/arrows/arr079.svg'"
+        class="svg-icon svg-icon-1 rotate-180"></span>
+    </button>
+  </ng-container>
+</div>
+
+<div class="aside-menu flex-column-fluid">
+  <div #ktAsideScroll id="kt_aside_menu_wrapper" class="hover-scroll-overlay-y mt-3 mb-2"
+    data-kt-scroll="true" data-kt-scroll-activate="{default: false, lg: true}"
+    data-kt-scroll-height="auto" data-kt-scroll-dependencies="#kt_aside_logo, #kt_aside_footer"
+    data-kt-scroll-wrappers="#kt_aside_menu" data-kt-scroll-offset="0">
+    <div id="kt_aside_menu" data-kt-menu="true" class="menu menu-column">
+      <app-aside-menu id="asideMenu"></app-aside-menu>
+    </div>
+  </div>
+</div>
+
+<div class="aside-footer flex-column-auto px-5 pb-5" id="kt_aside_footer">
+  <div class="jtak-system-state">
+    <span class="jtak-status-dot" aria-hidden="true"></span>
+    <span class="btn-label"><strong>Operations online</strong><small>JTAK Admin · 2026</small></span>
+  </div>
+</div>

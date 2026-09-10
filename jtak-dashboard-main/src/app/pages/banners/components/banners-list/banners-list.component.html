@@ -1,0 +1,108 @@
+<div class="card card-custom gutter-b">
+    <div class="card-header">
+      <div class="card-title">
+        <div><h3 class="card-label">Banners</h3><span class="card-subtitle">Control campaign artwork and in-app promotions.</span></div>
+      </div>
+      <div class="card-toolbar">
+        <button type="button" class="btn btn-primary" (click)="create()">
+          <i class="fas fa-plus"></i> Add banner
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <!-- begin: Filtration form -->
+      <div class="form form-label-right">
+        <div class="form-group row">
+          <div class="col-lg-2" [formGroup]="searchGroup">
+            <input
+              type="text"
+              class="form-control"
+              name="searchText"
+              placeholder="Search banners"
+              formControlName="searchTerm"
+            />
+          </div>
+        </div>
+      </div>
+      <!-- end: Filtration form -->
+      <ng-container *ngIf="bannersService.items$ | async as items">
+        <div class="bulk-action-bar" *ngIf="selection.count > 0">
+          <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
+          <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'banners')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-danger" (click)="bulkDelete(items)"><i class="fas fa-trash"></i> Delete</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
+        </div>
+      </ng-container>
+  
+      <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="bannersService.items$ | async as items">
+        <table
+          class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
+        >
+          <thead>
+            <tr class="fw-bolder text-muted">
+              <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all banners on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
+              <th scope="col">
+                Title
+                <app-sort-icon
+                  column="title"
+                  [activeColumn]="sorting.column"
+                  [activeDirection]="sorting.direction"
+                  (sort)="sort($event)"
+                ></app-sort-icon>
+              </th>
+              <th scope="col">
+                Description
+              </th>
+              <th scope="col">
+                Section / القسم
+              </th>
+              <th scope="col">
+                Active
+              </th>
+              <th scope="col">
+                Created Date
+              </th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
+              <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select ' + i.title" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
+              <td>{{ i.title }}</td>
+              <td>{{ i.description }}</td>
+              <td>
+                <span class="badge badge-light-warning" *ngIf="isDontMiss(i)">لا تفوتها</span>
+                <span class="badge badge-light-success" *ngIf="isAllSections(i)">كلاهما</span>
+                <span class="badge badge-light-primary" *ngIf="isDailyOffers(i)">العروض اليومية</span>
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  [ngClass]="{'badge-light-success': i.active,'badge-warning': !i.active}"
+                >
+                  {{ i.active ? "Active" : "Disabled" }}
+                </span>
+              </td>
+              <td>{{ i.createdDate | date }}</td>
+              <td>
+                <app-table-actions
+                  (editClicked)="edit(i)"
+                  (deleteClicked)="delete(i.id)"
+                >
+                </app-table-actions>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+  
+      <app-paginator
+        class="d-flex justify-content-between align-items-center flex-wrap"
+        [paginator]="paginator"
+        [isLoading]="isLoading"
+        (paginate)="paginate($event)"
+      ></app-paginator>
+  
+      <!-- begin:Table -->
+    </div>
+    <!-- end: Table -->
+  </div>
+  

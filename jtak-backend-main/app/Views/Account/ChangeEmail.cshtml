@@ -1,0 +1,33 @@
+﻿@using App.Resources
+
+@model bool
+@{
+    Layout = "~/Views/Shared/_LayoutPage.cshtml";
+    ViewData["Title"] = _Account.ConfirmEmail;
+}
+
+<div class="block-center mt-4 wd-xxl">
+    <!-- START card-->
+    <div class="card card-flat p-3">
+        <div class="card-body">
+            <a style="width: 100%; text-align: center; display: inline-block;" href="@Url.Action("Index", "Dashboard")">
+                <img style="max-height: 120px;margin-bottom:30px;" src="~/images/logo.svg" alt="@_Common.SiteName" title="@_Common.SiteName">
+            </a>
+            <h4 class="text-center pv">@_Account.ConfirmEmail</h4>
+            <div>
+                @if (Model)
+                {
+                    <p>
+                        @Html.Raw(string.Format(_Account.ThanksForConfirmingYourEmail, Url.Action("Login")))
+                    </p>
+                }
+                else
+                {
+                    <p>
+                        @Html.Raw(_Account.ConfirmationEmailWasResent)
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+</div>

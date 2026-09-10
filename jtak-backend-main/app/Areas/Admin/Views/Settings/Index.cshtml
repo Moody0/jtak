@@ -1,0 +1,33 @@
+﻿@using App.Resources
+@model App.Areas.Admin.Models.SettingsVm
+
+<div class="container-fluid">
+    <form asp-action="Index">
+        <div class="card card-default">
+            <div class="card-header">
+                <em class="fa fa-list-alt p-2"></em> @_Nav.Settings
+            </div>
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="row">
+                    <div class="col-lg-6">
+                        @Html.EditorFor(x => x.FooterNote)
+                    </div>
+                    <div class="col-lg-6">
+
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-right">
+                <div class="btn-group">
+                    <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+                    <input type="submit" value="@_Common.Save" class="btn btn-success" />
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

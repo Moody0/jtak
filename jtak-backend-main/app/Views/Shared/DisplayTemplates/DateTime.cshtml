@@ -1,0 +1,16 @@
+﻿@using Solf.Extensions
+
+@model DateTime
+
+@{
+    //var d = DateTime.SpecifyKind(Model, DateTimeKind.Utc).ToLocalTime();
+    var d = DateTime.SpecifyKind(Model, DateTimeKind.Utc);
+}
+@if (d.Hour == 0 && d.Minute == 0 && d.Second == 0)
+{
+    @d.ToShortDateString()
+}
+else
+{
+    @d.Tostring_ddMMyyyyHHmm()
+}

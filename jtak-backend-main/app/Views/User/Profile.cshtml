@@ -1,0 +1,51 @@
+﻿@using App.Extensions
+@using Microsoft.AspNetCore.Identity
+@using App.Helpers
+@using App.Shared.Entities
+@using App.Shared.Entities.Resources
+@using App.Resources
+@{
+    Layout = "_LayoutTheme";
+}
+@model App.Shared.Entities.UserDto
+
+<header class="bg-light-gray3" style="margin-top:115px;padding-bottom:30px;">
+    <div class="bg-danger" style="height: 275px;top: 0;position: absolute;width: 100%;"></div>
+    <div class="container">
+        <div class="d-md-flex flex-md-row">
+            <div class="col-md-5">
+                <div>
+                    <img src="@Url.ImgHref(Model.ProfilePhoto,200,200,true)" style="border:solid 8px #fff;margin:15px;width:200px;" class="img-circle" />
+                </div>
+                <h2 class="text-dark">
+                    @Model.FullName
+                </h2>
+                <div class="mb-3 mb-md-0">
+                    @if (Model.PhoneNumber != null)
+                    {
+                        <a class="phone social-icon" target="_blank" href="@Model.PhoneNumber"><i class="fa fa-phone"></i></a>
+                    }
+                </div>
+            </div>
+            <div class="col-md-7">
+            </div>
+        </div>
+    </div>
+</header>
+
+@section Styles {
+    <style>
+        .main-header {
+            background-color: transparent;
+            box-shadow: none;
+        }
+    </style>
+}
+@section Scripts {
+    <script>
+        var logoSticky = "logodark";
+        var logoNormal = "logodark";
+        headerStyle();
+    </script>
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

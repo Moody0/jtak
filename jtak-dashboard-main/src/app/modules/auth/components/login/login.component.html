@@ -1,0 +1,49 @@
+<form class="form w-100" [formGroup]="loginForm" novalidate id="kt_login_signin_form" (ngSubmit)="submit()">
+  <div class="jtak-login-heading">
+    <span class="jtak-login-kicker">JTAK Admin</span>
+    <h1>Welcome back</h1>
+    <p>Sign in to manage daily operations.</p>
+  </div>
+
+  <div *ngIf="hasError" class="alert alert-danger" role="alert">
+    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+    <span>The email or password is incorrect.</span>
+  </div>
+
+  <div class="fv-row mb-6">
+    <label class="form-label" for="admin-email">Email address</label>
+    <input id="admin-email" class="form-control form-control-lg" type="email" name="email"
+      formControlName="email" autocomplete="email" placeholder="name@company.com"
+      [ngClass]="{ 'is-invalid': loginForm.controls['email'].invalid && loginForm.controls['email'].touched }" />
+    <ng-container [ngTemplateOutlet]="formError" [ngTemplateOutletContext]="{
+      validation: 'required', message: 'Email is required', control: loginForm.controls['email'] }"></ng-container>
+    <ng-container [ngTemplateOutlet]="formError" [ngTemplateOutletContext]="{
+      validation: 'email', message: 'Enter a valid email address', control: loginForm.controls['email'] }"></ng-container>
+  </div>
+
+  <div class="fv-row mb-7">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <label class="form-label mb-0" for="admin-password">Password</label>
+      <a routerLink="/auth/forgot-password" class="jtak-forgot-link">Forgot password?</a>
+    </div>
+    <input id="admin-password" class="form-control form-control-lg" type="password" name="password"
+      autocomplete="current-password" formControlName="password" placeholder="Enter your password"
+      [ngClass]="{ 'is-invalid': loginForm.controls['password'].invalid && loginForm.controls['password'].touched }" />
+    <ng-container [ngTemplateOutlet]="formError" [ngTemplateOutletContext]="{
+      validation: 'required', message: 'Password is required', control: loginForm.controls['password'] }"></ng-container>
+  </div>
+
+  <button type="submit" id="kt_sign_in_submit" class="btn btn-lg btn-primary w-100" [disabled]="loginForm.invalid">
+    <ng-container *ngIf="isLoading$ | async; else signInLabel">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Signing in
+    </ng-container>
+    <ng-template #signInLabel>Sign in securely <i class="fas fa-arrow-right" aria-hidden="true"></i></ng-template>
+  </button>
+  <p class="jtak-login-help">Access is restricted to authorized JTAK staff.</p>
+</form>
+
+<ng-template #formError let-control="control" let-message="message" let-validation="validation">
+  <div class="fv-plugins-message-container" *ngIf="control.hasError(validation) && (control.dirty || control.touched)">
+    <span role="alert">{{ message }}</span>
+  </div>
+</ng-template>

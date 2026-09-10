@@ -1,0 +1,152 @@
+﻿@using App.Resources
+@{
+    var lang = System.Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName;
+    var RTLext = lang == "ar" ? "-rtl" : "";
+    var isRtl = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft;
+}
+<!DOCTYPE html>
+<html lang="@lang" dir="@(isRtl?"rtl":"ltr")">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>@_Common.SiteName</title>
+    <meta name="keywords" content="bootstrap, app, theme">
+    <meta name="author" content="SOL Integrated Solutions">
+
+    <!-- FAVICON-->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="apple-touch-icon" sizes="57x57" href="/fav/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/fav/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/fav/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/fav/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/fav/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/fav/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/fav/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/fav/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/fav/apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/fav/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="/fav/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/fav/favicon-16x16.png">
+    <link rel="manifest" href="/fav/manifest.json">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="/fav/ms-icon-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <!-- Style css -->
+    <link href="~/css/bootstrap@(RTLext).css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/langingpage/css/style@(RTLext).css">
+    <link rel="stylesheet" href="~/langingpage/css/responsive@(RTLext).css">
+    @if (IsSectionDefined("Styles"))
+    {@RenderSection("Styles", required: false)}
+</head>
+<body>
+    <div id="scrollUp" title="Scroll To Top"><i class="fas fa-arrow-up"></i></div>
+    <div class="main">
+        @RenderBody()
+        <div class="height-emulator d-none d-lg-block"></div>
+        <footer class="footer-area footer-fixed">
+            <div class="footer-top ptb_100">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <div class="footer-items">
+                                <a class="navbar-brand" href="#">
+                                    <img class="logo" style="width: 100%;height: 52px;"  src="~/images/logo.svg" alt="@_Common.SiteName logo" />
+                                </a>
+                                <p class="mt-2 mb-3">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Quis non, fugit totam vel laboriosam vitae.</p>
+                                <div class="social-icons d-flex">
+                                    <a class="facebook" href="#">
+                                        <i class="fab fa-facebook-f"></i>
+                                        <i class="fab fa-facebook-f"></i>
+                                    </a>
+                                    <a class="twitter" href="#">
+                                        <i class="fab fa-twitter"></i>
+                                        <i class="fab fa-twitter"></i>
+                                    </a>
+                                    <a class="google-plus" href="#">
+                                        <i class="fab fa-google-plus-g"></i>
+                                        <i class="fab fa-google-plus-g"></i>
+                                    </a>
+                                    <a class="vine" href="#">
+                                        <i class="fab fa-vine"></i>
+                                        <i class="fab fa-vine"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <div class="footer-items">
+                                <h3 class="footer-title mb-2">@_Home.UsefulLinks</h3>
+                                <ul>
+                                    <li class="py-2"><a href="#">About Us</a></li>
+                                    <li class="py-2"><a href="#">Services</a></li>
+                                    <li class="py-2"><a href="@Url.Action("Index","TermsAndConditions")">@_Nav.TermsAndConditions</a></li>
+                                    <li class="py-2"><a href="@Url.Action("Index","PrivacyPolicy")">@_Nav.PrivacyPolicy</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <div class="footer-items">
+                                <h3 class="footer-title mb-2"></h3>
+                                <div class="button-group store-buttons store-black d-flex flex-wrap">
+                                    <a href="">
+                                        <img src="~/langingpage/img/icon/google-play-black.png" alt="@_Common.Download">
+                                    </a>
+                                    <a href="">
+                                        <img src="~/langingpage/img/icon/app-store-black.png" alt="@_Common.Download">
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="copyright-area d-flex flex-wrap justify-content-center justify-content-sm-between text-center py-4">
+                                <div class="copyright-left">@Html.Raw(string.Format(_Common.AllRightsResirved, DateTime.UtcNow.Year)) - @_Common.SiteName</div>
+                                <div class="copyright-right">@Html.Raw(_Common.BroughtToYouBy)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+        <!--====== Footer Area End ======-->
+    </div>
+
+
+    <!-- ***** All jQuery Plugins ***** -->
+    <!-- jQuery(necessary for all JavaScript plugins) -->
+    <script src="~/langingpage/js/jquery/jquery-3.3.1.min.js"></script>
+
+    <!-- Bootstrap js -->
+    <script src="~/langingpage/js/bootstrap/popper.min.js"></script>
+    <script src="~/langingpage/js/bootstrap/bootstrap.min.js"></script>
+
+    <!-- Plugins js -->
+    <script src="~/langingpage/js/plugins/plugins.min.js"></script>
+
+    <!-- Active js -->
+    <script src="~/langingpage/js/active.js"></script>
+    @if (isRtl)
+    {
+        <style>
+            @@import url('//fonts.googleapis.com/css?family=Cairo&display=swap');
+        </style>
+    }
+    else
+    {
+        <style>
+            @@import url('//fonts.googleapis.com/css?family=Poppins:300,400,500,600,700&display=swap');
+        </style>
+    }
+</body>
+</html>

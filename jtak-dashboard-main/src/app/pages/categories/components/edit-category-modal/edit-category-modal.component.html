@@ -1,0 +1,67 @@
+<app-edit-modal
+  [item]="item"
+  [itemName]="item.title"
+  moduleName="Category"
+  [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid"
+  (cancelClicked)="modal.dismiss()"
+  (saveClicked)="save()"
+>
+  <ng-container *ngIf="item">
+    <form class="form form-label-right" [formGroup]="formGroup">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="title">Title</label>
+            <app-input-container [control]="formGroup.controls.title">
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="title"
+                id="title"
+                placeholder="Enter title"
+                #input
+              />
+            </app-input-container>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="parentId">Parent Category</label>
+            <ng-select formControlName="parentId" placeholder="None — Main Category (تصنيف رئيسي)" [clearable]="true">
+              <ng-option *ngFor="let cat of parentCategories" [value]="cat.id">
+                {{ cat.title }}
+              </ng-option>
+            </ng-select>
+            <small class="text-muted d-block mt-1">Leave empty to show on Home Page as Main Category</small>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-8">
+            <label for="order">Display Order</label>
+            <input
+              type="number"
+              class="form-control form-control-solid"
+              formControlName="order"
+              id="order"
+              placeholder="0"
+            />
+            <small class="text-muted d-block mt-1">Order on Home (1, 2, 3...)</small>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <label class="checkbox checkbox-single pt-10">
+            <input type="checkbox" formControlName="active" />
+            <span class="mx-2 fs-5">isActive</span>
+          </label>
+        </div>
+        <div class="col-12">
+          <label>Category icon</label>
+          <app-file-uploader uploaderTitle="Choose category image" (fileUploaded)="onFileUploaded($event, 'icon')"></app-file-uploader>
+          <div class="edit-image-grid mt-3"><app-uploaded-image *ngIf="formGroup.get('icon')?.value" [imageId]="formGroup.get('icon')?.value" [dimensions]="{ width: 320, height: 180 }" (imageDeleted)="onFileDelete('icon')"></app-uploaded-image></div>
+        </div>
+      </div>
+    </form>
+  </ng-container>
+</app-edit-modal>

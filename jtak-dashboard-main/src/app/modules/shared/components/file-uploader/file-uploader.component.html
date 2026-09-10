@@ -1,0 +1,40 @@
+<input
+  type="file"
+  class="file-input"
+  (change)="onFileSelected($event)"
+  [accept]="requiredFileType"
+  #fileUpload
+  [multiple]="multiple"
+/>
+
+<div class="file-upload d-flex align-items-center mb-3">
+  <button
+    class="upload-btn btn btn-light"
+    (click)="fileUpload.click()"
+    type="button" aria-label="Choose file"
+  >
+    <span class="fas fa-upload"></span>
+  </button>
+
+  <div class="mx-4 w-100">
+    <span>{{ uploaderTitle || "No file uploaded yet." }}</span>
+    <div class="d-flex align-items-center">
+      <div class="progress progress-container mr-2" *ngIf="uploadProgress">
+        <div
+          class="progress-bar bg-success"
+          role="progressbar"
+          [style.width.%]="uploadProgress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        ></div>
+      </div>
+
+      <button type="button"
+        *ngIf="uploadProgress"
+        class="btn btn-icon btn-sm fas fa-times cursor-pointer mx-2"
+        aria-label="Cancel upload"
+        (click)="cancelUpload()"
+      ></button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,36 @@
+﻿@using App.Resources
+@model App.Models.AccountViewModels.LoginViewModel
+@{
+    ViewBag.Title = "Log in";
+    Layout = "~/Views/Shared/_LayoutPage.cshtml";
+}
+
+<div class="login-content">
+    <a style="width: 100%; text-align: center; display: inline-block;" href="@Url.Action("Index", "Dashboard")">
+        <img style="max-height: 150px;" src="~/images/zialogo.svg" alt="@_Common.SiteName" title="@_Common.SiteName">
+    </a>
+    <p class="text-center pv">@_Account.LoginTitle</p>
+
+    <form asp-action="Login" role="form" data-parsley-validate="" novalidate="" class="mb-lg">
+        <div class="form-group has-feedback">
+            <input asp-for="Email" type="email" placeholder="الإيميل" autocomplete="off" required="required" class="form-control" />
+            <span class="fa fa-envelope form-control-feedback text-muted"></span>
+        </div>
+        <div class="form-group has-feedback">
+            <input asp-for="Password" type="password" placeholder="كلمة السر" required="required" class="form-control" />
+            <span class="fa fa-lock form-control-feedback text-muted"></span>
+        </div>
+        <div class="clearfix">
+            <div class="checkbox c-checkbox pull-left mt0">
+                <label>
+                    <input asp-for="RememberMe" type="checkbox" value="" name="remember" />
+                    <span class="fa fa-check"></span>@_Account.RememberMe
+                </label>
+            </div>
+            <div class="pull-right">
+                <a href="@Url.Action("ForgotPassword")" class="text-muted">@_Account.ForgetYourPassword</a>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-block btn-primary mt-lg">@_Account.Login</button>
+    </form>
+</div>

@@ -1,0 +1,108 @@
+﻿@using App.Shared.Entities.Resources
+@using App.Resources
+@model App.Areas.Admin.Models.RoleVm
+<h3>
+    @_Nav.Roles
+</h3>
+<div class="container-fluid">
+    <div class="card card-default">
+        <div class="card-header">
+            <em class="fa fa-users p-2"></em> Manage Roles.
+        </div>
+        <div class="card-body">
+            <div class="col-lg-12">
+                @*
+                    <p>
+                        <a asp-action="Create" class="btn btn-primary" data-toggle="tooltip" title="@_Common.Create"><i class="fa fa-plus"></i></a>
+                    </p>
+                *@
+                <table id="datatable" class="table table-striped w-100">
+                    <thead>
+                        <tr>
+                            <th>@Html.DisplayNameFor(x => x.Name)</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>@_Common.LoadingData </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link href="~/lib/datatables-colvis/css/dataTables.colVis.css" rel="stylesheet" />
+    <link href="~/lib/datatables/media/css/dataTables.bootstrap.css" rel="stylesheet" />
+    <link href="~/lib/dataTables.fontAwesome/index.css" rel="stylesheet" />
+}
+
+@section Scripts {
+    <script src="~/js/sol.datatables.min.js"></script>
+    <script>
+        $(function() {
+            if (!$.fn.dataTable) return;
+
+            var dtInstance = $('#datatable').dataTable({
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                processing: true,
+                serverSide: true,
+                ajax: {url: "@Url.Action("Index")",type: "POST"},
+                'paging': true,
+                'ordering': true,
+                'info': true,
+                'responsive': true,
+                columns: [
+                    { name: 'Name', data: 'name', title: '@_AppUser.DisplayName', sortable: true, searchable: false },
+                    {
+                        name: 'actions',
+                        className: 'actionbuttons',
+                        data: null,
+                        title: '',
+                        width: '150px', sortable: false, searchable: false,
+                        render: function(data, type, row) {
+                            return data.name !== 'Admin'?`<div class="dt-buttons btn-group">
+                                <a href="@Url.Action("Permissions")/${data.id}" class="btn btn-outline-purple" data-toggle="tooltip" title="@_AppRole.RolePermissions"><i class="fa fa-lock"></i></a>
+                                </div>`:'';
+                        }
+                    }
+                ],
+                oLanguage: @Html.Raw(_Common.DataTablesLang),
+                dom: '<"html5buttons"B>lTfgtip',
+                buttons: [
+                    {
+                        extend: 'excel',
+                        className: 'btn-sm',
+                        title: $('title').text(),
+                        exportOptions: { columns: ':not(.actionbuttons)' }
+                    },
+                    { extend: 'copy', className: 'btn-sm', exportOptions: { columns: ':not(.actionbuttons)' } },
+                    { extend: 'csv', className: 'btn-sm', exportOptions: { columns: ':not(.actionbuttons)' } },
+                    {
+                        extend: 'pdf',
+                        className: 'btn-sm',
+                        title: $('title').text(),
+                        exportOptions: { columns: ':not(.actionbuttons)' }
+                    },
+                    { extend: 'print', className: 'btn-sm', exportOptions: { columns: ':not(.actionbuttons)' } }
+                ],
+                initComplete: function (settings, json) {
+                    $('#datatable [data-toggle="tooltip"]').tooltip({ container: 'body'});
+                },
+                stateSave: true
+            });
+
+
+            var inputSearchClass = 'datatable_input_col_search';
+            var columnInputs = $('tfoot .' + inputSearchClass);
+
+            // On input keyup trigger filtering
+            columnInputs.keyup(function() {
+                dtInstance.fnFilter(this.value, columnInputs.index(this));
+            });
+        });
+    </script>
+}

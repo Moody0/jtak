@@ -1,0 +1,142 @@
+﻿@using App.Extensions
+@using App.Resources
+@using Solf.Extensions
+@{
+    var RTLext = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft ? "-rtl" : "";
+    var RTLdir = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft ? "rtl" : "ltr";
+    var lang = System.Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName;
+}
+<!DOCTYPE html>
+<html lang="@(lang)" dir="@(RTLdir)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@_Common.SiteName</title>
+    @*<meta name="keywords" content="Speed of Light, Web">*@
+    <meta name="author" content="SOL Integrated Solutions">
+
+    <!-- FAVICON-->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="apple-touch-icon" sizes="57x57" href="/fav/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/fav/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/fav/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/fav/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/fav/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/fav/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/fav/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/fav/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/fav/apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/fav/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="/fav/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/fav/favicon-16x16.png">
+    <link rel="manifest" href="/fav/manifest.json">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="/fav/ms-icon-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <!-- Bundle -->
+    <link rel="stylesheet" href="/theme/vendor/css/bundle.min.css">
+    <!-- Plugin Css -->
+    <link rel="stylesheet" href="/theme/vendor/css/jquery.fancybox.min.css">
+    <link rel="stylesheet" href="/theme/vendor/css/owl.carousel.min.css">
+    <link rel="stylesheet" href="/theme/vendor/css/swiper.min.css">
+
+    <link rel="stylesheet" href="/theme/vendor/css/cubeportfolio.min.css">
+    <!-- Revolution Slider CSS Files -->
+    <link rel="stylesheet" href="/theme/css/navigation.css">
+    <link rel="stylesheet" href="/theme/css/settings.css">
+    <!-- Slick CSS Files -->
+    <link rel="stylesheet" href="/theme/vendor/css/slick.css">
+    <link rel="stylesheet" href="/theme/vendor/css/slick-theme.css">
+    <!-- Select -->
+    <link rel="stylesheet" href="/theme/vendor/css/select2.min.css">
+    <link rel="stylesheet" href="/theme/css/style@(RTLext).css">
+    <link rel="stylesheet" href="/theme/css/custom.css">
+
+    @if (IsSectionDefined("Styles"))
+    {@RenderSection("Styles", required: false)}
+</head>
+<body>
+    <div class="page-wrapper">
+        @await Html.PartialAsync("_Navbar")
+
+        @RenderBody()
+
+        <div class="main-footer text-center text-md-left">
+            <hr />
+            <div class="container-fluid">
+                <div class="row">
+                    <hr>
+                    <div class="col-md-6">
+                        <a href="/"><img style="padding:10px;height:55px;" src="/images/logodark.svg" alt="" title="@_Common.SiteName"></a>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="copyright float-md-right p-4">@Html.Raw(string.Format(_Common.AllRightsResirved, DateTime.UtcNow.Year)) - @_Common.SiteName</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/theme/vendor/js/bundle.min.js"></script>
+
+    <style>
+        @@font-face {
+            font-family: 'Bahij_TheSansArabic';
+            font-weight: 700;
+            src: url('/fonts/bahij/Bahij_TheSansArabic-Black.woff2') format('woff2');
+            unicode-range: U+0600-06FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE80-FEFC;
+        }
+
+        @@font-face {
+            font-family: 'Bahij_TheSansArabic';
+            font-weight: 300;
+            src: url('/fonts/bahij/Bahij_TheSansArabic-ExtraLight.woff2') format('woff2');
+            unicode-range: U+0600-06FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE80-FEFC;
+        }
+
+        @@font-face {
+            font-family: 'Bahij_TheSansArabic';
+            font-weight: 400;
+            src: url('/fonts/bahij/Bahij_TheSansArabic-Plain.woff2') format('woff2');
+            unicode-range: U+0600-06FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE80-FEFC;
+        }
+    </style>
+    <link href="//fonts.googleapis.com/css2?family=Raleway:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="//fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;700&display=swap" rel="stylesheet">
+    @RenderSection("scripts", required: false)
+    @Html.RenderScripts()
+
+    <link href="~/vendor/toastr/build/toastr.min.css" rel="stylesheet" />
+    <script src="~/vendor/toastr/build/toastr.min.js"></script>
+    @await Html.PartialAsync("_ToastrMsg")
+    <script>
+        function toggleDropdown(e) {
+            const _d = $(e.target).closest('.dropdown'),
+                _m = $('.dropdown-menu', _d);
+            setTimeout(function () {
+                const shouldOpen = e.type !== 'click' && _d.is(':hover');
+                _m.toggleClass('show', shouldOpen);
+                _d.toggleClass('show', shouldOpen);
+                $('[data-toggle="dropdown"]', _d).attr('aria-expanded', shouldOpen);
+            }, e.type === 'mouseleave' ? 300 : 0);
+        }
+
+        $('body')
+            .on('mouseenter mouseleave', '.dropdown', toggleDropdown)
+            .on('click', '.dropdown-menu a', toggleDropdown);
+    </script>
+    <!--End Google Map APi-->
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-138671847-2"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'UA-138671847-2');
+    </script>
+</body>
+</html>

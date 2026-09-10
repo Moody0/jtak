@@ -1,0 +1,14 @@
+﻿@using Solf
+@using App.Extensions
+
+@model String
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+}
+@if (Model != null)
+{
+    foreach (var s in Model.Split(','))
+    {
+        <img id="uploadIcon_@fieldName" src="@Url.ImgHref(s)" style="max-height: 100px; max-width: 100px;" />
+    }
+}

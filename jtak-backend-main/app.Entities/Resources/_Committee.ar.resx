@@ -1,0 +1,255 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Active" xml:space="preserve">
+    <value>مفعل</value>
+  </data>
+  <data name="AnnualPlan" xml:space="preserve">
+    <value>الخطة السنوية</value>
+  </data>
+  <data name="CleanStructure" xml:space="preserve">
+    <value>هيكلية اللجنة</value>
+  </data>
+  <data name="CommitteeActivities" xml:space="preserve">
+    <value>نشاطات اللجنة (المجالات التي يساهم الفريق ويعمل بها)</value>
+  </data>
+  <data name="CommitteeAudiance" xml:space="preserve">
+    <value>الفئة التي يعمل معها اللجنة</value>
+  </data>
+  <data name="CommitteeBlogPosts" xml:space="preserve">
+    <value>منشورات اللجنة</value>
+  </data>
+  <data name="CommitteeCreatedDate" xml:space="preserve">
+    <value>تاريخ التأسيس</value>
+  </data>
+  <data name="CommitteeDialogs" xml:space="preserve">
+    <value>حوارات اللجنة</value>
+  </data>
+  <data name="CommitteeEvents" xml:space="preserve">
+    <value>فعاليات اللجنة</value>
+  </data>
+  <data name="CommitteeGoals" xml:space="preserve">
+    <value>أهداف اللجنة</value>
+  </data>
+  <data name="CommitteeInitiatives" xml:space="preserve">
+    <value>مبادرات اللجنة</value>
+  </data>
+  <data name="CommitteeLeader" xml:space="preserve">
+    <value>قائد اللجنة</value>
+  </data>
+  <data name="CommitteeMemberCount" xml:space="preserve">
+    <value>عدد أعضاء الفريق (ذكور+إناث)</value>
+  </data>
+  <data name="CommitteeMembers" xml:space="preserve">
+    <value>الأعضاء</value>
+  </data>
+  <data name="CommitteePublications" xml:space="preserve">
+    <value>أوراق اللجنة البحثية</value>
+  </data>
+  <data name="CommitteeTeams" xml:space="preserve">
+    <value>فرق في نفس المنطقة</value>
+  </data>
+  <data name="CommitteeVMV" xml:space="preserve">
+    <value>رؤية ورسالة وقيم لجنة</value>
+  </data>
+  <data name="Contact" xml:space="preserve">
+    <value>التواصل مع لجنة</value>
+  </data>
+  <data name="Country" xml:space="preserve">
+    <value>مكان عمل لجنة</value>
+  </data>
+  <data name="CreateCommittee" xml:space="preserve">
+    <value>إنشاء لجنة</value>
+  </data>
+  <data name="ElectedLeader" xml:space="preserve">
+    <value>قائد منتخب</value>
+  </data>
+  <data name="Facebook" xml:space="preserve">
+    <value>فيسبوك</value>
+  </data>
+  <data name="GeneralContent" xml:space="preserve">
+    <value>محتوى عام - غير مرتبط بلجنة محدد</value>
+  </data>
+  <data name="Instagram" xml:space="preserve">
+    <value>إنستاغرام</value>
+  </data>
+  <data name="InternalLaw" xml:space="preserve">
+    <value>نظام داخلي للفريق</value>
+  </data>
+  <data name="IsJoinable" xml:space="preserve">
+    <value>انضمام مباشر (من دون انتخابات)</value>
+  </data>
+  <data name="IsLisenced" xml:space="preserve">
+    <value>مرخص</value>
+  </data>
+  <data name="JoinCommittee" xml:space="preserve">
+    <value>انضم للجنة</value>
+  </data>
+  <data name="LeaveCommittee" xml:space="preserve">
+    <value>غادر اللجنة</value>
+  </data>
+  <data name="LinkedIn" xml:space="preserve">
+    <value>لينكد إن</value>
+  </data>
+  <data name="Logo" xml:space="preserve">
+    <value>لوغو</value>
+  </data>
+  <data name="MakeElectable" xml:space="preserve">
+    <value>تفعيل الترشيح</value>
+  </data>
+  <data name="MakeJoinable" xml:space="preserve">
+    <value>تفعيل الإنضمام المباشر</value>
+  </data>
+  <data name="MoreInfo" xml:space="preserve">
+    <value>معلومات أكثر</value>
+  </data>
+  <data name="NoCommittees" xml:space="preserve">
+    <value>انتظرو لجاننا قريباً</value>
+  </data>
+  <data name="Overview" xml:space="preserve">
+    <value>سيتم إضافة المزيد من اللجان لاحقا</value>
+  </data>
+  <data name="Pending" xml:space="preserve">
+    <value>لقد تقدمت بطلب للإنضمام لهذا الفريق، سيتم مراجعة طلبك بأقرب وقت</value>
+  </data>
+  <data name="PhoneNumber" xml:space="preserve">
+    <value>رقم الهاتف</value>
+  </data>
+  <data name="Photo" xml:space="preserve">
+    <value>الصورة</value>
+  </data>
+  <data name="PromoVideoYoutube" xml:space="preserve">
+    <value>فيديو برومو يوتيوب</value>
+  </data>
+  <data name="ReElect" xml:space="preserve">
+    <value>إعادة الانتخابات</value>
+  </data>
+  <data name="Statictics" xml:space="preserve">
+    <value>إحصاءات اللجنة</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>اسم اللجنة</value>
+  </data>
+  <data name="Twitter" xml:space="preserve">
+    <value>تويتر</value>
+  </data>
+  <data name="WhatsApp" xml:space="preserve">
+    <value>وتس أب</value>
+  </data>
+</root>

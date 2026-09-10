@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="11.0.1" />
+    <PackageReference Include="FirebaseAdmin" Version="2.3.0" />
+    <PackageReference Include="MaxMind.GeoIP2" Version="5.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="6.0.6" />
+    <PackageReference Include="Microsoft.AspNetCore.Hosting" Version="2.2.7" />
+    <PackageReference Include="Microsoft.AspNetCore.Hosting.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Localization" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
+    <PackageReference Include="SendGrid" Version="9.28.0" />
+    <PackageReference Include="Twilio" Version="5.75.3" />
+    <PackageReference Include="URF.Core.Abstractions" Version="6.0.1" />
+    <PackageReference Include="URF.Core.Services" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\App.Data\App.Shared.Data.csproj" />
+    <ProjectReference Include="..\App.Entities\App.Shared.Entities.csproj" />
+    <ProjectReference Include="..\Modules\Catalog\Modules.Catalog.Entities\Modules.Catalog.Entities.csproj" />
+    <ProjectReference Include="..\Modules\Orders\Modules.Orders.Data\Modules.Orders.Data.csproj" />
+    <ProjectReference Include="..\Modules\Orders\Modules.Orders.Entities\Modules.Orders.Entities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Cache\" />
+    <Folder Include="Resources\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Solf">
+      <HintPath>..\Solf\Solf.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

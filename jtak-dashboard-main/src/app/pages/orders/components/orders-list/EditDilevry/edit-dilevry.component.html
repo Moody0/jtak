@@ -1,0 +1,21 @@
+<app-edit-modal
+  [item]="item"
+  [itemName]="item.deliveryUser"
+  moduleName="deliveryUser"
+  [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid"
+  (cancelClicked)="modal.dismiss()"
+  (saveClicked)="saved()"
+>
+  <form class="form form-label-right" [formGroup]="formGroup">
+    <ng-container  >
+      <ng-select  formControlName="uid"
+      [items]="deliviries"
+      [(ngModel)]="item.deliveryId"
+      bindLabel="fullName"
+      bindValue="id"
+      >
+      </ng-select>
+    </ng-container>
+  </form>
+</app-edit-modal>

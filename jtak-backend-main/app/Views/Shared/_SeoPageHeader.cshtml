@@ -1,0 +1,29 @@
+@using App.Resources
+@using App.Extensions
+@using App.Shared.Entities.Enums
+@using Solf.Enums
+
+@model App.Models.SeoPageHeader
+
+<style scoped>
+header { background-image: url( @Html.Raw(Url.ImgHref(Model.MobileHeaderImage?? Model.HeaderImage, 1024,1024,true)) ); }
+@@media (min-width: 1024px) { header { background-image: url( @Html.Raw(Url.ImgHref(Model.HeaderImage,1920,0,false)) ); } }
+@@media (min-width: 1921px) { header { background-image: url( @Html.Raw(Url.ImgHref(Model.HeaderImage,2560,0,false)) ); } }
+</style>
+<header class="d-flex align-items-stretch hero-50-height" style="height: 50vh;margin-top:75px; background-position: center; background-repeat: no-repeat; background-size: cover;">
+    <div class="container d-flex">
+        <div class="d-flex align-items-center justify-content-between flex-fill">
+            <div class="flex-fill">
+                <h1 class="blue-title">@Model.SeoTitle</h1>
+                @if (Model.SubTitle != null)
+                {
+                    <h2 class="subtitles">@Model.SubTitle</h2>
+                }
+                @if (Model.SubTitle2 != null)
+                {
+                    <h2 class="subtitles">@Model.SubTitle2</h2>
+                }
+            </div>
+        </div>
+    </div>
+</header>

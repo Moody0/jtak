@@ -1,0 +1,30 @@
+@using Solf.Extensions
+@model List<Solf.Enums.CountryEnum>
+@{
+    var returnuUrl = ($"{Context.Request.Scheme}://{Context.Request.Host}{Context.Request.Path}{Context.Request.QueryString}");
+}
+@foreach (var c in Model)
+{
+<a href="@Url.Action("ChangeCountry","Dashboard", new {id = c, area=""})?returnUrl=@returnuUrl" class="list-group-item">
+    <div class="media-box">
+        <div class="pull-left">
+            <span class="flag-icon flag-icon-@c.ToString().ToLower()"></span>
+        </div>
+        @if(c == ViewBag.CurrentCountry){
+            <div class="pull-right">
+                <span class="fa fa-check text-success"></span>
+            </div>
+        }
+        <div class="media-box-body clearfix">
+            <p class="m0">@c.ToLocalizedName()</p>
+        </div>
+    </div>
+</a>
+}
+@*
+    <!-- last list item -->
+    <a href="#" class="list-group-item">
+        <small>More countires</small>
+        <em class="fa fa-plus pull-right text-success"></em>
+    </a>
+*@

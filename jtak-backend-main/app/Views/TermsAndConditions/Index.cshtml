@@ -1,0 +1,21 @@
+﻿@using App.Resources
+
+@{
+    Layout = "_LayoutTheme";
+    ViewBag.Title = _Nav.TermsAndConditions;
+}
+@model App.Models.Pages.TermsAndConditionsPageVm
+
+@{await Html.RenderPartialAsync("_SeoPageHeader", new App.Models.SeoPageHeader
+    {
+        HeaderImage = Model?.HeaderImage,
+        MobileHeaderImage = Model?.MobileHeaderImage,
+        SeoTitle = _Nav.TermsAndConditions,
+        SubTitle = Model.SubTitle
+    });}
+
+<section class="auto-container" style="padding-top:40px;padding-bottom:80px;">
+    <article class="container" style="padding:50px 0;">
+        @Html.Raw(Model?.Body)
+    </article>
+</section>

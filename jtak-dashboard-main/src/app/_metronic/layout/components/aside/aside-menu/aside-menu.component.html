@@ -1,0 +1,11 @@
+<nav class="jtak-nav" aria-label="Main navigation">
+  <section class="jtak-nav-group" *ngFor="let group of applicationMenuGroups">
+    <div class="menu-content jtak-nav-label">{{ group.label }}</div>
+    <div class="menu-item" *ngFor="let item of group.items">
+      <a class="menu-link without-sub" [routerLink]="'/' + item.path" routerLinkActive="active">
+        <span class="menu-icon" aria-hidden="true"><span [class]="item.icon"></span></span>
+        <span class="menu-title" [translate]="item.label"></span>
+      </a>
+    </div>
+  </section>
+</nav>

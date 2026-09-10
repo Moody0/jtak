@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="URF.Core.Services" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\App.Services\App.Shared.Services.csproj" />
+    <ProjectReference Include="..\Modules.Catalog.Data\Modules.Catalog.Data.csproj" />
+    <ProjectReference Include="..\Modules.Catalog.Entities\Modules.Catalog.Entities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Solf">
+      <HintPath>..\..\..\Solf\Solf.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

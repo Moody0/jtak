@@ -1,0 +1,26 @@
+﻿@using Solf
+@using App.Extensions
+@model String
+@{
+    var ext = System.IO.Path.GetExtension(Model?.ToLower());
+    var downloadLink = (bool?)ViewData["downloadLink"];
+    var w = Convert.ToInt32(ViewData["w"] ?? "100");
+    var h = Convert.ToInt32(ViewData["h"] ?? "100");
+    var crop = Convert.ToBoolean(ViewData["crop"] ?? "true");
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+}
+@if (downloadLink == true)
+{
+    <a href="@Url.DownloadHref(Model)" target="_blank" class="btn btn-primary"><span class="fa fa-download"></span> @_Common.Download</a>
+}
+else if (ext != ".pdf")
+{
+    <img id="uploadIcon_@fieldName" src="@Url.ImgHref(Model, w, h, crop)" style="width: @ViewData["width"]" class="@ViewData["class"]" />
+}
+else
+{
+    <iframe src="/ViewerJS/index.html#@Url.DownloadHref(Model)" style="width:100%; height:800px;" frameborder="0"></iframe>
+    @*
+        <iframe src="https://docs.google.com/gview?url=@r@Url.DownloadHref(Model)&embedded=true" style="width:100%; height:800px;" frameborder="0"></iframe>
+    *@
+}

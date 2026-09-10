@@ -1,0 +1,119 @@
+.iti {
+  width: 100%;
+}
+
+
+.iti__hide {
+  display: none; }
+
+pre {
+  margin: 0 !important;
+  display: inline-block; }
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string,
+.token.variable {
+  background: none; }
+
+input {
+  height: 35px;
+  margin: 0;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 100%;
+  color: inherit; }
+  input[disabled] {
+    background-color: #eee; }
+
+textarea{
+margin: 0;
+padding: 6px 12px;
+font-family: inherit;
+font-size: 100%;
+color: inherit; }
+
+input, select, textarea {
+  border: 1px solid #CCC;
+  width: 250px; }
+
+::-webkit-input-placeholder {
+  color: #BBB; }
+
+::-moz-placeholder {
+  /* Firefox 19+ */
+  color: #BBB;
+  opacity: 1; }
+
+:-ms-input-placeholder {
+  color: #BBB; }
+
+
+
+#result {
+  margin-bottom: 100px; }
+
+
+
+
+  .iti__flag-container {
+    padding: 0px;
+  }
+  input,
+  textarea,
+  .iti--allow-dropdown input,
+  .iti--allow-dropdown input[type='text'],
+  .iti--allow-dropdown input[type='tel'],
+  .iti--separate-dial-code input,
+  .iti--separate-dial-code input[type='text'],
+  .iti--separate-dial-code input[type='tel'] {
+    box-shadow: 3px 3px #0b2e5c;
+    border-radius: 0;
+    border-color: #0b2e5c;
+    transition-duration: 400ms;
+    width: 100%;
+  }
+
+  textarea:focus,
+  input:focus,
+  .iti--allow-dropdown input:focus,
+  .iti--allow-dropdown input[type='text']:focus,
+  .iti--allow-dropdown input[type='tel']:focus,
+  .iti--separate-dial-code input:focus,
+  .iti--separate-dial-code input[type='text']:focus,
+  .iti--separate-dial-code input[type='tel']:focus {
+    box-shadow: 5px 5px #f2a20c;
+    border-color: #f2a20c !important;
+  }
+  textarea:focus-visible,
+  input:focus-visible,
+  .iti--allow-dropdown input:focus-visible,
+  .iti--allow-dropdown input[type='text']:focus-visible,
+  .iti--allow-dropdown input[type='tel']:focus-visible,
+  .iti--separate-dial-code input:focus-visible,
+  .iti--separate-dial-code input[type='text']:focus-visible,
+  .iti--separate-dial-code input[type='tel']:focus-visible {
+    outline: none;
+  }
+
+  .iti--separate-dial-code .iti__selected-flag {
+    color: #ffffff;
+    background-color: #0b2e5c;
+    transition-duration: 400ms;
+  }
+  .iti--allow-dropdown .iti__flag-container:hover .iti__selected-flag {
+    background-color: #f2a20c;
+  }
+  .iti__arrow {
+    border-top-color: #ffffff;
+  }
+  .iti__arrow.iti__arrow--up {
+    border-top-color: transparent;
+    border-bottom-color: #ffffff;
+  }
+  .hide {
+    display: none;
+  }
+

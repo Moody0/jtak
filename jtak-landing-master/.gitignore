@@ -1,0 +1,8 @@
+.DS_Store
+node_modules
+.cache
+dist
+dist.7z
+
+.parcel-cache
+src/assets/css/index.css

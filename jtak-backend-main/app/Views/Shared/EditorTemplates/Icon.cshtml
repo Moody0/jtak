@@ -1,0 +1,20 @@
+﻿@using App.Extensions
+@model String
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+
+}
+
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <div class="input-group iconpicker-container">
+        <input asp-for="@Model" type="text" class="form-control" />
+        <span class="input-group-addon"><i class="fa @Model"></i></span>
+    </div>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+<link href="~/lib/fontawesome-iconpicker/dist/css/fontawesome-iconpicker.min.css" rel="stylesheet" />
+<script src="~/lib/fontawesome-iconpicker/dist/js/fontawesome-iconpicker.min.js"></script>
+<script>
+    $('#@fieldName').iconpicker();
+</script>

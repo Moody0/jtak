@@ -1,0 +1,15 @@
+<button
+  type="submit"
+  id="kt_login_signin_submit"
+  class="btn btn-primary btn-elevate font-weight-bolder font-size-h6 px-8 py-4 my-3 mr-3 btn-block"
+  [disabled]="disabled"
+>
+  <ng-container *ngIf="isLoading; else text">
+    <span
+      class="spinner spinner-light ml-5 text-center"
+      style="margin-left: -1rem !important"
+    ></span>
+  </ng-container>
+
+  <ng-template #text>{{ label }}</ng-template>
+</button>

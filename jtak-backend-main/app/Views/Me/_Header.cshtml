@@ -1,0 +1,20 @@
+﻿@using App.Resources
+@using App.Views.Manage
+
+@using App.Shared.Entities
+@{
+    Layout = null;
+}
+@model UserDto
+<section class="profile-header pb-0" style="background-color:#fbfbfb">
+    <div class="container">
+        <div class="row h-100 justify-content-center justify-content-md-start align-items-center">
+            <div>
+                @Html.EditorFor(x => x.ProfilePhoto)
+            </div>
+            <div class="flex-fill">
+                <h2 class="justify-content-start">@Model.FullName</h2>
+            </div>
+        </div>
+    </div>
+</section>

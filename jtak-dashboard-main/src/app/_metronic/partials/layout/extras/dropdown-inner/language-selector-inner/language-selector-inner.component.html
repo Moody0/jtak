@@ -1,0 +1,24 @@
+<div ngbDropdown 
+class="d-flex align-items-center"
+ [autoClose]="true" 
+[ngClass]="toolbarButtonMarginClass"
+style="position: initial !important;">
+  <div ngbDropdownToggle class="btn btn-icon btn-active-light-primary position-relative w-30px h-30px w-md-40px h-md-40px" data-toggle="dropdown">
+      <span [inlineSVG]="language.flag" [ngClass]="toolbarButtonIconSizeClass" class="svg-icon"></span>
+  </div>
+  <div ngbDropdownMenu class="dropdown-menu p-0 m-0 dropdown-menu-anim-up dropdown-menu-sm dropdown-menu-right">
+    <ul class="navi navi-hover p-4" style="list-style-type: none;">
+      <ng-container *ngFor="let language of languages">
+        <li class="navi-item" [ngClass]="{ active: language.active }">
+          <a href="javascript:;" (click)="setLanguageWithRefresh(language.lang)" [ngClass]="{ active: language.active }"
+            class="navi-link">
+            <span class="symbol symbol-20 mr-3">
+              <img src="{{ language.flag }}" class="svg-icon w-30px h-30px m-2"/>
+            </span>
+            <span class="navi-text">{{ language.name }}</span>
+          </a>
+        </li>
+      </ng-container>
+    </ul>
+  </div>
+</div>

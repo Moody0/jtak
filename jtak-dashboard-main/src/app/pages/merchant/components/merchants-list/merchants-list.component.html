@@ -1,0 +1,101 @@
+<div class="card card-custom gutter-b">
+  <div class="card-header">
+    <div class="card-title">
+      <div><h3 class="card-label">Merchants</h3><span class="card-subtitle">Manage partners, stores, and catalog access.</span></div>
+    </div>
+    <div class="card-toolbar">
+      <button type="button" class="btn btn-primary" (click)="create()">
+        <i class="fas fa-plus"></i> Add merchant
+      </button>
+    </div>
+  </div>
+  <div class="card-body">
+    <!-- begin: Filtration form -->
+    <div class="form form-label-right">
+      <div class="form-group row">
+        <div class="col-lg-2" [formGroup]="searchGroup">
+          <input
+            type="text"
+            class="form-control"
+            name="searchText"
+            placeholder="Search merchants"
+            formControlName="searchTerm"
+          />
+        </div>
+      </div>
+    </div>
+    <!-- end: Filtration form -->
+    <ng-container *ngIf="service.items$ | async as items">
+      <div class="bulk-action-bar" *ngIf="selection.count > 0">
+        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
+        <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'merchants')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
+      </div>
+    </ng-container>
+
+    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="service.items$ | async as items">
+      <table
+        class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
+      >
+      <thead>
+        <tr>
+        <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all merchants on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
+        <th scope="col">Name / Market</th>
+        <th scope="col">Phone</th>
+        <th scope="col">Type</th>
+        <th scope="col">Status</th>
+        <th scope="col" style="width: 180px;">ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let merchant of items" [class.table-row-selected]="selection.isSelected(merchant)">
+          <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(merchant)" [attr.aria-label]="'Select ' + merchant.title" (change)="selection.toggle(merchant, $any($event.target).checked)" /></td>
+          <td>
+            <div>
+              <span class="text-dark fw-bolder fs-6">{{ merchant.title }}</span>
+              <span class="text-muted d-block fs-7" *ngIf="merchant.shortDescription">{{ merchant.shortDescription }}</span>
+            </div>
+          </td>
+          <td>{{ merchant.phone1 }}</td>
+          <td>
+            <span
+              class="badge"
+              [ngClass]="{'badge-light-primary': merchant.merchantKind === 1, 'badge-light-success': merchant.merchantKind === 2, 'badge-light-warning': merchant.merchantKind === 3, 'badge-light-info': !merchant.merchantKind}"
+            >
+              {{ merchantKindLabel(merchant) }}
+            </span>
+          </td>
+          <td>
+            <span
+              class="badge"
+              [ngClass]="{'badge-light-success': merchant.active,'badge-warning': !merchant.active}"
+            >
+              {{ merchant.active ? "Active" : "Disabled" }}
+            </span>
+          </td>
+          <td>
+            <app-table-actions
+              (editClicked)="edit(merchant)"
+              (deleteClicked)="delete(merchant.id)"
+              [showDeleteButton]="true"
+            ></app-table-actions>            
+            <a
+              [routerLink]="['/merchants', merchant.id, 'overview']"
+              (click)="rememberMerchant(merchant)"
+              class="btn btn-sm btn-primary merchant-manage-link"
+            >
+              Manage <i class="fas fa-arrow-right"></i>
+            </a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- end: Table -->
+
+  <app-paginator
+    class="d-flex justify-content-between align-items-center flex-wrap"
+    [paginator]="paginator"
+    [isLoading]="isLoading"
+    (paginate)="paginate($event)"
+  ></app-paginator>
+</div>

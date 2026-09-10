@@ -1,0 +1,23 @@
+﻿@using App.Extensions
+@model DateTime?
+@{
+    var defaultHtmlAttributesObject = new
+    {@@class = "ltr"
+};
+
+}
+
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <div class="input-group date date-time-picker">
+        @Html.TextBoxFor(model => model, "{0:g}", defaultHtmlAttributesObject)
+        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+    </div>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+
+@Html.Script(@<script>
+    $(document).ready(function () {
+        $('#@Html.IdFor(model=>model)').removeAttr("data-val-date");
+    });
+</script>)

@@ -1,0 +1,8 @@
+<app-delete-modal
+moduleName="Merchant"
+title="Delete"
+[isLoading]="service.isLoading$ | async"
+(cancelClicked)="modal.dismiss()"
+(deleteClicked)="this.delete()"
+>
+</app-delete-modal>

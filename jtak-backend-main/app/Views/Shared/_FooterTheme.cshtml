@@ -1,0 +1,62 @@
+﻿@using App.Resources
+@using App.Shared.Entities.Enums
+@using Solf.Enums
+@using App.Areas.Admin.Models;
+@using System.Globalization
+
+@inject App.Shared.Services.IGenericSettingService _settings
+
+@{
+    var setting = await _settings.GetValue<SettingsVm>("SettingsVm", System.Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName) ?? new SettingsVm();
+}
+<footer class="bg-dark pt-5 text-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-5">
+                <a href="/">
+                    <img style="height:80px;padding-bottom:20px;" class="lazy loaded" alt="" title="" data-ll-status="loaded" src="/images/logo-white.svg">
+                </a>
+                <p class="text-light">
+                    @setting.FooterNote
+                <p>
+            </div>
+            <div class="col-md-3">
+                <div class="pb-2">@_Home.UsefulLinks</div>
+                <ul>
+                    <li><a href="@Url.Action("Index","Contact",new { area = "" })">@_Nav.Contact</a></li>
+                    <li><a href="@Url.Action("Index","TermsAndConditions",new { area = "" })">@_Nav.TermsAndConditions</a></li>
+                    <li><a href="@Url.Action("Index","PrivacyPolicy",new { area = "" })">@_Nav.PrivacyPolicy</a></li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <div class="pb-2">@_Home.FollowUs</div>
+                <div class="address-social">
+                    <ul class="list-unstyled">
+                        <li><a class="facebook-bg-hvr ml-0" href="@(_settings.GetValue<string>("FacebookLink"))"><i class="fab fa-facebook-f" aria-hidden="true"></i></a></li>
+                        <li><a class="twitter-bg-hvr" href="@(_settings.GetValue<string>("TwitterLink"))"><i class="fab fa-twitter" aria-hidden="true"></i></a></li>
+                        <li><a class="linkedin-bg-hvr" href="@(_settings.GetValue<string>("LinkedInLink"))"><i class="fab fa-linkedin-in" aria-hidden="true"></i></a></li>
+                        <li><a class="instagram-bg-hvr mr-0" href="@(_settings.GetValue<string>("InstagramLink"))"><i class="fab fa-instagram" aria-hidden="true"></i></a></li>
+                    </ul>
+                </div>
+                <div class="pb-2">@_Home.SiteInOtherLangs </div>
+                <div>
+                    @{
+                        var otherCulture = new System.Globalization.CultureInfo[] { new CultureInfo("ar"), new CultureInfo("en") }.FirstOrDefault(x => x.TwoLetterISOLanguageName != System.Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName);
+                    }
+
+                    <ul class="list-unstyled">
+                        <li class="nav-item"> <a href="@Url.Action("ChangeLanguage","Dashboard", new{area="",id = otherCulture.Name, returnurl = $"{Context.Request.Path}{Context.Request.QueryString}" })" class="nav-link"> @otherCulture.NativeName </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <div class="copyright-area d-flex flex-wrap justify-content-center justify-content-sm-between text-center py-4">
+                    <div class="copyright-left">@Html.Raw(string.Format(_Common.AllRightsResirved, DateTime.UtcNow.Year)) - @_Common.SiteName</div>
+                    <div class="copyright-right d-none">@Html.Raw(_Common.BroughtToYouBy)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>

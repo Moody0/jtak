@@ -1,0 +1,22 @@
+﻿@using App.Shared.Entities
+@using App.Resources
+@using App.Helpers
+
+@model UserDto
+
+<div class="profile-nav col-lg-3">
+    <ul class="mt-md-4" style="background-color:#fbfbfb">
+        <li class="@Html.isActive("Index,Edit,ChangePassword","Me")">
+            <a href="@Url.Action("Index","Me", new {area = ""})">
+                <i class="fa fa-user p-1" style="width:29px !important;text-align:center;"></i>
+                @_Account.MyAccount
+            </a>
+        </li>
+        <li class="@Html.isActive("Notifications","Me")">
+            <a href="@Url.Action("Notifications","Me", new {area = ""})">
+                <i class="fa fa-bell p-1" style="width:29px !important;text-align:center;"></i>
+                @_Nav.Notifications
+            </a>
+        </li>
+    </ul>
+</div>

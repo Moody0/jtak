@@ -1,0 +1,69 @@
+﻿@using App.Extensions
+@model string
+@{
+    var latitudeVal = "40.986189";
+    var longitudeVal = "28.9898774";
+
+    if (Model != null && Model.IndexOf(',') > 0)
+    {
+        latitudeVal = Model.Split(',')[0];
+        longitudeVal = Model.Split(',')[1];
+    }
+
+    var guid = Guid.NewGuid().ToString("N");
+
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+
+    var locationSearchId = fieldName + "_LocationSearch";
+    var latInputId = fieldName + "_Latitude";
+    var longInputId = fieldName + "_Longitude"; // or you can  use Html.Id("Longitude")
+    var showLabel = Convert.ToBoolean(ViewData["showLabel"] ?? "True");
+}
+
+@Html.Hidden("Latitude")
+@Html.Hidden("Longitude")
+
+
+
+<div class="form-group">
+    @if (showLabel)
+    {
+        <label asp-for="@Model" class="control-label"></label>
+    }
+    <div class="">
+        @Html.HiddenFor(model => model)
+        @*@Html.TextBox("LocationSearch", string.Empty, htmlAttributes)*@
+        <div id="map-div-@guid" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
+        <span asp-validation-for="@Model" class="text-danger"></span>
+    </div>
+</div>
+
+
+@Html.Script(@<script src="https://maps.google.com/maps/api/js?key=AIzaSyBk2cKUejJ6r1R4juhCF4DKpelMc-twebU&sensor=false&libraries=places"></script>)
+@Html.Script(@<script src="~/vendor/jquery-locationpicker/dist/locationpicker.jquery.js"></script>)
+
+@Html.Script(
+    @<script type="text/javascript">
+        $('#@Html.IdFor(model => model)').val("@latitudeVal,@longitudeVal");
+
+        $(function () {
+            $('#map-div-@guid').locationpicker({
+                location: {
+                    latitude: '@latitudeVal',
+                    longitude: '@longitudeVal'
+                },
+                radius: 0,
+                zoom: 10,
+                inputBinding: {
+                    latitudeInput: $('#@latInputId'),
+                    longitudeInput: $('#@longInputId'),
+                    //locationNameInput: $('#@locationSearchId')
+                },
+                enableAutocomplete: true,
+                onchanged: function (currentLocation, radius, isMarkerDropped) {
+                    $('#@Html.IdFor(model => model)').val(currentLocation.latitude + "," + currentLocation.longitude);
+                }
+            });
+
+        });
+    </script>)

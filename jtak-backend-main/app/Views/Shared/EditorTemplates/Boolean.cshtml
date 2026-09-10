@@ -1,0 +1,10 @@
+﻿@model Boolean
+@{ 
+    var defaultHtmlAttributesObject = new {@@class = "form-control"};
+}
+<div class="checkbox c-checkbox">
+    <label class="control-label" style="color:@ViewData["color"]">
+        @Html.CheckBoxFor(model => model, defaultHtmlAttributesObject)
+        <span class="fa fa-check"></span> @Html.DisplayNameFor(model => model) @ViewData["append"]
+    </label>
+</div>

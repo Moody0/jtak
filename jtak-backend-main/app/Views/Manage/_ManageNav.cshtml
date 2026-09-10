@@ -1,0 +1,37 @@
+﻿@using App.Helpers
+@using App.Shared.Entities
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<AppUser> SignInManager
+@{
+    var hasExternalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).Any();
+}
+@*
+    <ul class="nav nav-pills nav-stacked">
+        <li class="@Html.isActive(controllers: "Manage",actions:"Index")"><a asp-action="Index">Profile</a></li>
+        <li class="@Html.isActive(controllers: "Manage",actions:"ChangePassword")"><a asp-action="ChangePassword">Password</a></li>
+        @if (hasExternalLogins)
+        {
+            <li class="@Html.isActive(controllers: "Manage",actions:"ExternalLogins")"><a asp-action="ExternalLogins">External logins</a></li>
+        }
+        <li class="@Html.isActive(controllers: "Manage",actions:"TwoFactorAuthentication")"><a asp-action="TwoFactorAuthentication">Two-factor authentication</a></li>
+    </ul>
+*@
+<ul role="tablist" class="nav nav-tabs">
+    <li class="@Html.isActive(controllers: "Manage",actions:"Index")">
+        <a asp-action="Index">Profile</a>
+    </li>
+    <li class="@Html.isActive(controllers: "Manage",actions:"ChangePassword")">
+        <a asp-action="ChangePassword">Password</a>
+    </li>
+    @if (hasExternalLogins)
+    {
+        <li class="@Html.isActive(controllers: "Manage",actions:"ExternalLogins")">
+            <a asp-action="ExternalLogins">External logins</a>
+        </li>
+    }
+    @*
+        <li class="@Html.isActive(controllers: "Manage",actions:"TwoFactorAuthentication")">
+            <a asp-action="TwoFactorAuthentication">Two-factor authentication</a>
+        </li>
+    *@
+</ul>

@@ -1,0 +1,17 @@
+<div class="d-flex flex-wrap py-2">
+  <ng-pagination [collectionSize]="paginator.total" [(page)]="paginator.page" [maxSize]="4"
+    [rotate]="true" [boundaryLinks]="true" [pageSize]="paginator.pageSize"
+    (pageChange)="pageChange($event)"></ng-pagination>
+</div>
+<div class="d-flex align-items-center py-2">
+  <div class="d-flex align-items-center me-3" *ngIf="isLoading" role="status">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    <span class="text-muted">Loading…</span>
+  </div>
+  <label class="visually-hidden" for="page-size">Rows per page</label>
+  <select id="page-size" class="form-select form-select-sm me-3" style="width: 76px"
+    [(ngModel)]="paginator.pageSize" (change)="sizeChange()">
+    <option *ngFor="let ps of pageSizes" [value]="ps">{{ ps }}</option>
+  </select>
+  <span class="react-bootstrap-table-pagination-total">Page {{ paginator.page }} · {{ paginator.total }} total</span>
+</div>

@@ -1,0 +1,19 @@
+<div class="img-container" *ngIf="imageId">
+  <img
+    class="img-fluid image"
+    [src]="filesService.getFile(imageId, dimensions.width, dimensions.height)"
+    [alt]="imageId"
+    [style.max-width.px]="dimensions?.width || 320"
+    [style.max-height.px]="dimensions?.height || 180"
+    style="object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc;"
+  />
+  <button
+    *ngIf="showDeleteButton"
+    class="close-button btn btn-danger"
+    (click)="onDeleteImageClicked()"
+    type="button"
+    title="Delete image"
+  >
+    <span class="fas fa-times"></span>
+  </button>
+</div>

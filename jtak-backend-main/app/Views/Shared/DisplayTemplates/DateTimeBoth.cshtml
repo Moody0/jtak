@@ -1,0 +1,11 @@
+﻿@using Solf.Extensions
+
+@model DateTime?
+
+@{
+    var d = Model.HasValue ? (DateTime?)DateTime.SpecifyKind(Model.Value, DateTimeKind.Utc).ToLocalTime() : null;
+}
+@if (d.HasValue)
+{
+    <span data-utcdate="@Model.Value.ToString("O")"></span>
+}

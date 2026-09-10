@@ -1,0 +1,94 @@
+<app-edit-modal
+  [item]="item"
+  [itemName]="item.toUser"
+  moduleName="Payment"
+  [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid"
+  (cancelClicked)="modal.dismiss()"
+  (saveClicked)="save()"
+>
+  <ng-container *ngIf="item">
+    <form class="form form-label-right" [formGroup]="formGroup">
+      <div class="row">
+
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="byUser">By Delivery</label>
+            <ng-select placeholder="Select Deliveries" formControlName="byUser"
+            (change)="changedDelivery($event)">
+              <ng-option [value]="i" *ngFor="let i of deliveries">
+                {{ i.fullName }}
+              </ng-option>
+            </ng-select>
+            <span *ngIf="deliveryBalance !== 0">Balance: {{deliveryBalance}}</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="toUser">To Merchant</label>
+            <ng-select placeholder="Select Merchant" formControlName="toUser"
+            (change)="changedMerchant($event)">
+              <ng-option [value]="i" *ngFor="let i of merchants">
+                {{ i.fullName }}
+              </ng-option>
+            </ng-select>
+            <span *ngIf="merchantBalance !== 0">Balance: {{merchantBalance}}</span>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="amount">Amount</label>
+            <app-input-container [control]="formGroup.controls.amount">
+              <input
+                type="number"
+                class="form-control form-control-solid"
+                formControlName="amount"
+                id="amount"
+                placeholder="Enter amount"
+                #input
+              />
+            </app-input-container>
+          </div>
+        </div>
+        <div>
+          <span class="badge badge-warning">
+            عند إضافة دفعة أنت تقر باستلامك لكامل الرصيد من السائق، وتسليمه المبلغ المكتوب كعهده ليسلمها إلى التاجر.
+          </span>
+        </div>
+<!-- 
+        <div class="col-md-4">
+            <div class="mb-8">
+              <label for="newBalance">New Balance</label>
+              <app-input-container [control]="formGroup.controls.newBalance">
+                <input
+                  type="number"
+                  class="form-control form-control-solid"
+                  formControlName="newBalance"
+                  id="newBalance"
+                  placeholder="Enter new balance"
+                  #input
+                />
+              </app-input-container>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="mb-8">
+              <label for="handoverDate">Hand over date</label>
+              <app-input-container [control]="formGroup.controls.handoverDate">
+                <input
+                  type="date"
+                  class="form-control form-control-solid"
+                  formControlName="handoverDate"
+                  id="handoverDate"
+                  placeholder="Enter hand over date"
+                  #input
+                />
+              </app-input-container>
+            </div>
+          </div> -->
+
+      </div>
+    </form>
+  </ng-container>
+</app-edit-modal>

@@ -1,0 +1,50 @@
+﻿@using App.Extensions
+@model DateTime?
+@{
+    var guid = Guid.NewGuid().ToString();
+    // https://tempusdominus.github.io/bootstrap-4/Usage/
+}
+
+<input asp-for="@Model" type="hidden">
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <div class="input-group date" id="@(guid)" data-target-input="nearest">
+        <input type="text" class="form-control datetimepicker-input" data-target="#@(guid)">
+        <div class="input-group-append" data-target="#@(guid)" data-toggle="datetimepicker">
+            <div class="input-group-text"><i class="fa fa-calendar"></i></div>
+        </div>
+    </div>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+
+@Html.Script(@<script>
+    $(function () {
+        $('#@(guid)').removeAttr("data-val-date");
+
+        if ($.fn.datetimepicker) {
+            $('#@(guid)').datetimepicker({
+                locale: window.currentLocal,
+                icons: {
+                    time: 'far fa-clock',
+                    date: 'fa fa-calendar',
+                    up: 'fa fa-chevron-up',
+                    down: 'fa fa-chevron-down',
+                    previous: 'fa fa-chevron-right',
+                    next: 'fa fa-chevron-left',
+                    today: 'fa fa-crosshairs',
+                    clear: 'fa fa-trash'
+                }
+            })
+            $('#@(guid)').on("change.datetimepicker", function (e) {
+                console.log(moment.utc(e.date).format());
+                $('#@Html.IdFor(model => model)').val(moment.utc(e.date).toISOString());
+           });
+            @if (Model.HasValue)
+            {
+                <text>
+            $('#@(guid)').datetimepicker('date', moment('@DateTime.SpecifyKind(Model.Value,DateTimeKind.Utc).ToString("O")', moment.ISO_8601));
+                </text>
+            }
+        }
+    });
+</script>)

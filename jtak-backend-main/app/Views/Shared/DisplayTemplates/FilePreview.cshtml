@@ -1,0 +1,15 @@
+﻿@using App.Extensions
+@using Solf
+@model string
+@{
+    var isNull = string.IsNullOrWhiteSpace(Model);
+    var disabled = isNull ? "disabled" : "";
+    var url = isNull ? "#" : Url.DownloadHref(Model);
+}
+
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <a href="@url" target="_blank" class="btn btn-outline-primary @disabled" @disabled>
+        <i class="fa fa-download"></i> @_Common.Download
+    </a>
+</div>

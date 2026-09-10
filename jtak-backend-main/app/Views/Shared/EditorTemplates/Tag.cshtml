@@ -1,0 +1,24 @@
+﻿@model String
+
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <div class="">
+        <input asp-for="@Model" type="text" class="form-control taggable @ViewData["class"]" />
+        <span asp-validation-for="@Model" class="text-danger"></span>
+    </div>
+</div>
+
+<link href="~/lib/selectize/dist/css/selectize.css" rel="stylesheet" />
+<script src="~/lib/selectize/dist/js/selectize.js"></script>
+<script>
+    $('input.taggable').selectize({
+        delimiter: ',',
+        persist: false,
+        create: function(input) {
+            return {
+                value: input,
+                text: input
+            }
+        }
+    });
+</script>

@@ -1,0 +1,8 @@
+<app-delete-modal
+  moduleName="User"
+  title="Delete User"
+  [isLoading]="service.isLoading$ | async"
+  (cancelClicked)="modal.dismiss()"
+  (deleteClicked)="delete()"
+>
+</app-delete-modal>

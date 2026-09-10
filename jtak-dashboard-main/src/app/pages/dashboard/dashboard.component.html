@@ -1,0 +1,229 @@
+<main class="ops-dashboard">
+  <header class="ops-hero">
+    <div>
+      <div class="ops-eyebrow"><span></span> Live operations overview</div>
+      <h2>Good to see you. Here’s what’s happening today.</h2>
+      <p>Monitor orders, catalog health, merchant balances, and the exchange rate from one place.</p>
+    </div>
+    <div class="ops-hero-actions">
+      <span class="ops-updated">Updated {{ lastUpdated | date:'shortTime' }}</span>
+      <button type="button" class="btn btn-light ops-refresh" (click)="refreshDashboard()" [disabled]="dashboardLoading">
+        <i class="fas fa-redo-alt" [class.fa-spin]="dashboardLoading" aria-hidden="true"></i>
+        Refresh
+      </button>
+      <a routerLink="/orders" class="btn btn-primary">
+        View orders <i class="fas fa-arrow-right" aria-hidden="true"></i>
+      </a>
+    </div>
+  </header>
+
+  <section class="ops-rate-panel" aria-labelledby="rate-heading">
+    <div class="ops-rate-heading">
+      <div class="ops-icon ops-icon--amber"><i class="fas fa-exchange-alt" aria-hidden="true"></i></div>
+      <div>
+        <span class="ops-section-kicker">Store configuration</span>
+        <h3 id="rate-heading">USD to SYP exchange rate</h3>
+        <p>Used to convert product prices across Best Market and Clover Mall.</p>
+      </div>
+    </div>
+    <div class="ops-rate-control">
+      <label for="exchange-rate">1 USD equals</label>
+      <div class="ops-rate-input">
+        <input id="exchange-rate" type="number" [(ngModel)]="exchangeRate" min="1" step="100"
+          [disabled]="isSavingRate" aria-describedby="rate-feedback" />
+        <span>SYP</span>
+      </div>
+      <button type="button" class="btn btn-dark" (click)="saveExchangeRate()"
+        [disabled]="isSavingRate || !exchangeRate || exchangeRate <= 0">
+        <span *ngIf="isSavingRate" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <i *ngIf="!isSavingRate" class="fas fa-check" aria-hidden="true"></i>
+        {{ isSavingRate ? 'Saving' : 'Save rate' }}
+      </button>
+    </div>
+    <div id="rate-feedback" class="ops-feedback ops-feedback--success" *ngIf="rateSaveSuccess" role="status">
+      <i class="fas fa-check-circle" aria-hidden="true"></i> Exchange rate saved
+    </div>
+    <div id="rate-feedback" class="ops-feedback ops-feedback--error" *ngIf="rateSaveError" role="alert">
+      <i class="fas fa-exclamation-circle" aria-hidden="true"></i> Couldn’t save. Please try again.
+    </div>
+  </section>
+
+  <section class="ops-featured-panel" aria-labelledby="featured-categories-heading">
+    <div class="ops-featured-heading">
+      <div>
+        <span class="ops-section-kicker">Customer app navigation</span>
+        <h3 id="featured-categories-heading">Featured categories on Home</h3>
+        <p>Choose up to 8 top-level categories, then set the exact order customers see. Category name, image and active status are managed in Categories.</p>
+      </div>
+      <a routerLink="/categories" class="btn btn-light">
+        <i class="fas fa-tags" aria-hidden="true"></i> Manage categories
+      </a>
+    </div>
+
+    <div class="ops-featured-add">
+      <ng-select
+        [(ngModel)]="featuredCategoryToAdd"
+        [items]="availableFeaturedCategories"
+        bindLabel="title"
+        bindValue="id"
+        [clearable]="true"
+        [searchable]="true"
+        [disabled]="featuredCategoriesLoading || featuredCategories.length >= 8"
+        placeholder="Select a category to feature"
+        aria-label="Category to add to Home"
+      ></ng-select>
+      <button type="button" class="btn btn-primary" (click)="addFeaturedCategory()"
+        [disabled]="!featuredCategoryToAdd || featuredCategories.length >= 8">
+        <i class="fas fa-plus" aria-hidden="true"></i> Add category
+      </button>
+    </div>
+
+    <div *ngIf="featuredCategoriesLoading" class="ops-featured-empty">Loading categories…</div>
+    <div *ngIf="!featuredCategoriesLoading && !featuredCategories.length" class="ops-featured-empty">
+      No categories are selected. Choose the categories that should appear in the customer app’s Home grid.
+    </div>
+    <ol *ngIf="featuredCategories.length" class="ops-featured-list">
+      <li *ngFor="let category of featuredCategories; let index = index">
+        <span class="ops-featured-order">{{ index + 1 }}</span>
+        <span class="ops-featured-name">{{ category.title }}</span>
+        <span class="ops-featured-meta">{{ category.icon ? 'Image set' : 'No image' }}</span>
+        <div class="ops-featured-actions">
+          <button type="button" class="btn btn-sm btn-light" (click)="moveFeaturedCategory(index, -1)"
+            [disabled]="index === 0" [attr.aria-label]="'Move ' + category.title + ' up'">
+            <i class="fas fa-arrow-up" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-light" (click)="moveFeaturedCategory(index, 1)"
+            [disabled]="index === featuredCategories.length - 1" [attr.aria-label]="'Move ' + category.title + ' down'">
+            <i class="fas fa-arrow-down" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-light-danger" (click)="removeFeaturedCategory(category)"
+            [attr.aria-label]="'Remove ' + category.title">
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+      </li>
+    </ol>
+
+    <div class="ops-featured-footer">
+      <span>{{ featuredCategories.length }} / 8 categories selected</span>
+      <button type="button" class="btn btn-dark" (click)="saveFeaturedCategories()"
+        [disabled]="isSavingFeaturedCategories || featuredCategoriesLoading">
+        <span *ngIf="isSavingFeaturedCategories" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <i *ngIf="!isSavingFeaturedCategories" class="fas fa-save" aria-hidden="true"></i>
+        {{ isSavingFeaturedCategories ? 'Saving' : 'Save Home categories' }}
+      </button>
+    </div>
+    <div *ngIf="featuredCategoriesSaveSuccess" class="ops-feedback ops-feedback--success" role="status">
+      <i class="fas fa-check-circle" aria-hidden="true"></i> Home featured categories saved
+    </div>
+    <div *ngIf="featuredCategoriesSaveError" class="ops-feedback ops-feedback--error" role="alert">
+      <i class="fas fa-exclamation-circle" aria-hidden="true"></i> Couldn’t save. Please try again.
+    </div>
+  </section>
+
+  <section class="ops-stat-grid" aria-label="Platform totals">
+    <a routerLink="/orders" class="ops-stat-card ops-stat-card--featured">
+      <div class="ops-stat-top"><span>Orders</span><i class="fas fa-shopping-bag" aria-hidden="true"></i></div>
+      <strong>{{ data.ordersCount | number }}</strong>
+      <span class="ops-stat-link">Manage orders <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+    <a routerLink="/products" class="ops-stat-card">
+      <div class="ops-stat-top"><span>Products</span><i class="fas fa-box-open" aria-hidden="true"></i></div>
+      <strong>{{ data.productsCount | number }}</strong>
+      <span class="ops-stat-link">Open catalog <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+    <a routerLink="/users" class="ops-stat-card">
+      <div class="ops-stat-top"><span>Customers</span><i class="fas fa-users" aria-hidden="true"></i></div>
+      <strong>{{ data.usersCount | number }}</strong>
+      <span class="ops-stat-link">View customers <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+    <a routerLink="/bills" class="ops-stat-card">
+      <div class="ops-stat-top"><span>Bills</span><i class="fas fa-file-invoice" aria-hidden="true"></i></div>
+      <strong>{{ data.billsCount | number }}</strong>
+      <span class="ops-stat-link">Review billing <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+  </section>
+
+  <section class="ops-finance" aria-labelledby="finance-heading">
+    <div class="ops-section-heading">
+      <div>
+        <span class="ops-section-kicker">Financial snapshot</span>
+        <h3 id="finance-heading">Order value breakdown</h3>
+      </div>
+      <span class="ops-unit">All values in SYP</span>
+    </div>
+    <div class="ops-finance-grid">
+      <div class="ops-finance-primary">
+        <span>Total order value</span>
+        <strong>{{ data.totalOrdersValue | number }}</strong>
+        <small>SYP across all completed orders</small>
+      </div>
+      <div class="ops-finance-item">
+        <span>JTAK orders</span><strong>{{ data.jTakOrdersValue | number }}</strong><small>SYP</small>
+      </div>
+      <div class="ops-finance-item">
+        <span>Merchant orders</span><strong>{{ data.merchantOrdersValue | number }}</strong><small>SYP</small>
+      </div>
+      <div class="ops-finance-item">
+        <span>Additional orders</span><strong>{{ data.jTakAdditionalOrdersValue | number }}</strong><small>SYP</small>
+      </div>
+    </div>
+  </section>
+
+  <div class="ops-content-grid">
+    <section class="ops-panel" aria-labelledby="balances-heading">
+      <div class="ops-panel-header">
+        <div>
+          <span class="ops-section-kicker">Settlements</span>
+          <h3 id="balances-heading">Merchant balances</h3>
+          <p>Current dues and payable amounts.</p>
+        </div>
+        <a routerLink="/payments" class="ops-text-link">Payments <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </div>
+      <ng-container *ngIf="service.items$ | async as merchants">
+        <div class="table-responsive">
+          <table class="table ops-table">
+            <thead><tr><th scope="col">Merchant</th><th scope="col" class="text-end">Balance</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let merchant of merchants">
+                <td>
+                  <div class="ops-merchant">
+                    <span class="ops-avatar">{{ merchant.name ? merchant.name.charAt(0) : 'M' }}</span>
+                    <span><strong>{{ merchant.name }}</strong><small>Merchant account</small></span>
+                  </div>
+                </td>
+                <td class="text-end"><strong class="ops-amount">{{ merchant.amount | number }}</strong><small class="ops-currency">SYP</small></td>
+              </tr>
+              <tr *ngIf="!merchants.length"><td colspan="2"><div class="ops-empty"><i class="fas fa-wallet"></i><strong>No balances yet</strong><span>Merchant balances will appear here.</span></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
+      <app-paginator class="ops-paginator d-flex justify-content-between align-items-center flex-wrap"
+        [paginator]="paginator" [isLoading]="isLoading" (paginate)="paginate($event)"></app-paginator>
+    </section>
+
+    <section class="ops-panel" aria-labelledby="products-heading">
+      <div class="ops-panel-header">
+        <div>
+          <span class="ops-section-kicker">Demand</span>
+          <h3 id="products-heading">Top products</h3>
+          <p>Most ordered items right now.</p>
+        </div>
+        <a routerLink="/products" class="ops-text-link">Catalog <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </div>
+      <ol class="ops-ranking" *ngIf="data.topProducts?.length; else noProducts">
+        <li *ngFor="let item of data.topProducts; let idx = index; trackBy: trackByProductId">
+          <span class="ops-rank">{{ idx + 1 }}</span>
+          <div class="ops-product-info">
+            <div><strong>{{ item.productName }}</strong><span>{{ item.count | number }} orders</span></div>
+            <div class="ops-progress" aria-hidden="true"><span [style.width.%]="getTopProductShare(item.count)"></span></div>
+          </div>
+        </li>
+      </ol>
+      <ng-template #noProducts>
+        <div class="ops-empty"><i class="fas fa-chart-bar"></i><strong>No ranking data yet</strong><span>Top products will appear after orders arrive.</span></div>
+      </ng-template>
+    </section>
+  </div>
+</main>

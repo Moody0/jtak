@@ -1,0 +1,114 @@
+<div class="card card-custom gutter-b">
+  <div class="card-header">
+    <div class="card-title">
+      <div><h3 class="card-label">Orders</h3><span class="card-subtitle">Track fulfillment, delivery assignments, and cancellations.</span></div>
+    </div>
+
+  </div>
+  <div class="card-body">
+    <!-- begin: Filtration form -->
+    <div class="form form-label-right">
+      <div class="form-group row">
+        <div class="col-lg-2" [formGroup]="searchGroup">
+          <input type="text" class="form-control" name="searchText" placeholder="Search orders" formControlName="searchTerm" />
+        </div>
+      </div>
+    </div>
+    <!-- end: Filtration form -->
+    <ng-container *ngIf="ordersService.items$ | async as items">
+      <div class="bulk-action-bar" *ngIf="selection.count > 0">
+        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
+        <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'orders')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-danger" (click)="bulkCancel(items)"><i class="fas fa-ban"></i> Cancel orders</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
+      </div>
+    </ng-container>
+
+    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="ordersService.items$ | async as items">
+      <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+        <thead>
+          <tr class="fw-bolder text-muted">
+            <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all orders on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
+            <th scope="col">
+              Id
+              <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"
+                (sort)="sort($event)"></app-sort-icon>
+            </th>
+            <th scope="col" style="width: 26%;">
+              Order
+              <app-sort-icon column="purchaseDate" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"
+                (sort)="sort($event)"></app-sort-icon>
+            </th>
+            <th scope="col">
+              Price
+            </th>
+            <th scope="col">
+              Order Details
+            </th>
+            <th scope="col">
+              Delivery User
+            </th>
+            <th scope="col">
+              Cancel
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
+            <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select order ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
+            <td>{{ i.id }}</td>
+            <td>
+              <div>{{ i.purchaseDate | date }}</div>
+              <div>{{ i.address }}</div>
+              <div>{{ i.phonenumber }}</div>
+              <div>
+                <a class="badge mb-2 p-1 badge-warning text-dark" target="_blank"
+                  href="https://www.google.com/maps/search/?api=1&query={{ i.lat }},{{ i.lng }}"><i
+                    class="fas fa-map-marker-alt" style="color: black;"></i> Map</a>
+              </div>
+              <div>{{ i.user }}</div>
+            <td>
+              <span class="fw-bolder">{{ i.price | number }}</span>
+              <span class="currency-badge">SYP</span>
+            </td>
+            <td>
+              <table>
+              <tr *ngFor="let detail of i.orderDetails">
+                <td class="p-1">{{detail.productTitle}} × {{detail.quantity}}</td>
+                <td class="p-1" style="direction: ltr;text-align: right;">
+                  <strong>{{detail.totalFinalPrice | number}}</strong>
+                  <span class="badge badge-light-primary ms-1">SYP</span>
+                </td>
+                <td class="p-1"><span class="badge mb-2 p-1" [ngClass]="{
+                    'badge-light-success': detail.orderDetailStatus === 3,
+                    'badge-warning': detail.orderDetailStatus !== 3
+                  }">{{detail.orderDetailStatusString}}</span></td>
+                </tr>
+            </table>
+            </td>
+            <td>{{ i.deliveryUser }}
+              <div>
+              <button *ngIf="canApprove(i)" type="button" class="btn btn-sm btn-primary me-2" (click)="approve(i)"><i class="fas fa-check"></i>Approve</button>
+              <app-table-actions *ngIf="isDeliveryEditable(i)" (editClicked)="edit(i)"
+                                    [showDeleteButton]="false">
+              </app-table-actions>
+            </div>
+            </td>
+            <td>
+            
+              <button class="btn text-danger p-2"
+              href="#"
+                (click)="confirmCancel(i.id)" aria-label="Cancel order"><i
+                  class="fas fa-times"></i><span class="ms-1">Cancel</span></button>
+               
+                </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <app-paginator class="d-flex justify-content-between align-items-center flex-wrap" [paginator]="paginator"
+      [isLoading]="isLoading" (paginate)="paginate($event)"></app-paginator>
+
+    <!-- begin:Table -->
+  </div>
+  <!-- end: Table -->
+</div>

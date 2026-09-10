@@ -1,0 +1,62 @@
+﻿@using App.Areas.Admin.Models
+@using App.Shared.Entities.Resources
+@using App.Resources
+@using Solf.Extensions
+@model List<App.Areas.Admin.Models.UserPermission>
+
+<h3>
+    @_AppUser.UserPermissions
+    <small>@ViewBag.UserDisplayName (@ViewBag.UserEmail)</small>
+</h3>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <form asp-action="Permissions">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4>
+                            @_Common.Edit
+                        </h4>
+                        <hr />
+                    </div>
+                    <div class="panel-body">
+                        @for (int i = 0; i < Model.Count; i++)
+                        {
+                            <div class="form-group row">
+                                <label asp-for="@Model[i].AppPermissionKey" class="control-label col-lg-3">@Model[i].AppPermissionKey.ToLocalizedName()</label>
+                                <div class="col-lg-9">
+                                    <input asp-for="@Model[i].AppPermissionKey" type="hidden" />
+                                    @foreach (var item in Html.GetEnumSelectList<UserPermissionValue>())
+                                    {
+                                        <label class="radio-inline c-radio">
+                                            <input id="@Model[i].AppPermissionKey-@item.Value" name="[@i].UserPermissionValue" type="radio" value="@item.Value" checked="@(((int)Model[i].UserPermissionValue).ToString() == item.Value)" />
+                                            @if (item.Value == ((int)UserPermissionValue.NoChange).ToString())
+                                            {
+                                                <span class="fa fa-minus"></span>
+                                            }
+                                            else if (item.Value == ((int)UserPermissionValue.Allow).ToString())
+                                            {
+                                                <span class="fa fa-check"></span>
+                                            }
+                                            else if (item.Value == ((int)UserPermissionValue.Deny).ToString())
+                                            {
+                                                <span class="fa fa-times"></span>
+                                            }
+                                            @item.Text
+                                        </label>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="card-footer text-right">
+                        <div class="btn-group">
+                            <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+                            <input type="submit" value="@_Common.Save" class="btn btn-success" />
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

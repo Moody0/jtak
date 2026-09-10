@@ -1,0 +1,27 @@
+﻿@using App.Extensions
+@model DateTime?
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+    var defaultHtmlAttributesObject = new
+    {@@class = "form-control datetimepicker-input",
+    data_target = "#" + fieldName,
+    min = "00:00:00",
+    max = "23:59:59"
+};
+
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <div class="input-group date time-picker" id="@fieldName" data-target-input="nearest">
+        @Html.TextBoxFor(model => model, "{0:HH:mm}", defaultHtmlAttributesObject)
+        <div class="input-group-append" data-target="#@fieldName" data-toggle="datetimepicker">
+            <div class="input-group-text"><i class="fas fa-clock"></i></div>
+        </div>
+    </div>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+@Html.Script(@<script>
+    $(function () {
+        $('#@Html.IdFor(model => model)').removeAttr("data-val-date");
+    });
+</script>)

@@ -1,0 +1,15 @@
+﻿@using App.Resources
+@model string
+
+@{
+    var isNull = string.IsNullOrWhiteSpace(Model);
+    var disabled = isNull ? "disabled" : "";
+    var url = isNull ? "#" : Url.Action("Player", "Services", new { area = "", id = Model });
+}
+
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <a href="@url" target="_blank" class="btn btn-outline-primary @disabled" @disabled>
+        <i class="fa fa-play"></i> @_Common.Play
+    </a>
+</div>

@@ -1,0 +1,52 @@
+﻿@using App.Extensions
+
+@model dynamic
+
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+    var multible = ViewData["multiple"] != null ? "multiple" : "";
+    var required = ViewData["required"];
+    var currentvalue = ViewData["currentvalue"] ?? "-";
+    var url = ViewData["url"];
+    var placeHolder = ViewData["placeHolder"];
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <select class="noautoselect2 cityareadropdown" asp-for="@Model"
+            data-val="true"
+            data-val-required="@Html.Raw(required)">
+        @if (Model != null)
+        {
+            <option value="@Model">@currentvalue</option>
+        }
+        else if (placeHolder != null)
+        {
+            <option value="">@placeHolder</option>
+        }
+    </select>
+    <div class="text-danger validationbox">
+        <span asp-validation-for="@Model" class="text-danger"></span>
+    </div>
+</div>
+
+
+@Html.Script(@<script>
+    $(function () {
+        if ($.fn.select2) {
+            $("select.cityareadropdown").select2({
+                theme: "bootstrap4", width: "100%", ajax: {
+                    url: function (params) {
+                        return '@Url.Action("Search", "CityAreas", new { area = "Admin" })/' + $("select[name='CityId']").val();
+                    }
+                }
+                @if (System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft) {
+                    <text> ,dir: "rtl" ,language: { errorLoading: function () { return "لا يمكن تحميل النتائج" }, inputTooLong: function (n) { return "الرجاء حذف " + (n.input.length - n.maximum) + " عناصر" }, inputTooShort: function (n) { return "الرجاء إضافة " + (n.minimum - n.input.length) + " عناصر" }, loadingMore: function () { return "جاري تحميل نتائج إضافية..." }, maximumSelected: function (n) { return "تستطيع إختيار " + n.maximum + " بنود فقط" }, noResults: function () { return "لم يتم العثور على أي نتائج" }, searching: function () { return "جاري البحث…" }, removeAllItems: function () { return "قم بإزالة كل العناصر" } } </text>
+                }
+
+            });
+
+            // workround to fix issue with validating select2 inputs
+            $('select').on('change', function () { $(this).trigger('blur'); });
+        }
+    });
+</script>)

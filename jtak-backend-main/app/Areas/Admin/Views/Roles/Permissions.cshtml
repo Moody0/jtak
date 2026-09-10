@@ -1,0 +1,49 @@
+﻿@using App.Areas.Admin.Models
+@using App.Shared.Entities.Resources
+@using App.Resources
+@using Solf.Extensions
+@model List<RolePermissionVm>
+
+<h3>
+    @_AppRole.RolePermissions
+    <small>@ViewBag.RoleName</small>
+</h3>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <form asp-action="Permissions">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h4>
+                            @_Common.Edit
+                        </h4>
+                        <hr />
+                    </div>
+                    <div class="panel-body">
+                        @for (int i = 0; i < Model.Count; i++)
+                        {
+                            <div class="form-group row">
+                                <label asp-for="@Model[i].AppPermissionKey" class="control-label col-lg-3">@Model[i].AppPermissionKey.ToLocalizedName()</label>
+                                <div class="col-lg-9">
+                                    <input asp-for="@Model[i].AppPermissionKey" type="hidden" />
+                                    <div class="checkbox c-checkbox">
+                                        <label class="control-label">
+                                            <input asp-for="@Model[i].IsAllowed" type="checkbox" />
+                                            <span class="fa fa-check"></span> @Html.DisplayNameFor(model => model)
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="card-footer text-right">
+                        <div class="btn-group">
+                            <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+                            <input type="submit" value="@_Common.Save" class="btn btn-success" />
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

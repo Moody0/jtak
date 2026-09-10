@@ -1,0 +1,75 @@
+﻿@using App.Resources;
+@using Solf.Extensions;
+@using App.Shared.Entities;
+@using App.Shared.Entities.Resources;
+@model UserDto
+
+<form asp-action="Edit" asp-controller="Me" asp-route-id="">
+    @await Html.PartialAsync("_Header")
+    <div class="container clearfix h-100">
+        <div class="row mb-4" style="min-height:50vh">
+            @await Html.PartialAsync("_UserNav")
+            <div class="col-lg-9">
+                <div class="row mt-4">
+                    <div class="col-lg-6">
+                        @Html.EditorFor(x => x.FirstName)
+                    </div>
+                    <div class="col-lg-6">
+                        @Html.EditorFor(x => x.LastName)
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-lg-6">
+                        @Html.EditorFor(x => x.Email)
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="form-group">
+                            <p>
+                                @_AppUser.Gender
+                            </p>
+                            <div class="form-check-inline mb-4">
+                                <input class="form-check-input m-2" id="male" type="radio" name="Gender"
+                                       value="@((int)App.Shared.Entities.Enums.Gender.Male)"
+                                       @(Model.Gender == App.Shared.Entities.Enums.Gender.Male ? "checked" : "")>
+                                <label class="form-check-label" for="male">@App.Shared.Entities.Enums.Gender.Male.ToLocalizedName()</label>
+                            </div>
+                            <div class="form-check-inline mb-4">
+                                <input class="form-check-input m-2" id="female" type="radio" name="Gender"
+                                       value="@((int)App.Shared.Entities.Enums.Gender.Female)"
+                                       @(Model.Gender == App.Shared.Entities.Enums.Gender.Female ? "checked" : "")>
+                                <label class="form-check-label" for="female">@App.Shared.Entities.Enums.Gender.Female.ToLocalizedName()</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-lg-6">
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="btn-group float-right">
+                            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">@_Common.BackToList</a>
+                            <input type="submit" value="@_Common.Save" class="btn btn-sm btn-outline-success mb-0" />
+                        </div>
+                        <br />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+@section Styles {
+    <link href="~/vendor/select2/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="~/vendor/@@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.css" rel="stylesheet" />
+    <link href="~/vendor/sweetalert2/dist/sweetalert2.min.css" rel="stylesheet" />
+}
+@section Scripts {
+    <script src="~/vendor/select2/dist/js/select2.min.js"></script>
+    <script>
+        var logoSticky = "logodark";
+        var logoNormal = "logodark";
+        headerStyle();
+        $('select').select2({ theme: "bootstrap4", width: "100%" });
+    </script>
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+    @{await Html.RenderPartialAsync("_ToastrMsg");}
+}

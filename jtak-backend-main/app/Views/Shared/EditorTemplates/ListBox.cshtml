@@ -1,0 +1,17 @@
+﻿@using App.Extensions
+@model object[]
+@{
+    var defaultHtmlAttributesObject = new
+    {@@class = "select2"
+};
+var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+}
+
+<div class="form-group">
+    @Html.LabelFor(model => model, new { @class = "control-label" })
+    <div class="">
+        @Html.ListBoxFor(model => model, ViewData[fieldName.Replace('.', '_')] as MultiSelectList, defaultHtmlAttributesObject)
+        @Html.ValidationMessageFor(model => model, "", new { @class = "text-danger" })
+    </div>
+</div>
+

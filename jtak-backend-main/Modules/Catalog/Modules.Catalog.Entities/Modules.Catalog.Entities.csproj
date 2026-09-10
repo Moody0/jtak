@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\App.Entities\App.Shared.Entities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Solf">
+      <HintPath>..\..\..\Solf\Solf.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

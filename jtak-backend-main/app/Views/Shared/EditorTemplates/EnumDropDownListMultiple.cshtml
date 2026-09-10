@@ -1,0 +1,29 @@
+﻿@using Solf.Extensions
+@using System.Linq
+@model dynamic
+@{
+    var enumType = Nullable.GetUnderlyingType(ViewData.ModelMetadata.ModelType.GetElementType()) ??
+        ViewData.ModelMetadata.ModelType.GetElementType();
+
+    var values = Enum.GetValues(enumType)
+                        .Cast<object>()
+                        .Where(x => ((int)x) != 0)
+                        .Select(v => new SelectListItem
+                        {
+                            Selected = ((int[])Model)?.Any(x => (int)x == (int)v)??false,
+                            Text = v.ToLocalizedName(),
+                            Value = v.ToString()
+                        });
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <select asp-for="@Model" asp-items="@values" class="@ViewData["class"]" multiple>
+        @if (ViewBag.placeholder != null)
+        {
+            <option value="">@ViewBag.placeholder</option>
+        }
+    </select>
+    <div class="text-danger validationbox">
+        <span asp-validation-for="@Model" class="text-danger"></span>
+    </div>
+</div>

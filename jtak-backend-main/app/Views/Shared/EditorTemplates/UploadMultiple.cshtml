@@ -1,0 +1,97 @@
+﻿@using Microsoft.AspNetCore.Mvc.Localization
+@using Solf.Extensions
+@using App.Extensions
+@using Microsoft.AspNetCore.Hosting
+@using Solf
+@using Microsoft.EntityFrameworkCore.Internal
+
+@model string
+@inject IViewLocalizer Localizer
+@inject IWebHostEnvironment _Environment
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+
+    var list = Model != null ? (Model.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()) : new List<string>();
+
+    string result = string.Join(",", list.Where(x => !string.IsNullOrEmpty(x))
+                        .Select(x => "{source: '" + x + "', options: { type: 'limbo' } }"));
+
+    var existedFiles = ("[" + result + "]");
+}
+
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <input asp-for="@Model" type="hidden" />
+    <div id="fb@(fieldName)"></div>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+
+@Html.Script(@<script src="~/vendor/filepond/dist/filepond.min.js"></script>)
+@Html.Script(@<script src="~/vendor/jquery-filepond/filepond.jquery.js"></script>)
+@Html.Script(@<script src="~/vendor/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.min.js"></script>)
+@Html.Script(@<script>
+    function removeValue(list, value, separator) {
+        separator = separator || ",";
+        var values = list.split(separator);
+        for(var i = 0 ; i < values.length ; i++) {
+        if(values[i] == value) {
+            values.splice(i, 1);
+            return values.join(separator);
+        }
+        }
+        return list;
+    }
+    $(function () {
+
+             // First register any plugins
+             $.fn.filepond.registerPlugin(FilePondPluginImagePreview);
+
+             FilePond.setOptions({
+                labelIdle: '@Html.Raw(_Common.DragAndDropHere)',
+                server: {
+                    process: {
+                        url: '@Url.Action("Upload", "Services", new {area = "" })',
+                        method: 'POST'
+                    },
+                    restore: {
+                        url: '@Url.Action("PreviewImage", "Services", new {area = "" })/',
+                        method: 'GET'
+                    },
+                 }
+             });
+
+             // Turn input element into a pond with configuration options
+              $('#fb@(fieldName)').filepond({
+                 allowMultiple: true,
+                 files: @Html.Raw(existedFiles)
+             });
+             $('#fb@(fieldName)').on('FilePond:processfile', function(e) {
+                 if (e.error) {
+                     console.log('Error removing file',error);
+                     return;
+                 }
+                 let alreadyThere = $('input[name=@fieldName]').val().includes(e.detail.file.serverId);
+                 console.log('alreadyThere',alreadyThere);
+
+                 if (alreadyThere) return;
+
+                 let newVal = $('input[name=@fieldName]').val() + ',' + e.detail.file.serverId;
+                 $('input[name=@fieldName]').val(newVal);
+             });
+
+             $('#fb@(fieldName)').on('FilePond:updatefiles', function(e) {
+                 if (e.error) {
+                     console.log('Error removing file',e.error);
+                     return;
+                 }
+                 var val="";
+                 $('#fb@(fieldName) input[name=filepond]').each(function () {
+                     if($(this).val()) val += ',' + $(this).val();
+                 });
+                 if(val.startsWith(",")) val = val.substring(1, val.length);
+                 if(val.endsWith(",")) val = val.substring(0, val.length - 1);
+                 $('input[name=@fieldName]').val(val);
+             });
+         });
+
+</script>)

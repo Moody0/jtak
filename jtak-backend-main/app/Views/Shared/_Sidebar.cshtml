@@ -1,0 +1,111 @@
+@using App.Helpers
+@using App.Resources
+@using App.Extensions
+@using App.Entities
+@using Microsoft.AspNetCore.Identity
+@using App.Shared.Entities.Enums
+@using Solf
+@using Solf.Enums
+@addTagHelper *,TagHelperSamples
+@addTagHelper *,TagHelperSamples.Authorization
+@inject ISessionHelper sessionHelper
+
+@{ var currentUser = sessionHelper.CurrentUser; }
+
+<div class="aside-inner">
+    <nav class="sidebar" data-sidebar-anyclick-close="">
+        <ul class="sidebar-nav">
+            @*<li class="nav-heading">
+                    <span><img src="~/images/logobig.png" alt="@_Common.SiteName" class="img-responsive" /></span>
+                </li>*@
+            <li class="has-user-block">
+                <div id="user-block" class="collapse">
+                    <a href="@Url.Action("Index", "Manage", new{area=""})" style="text-decoration-line: initial;">
+                        <div class="item user-block">
+                            <!-- User picture-->
+                            <div class="user-block-picture">
+                                <div class="user-block-status">
+                                    <img src="@Url.ImgHref(currentUser?.ProfilePhoto, 60, 60, true)" alt="Avatar" width="60" height="60" class="img-thumbnail img-circle" />
+                                </div>
+                            </div>
+                            <div class="user-block-info">
+                                <span class="user-block-name">@(currentUser?.FirstName + " " + currentUser?.LastName)</span>
+                                <span class="user-block-role">@(currentUser?.Email)</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </li>
+            <!-- END user info-->
+            <li class="nav-heading">
+                <span>@_Nav.Dashboard</span>
+            </li>
+            <!-- Iterates over all sidebar items-->
+            <li class="@Html.isActive(controllers: "Dashboard")">
+                <a href="@Url.Action("Index", "Dashboard" , new {area="" })" title="@_Nav.Home">
+                    <em class="icon-speedometer"></em>
+                    <span>@_Nav.Home</span>
+                </a>
+            </li>
+            <li asp-authorize asp-policy="@nameof(AppPermissionKey.AdminPermission)" class="@Html.isActive(controllers: "Users,Teams,YourRoleInChange,Cities,Categories")">
+                <a href="#admin" title="@_Nav.Admin" data-toggle="collapse">
+                    <em class="icon-user"></em>
+                    <span>@_Nav.Admin</span>
+                </a>
+                <ul id="admin" class="sidebar-nav sidebar-subnav collapse">
+                    <li class="sidebar-subnav-header">@_Nav.Admin</li>
+                    <li class="@Html.isActive(controllers: "Users")">
+                        <a href="@Url.Action("Index", "Users", new {area="Admin" })" title="@_Nav.Users">
+                            <span>@_Nav.Users</span>
+                        </a>
+                    </li>
+                    <li class="@Html.isActive(controllers: "Cities")">
+                        <a href="@Url.Action("Index", "Cities", new {area="Admin" })" title="@_Nav.Cities">
+                            <span>@_Nav.Cities</span>
+                        </a>
+                    </li>
+                    <li class="@Html.isActive(controllers: "CityAreas")">
+                        <a href="@Url.Action("Index", "CityAreas", new {area="Admin" })" title="@_Nav.CityAreas">
+                            <span>@_Nav.CityAreas</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li asp-authorize asp-policy="@nameof(AppPermissionKey.AdminPermission)" class="@Html.isActive(controllers: "Pages")">
+                <a href="#pages" title="@_Nav.Pages" data-toggle="collapse">
+                    <em class="icon-docs"></em>
+                    <span>@_Nav.Pages</span>
+                </a>
+                <ul id="pages" class="sidebar-nav sidebar-subnav collapse">
+                    <li class="sidebar-subnav-header">@_Nav.Pages</li>
+                    <li class="@Html.isActive(controllers: "Pages",actions:"Home")">
+                        <a href="@Url.Action("Home", "Pages", new {area="Admin" })" title="@_Nav.Home">
+                            <span>@_Nav.Home</span>
+                        </a>
+                    </li>
+                    <li class="@Html.isActive(controllers: "Pages",actions:"Contact")">
+                        <a href="@Url.Action("Contact", "Pages", new {area="Admin" })" title="@_Nav.Contact">
+                            <span>@_Nav.Contact</span>
+                        </a>
+                    </li>
+                    <li class="@Html.isActive(controllers: "Pages",actions:"PrivacyPolicy")">
+                        <a href="@Url.Action("PrivacyPolicy", "Pages", new {area="Admin" })" title="@_Nav.PrivacyPolicy">
+                            <span>@_Nav.PrivacyPolicy</span>
+                        </a>
+                    </li>
+                    <li class="@Html.isActive(controllers: "Pages",actions:"TermsAndConditions")">
+                        <a href="@Url.Action("TermsAndConditions", "Pages", new {area="Admin" })" title="@_Nav.TermsAndConditions">
+                            <span>@_Nav.TermsAndConditions</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li asp-authorize asp-policy="@nameof(AppPermissionKey.AdminPermission)" class="@Html.isActive(controllers: "Settings")">
+                <a href="@Url.Action("Index", "Settings", new {area="Admin" })" title="@_Nav.Settings">
+                    <em class="icon-equalizer"></em>
+                    <span>@_Nav.Settings</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</div>

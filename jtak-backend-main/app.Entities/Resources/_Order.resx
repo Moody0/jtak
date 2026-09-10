@@ -1,0 +1,250 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Amount" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="AppUser" xml:space="preserve">
+    <value>App User</value>
+  </data>
+  <data name="Completed" xml:space="preserve">
+    <value>Completed</value>
+  </data>
+  <data name="Count" xml:space="preserve">
+    <value>Count</value>
+  </data>
+  <data name="Coupon" xml:space="preserve">
+    <value>Coupon</value>
+  </data>
+  <data name="Discount" xml:space="preserve">
+    <value>Discount</value>
+  </data>
+  <data name="DiscountFixed" xml:space="preserve">
+    <value>Discount Fixed</value>
+  </data>
+  <data name="DiscountPercent" xml:space="preserve">
+    <value>Discount Percent</value>
+  </data>
+  <data name="ExpiryDate" xml:space="preserve">
+    <value>Expiry Date</value>
+  </data>
+  <data name="FailureTitle" xml:space="preserve">
+    <value>Failure</value>
+  </data>
+  <data name="FinalPrice" xml:space="preserve">
+    <value>Final Price</value>
+  </data>
+  <data name="FinalPriceWithPromoCode" xml:space="preserve">
+    <value>Final Price with Promo Code</value>
+  </data>
+  <data name="KupoPrice" xml:space="preserve">
+    <value>Kupo Price</value>
+  </data>
+  <data name="NewOrderNotificationEmailBody" xml:space="preserve">
+    <value>&lt;div&gt;&lt;img src="https://onstrategos.com/images/logodark.png" style="width:350px;"/&gt;&lt;/div&gt;
+مرحباً &lt;b&gt;{0}&lt;/b&gt;,&lt;br/&gt;&lt;br/&gt;
+&lt;p&gt;يسعدنا تسجيلكم في تخصص التخطيط الإستراتيجي للدولة، برنامج ({1}).&lt;br/&gt;
+نود نلفت انتباهكم لما يلي:&lt;/b&gt;.
+&lt;/p&gt;
+&lt;p&gt;
+&lt;ul&gt;
+&lt;li&gt;بإمكانكم بدء الدراسة الآن، أو في أي وقت تشاؤون.&lt;/li&gt;
+&lt;li&gt;لا تتطلب الدراسة الحضور بساعات محددة، وإنما في الأوقات التي تناسبكم.&lt;/li&gt;
+&lt;li&gt;كما يسعدنا انضمامكم لمجتمع الدارسين على التلجرام على هذا الرابط: &lt;a href="https://t.me/joinchat/AN0mKA9HI5xaAyndGr85Ug"&gt;https://t.me/joinchat/AN0mKA9HI5xaAyndGr85Ug&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/p&gt;
+&lt;p&gt;
+لأي استفسار لا تتردوا بمراسلتنا على: help@onstrategos.com&lt;br/&gt;
+دمتم بخير&lt;br/&gt;
+فريق استراتيجوس
+&lt;a href="https://onstrategos.com" target="_blank"&gt;&lt;img src="https://onstrategos.com/images/icons/web.png" style="width:40px"&gt;&lt;/a&gt;
+&lt;a href="https://www.facebook.com/OnStrategos" target="_blank"&gt;&lt;img src="https://onstrategos.com/images/icons/facebook.png" style="width:40px"&gt;&lt;/a&gt;
+&lt;a href="https://twitter.com/onstrategos" target="_blank"&gt;&lt;img src="https://onstrategos.com/images/icons/twitter.png" style="width:40px"&gt;&lt;/a&gt;
+&lt;a href="https://www.linkedin.com/company/onstrategos" target="_blank"&gt;&lt;img src="https://onstrategos.com/images/icons/linkedin.png" style="width:40px"&gt;&lt;/a&gt;
+&lt;a href="https://www.instagram.com/onstrategos" target="_blank"&gt;&lt;img src="https://onstrategos.com/images/icons/instagram.png" style="width:40px"&gt;&lt;/a&gt;
+&lt;a href="https://t.me/OnStrategos" target="_blank"&gt;&lt;img src="https://onstrategos.com/images/icons/telegram.png" style="width:40px"&gt;&lt;/a&gt;
+&lt;/p&gt;</value>
+  </data>
+  <data name="NewOrderNotificationEmailTitle" xml:space="preserve">
+    <value>أهلا بكم في برنامج التخطيط الاستراتيجي للدولة</value>
+  </data>
+  <data name="Notes" xml:space="preserve">
+    <value>Notes</value>
+  </data>
+  <data name="Order" xml:space="preserve">
+    <value>Order</value>
+  </data>
+  <data name="OrderDetails" xml:space="preserve">
+    <value>Order Details</value>
+  </data>
+  <data name="OrderStatus" xml:space="preserve">
+    <value>Order Status</value>
+  </data>
+  <data name="OrderType" xml:space="preserve">
+    <value>Order Type</value>
+  </data>
+  <data name="PaymentDescription" xml:space="preserve">
+    <value>Payment Description</value>
+  </data>
+  <data name="PaymentMethod" xml:space="preserve">
+    <value>Payment Method</value>
+  </data>
+  <data name="Pending" xml:space="preserve">
+    <value>Pending</value>
+  </data>
+  <data name="Price" xml:space="preserve">
+    <value>Price</value>
+  </data>
+  <data name="Product" xml:space="preserve">
+    <value>Product</value>
+  </data>
+  <data name="PromoCode" xml:space="preserve">
+    <value>Promo Code</value>
+  </data>
+  <data name="PurchaseDate" xml:space="preserve">
+    <value>Purchase Date</value>
+  </data>
+  <data name="QrCode" xml:space="preserve">
+    <value>Qr Code</value>
+  </data>
+  <data name="QrCodeExpiryDate" xml:space="preserve">
+    <value>Qr Code Expiry Date</value>
+  </data>
+  <data name="Rejected" xml:space="preserve">
+    <value>Rejected</value>
+  </data>
+  <data name="RemainingCount" xml:space="preserve">
+    <value>Remaining Count</value>
+  </data>
+  <data name="SendOrderCompletedEmail" xml:space="preserve">
+    <value>Send order completed email</value>
+  </data>
+  <data name="Success" xml:space="preserve">
+    <value>Success</value>
+  </data>
+  <data name="SuccessTitle" xml:space="preserve">
+    <value>Success</value>
+  </data>
+  <data name="UsedCount" xml:space="preserve">
+    <value>Used Count</value>
+  </data>
+  <data name="User" xml:space="preserve">
+    <value>User</value>
+  </data>
+</root>

@@ -1,0 +1,55 @@
+﻿@using App.Extensions
+@using App.Resources
+
+@model App.Shared.Entities.UserDto
+
+<div class="content-heading">
+    <img class="float-left mr-2 ml-2" src="@Url.ImgHref(Model.ProfilePhoto,50,50)" />
+    <div>
+        @Model.FullName
+        <small>@_Common.Details</small>
+    </div>
+</div>
+<div class="container-fluid">
+    <div class="card card-default">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="dl-horizontal">
+                        <dt>
+                            @Html.DisplayNameFor(model => model.Email)
+                        </dt>
+                        <dd>
+                            @Html.DisplayFor(model => model.Email)
+                        </dd>
+                        <dt>
+                            @Html.DisplayNameFor(model => model.PhoneNumber)
+                        </dt>
+                        <dd>
+                            @Html.DisplayFor(model => model.PhoneNumber)
+                        </dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="dl-horizontal">
+                        <dt>
+                            @Html.DisplayNameFor(model => model.CreatedDate)
+                        </dt>
+                        <dd>
+                            @Html.DisplayFor(model => model.CreatedDate)
+                        </dd>
+                        <dt>
+                            @Html.DisplayNameFor(model => model.IsActive)
+                        </dt>
+                        <dd>
+                            @Html.DisplayFor(model => model.IsActive)
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer text-right">
+            <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+        </div>
+    </div>
+</div>

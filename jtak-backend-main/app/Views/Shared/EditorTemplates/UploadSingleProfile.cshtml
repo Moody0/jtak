@@ -1,0 +1,61 @@
+﻿@using App.Extensions
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Solf.Extensions
+@using Microsoft.AspNetCore.Hosting
+@using Solf
+@using Microsoft.EntityFrameworkCore.Internal
+
+@model string
+@inject IViewLocalizer Localizer
+@inject IWebHostEnvironment _Environment
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+
+    var list = Model != null ? (Model.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()) : new List<string>();
+
+    string result = string.Join(",", list.Where(x => !string.IsNullOrEmpty(x))
+                        .Select(x => "{source: '" + x + "', options: { type: 'limbo' } }"));
+
+    var existedFiles = ("[" + result + "]");
+}
+
+<div class="thumb128 m-2">
+    <input asp-for="@Model" type="file" class="filepond" />
+</div>
+
+@Html.Script(@<script src="~/vendor/filepond/dist/filepond.min.js"></script>)
+@Html.Script(@<script src="~/vendor/jquery-filepond/filepond.jquery.js"></script>)
+@Html.Script(@<script src="~/vendor/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.min.js"></script>)
+@Html.Script(@<script>
+         $(function () {
+
+             // First register any plugins
+             $.fn.filepond.registerPlugin(FilePondPluginImagePreview);
+
+             FilePond.setOptions({
+                server: {
+                    process: {
+                        url: '@Url.Action("UpdateUserImage", "services", new {area = "" })',
+                        method: 'POST'
+                    },
+                    restore: {
+                        url: '@Url.Action("PreviewImage", "Services", new {area = "", culture = "en" })/',
+                        method: 'GET'
+                    },
+                 }
+             });
+             // Turn input element into a pond with configuration options
+             $('#@fieldName').filepond({
+                 allowMultiple: false,
+                 name: '@fieldName',
+                 files: @Html.Raw(existedFiles),
+                labelIdle: '@Html.Raw(_Common.DragAndDropHere)',
+                imagePreviewHeight: 170,
+                imageCropAspectRatio: '1:1',
+                imageResizeTargetWidth: 200,
+                imageResizeTargetHeight: 200,
+                stylePanelLayout: 'circle'
+             });
+
+         });
+</script>)

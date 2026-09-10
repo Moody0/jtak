@@ -1,0 +1,29 @@
+<div class="card card-custom gutter-b">
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label">Edit Static Page</h3>
+    </div>
+    <div class="card-toolbar">
+
+    </div>
+  </div>
+  <div class="card-body" *ngIf="_pageData">
+    <form [formGroup]="formGroup" (ngSubmit)="save()">
+      <div class="mt-5">
+        <div class="form-group">
+          <div class="NgxEditor__Wrapper">
+            <ngx-editor-menu [editor]="editor" [toolbar]="toolbar"></ngx-editor-menu>
+            <ngx-editor [editor]="editor" outputFormat="html"
+            formControlName="body"
+            placeholder=""></ngx-editor>
+          </div>
+        </div>
+        <div style="text-align: end">
+          <button type="submit" class="btn btn-primary font-weight-bold mr-2">
+            Save
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

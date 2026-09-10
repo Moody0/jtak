@@ -1,0 +1,63 @@
+﻿@using Microsoft.AspNetCore.Mvc.Localization
+@using Solf.Extensions
+@using App.Extensions
+@using Microsoft.AspNetCore.Hosting
+@using Solf
+@using Microsoft.EntityFrameworkCore.Internal
+
+@model string
+@inject IViewLocalizer Localizer
+@inject IWebHostEnvironment _Environment
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+
+    var list = Model != null ? (Model.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()) : new List<string>();
+
+    string result = string.Join(",", list.Where(x => !string.IsNullOrEmpty(x))
+                        .Select(x => "{source: '" + x + "', options: { type: 'limbo' } }"));
+    var existedFiles = ("[" + result + "]");
+}
+
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <input asp-for="@Model" type="file" />
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+
+@Html.Script(@<script src="~/vendor/filepond/dist/filepond.min.js"></script>)
+@Html.Script(@<script src="~/vendor/jquery-filepond/filepond.jquery.js"></script>)
+@Html.Script(@<script src="~/vendor/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.min.js"></script>)
+@Html.Script(@<script src="~/vendor/filepond-plugin-file-validate-type/dist/filepond-plugin-file-validate-type.min.js"></script>)
+@Html.Script(@<script>
+         $(function () {
+
+             // First register any plugins
+             $.fn.filepond.registerPlugin(FilePondPluginImagePreview);
+             $.fn.filepond.registerPlugin(FilePondPluginFileValidateType);
+
+             FilePond.setOptions({
+                 labelIdle: '@Html.Raw(_Common.DragAndDropHere)',
+                server: {
+                    process: {
+                        url: '@Url.Action("Upload", "Services", new {area = "", culture = "en" })',
+                        method: 'POST'
+                    },
+                    restore: {
+                        url: '@Url.Action("PreviewImage", "Services", new {area = "", culture = "en" })/',
+                        method: 'GET'
+                    },
+                 }
+             });
+
+             // Turn input element into a pond with configuration options
+             $('#@fieldName').filepond({
+                 allowMultiple: false,
+                 acceptedFileTypes: ['image/jpeg', 'image/png', 'application/pdf', 'application/zip', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessing'],
+                 name: '@fieldName',
+                 files: @Html.Raw(existedFiles)
+             });
+
+             // Set allowMultiple property to true
+             $('#@fieldName').filepond('allowMultiple', false);
+         });
+</script>)

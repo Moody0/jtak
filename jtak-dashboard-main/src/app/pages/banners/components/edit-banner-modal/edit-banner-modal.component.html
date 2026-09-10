@@ -1,0 +1,112 @@
+<app-edit-modal
+  [item]="item"
+  [itemName]="item.title"
+  moduleName="Banner"
+  [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid"
+  (cancelClicked)="modal.dismiss()"
+  (saveClicked)="save()"
+>
+  <ng-container *ngIf="item">
+    <form class="form form-label-right" [formGroup]="formGroup">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="title">Title</label>
+            <app-input-container [control]="formGroup.controls.title">
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="title"
+                id="title"
+                placeholder="Enter title"
+                #input
+              />
+            </app-input-container>
+          </div>
+        </div>        
+        <div class="col-md-8">
+          <div class="mb-8">
+            <label for="url">URL</label>
+            <app-input-container [control]="formGroup.controls.url">
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="url"
+                id="url"
+                placeholder="Enter URL"
+                #input
+              />
+            </app-input-container>
+          </div>
+        </div>
+        <div class="col-md-10">
+          <div class="mb-8">
+            <label for="description">Description</label>
+            <app-input-container [control]="formGroup.controls.description">
+              <textarea
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="description"
+                id="description"
+                placeholder="Enter description"
+                #input
+              ></textarea>
+            </app-input-container>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="mb-8">
+            <label for="sectionPlacement">مكان العرض في التطبيق (Placement)</label>
+            <select
+              class="form-select form-select-solid"
+              formControlName="sectionPlacement"
+              id="sectionPlacement"
+            >
+              <option value="daily_offers">العروض اليومية (أعلى الصفحة) - Daily Offers</option>
+              <option value="dont_miss">لا تفوتها (بانرات العروض الترويجية) - Don't Miss</option>
+              <option value="all">كلاهما (يظهر في القسمين) - Both Sections</option>
+            </select>
+            <div class="form-text text-muted">
+              حدد القسم الذي سيظهر فيه البانر في الصفحة الرئيسية
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="order">الترتيب (Order)</label>
+            <input
+              type="number"
+              class="form-control form-control-solid"
+              formControlName="order"
+              id="order"
+              placeholder="0"
+            />
+          </div>
+        </div>
+
+        <div class="col-md-2">
+          <label class="checkbox checkbox-single pt-10">
+            <input type="checkbox" formControlName="active" />
+            <span class="mx-2 fs-5">isActive</span>
+          </label>
+        </div>
+
+        <div class="col-md-12">
+          <app-file-uploader
+            uploaderTitle="Upload banner image"
+            (fileUploaded)="onFileUploaded($event, 'featuredImage')"
+          ></app-file-uploader>
+
+          <app-uploaded-image
+            [imageId]="formGroup.get('featuredImage')?.value"
+            [dimensions]="{ width: 600, height: 300 }"
+            (imageDeleted)="onFileDelete('featuredImage')"
+          ></app-uploaded-image>
+        </div>
+      </div>
+    </form>
+  </ng-container>
+</app-edit-modal>

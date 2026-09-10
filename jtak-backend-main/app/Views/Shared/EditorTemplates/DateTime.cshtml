@@ -1,0 +1,55 @@
+﻿@using App.Extensions
+@model DateTime?
+@{
+    var guid = Guid.NewGuid().ToString();
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+    //https://github.com/tempusdominus/bootstrap-4
+}
+
+<input asp-for="@Model" type="hidden">
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <div class="input-group date" id="@(guid)" data-target-input="nearest">
+        <input type="text" class="form-control datetimepicker-input" data-target="#@(guid)">
+        <div class="input-group-append" data-target="#@(guid)" data-toggle="datetimepicker">
+            <div class="input-group-text"><i class="fa fa-calendar"></i></div>
+        </div>
+    </div>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+
+@Html.Script(@<script>
+    $(function () {
+        $('#@(guid)').removeAttr("data-val-date");
+
+        if ($.fn.datetimepicker) {
+            $('#@(guid)').datetimepicker({
+                locale: window.currentLocal,
+                icons: {
+                    time: 'far fa-clock',
+                    date: 'far fa-calendar-alt',
+                    up: 'fa fa-chevron-up',
+                    down: 'fas fa-chevron-up',
+                    previous: 'fas fa-chevron-left',
+                    next: 'fas fa-chevron-right',
+                    today: 'fas fa-crosshairs',
+                    clear: 'fas fa-trash'
+                },
+                format: 'L'
+            })
+           $('#@(guid)').on("change.datetimepicker", function (e) {
+               console.log(moment.utc(e.date).format());
+               $('#@Html.IdFor(model => model)').val(moment.utc(e.date).format());
+           });
+            @if (Model.HasValue)
+            {
+                <text>
+            $('#@(guid)').datetimepicker('date', moment('@DateTime.SpecifyKind(Model.Value,DateTimeKind.Utc).ToString("O")', moment.ISO_8601));
+                </text>
+            }
+            $.validator.methods.date = function (value, element) {
+                return this.optional(element) || moment(value, "L", true).isValid();
+            }
+        }
+    });
+</script>)

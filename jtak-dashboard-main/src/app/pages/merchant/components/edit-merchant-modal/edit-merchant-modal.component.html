@@ -1,0 +1,71 @@
+<app-edit-modal [item]="item" [itemName]="item.title" moduleName="Merchant" [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid" (cancelClicked)="modal.dismiss()" (saveClicked)="save()">
+  <ng-container *ngIf="item">
+    <form class="form jtak-edit-form" [formGroup]="formGroup">
+      <section class="edit-section">
+        <div class="edit-section-heading"><span>01</span><div><h3>Business details</h3><p>Customer-facing identity and merchant ownership.</p></div></div>
+        <div class="row g-4">
+          <div class="col-md-6"><label for="title">Business name</label><app-input-container [control]="formGroup.controls.title"><input type="text" class="form-control" formControlName="title" id="title" placeholder="Enter the business name" /></app-input-container></div>
+          <div class="col-md-6"><label for="ownerId">Account owner</label><ng-select id="ownerId" formControlName="ownerId" placeholder="Choose an owner"><ng-option *ngFor="let user of merchantUsers" [value]="user.id">{{ user.fullName }}</ng-option></ng-select></div>
+          <div class="col-12">
+            <label class="d-block mb-2">Merchant type (نوع المتجر)</label>
+            <div class="d-flex flex-wrap gap-4">
+              <label class="d-flex align-items-center gap-2 cursor-pointer">
+                <input type="radio" formControlName="merchantKind" [value]="0" class="form-check-input mt-0" />
+                <span>🍽️ <strong>Restaurant (مطعم)</strong></span>
+              </label>
+              <label class="d-flex align-items-center gap-2 cursor-pointer">
+                <input type="radio" formControlName="merchantKind" [value]="1" class="form-check-input mt-0" />
+                <span>🛒 <strong>Supermarket / Market (سوبرماركت)</strong></span>
+              </label>
+              <label class="d-flex align-items-center gap-2 cursor-pointer">
+                <input type="radio" formControlName="merchantKind" [value]="2" class="form-check-input mt-0" />
+                <span>💊 <strong>Pharmacy (صيدلية)</strong></span>
+              </label>
+              <label class="d-flex align-items-center gap-2 cursor-pointer">
+                <input type="radio" formControlName="merchantKind" [value]="3" class="form-check-input mt-0" />
+                <span>🏬 <strong>Store (متجر)</strong></span>
+              </label>
+            </div>
+            <small class="text-muted d-block mt-1">This controls exactly which featured category contains the merchant in the customer app.</small>
+          </div>
+          <div class="col-12"><label for="shortDescription">Short description</label><app-input-container [control]="formGroup.controls.shortDescription"><input type="text" class="form-control" formControlName="shortDescription" id="shortDescription" placeholder="A short summary shown in listings" /></app-input-container></div>
+          <div class="col-12"><label for="description">Full description</label><app-input-container [control]="formGroup.controls.description"><textarea class="form-control" rows="4" formControlName="description" id="description" placeholder="Describe the business, cuisine, or service"></textarea></app-input-container></div>
+          <div class="col-12"><label class="setting-toggle"><input type="checkbox" formControlName="active" /><span><strong>Merchant is active</strong><small>Customers can discover and order from this merchant.</small></span></label></div>
+        </div>
+      </section>
+
+      <section class="edit-section">
+        <div class="edit-section-heading"><span>02</span><div><h3>Contact and delivery</h3><p>How the team reaches this merchant and where they deliver.</p></div></div>
+        <div class="row g-4">
+          <div class="col-md-6"><label for="phone1">Primary phone</label><app-input-container [control]="formGroup.controls.phone1"><input type="tel" class="form-control" formControlName="phone1" id="phone1" placeholder="Primary contact number" /></app-input-container></div>
+          <div class="col-md-6"><label for="phone2">Secondary phone <span class="optional-label">Optional</span></label><app-input-container [control]="formGroup.controls.phone2"><input type="tel" class="form-control" formControlName="phone2" id="phone2" placeholder="Backup contact number" /></app-input-container></div>
+          <div class="col-md-8"><label for="address">Address</label><app-input-container [control]="formGroup.controls.address"><input type="text" class="form-control" formControlName="address" id="address" placeholder="Street, district, and city" /></app-input-container></div>
+          <div class="col-md-4"><label for="shippingCoverageInMeters">Delivery radius</label><div class="input-with-suffix"><input type="number" class="form-control" formControlName="shippingCoverageInMeters" id="shippingCoverageInMeters" min="0" placeholder="0" /><span>meters</span></div></div>
+        </div>
+      </section>
+
+      <section class="edit-section">
+        <div class="edit-section-heading"><span>03</span><div><h3>Commercial settings</h3><p>Settlement account and JTAK commission.</p></div></div>
+        <div class="row g-4">
+          <div class="col-md-6"><label for="ibaN1Title">Account holder</label><app-input-container [control]="formGroup.controls.ibaN1Title"><input type="text" class="form-control" formControlName="ibaN1Title" id="ibaN1Title" placeholder="Name on the account" /></app-input-container></div>
+          <div class="col-md-6"><label for="ibaN1">IBAN / account number</label><app-input-container [control]="formGroup.controls.ibaN1"><input type="text" class="form-control" formControlName="ibaN1" id="ibaN1" placeholder="Enter account details" /></app-input-container></div>
+          <div class="col-md-6"><label for="profitOutOfMerchantPricePercent">JTAK commission</label><div class="input-with-suffix"><input type="number" class="form-control" formControlName="profitOutOfMerchantPricePercent" id="profitOutOfMerchantPricePercent" min="0" max="100" placeholder="0" /><span>%</span></div></div>
+        </div>
+      </section>
+
+      <section class="edit-section">
+        <div class="edit-section-heading"><span>04</span><div><h3>Branding</h3><p>Upload the logo customers will see throughout the app.</p></div></div>
+        <label for="photo">Logo URL <span class="optional-label">Optional</span></label>
+        <app-input-container [control]="formGroup.controls.photo"><input type="text" class="form-control mb-3" formControlName="photo" id="photo" placeholder="Asset path or image URL" /></app-input-container>
+        <app-file-uploader uploaderTitle="Choose merchant logo" (fileUploaded)="onFileUploaded($event, 'photo')"></app-file-uploader>
+        <app-uploaded-image *ngIf="formGroup.get('photo')?.value" [imageId]="formGroup.get('photo')?.value" [dimensions]="{ width: 320, height: 160 }" (imageDeleted)="onFileDelete('photo')"></app-uploaded-image>
+      </section>
+
+      <section class="edit-section edit-section--last">
+        <div class="edit-section-heading"><span>05</span><div><h3>Map location</h3><p>Drag the marker to the merchant’s exact pickup point.</p></div></div>
+        <div class="merchant-map"><google-map height="360px" width="100%" [center]="center" [options]="options" [zoom]="zoom"><map-marker [position]="marker.position" [options]="marker.options" (mapDragend)="onCursorChange($event)"></map-marker></google-map></div>
+      </section>
+    </form>
+  </ng-container>
+</app-edit-modal>

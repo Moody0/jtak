@@ -1,0 +1,12 @@
+<ng-container *ngIf="isActive">
+  <ng-container *ngIf="activeDirection === 'ASC'">
+    <span class="fas fa-arrow-up ml-1"> </span>
+  </ng-container>
+  <ng-container *ngIf="activeDirection === 'DESC'">
+    <span class="fas fa-arrow-down ml-1"> </span>
+  </ng-container>
+</ng-container>
+
+<ng-container *ngIf="!isActive">
+  <span class="fas fa-sort ml-1 svg-icon-sort"> </span>
+</ng-container>

@@ -1,0 +1,89 @@
+﻿@using App.Resources
+@using App.Extensions
+@using App.Shared.Entities
+@using App.Shared.Entities.Resources
+@using System.Linq
+@using Microsoft.EntityFrameworkCore
+@inject AutoMapper.IMapper mapper
+@inject Microsoft.AspNetCore.Identity.UserManager<AppUser> userManager
+
+@{
+    var uid = User.GetUserId();
+    var user = mapper.Map<UserDto>(await userManager.GetUserAsync(User));
+}
+
+@await Html.PartialAsync("_Header", user)
+<div class="container clearfix h-100">
+    <div class="row mb-4" style="min-height:50vh">
+        @await Html.PartialAsync("_UserNav", user)
+        <div class="col-lg-9">
+            <table id="datatable" class="table table-striped w-100">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody><tr><td>@_Common.LoadingData </td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@section Styles {
+    <link rel="stylesheet" href="/vendor/datatables.net-bs4/css/dataTables.bootstrap4.css">
+}
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script src="~/js/sol.datatables.min.js"></script>
+    <script>
+        $(function() {
+            if (!$.fn.dataTable) return;
+
+            var dtInstance = $('#datatable').dataTable({
+                order: [[0, "desc"]],
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "@Html.Raw(_Common.All)"]],
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: "@Url.Action("Notifications", "Me")",
+                    data: function (d) { d.Id = $("input[name='filter']:checked").val(); },
+                    type: "POST"
+                },
+                paging: true,
+                ordering: true,
+                info: true,
+                responsive: true,
+                columns: [
+                    {
+                        name: 'Title', data: 'title', title: '@_Entities.Title', sortable: false, searchable: false, render: function(data, type, row) {
+                            return '<a href="' + (row.url ?? '#') + '">' + row.title + '</a><p>' + row.text + '</p>';
+                        }
+                    },
+                    { name: 'CreatedDate', data: 'createdDate', title: '@_Entities.CreatedDate', sortable: true, searchable: false, render: $.fn.dataTable.render.ago() }
+                ],
+                oLanguage: @Html.Raw(_Common.DataTablesLang),
+                dom: 'tp',
+                drawCallback: function (settings) {
+                    $('#datatable_wrapper [data-toggle="tooltip"]').tooltip({ container: 'body' });
+                },
+                stateSave: true
+            });
+
+            var columnInputs = $('tfoot .datatable_input_col_search');
+
+            // On input keyup trigger filtering
+            columnInputs.keyup(function() {
+                dtInstance.fnFilter(this.value, columnInputs.index(this));
+            });
+
+            $("#filter1").change(function () {
+                $('#datatable').DataTable().ajax.reload();
+            });
+            $("#filter2").change(function () {
+                $('#datatable').DataTable().ajax.reload();
+            });
+        });
+    </script>
+    @{await Html.RenderPartialAsync("_ToastrMsg");}
+}

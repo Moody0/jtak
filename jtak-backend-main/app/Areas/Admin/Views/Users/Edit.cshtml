@@ -1,0 +1,39 @@
+﻿@using App.Resources
+@model App.Shared.Entities.UserDto
+
+<div class="content-heading">
+    <div>
+        @_Nav.Users
+        <small>@ViewBag.UserDisplayName (@ViewBag.UserEmail)</small>
+    </div>
+</div>
+<div class="container-fluid">
+    <form asp-action="Edit">
+        <div class="card card-default">
+            <div class="card-body">
+                <div class="col-md-6">
+                    <div asp-validation-summary="All" class="text-danger"></div>
+                    <input type="hidden" asp-for="Id" />
+                    @Html.EditorFor(x => x.FirstName)
+                    @Html.EditorFor(x => x.LastName)
+                    @Html.EditorFor(x => x.Email)
+                    @Html.EditorFor(x => x.PhoneNumber)
+                    @Html.EditorFor(x => x.IsActive)
+                </div>
+                <div class="col-md-6">
+                    @Html.EditorFor(x => x.ProfilePhoto)
+                </div>
+            </div>
+            <div class="card-footer text-right">
+                <div class="btn-group">
+                    <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+                    <input type="submit" value="@_Common.Save" class="btn btn-success" />
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

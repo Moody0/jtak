@@ -1,0 +1,8 @@
+﻿@model DateTime?
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+}
+@if (Model.HasValue)
+{
+    <span class="ltr">@Model.Value.ToLongTimeString()</span>
+}

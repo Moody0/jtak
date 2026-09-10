@@ -1,0 +1,91 @@
+<app-edit-modal [item]="item" [itemName]="item.title" moduleName="Banner" [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid" (cancelClicked)="modal.dismiss()" (saveClicked)="save()">
+  <ng-container *ngIf="item">
+    <form class="form form-label-right" [formGroup]="formGroup">
+      <div class="row">
+        <div class="col-md-12">
+          <div class="mb-8">
+            <label for="titleAr">Title AR</label>
+            <app-input-container [control]="formGroup.controls.titleAr">
+              <input type="text" class="form-control form-control-solid" formControlName="titleAr" id="titleAr"
+                placeholder="Enter title AR" #input />
+            </app-input-container>
+          </div>
+        </div>
+        <!-- <div class="col-md-4">
+          <div class="mb-8">
+            <label for="titleEn">Title EN</label>
+            <app-input-container [control]="formGroup.controls.titleEn">
+              <input type="text" class="form-control form-control-solid" formControlName="titleEn" id="titleEn"
+                placeholder="Enter title EN" #input />
+            </app-input-container>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="titleTr">Title TR</label>
+            <app-input-container [control]="formGroup.controls.titleTr">
+              <input type="text" class="form-control form-control-solid" formControlName="titleTr" id="titleTr"
+                placeholder="Enter title TR" #input />
+            </app-input-container>
+          </div>
+        </div> -->
+        <div class="col-md-12">
+          <div class="mb-8">
+            <label for="textAr">Text AR</label>
+            <app-input-container [control]="formGroup.controls.textAr">
+              <input type="text" class="form-control form-control-solid" formControlName="textAr" id="textAr"
+                placeholder="Enter text AR" #input />
+            </app-input-container>
+          </div>
+        </div>
+        <!-- <div class="col-md-4">
+          <div class="mb-8">
+            <label for="textEn">Text EN</label>
+            <app-input-container [control]="formGroup.controls.textEn">
+              <input type="text" class="form-control form-control-solid" formControlName="textEn" id="textEn"
+                placeholder="Enter text EN" #input />
+            </app-input-container>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="textTr">Text TR</label>
+            <app-input-container [control]="formGroup.controls.textTr">
+              <input type="text" class="form-control form-control-solid" formControlName="textTr" id="textTr"
+                placeholder="Enter text TR" #input />
+            </app-input-container>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-8">
+            <label for="notificationType">Notification Type</label>
+            <app-input-container [control]="formGroup.controls.textTr">
+              <input type="number" class="form-control form-control-solid" formControlName="notificationType"
+                id="notificationType" placeholder="Enter notification type" #input />
+            </app-input-container>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="mb-8">
+            <label for="url">URL</label>
+            <app-input-container [control]="formGroup.controls.url">
+              <input type="text" class="form-control form-control-solid" formControlName="url" id="url"
+                placeholder="Enter URL" #input />
+            </app-input-container>
+          </div>
+        </div>
+ -->
+
+        <div class="col-md-12">
+          <app-file-uploader uploaderTitle="Upload notification image"
+            (fileUploaded)="onFileUploaded($event, 'image')"></app-file-uploader>
+
+          <app-uploaded-image [imageId]="formGroup.get('image')?.value"
+            [dimensions]="{ width: 600, height: 300 }" (imageDeleted)="onFileDelete('image')">
+          </app-uploaded-image>
+        </div>
+      </div>
+    </form>
+  </ng-container>
+</app-edit-modal>

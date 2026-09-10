@@ -1,0 +1,13 @@
+<div class="d-flex align-items-center" [ngClass]="toolbarButtonMarginClass">
+  <app-language-selector-inner></app-language-selector-inner>
+</div>
+
+<div class="d-flex align-items-center" [ngClass]="toolbarButtonMarginClass" id="kt_header_user_menu_toggle">
+  <div class="jtak-user-trigger cursor-pointer" data-kt-menu-trigger="click" data-kt-menu-attach="parent"
+    data-kt-menu-placement="bottom-end" data-kt-menu-flip="bottom" *ngIf="auth.user$ | async as user">
+    <span class="jtak-user-copy"><small>Administrator</small><strong>{{ user.fullName || 'JTAK Admin' }}</strong></span>
+    <span class="jtak-user-avatar" aria-hidden="true">{{ user.fullName ? user.fullName.charAt(0) : 'J' }}</span>
+    <i class="fas fa-chevron-down jtak-user-chevron" aria-hidden="true"></i>
+  </div>
+  <app-user-inner></app-user-inner>
+</div>

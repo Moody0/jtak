@@ -1,0 +1,45 @@
+﻿@model App.Models.Pages.PrivacyPolicyPageVm
+
+<div class="container-fluid">
+    <form asp-action="PrivacyPolicy">
+        <div class="card card-default">
+            <div class="card-header">
+                <em class="fa fa-list-alt p-2"></em> @_Nav.PrivacyPolicy
+            </div>
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="row" style="overflow:hidden">
+                    <div class="col-lg-6">
+                        @Html.EditorFor(x => x.SubTitle)
+                        @Html.EditorFor(x => x.HeaderImage)
+                        @Html.EditorFor(x => x.MobileHeaderImage)
+                        @Html.EditorFor(x => x.Body)
+                    </div>
+                    <div class="col-lg-6">
+                    </div>
+                    <hr class="col-12" />
+                    <div class="col-lg-6">
+                        <h4>@_Common.SEOdata</h4>
+                        @Html.EditorFor(x => x.SeoTitle)
+                        @Html.EditorFor(x => x.SeoDescription)
+                        @*@Html.EditorFor(x => x.SeoKeywords)*@
+                    </div>
+                    <div class="col-lg-6">
+                        @Html.EditorFor(x => x.SeoFeaturedImage)
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-right">
+                <div class="btn-group">
+                    <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+                    <input type="submit" value="@_Common.Save" class="btn btn-success" />
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

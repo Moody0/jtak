@@ -1,0 +1,19 @@
+﻿@using App.Extensions
+@model String
+@{
+    var idclass = Guid.NewGuid().ToString();
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <textarea rows="8" asp-for="@Model" type="text" class="form-control @idclass"></textarea>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+<style>
+    div.shortcode {
+        display: none !important;
+    }
+</style>
+@Html.Script(@<script src="~/lib/jquery-emoji-picker/js/jquery.emojipicker.js"></script>)
+@Html.Script(@<script src="~/lib/jquery-emoji-picker/js/jquery.emojis.js"></script>)
+@Html.Script(@<script>  $(function (e) { $('.@idclass').emojiPicker({ height: '300px', width: '450px' }); }); </script>)
+

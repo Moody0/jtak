@@ -1,0 +1,104 @@
+<div class="card card-custom gutter-b">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-title">
+      <h3 class="card-label">Set Products For Merchant</h3>
+    </div>
+    <div>
+      <button class="btn btn-success" (click)="save()">Save</button>
+    </div>
+  </div>
+  <div class="card-body" style="max-height: 90vh; overflow-y: scroll">
+    <table class="table">
+      <tr>
+        <td>
+          <input
+            type="checkbox"
+            (change)="toggleAllChanged($event)"
+            [checked]="toggleAll"
+          />
+          <span>Toggle All</span>
+        </td>
+        <td>
+          <input
+            type="text"
+            class="form-control"
+            name="searchText"
+            placeholder="Search"
+            [(ngModel)]="search"
+            (ngModelChange)="onSearchChange($event)"
+          />
+        </td>
+      </tr>
+    </table>
+
+    <table class="table table-sm mt-3">
+      <thead>
+        <tr>
+          <td>Enabled</td>
+          <td>Product</td>
+          <td>Merchant Price</td>
+          <td>Additional %</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          *ngFor="
+            let i of search.length > 0
+              ? productMerchantsDraft
+              : productMerchants
+          "
+          class="border-bottom"
+          style="vertical-align: middle"
+        >
+          <td style="width: 50px">
+            <input
+              type="checkbox"
+              name="checkbox"
+              [checked]="i.isSelected"
+              (change)="changeIsSelected(i.productId)"
+            />
+          </td>
+          <td class="d-flex border-none">
+            <div>
+              <img
+                loading="lazy"
+                height="50"
+                [src]="filesService.getFile(i.productPhotos, 50, 50)"
+                alt="productImg"
+              />
+            </div>
+            <div class="px-2">
+              <div style="font-weight: 700">{{ i.product }}</div>
+              <div>
+                <span class="badge badge-light-success"
+                  >{{ i.productCat1 }}
+                </span>
+                <i class="fas fa-chevron-left m-1"></i>
+                <span class="badge badge-success"> {{ i.productCat2 }}</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span *ngIf="i.price === i.finalPrice">{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">SYP</span></span>
+            <span *ngIf="i.price !== i.finalPrice">
+              <span style="text-decoration: line-through" class="text-muted me-1">{{ i.price | number }}</span>
+              <span>{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">SYP</span></span>
+            </span>
+          </td>
+          <td>
+            <input
+              style="max-width: 80px"
+              [name]="i.product"
+              type="number"
+              max="100"
+              min="0"
+              (change)="onPercentChange(i.productId, $event)"
+              [(ngModel)]="i.additionalProfitPercent"
+              class="form-control form-control-solid"
+            />
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

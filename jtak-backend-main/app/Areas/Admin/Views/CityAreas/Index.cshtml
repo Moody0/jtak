@@ -1,0 +1,157 @@
+﻿@*@using Solf.Extensions
+@using App.Shared.Entities.Resources
+@using App.Resources
+
+@{ Layout = "_Layout"; }
+@model App.Entities.CityAreaDto
+@inject Microsoft.AspNetCore.Mvc.Localization.IViewLocalizer Localizer
+
+
+<div class="container-fluid">
+    <div class="card card-default">
+        <div class="card-header">
+            <em class="fa fa-box p-2"></em> @Localizer["Manage City Areas."]
+            <a asp-action="Create" class="btn btn-primary float-right" data-toggle="tooltip" title="@_Common.Create"><i class="fa fa-plus"></i></a>
+        </div>
+        <div class="card-body">
+            <table id="datatable" class="table table-striped w-100">
+                <thead>
+                    <tr>
+                        <th>@Html.DisplayNameFor(x => x.Title)</th>
+                        <th>@Html.DisplayNameFor(x => x.City)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody><tr><td>@_Common.LoadingData </td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="/vendor/datatables.net-bs4/css/dataTables.bootstrap4.css">
+}
+
+@section Scripts {
+    <script src="~/js/sol.datatables.min.js"></script>
+    <script>
+        $(function() {
+            if (!$.fn.dataTable) return;
+
+            $('#SlideType').on('change', function (e) {
+                $('#datatable').DataTable().ajax.reload();
+            });
+
+            var dtInstance = $('#datatable').dataTable({
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "@Html.Raw(_Common.All)"]],
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: "@Url.Action("Index")",
+                    type: "POST"
+                },
+                paging: true,
+                ordering: true,
+                info: true,
+                responsive: true,
+                columns: [
+                    { name: 'Title', data: 'title', title: '@_City.CityArea', sortable: false, searchable: false },
+                    { name: 'City', data: 'city', title: '@_City.City', sortable: false, searchable: false },
+                    {
+                        name: 'actions',
+                        className: 'actionbuttons',
+                        data: null,
+                        title: '',
+                        width: '150px',
+                        sortable: false,
+                        searchable: false,
+                        render: function (data, type, row) {
+                            return `<div class="dt-buttons btn-group">
+                                <a href="@Url.Action("Edit")/${row["id"]}" class="btn btn-outline-primary" data-toggle="tooltip" title="@_Common.Edit"><i class="fa fa-edit"></i></a>
+                                <button onclick="deleteRecord(${row["id"]})" class="btn btn-outline-danger" data-toggle="tooltip" title="@_Common.Delete"><i class="fa fa-times"></i></button></div>`;
+                        }
+                    }
+                ],
+                oLanguage: @Html.Raw(_Common.DataTablesLang),
+                dom: '<"row"<"col-md-6"l><"col-md-6"Bfr>>tip',
+                drawCallback: function (settings) {
+                    $('#datatable_wrapper [data-toggle="tooltip"]').tooltip({ container: 'body' });
+                },
+                stateSave: true
+            });
+
+            var columnInputs = $('tfoot .datatable_input_col_search');
+
+            // On input keyup trigger filtering
+            columnInputs.keyup(function() {
+                dtInstance.fnFilter(this.value, columnInputs.index(this));
+            });
+        });
+        function deleteRecord(id) {
+            Swal.fire({
+                title: '@Html.Raw(_Common.DeleteMsgTitle)',
+                text: "@Html.Raw(_Common.DeleteMsgBody)",
+                type: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '@Html.Raw(_Common.DeleteBtnText)',
+                cancelButtonText: '@Html.Raw(_Common.CancelBtnText)'
+            }).then((result) => {
+                if (result.value) {
+                    $.ajax({
+                        method: "POST",
+                        url: `@Url.Action("Delete")/${id}`
+                    })
+                    .done(function (data) {
+                        toastr.success('@Html.Raw(_Common.DeleteSuccessToastr)');
+                        $('#datatable').DataTable().ajax.reload();
+                    })
+                    .fail(function () {
+                        toastr.error('@Html.Raw(_Common.DeleteFailedToastr)');
+                    });
+                }
+            });
+        }
+
+        function Up(id){
+            var jqxhr = $.ajax({ method: "POST", url: `@Url.Action("Up")/${id}` })
+                .done(function (data) {
+                    $('#datatable_wrapper [data-toggle="tooltip"]').tooltip('dispose');
+                    $('#datatable').DataTable().ajax.reload();
+                })
+                .fail(function () {
+                    toastr.error('Failed to set order', 'Opps');
+                });
+        }
+        function Down(id){
+            var jqxhr = $.ajax({ method: "POST", url: `@Url.Action("Down")/${id}` })
+                .done(function (data) {
+                    $('#datatable_wrapper [data-toggle="tooltip"]').tooltip('dispose');
+                    $('#datatable').DataTable().ajax.reload();
+                })
+                .fail(function () {
+                    toastr.error('Failed to set order', 'Opps');
+                });
+        }
+       async function ChooseOrder(id) {
+            const { value: order } = await Swal.fire({
+                title: '@_Common.ChooseOrder',
+                input: 'number',
+                inputValue: 0,
+                showCancelButton: true,
+                confirmButtonText: '@Html.Raw(_Common.OkBtnText)',
+                cancelButtonText: '@Html.Raw(_Common.CancelBtnText)'
+            });
+
+            $.ajax({ method: "POST", url: `@Url.Action("ChooseOrder")/${id}`, data: {order : order} })
+                .done(function (data) {
+                    $('#datatable_wrapper [data-toggle="tooltip"]').tooltip('dispose');
+                    $('#datatable').DataTable().ajax.reload();
+                })
+                .fail(function () {
+                    toastr.error('Failed to set order', 'Opps');
+                });
+        }
+    </script>
+}*@

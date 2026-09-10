@@ -1,0 +1,54 @@
+﻿@using App.Extensions
+@using System.Globalization
+@using App.Shared.Entities
+@using App.Resources
+@using App.Shared.Entities.Resources
+@model UserDto
+
+@await Html.PartialAsync("_Header")
+<div class="container clearfix h-100">
+    <div class="row mb-4" style="min-height:50vh">
+        @await Html.PartialAsync("_UserNav")
+        <div class="col-lg-9">
+            <div class="row">
+                <div class="col-4 col-md-3">@Html.DisplayNameFor(x => x.Email)</div>
+                <div class="col">@Html.DisplayFor(x => x.Email)</div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-4 col-md-2">@_AppUser.ContactInfo</div>
+                <div class="col">
+                    @if (Model.PhoneNumber != null)
+                    {
+                        <a class="phone social-icon" target="_blank" href="@Model.PhoneNumber"><i class="fa fa-phone"></i></a>
+                    }
+                </div>
+            </div>
+            <hr>
+            <div class="btn-group float-md-right">
+                <a href="@Url.Action("Logout","Account", new { ReturnUrl = Url.Action("Index","Home") })" class="btn btn-sm btn-outline-warning">
+                    @_Account.Logout
+                </a>
+                <a href="@Url.Action("ChangePassword","Me")" class="btn btn-sm btn-outline-secondary">
+                    @_Account.Change_My_Password
+
+                </a>
+                <a href="@Url.Action("Edit","Me")" class="btn btn-sm btn-outline-danger">
+                    @_Common.Edit
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .main-header {
+            box-shadow: none;
+        }
+    </style>
+}
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+    @{await Html.RenderPartialAsync("_ToastrMsg");}
+}

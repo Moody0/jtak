@@ -1,0 +1,157 @@
+﻿@using App.Extensions
+@using Microsoft.AspNetCore.Identity
+@using App.Helpers
+@using App.Shared.Entities
+@using App.Shared.Entities.Resources
+@using App.Resources
+
+@inject ISessionHelper sessionHelper
+@inject App.Shared.Services.IGenericSettingService _settings
+@inject UserManager<AppUser> UserManager
+
+@{
+    var currentUser = await UserManager.GetUserAsync(User);
+}
+<header class="header-appear">
+    <nav class="navbar navbar-top-default navbar-expand-lg static-nav transparent-bg nav-bottom-line">
+        <div class="container">
+            <a class="logo" href="/">
+                <img src="/images/logo-white.svg" style="height:50px;" alt="logo" title="@_Common.SiteName" class="logo-default">
+                <img src="/images/logo.svg" style="height:50px;" alt="logo" title="@_Common.SiteName" class="logo-scrolled">
+            </a>
+            <div class="collapse navbar-collapse d-none d-lg-block justify-content-end">
+                <ul class="nav navbar-nav mr-2">
+
+                </ul>
+            </div>
+            <ul class="navbar-nav text-bold text-center text-md-light">
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <li class="nav-item dropdown btn-box d-none d-lg-block mr-2 ml-2" style="line-height:3">
+                        <a class="theme-btn btn-outline text-dark dropdown-toggle" href="#" title="@_Nav.Notifications" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" onclick="readAllNotifications()">
+                            <em class="fa fa-bell"></em>
+                            <div class="badge badge-danger notificationCount"></div>
+                        </a>
+                        <div class="dropdown-menu @(System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft ? "dropdown-menu-right" : "") notificationList" style="width:250px;">
+                            <a class="dropdown-item" id="emptyNotification">
+                                <span class="d-flex align-items-center justify-content-center">
+                                    <span class="small text-muted">@_Notifications.NoNewNotifications</span>
+                                </span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="@Url.Action("Notifications", "Me", new { area = "" })">
+                                <span class="d-flex align-items-center">
+                                    <span class="text-sm">@_Nav.AllNotifications</span>
+                                </span>
+                            </a>
+                        </div>
+                    </li>
+                    <li class="nav-item dropdown btn-box d-none d-lg-block mr-2 ml-2">
+                        <a class="theme-btn btn-outline text-dark dropdown-toggle" href="#" id="dropdownMenuButton2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <img src="@Url.ImgHref(currentUser?.ProfilePhoto, 60, 60, true)" alt="@currentUser?.FullName" width="50" height="50" class="img-thumbnail img-circle" />
+                        </a>
+                        <div class="dropdown-menu @(System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft ? "dropdown-menu-right" : "")" aria-labelledby="dropdownMenuButton2">
+                            <a class="dropdown-item disabled" href="#"><span class="user-block-name">@currentUser?.FullName</span></a>
+                            <a class="dropdown-item" href="@Url.Action("Index", "Me", new{area=""})"><i class="fa fa-user p-1" style="width: 30px; text-align: center;"></i> @_Nav.MyAccount</a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="@Url.Action("Logout", "Account", new { area = "" })"><i class="fa fa-power-off p-1" style="width: 30px; text-align: center;"></i> @_Account.Logout</a>
+                        </div>
+                    </li>
+                    <li class="nav-item d-lg-none  @Html.isActive(controllers: "User")">
+                        <a class="nav-link text-light" href="@Url.Action("Me", "User", new { area = "" })">
+                            <i class="fa fa-user p-1"></i> @_Nav.MyAccount
+                        </a>
+                    </li>
+                    <li class="nav-item d-lg-none">
+                        <a class="nav-link text-light" href="@Url.Action("Logout", "Account", new { area = "" })"><i class="fa fa-power-off p-1"></i> @_Account.Logout</a>
+                    </li>
+                }
+                else
+                {
+                    <a href="@Url.Action("Login", "Account", new { area = "" })" class="btn-setting btn-scale btn-red text-white d-none d-lg-block">@_Account.SignIn</a>
+                }
+            </ul>
+            @*
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <div class="item user-block" style="max-width: 175px;">
+                        <!-- User picture-->
+                        <div class="d-flex justify-content-start align-items-center">
+                            <div class="user-block-status m-2 d-none d-lg-block">
+                                <a class="d-none d-lg-block" href="@Url.Action("Index", "Me", new{area=""})" style="text-decoration-line: initial;">
+                                    <img src="@Url.ImgHref(currentUser?.ProfilePhoto, 60, 60, true)" alt="@currentUser?.FullName" width="50" height="50" class="img-thumbnail img-circle" />
+                                </a>
+                            </div>
+                            <div class="d-none d-lg-block">
+                                <a href="@Url.Action("Index", "Me", new{area=""})" style="text-decoration-line: initial;display:block;">
+                                    <span class="user-block-name">@currentUser?.FullName</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <a href="@Url.Action("Login", "Account", new { area = "" })" class="btn-setting btn-scale btn-red text-white d-none d-lg-block">@_Account.SignIn</a>
+                }*@
+            <a class="menu_bars d-inline-block d-lg-none menu-bars-setting" id="sidemenu_toggle">
+                <div class="menu-lines">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </a>
+        </div>
+    </nav>
+    <div class="side-menu">
+        <div class="inner-wrapper nav-icon">
+            <span class="btn-close" id="btn_sideNavClose"></span>
+            <nav class="side-nav w-100">
+                <div class="navbar-nav">
+                    @*<a class="nav-link" href="@Url.Action("Index","HaveYourSay", new{area="", culture = System.Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName})">@_Nav.HaveYourSay</a>*@
+
+                    <a class="menu-line"><i class="fa fa-angle-right font-14" aria-hidden="true"></i></a>
+                </div>
+            </nav>
+            <div class="side-footer text-white w-100">
+
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <div class="d-flex justify-content-start flex-fill mb-2">
+                        <a class="text-white" href="#">
+                            <img src="@Url.ImgHref(currentUser?.ProfilePhoto, 32, 32, true)" alt="Avatar" width="32" height="32" class="img-thumbnail img-circle" />
+                        </a>
+                        <div>
+                            <a href="@Url.Action("Index", "Me", new { area = "" })">
+                                <span class="user-block-name mr-2 ml-2">@(currentUser?.FullName)</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="@Url.Action("Logout", "Account", new { area = "" })" class="text-white mb-4">@_Account.Logout</a>
+                    </div>
+                }
+                else
+                {
+                    <a href="@Url.Action("Login", "Account", new { area = "" })" class="btn-setting btn-scale btn-red text-white mb-4">@_Account.SignIn</a>
+                }
+                <ul class="social-icons-simple d-none d-md-block">@*
+                    <li class="side-menu-icons"><a href="@_Common.FacebookLink"><i class="fab fa-facebook-f color-white"></i></a></li>
+                    <li class="side-menu-icons"><a href="@_Common.InstagramLink"><i class="fab fa-instagram color-white"></i></a></li>
+                    <li class="side-menu-icons"><a href="@_Common.TwitterLink"><i class="fab fa-twitter color-white"></i></a></li>
+                    <li class="side-menu-icons"><a href="@_Common.LinkedInLink"><i class="fab fa-linkedin color-white"></i></a></li>*@
+
+
+                        <li><a class="side-menu-icons" href="@(_settings.GetValue<string>("FacebookLink"))"><i class="fab fa-facebook-f color-white" aria-hidden="true"></i></a></li>
+                        <li><a class="side-menu-icons" href="@(_settings.GetValue<string>("TwitterLink"))"><i class="fab fa-twitter color-white" aria-hidden="true"></i></a></li>
+                        <li><a class="side-menu-icons" href="@(_settings.GetValue<string>("LinkedInLink"))"><i class="fab fa-linkedin-in color-white" aria-hidden="true"></i></a></li>
+                        <li><a class="side-menu-icons" href="@(_settings.GetValue<string>("InstagramLink"))"><i class="fab fa-instagram color-white" aria-hidden="true"></i></a></li>
+                    
+                </ul>
+                <p class="text-white">&copy; @DateTime.Now.Year @_Common.SiteName</p>
+            </div>
+        </div>
+    </div>
+    <a id="close_side_menu" href="javascript:void(0);"></a>
+    <!--Side Menu-->
+</header>

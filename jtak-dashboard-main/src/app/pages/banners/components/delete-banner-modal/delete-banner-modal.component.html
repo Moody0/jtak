@@ -1,0 +1,6 @@
+<app-delete-modal
+  [isLoading]="isLoading$ | async"
+  moduleName="Banner"
+  (deleteClicked)="delete()"
+  (cancelClicked)="modal.dismiss()"
+></app-delete-modal>

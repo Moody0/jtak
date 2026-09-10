@@ -1,0 +1,7 @@
+@using App.Resources
+@using App.Shared.Entities.Enums
+@using Solf.Enums
+
+<div class="text-center">
+    <span asp-authorize asp-policy="@nameof(AppPermissionKey.AdminPermission)">@Html.Raw(_Common.BroughtToYouBy) - </span>@Html.Raw(string.Format(_Common.AllRightsResirved, DateTime.UtcNow.Year)) - @_Common.SiteName
+</div>

@@ -1,0 +1,34 @@
+﻿@model dynamic
+
+@{
+    var type = Nullable.GetUnderlyingType(ViewData.ModelMetadata.ModelType) ?? ViewData.ModelMetadata.ModelType;
+
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+    var dataSource = (IEnumerable<SelectListItem>)ViewData[fieldName];
+    var multible = ViewData["multiple"] != null ? "multiple" : "";
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+
+    @if (ViewBag.placeholder != null)
+    {
+        <div class="">
+            <label class="radio-inline c-radio">
+                <input name="@fieldName" type="radio" value="" @(Model == null ? "checked" : "") />
+                <span class="fa fa-check"></span>@ViewBag.placeholder
+            </label>
+        </div>
+    }
+    @foreach (var item in dataSource)
+    {
+        <div class="">
+            <label class="radio-inline c-radio">
+                <input id="@fieldName-@item.Value" name="@fieldName" type="radio" value="@item.Value" @Html.Raw(Model != null && item.Value == ((int)Model).ToString() ? "checked" : "") />
+                <span class="fa fa-check"></span>@item.Text
+            </label>
+        </div>
+    }
+</div>
+<div class="text-danger validationbox">
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>

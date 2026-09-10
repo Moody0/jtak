@@ -1,0 +1,85 @@
+﻿@using App.Resources
+@using Microsoft.EntityFrameworkCore.Internal
+@using App.Extensions
+@using App.Shared.Entities.Enums
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model App.Shared.Entities.UserDto
+
+<div class="row">
+    <div class="col-lg-3">
+        <div class="card b">
+            <div class="card-header bg-gray-lighter text-bold">@_Account.MyAccount</div>
+            <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                <a asp-authorize asp-policy="@nameof(AppPermissionKey.CustomerPermission)" class="nav-link active" id="tabSetting1tab" href="#tabSetting1" aria-controls="tabSetting1" aria-selected="true" data-toggle="pill">@_Account.Activity</a>
+                <a class="nav-link" id="tabSetting2tab" href="#tabSetting2" aria-controls="tabSetting2" data-toggle="pill">@_Account.ManageAccount</a>
+                <a class="nav-link" id="tabSetting3tab" href="#tabSetting3" aria-controls="tabSetting3" data-toggle="pill">@_Account.Password</a>
+                <a asp-authorize asp-policy="@nameof(AppPermissionKey.CustomerPermission)" class="nav-link" id="tabSetting4tab" href="#tabSetting4" aria-controls="tabSetting4" data-toggle="pill">@_Account.Subscription</a>
+            </div>
+        </div>
+
+    </div>
+    <div class="col-lg-9">
+        <div class="tab-content p-0 b0" id="v-pills-tabContent">
+            <div asp-authorize asp-policy="@nameof(AppPermissionKey.CustomerPermission)" class="tab-pane fade show active" id="tabSetting1" aria-labelledby="tabSetting1tab">
+                <div class="card b">
+                    <div class="card-body" style="overflow:hidden;padding:0">
+                        <div style="margin:0;">
+                            <div class="bg-cover" style="background-image: url(/images/profile-bg.jpg);border-radius:0.25rem 0.25rem 0 0;">
+                                <div class="p-4 text-center text-white">
+                                    <img class="img-thumbnail rounded-circle thumb128" src="@Url.ImgHref(Model.ProfilePhoto)" alt="Image">
+                                    <h3 class="m-0">@Html.DisplayFor(x => x.FirstName) @Html.DisplayFor(x => x.LastName)</h3>
+                                    <p>@Html.DisplayFor(x => x.Email)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tabSetting2" aria-labelledby="tabSetting2tab">
+                <form asp-action="Index">
+                    <div class="card b">
+                        <div class="card-header bg-gray-lighter text-bold">@_Account.ManageAccount</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div asp-validation-summary="All" class="text-danger"></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-lg-6">
+                                    @Html.EditorFor(x => x.FirstName)
+                                    @Html.EditorFor(x => x.LastName)
+                                    <div class="form-group">
+                                        <label asp-for="Email"></label>
+                                        <input asp-for="Email" class="form-control" disabled />
+                                        <input asp-for="Email" type="hidden" />
+                                    </div>
+                                    @Html.EditorFor(x => x.PhoneNumber)
+                                </div>
+                                <div class="col-lg-2">
+                                </div>
+                                <div class="col-lg-4">
+                                    @Html.EditorFor(x => x.ProfilePhoto)
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer text-right">
+                            <div class="btn-group">
+                                <button type="button" onclick="window.history.back()" class="btn btn-secondary">@_Common.BackToList</button>
+                                <input type="submit" value="@_Common.Save" class="btn btn-success" />
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="tab-pane fade" id="tabSetting3" aria-labelledby="tabSetting3tab">
+                @await Html.PartialAsync("_ChangePassword", new App.Models.ManageViewModels.ChangePasswordViewModel())
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/vendor/jquery-sparkline/jquery.sparkline.js"></script>
+    <script src="~/vendor/easy-pie-chart/dist/jquery.easypiechart.js"></script>
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @{await Html.RenderPartialAsync("_ToastrMsg");}
+}

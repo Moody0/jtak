@@ -1,0 +1,109 @@
+﻿@using Solf.Extensions
+@using App.Resources
+@using App.Shared.Entities.Resources
+
+@model App.Models.AccountViewModels.RegisterVm
+@{
+    ViewBag.Title = _Account.Register;
+    Layout = "~/Views/Shared/_LayoutPage.cshtml";
+}
+
+<div class="block-center mt-4 wd-xxl">
+    <!-- START card-->
+    <div class="card card-flat p-3">
+        <div class="card-body">
+            <a style="width: 100%; text-align: center; display: inline-block;" href="@Url.Action(" Index", "Dashboard" )">
+                <img style="max-height: 120px;margin-bottom:30px;" src="~/images/logo.svg" alt="@_Common.SiteName" title="@_Common.SiteName">
+            </a>
+            <h4 class="text-center pv">@_Account.RegisterTitle</h4>
+            <form asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+                <div asp-validation-summary="All" class="text-danger"></div>
+                <div class="form-group has-feedback">
+                    <div class="input-group with-focus">
+                        <input asp-for="FirstName" type="text" placeholder="@_AppUser.FirstName" autocomplete="off" required="required" class="form-control border-right-0" />
+                        <div class="input-group-append">
+                            <span class="input-group-text text-muted bg-transparent border-left-0">
+                                <em class="fas fa-envelope"></em>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group has-feedback">
+                    <div class="input-group with-focus">
+                        <input asp-for="LastName" type="text" placeholder="@_AppUser.LastName" autocomplete="off" required="required" class="form-control border-right-0" />
+                        <div class="input-group-append">
+                            <span class="input-group-text text-muted bg-transparent border-left-0">
+                                <em class="fas fa-envelope"></em>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group has-feedback">
+                    <div class="input-group with-focus">
+                        <input asp-for="Email" type="email" placeholder="@_Account.Email" autocomplete="off" required="required" class="form-control border-right-0" />
+                        <div class="input-group-append">
+                            <span class="input-group-text text-muted bg-transparent border-left-0">
+                                <em class="fas fa-envelope"></em>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group has-feedback">
+                    <div>@_AppUser.Gender</div>
+                    <div class="form-check-inline">
+                        <input class="form-check-input m-2" id="male" type="radio" name="Gender"
+                               value="@((int)App.Shared.Entities.Enums.Gender.Male)"
+                               @(Model?.Gender == App.Shared.Entities.Enums.Gender.Male ? "checked" : "")>
+                        <label class="form-check-label" for="male">@App.Shared.Entities.Enums.Gender.Male.ToLocalizedName()</label>
+                    </div>
+                    <div class="form-check-inline">
+                        <input class="form-check-input m-2" id="female" type="radio" name="Gender"
+                               value="@((int)App.Shared.Entities.Enums.Gender.Female)"
+                               @(Model?.Gender == App.Shared.Entities.Enums.Gender.Female ? "checked" : "")>
+                        <label class="form-check-label" for="female">@App.Shared.Entities.Enums.Gender.Female.ToLocalizedName()</label>
+                    </div>
+                </div>
+                <div class="form-group has-feedback">
+                    <div class="input-group with-focus">
+                        <input asp-for="Password" type="password" placeholder="@_Account.Password" required="required" class="form-control border-right-0" />
+                        <div class="input-group-append">
+                            <span class="input-group-text text-muted bg-transparent border-left-0">
+                                <em class="fas fa-lock"></em>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group has-feedback">
+                    <div class="input-group with-focus">
+                        <input asp-for="ConfirmPassword" type="password" placeholder="@_Account.ConfirmPassword" required="required" class="form-control border-right-0" />
+                        <div class="input-group-append">
+                            <span class="input-group-text text-muted bg-transparent border-left-0">
+                                <em class="fas fa-lock"></em>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-block btn-primary mt-lg">@_Account.Register</button>
+            </form>
+            <hr style="margin:10px -30px;" />
+            <div class="col-12">
+                <section id="socialLoginForm" class="text-center">
+                    <p>
+                        لديك حساب؟ يمكنك تسجيل الدخول
+                        <a href="@Url.Action("Login")"> من هنا</a>
+                        ، أو يمكنك الدخول مباشرة باستخدام حسابك على:
+                    </p>
+                    <form asp-action="ExternalLogin" asp-controller="Account" asp-route-area="" asp-route-ReturnUrl="@ViewBag.ReturnUrl">
+                        <button type="submit" class="btn btn-danger" id="Google" name="provider" value="Google" data-toggle="tooltip" title="Log in using your Google account">
+                            <i class="fab fa-google"></i>
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="Facebook" name="provider" value="Facebook" data-toggle="tooltip" title="Log in using your Facebook account">
+                            <i class="fab fa-facebook-f"></i>
+                        </button>
+                    </form>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>

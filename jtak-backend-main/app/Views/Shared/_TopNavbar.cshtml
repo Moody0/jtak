@@ -1,0 +1,126 @@
+@using Solf
+@using App.Extensions
+@using Solf.Enums
+@using App.Shared.Entities.Enums
+@using App.Resources
+@using System.Globalization
+@addTagHelper *,TagHelperSamples
+@addTagHelper *,TagHelperSamples.Authorization
+
+<!-- START Top Navbar-->
+<nav class="navbar topnavbar">
+    <!-- START navbar header-->
+    <div class="navbar-header">
+        <a class="navbar-brand" href="@Url.Action("Index","Dashboard", new{area=""})">
+            <div class="brand-logo">
+                <img src="~/images/logo-white.svg" style="height:40px" alt="@_Common.SiteName" class="img-responsive" />
+            </div>
+            <div class="brand-logo-collapsed">
+                <img src="~/images/logo-min.svg" style="height:40px" alt="@_Common.SiteName" class="img-responsive" />
+            </div>
+        </a>
+    </div>
+    <!-- END navbar header-->
+    <!-- START Left navbar-->
+    <ul class="navbar-nav mr-auto flex-row">
+        <li class="nav-item">
+            <!-- Button used to collapse the left sidebar. Only visible on tablet and desktops-->
+            <a class="nav-link d-none d-md-block d-lg-block d-xl-block" href="#" data-trigger-resize="" data-toggle-state="aside-collapsed">
+                <em class="fas fa-bars"></em>
+            </a>
+            <!-- Button to show/hide the sidebar on mobile. Visible on mobile only.-->
+            <a class="nav-link sidebar-toggle d-md-none" href="#" data-toggle-state="aside-toggled" data-no-persist="true">
+                <em class="fas fa-bars"></em>
+            </a>
+        </li>
+        <!-- START User avatar toggle-->
+        <li class="nav-item d-none d-md-block" data-toggle="tooltip" title="@_Account.MyAccount">
+            <!-- Button used to collapse the left sidebar. Only visible on tablet and desktops-->
+            <a class="nav-link" id="user-block-toggle" href="#user-block" data-toggle="collapse">
+                <em class="icon-user"></em>
+            </a>
+        </li>
+        @*
+            <!-- START User avatar toggle-->
+            <li asp-authorize asp-policy="@nameof(AppPermissionKey.AdminPermission)" class="nav-item d-none d-md-block" data-toggle="tooltip" title="@_Account.ReAuthenticate">
+                <!-- Button used to collapse the left sidebar. Only visible on tablet and desktops-->
+                <a class="nav-link" asp-action="GoogleLogin" asp-controller="Attachments" asp-route-area="Content" asp-route-returnurl="@($"{Context.Request.Path}{Context.Request.QueryString}")">
+                    <i class="fab fa-google"></i>
+                </a>
+            </li>
+        *@
+        <!-- START User avatar toggle-->
+        <li asp-authorize asp-policy="@nameof(AppPermissionKey.AdminPermission)" class="nav-item d-none d-md-block">
+            <!-- Button used to collapse the left sidebar. Only visible on tablet and desktops-->
+            <div class="dropdown" style="padding: 10px 0;">
+                <a class="btn btn-green dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    @System.Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName.ToUpper()
+                </a>
+                <div class="dropdown-menu">
+                    @foreach (var culture in new CultureInfo[] { new CultureInfo("ar"), new CultureInfo("en") })
+                    {
+                        if (culture.Name != System.Threading.Thread.CurrentThread.CurrentCulture.Name)
+                        {
+                            <a class="dropdown-item" href="@Url.Action("ChangeLanguage","Dashboard", new{area="",id = culture.TwoLetterISOLanguageName.ToLower(), returnurl = $"{Context.Request.Path}{Context.Request.QueryString}" })">
+                                @culture.TwoLetterISOLanguageName.ToUpper()
+                            </a>
+                        }
+                    }
+                </div>
+            </div>
+        </li>
+        <li class="nav-item dropdown btn-box d-none d-lg-block mr-2 ml-2">
+            <a class="nav-link dropdown-toggle dropdown-toggle-nocaret" href="#" data-toggle="dropdown" title="Notifications" onclick="nconnection.invoke('ReadAllNotifications').catch(err => console.error(err.toString()));">
+                <em class="icon-bell"></em>
+                <span id="notificationCount" class="badge badge-danger"></span>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right animated flipInX @(System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft ? "dropdown-menu-right" : "") notificationList" style="width:250px;">
+                <a class="dropdown-item" id="emptyNotification">
+                    <span class="d-flex align-items-center justify-content-center">
+                        <span class="small text-muted">@_Notifications.NoNewNotifications</span>
+                    </span>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="@Url.Action("Notifications", "Me", new { area = "" })">
+                    <span class="d-flex align-items-center">
+                        <span class="text-sm">@_Nav.AllNotifications</span>
+                    </span>
+                </a>
+            </div>
+        </li>
+    </ul>
+    <!-- END Left navbar-->
+    <!-- START Right Navbar-->
+    <ul class="navbar-nav flex-row">
+        @*
+            <li class="nav-item">
+                <a class="nav-link" href="#" data-search-open>
+                    <em class="icon-magnifier"></em>
+                </a>
+            </li>
+        *@
+        <!-- Fullscreen (only desktops)-->
+        <li class="nav-item d-none d-md-block">
+            <a class="nav-link" href="#" data-toggle-fullscreen="">
+                <em class="fa fa-expand"></em>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="@Url.Action("Logout","Account", new{area=""})" data-toggle="tooltip" data-placement="bottom" title="Logout">
+                <em class="fa fa-power-off"></em>
+            </a>
+        </li>
+    </ul>
+    <!-- END Right Navbar-->
+    <!-- START Search form-->
+    <form class="navbar-form" role="search" action="search.html">
+        <div class="form-group">
+            <input class="form-control" type="text" placeholder="Type and hit enter ...">
+            <div class="fa fa-times navbar-form-close" data-search-dismiss=""></div>
+        </div>
+        <button class="d-none" type="submit">Submit</button>
+    </form>
+    <!-- END Search form-->
+
+</nav>
+<!-- END Top Navbar-->

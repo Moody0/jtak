@@ -1,0 +1,30 @@
+﻿@model dynamic
+@{
+    var type = Nullable.GetUnderlyingType(ViewData.ModelMetadata.ModelType) ?? ViewData.ModelMetadata.ModelType;
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+}
+    <div class="form-group">
+        <label asp-for="@Model" class="control-label"></label>
+        <div class="">
+
+            @if (ViewBag.placeholder != null)
+            {
+                <label class="radio-inline c-radio">
+                    <input name="@fieldName" type="radio" value="" @(Model == null ? "checked" : "") />
+                    <span class="fa fa-check"></span>
+                    @ViewBag.placeholder
+                </label>
+            }
+            @foreach (var item in Html.GetEnumSelectList(type))
+            {
+                <label class="radio-inline c-radio">
+                    <input id="@fieldName-@item.Value" name="@fieldName" type="radio" value="@item.Value" @(Model != null && item.Value == ((int)Model).ToString() ? "checked" : "") />
+                    <span class="fa fa-check"></span>
+                    @item.Text
+                </label>
+            }
+        </div>
+        <div class="text-danger validationbox">
+            <span asp-validation-for="@Model" class="text-danger"></span>
+        </div>
+    </div>

@@ -1,0 +1,33 @@
+﻿@model dynamic
+
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+    var multible = ViewData["multiple"] != null ? "multiple" : "";
+    var required = ViewData["required"];
+    var classes = ViewData["class"];
+    var currentvalue = ViewData["currentvalue"] ?? "--";
+    var url = ViewData["url"];
+    var contentType = ViewData["contentType"] != null ? ViewData["contentType"] : "video/mp4";
+    var placeHolder = ViewData["placeHolder"];
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <select asp-for="@Model"
+            data-ajax--delay="250"
+            data-ajax--url="@url"
+            class="@classes"
+            data-val="@(required!=null?"true":"false")"
+            data-val-required="@Html.Raw(required)">
+        @if (Model != null)
+        {
+            <option value="@Model">@currentvalue</option>
+        }
+        else if (placeHolder != null)
+        {
+            <option value="">@placeHolder</option>
+        }
+    </select>
+    <div class="text-danger validationbox">
+        <span asp-validation-for="@Model" class="text-danger"></span>
+    </div>
+</div>

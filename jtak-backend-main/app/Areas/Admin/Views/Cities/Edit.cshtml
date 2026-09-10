@@ -1,0 +1,36 @@
+﻿@*@{ Layout = "_Layout"; }
+@model App.Entities.City
+@inject Microsoft.AspNetCore.Mvc.Localization.IViewLocalizer Localizer
+
+<div class="container-fluid">
+    <form asp-action="Edit">
+        <div class="card card-default">
+            <div class="card-header">
+                <em class="fa fa-box p-2"></em> @Localizer["Edit City."]
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="col-md-6">
+                        @Html.EditorFor(x => x.TitleAr)
+                        @Html.EditorFor(x => x.TitleEn)
+                        @Html.EditorFor(x => x.TitleTr)
+                        @Html.EditorFor(x => x.Country)
+                        @Html.EditorFor(x => x.GeoNameId)
+                    </div>
+                    <div class="col-md-6"></div>
+                </div>
+            </div>
+            <div class="card-footer text-right">
+                <div class="btn-group">
+                    <a asp-action="Index" class="btn btn-secondary">@_Common.BackToList</a>
+                    <input type="submit" value="@_Common.Save" class="btn btn-success" />
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}*@

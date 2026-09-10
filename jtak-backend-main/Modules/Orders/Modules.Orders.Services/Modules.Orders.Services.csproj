@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="11.0.1" />
+    <PackageReference Include="URF.Core.Services" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modules.Orders.Data\Modules.Orders.Data.csproj" />
+    <ProjectReference Include="..\Modules.Orders.Entities\Modules.Orders.Entities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Solf">
+      <HintPath>..\..\..\Solf\Solf.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,90 @@
+﻿@using Solf.Helpers
+@using App.Extensions
+@model DateTime?
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+}
+
+@{
+    var htmlFieldPrefix = ViewData.TemplateInfo.HtmlFieldPrefix;
+    ViewData.TemplateInfo.HtmlFieldPrefix = "";
+    var defaultDate = string.Empty;
+    if (Model.HasValue)
+    {
+        defaultDate = CalenderHelper.ToHijri(Model.Value);
+    }
+}
+
+<div class="form-group col-md-3">
+    <label asp-for="@Model" class="control-label"></label> T("general.hijri")
+    <div class="input-group">
+        @Html.TextBox(fieldName + "H", defaultDate, "{0:dd/MM/yyyy}", new { @class = "form-control" })
+    </div>
+</div>
+
+@{
+    ViewData.TemplateInfo.HtmlFieldPrefix = htmlFieldPrefix;
+}
+
+<div class="form-group col-md-3">
+    <label asp-for="@Model" class="control-label"></label>
+    <div class="input-group">
+        @Html.TextBoxFor(model => model, "{0:dd/MM/yyyy}", new { @class = "form-control" })
+        <span asp-validation-for="@Model" class="text-danger"></span>
+    </div>
+</div>
+
+@Html.Script(
+@<script type="text/javascript">
+    $(function () {
+        var startDate = $('input[name="@fieldName"]');
+        var startDateH = $('input[name="@(fieldName)H"]');
+
+        function onHijriSelected(date, dateObj) {
+            $.ajax({
+                type: "POST",
+                url: "@Url.Action("ToMiladi")",
+                data: { 'hijri': date },
+                dataType: "text",
+                success: function (response) {
+                    dateObj.val(response);
+                },
+                error: function (e) {
+                    alert('error #001 : ' + e);
+                }
+            });
+        }
+
+        function onMiladiSelected(date, dateObj) {
+            $.ajax({
+                type: "POST",
+                url: "@Url.Action("ToHijri")",
+                data: { 'miladi': date },
+                dataType: "text",
+                success: function (response) {
+                    dateObj.val(response);
+                },
+                error: function (e) {
+                    alert('error #002 : ' + e);
+                }
+            });
+        }
+        startDateH.calendarsPicker({
+            calendar: $.calendars.instance('islamic', 'ar'),
+            onSelect: function () {
+                onHijriSelected(startDateH.val(), startDate);
+            }
+        });
+
+        startDate.datepicker({
+            daysOfWeekHighlighted: "5,6",
+            format: "dd/mm/yyyy",
+            //rtl: true,
+            autoclose: true,
+            todayHighlight: true
+        }).on("changeDate", function () {
+            onMiladiSelected(startDate.val(), startDateH);
+        });
+    });
+
+</script>)

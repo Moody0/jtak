@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <include src="partials/htmlheader.html"></include>
+    <title>Speed of Light - Contact Us</title>
+    <meta name="title" content="Speed of Light - Contact Us">
+    <meta name="description" content="">
+    <meta property="og:title" content="Speed of Light - Contact Us">
+    <meta property="og:description" content="">
+    <meta property="og:url" content="https://sol-gr.com/contact.html">
+
+    <link rel="stylesheet" href="/assets/css/intlTelInput.min.css" />
+    <link rel="stylesheet" href="/assets/css/demo.css" />
+  </head>
+  <body class="contact-page">
+    <div class="contact-page-container">
+      <div class="container-fluid">
+        <div class="row h-full flex items-center"
+        style="min-height: 90vh;">
+          <div class="col-md-6 col-sm-6 col-xs-12">
+            <h1 class="text-8xl text-white mb-28">Contact Us</h1>
+            <h2 class="text-white text-3xl mb-6 flex">
+              <img src="assets/img/icon2.svg" class="mr-2" />
+              <a target="_blank" href="tel:+905331565539">0533 156 55 39</a>
+            </h2>
+            <h2 class="text-white text-3xl mb-6 flex">
+              <img src="assets/img/icon1.svg" class="mr-2" />
+              <a target="_blank" href="mailto:info@sol-gr.com">info@sol-gr.com</a>
+            </h2>
+            <h2 class="text-white text-3xl mb-6 flex">
+              <img src="assets/img/icon3.svg" class="mr-2" />
+              <p style="width: 450px">
+                <a target="_blank" href="https://www.google.com/maps/place/Speed+of+Light+LTD/@37.0667425,37.3717391,15z/data=!4m5!3m4!1s0x0:0xfa34692329d06b90!8m2!3d37.0667425!4d37.3717391">
+                  GAZİANTEP / ŞEHİTKAMİL İNCİLİPINAR MAHALLESİ,
+                  ŞEHİT MEHMET ÖTER (Cadde) / KAZAZ İŞ Mrkz
+                </a>
+              </p>
+            </h2>
+          </div>
+          <div class="col-md-6 col-sm-6 col-xs-12">
+            <form action="https://api.sol-gr.com/ar/Contact" method="post" id="contact">
+              <div class="mb-6">
+                <input type="hidden" id="captcha" name="captcha" />
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="Your name"
+                />
+              </div>
+              <div class="mb-6">
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="Phone Number"
+                />
+                <span id="valid-msg" class="hide">✓ Valid</span>
+                <span id="error-msg" class="hide"></span>
+              </div>
+              <div class="mb-6">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="email"
+                />
+              </div>
+              <div class="mb-6">
+                <textarea
+                  id="email"
+                  name="message"
+                  placeholder="Enter Your Message"
+                  rows="7"
+                ></textarea>
+              </div>
+              <input id="full_number" type="hidden" />
+              <button id="send-btn"
+                type="button"
+                class="bg-primary text-2xl py-3 px-10 text-white cursor-pointer"
+              >
+                Send
+              </span>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <include src="partials/header.html"></include>
+    <include src="partials/footer.html"></include>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.13/js/intlTelInput.min.js"></script>
+    <script>
+      var input = document.querySelector('#phone');
+
+      // here, the index maps to the error code returned from getValidationError - see readme
+      var errorMap = [
+        'Invalid number',
+        'Invalid country code',
+        'Too short',
+        'Too long',
+        'Invalid number',
+      ];
+
+      var iti =
+        window &&
+        window.intlTelInput(input, {
+          // allowDropdown: false,
+          autoHideDialCode: false,
+          // autoPlaceholder: "off",
+          // dropdownContainer: document.body,
+          // excludeCountries: ["us"],
+          formatOnDisplay: true,
+          geoIpLookup: function (callback) {
+            if (!navigator.userAgent.match(/bot|spider/i)) {
+              if (localStorage.getItem('country')) {
+                var countryCode = localStorage.getItem('country');
+                callback(countryCode);
+              } else {
+                fetch('https://ipinfo.io/json?c5bb3c6a9d5c6f')
+                  .then((res) => res.json())
+                  .then((data) => {
+                    localStorage.setItem('ipinfo', data.country);
+                    var countryCode = data && data.country ? data.country : '';
+                    callback(countryCode);
+                  });
+              }
+            }
+          },
+          //hiddenInput: "full_number",
+          initialCountry: 'auto',
+          // localizedCountries: { 'de': 'Deutschland' },
+          nationalMode: false,
+          // onlyCountries: ['us', 'gb', 'ch', 'ca', 'do'],
+          // placeholderNumberType: "MOBILE",
+          preferredCountries: ['tr', 'sa'],
+          separateDialCode: true,
+          utilsScript:
+            'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.13/js/utils.min.js',
+        });
+
+      var reset = function () {
+        input.classList.remove('error');
+        document.getElementById('error-msg').innerHTML = '';
+        document.getElementById('error-msg').classList.add('hide');
+        document.getElementById('valid-msg').classList.add('hide');
+
+        var phoneNumber = iti.getNumber();
+        document.getElementById('full_number').value = phoneNumber;
+      };
+
+      // on blur: validate
+      input.addEventListener('blur', function () {
+        reset();
+        if (input.value.trim()) {
+          if (iti.isValidNumber()) {
+            document.getElementById('valid-msg').classList.remove('hide');
+          } else {
+            input.classList.add('error');
+            var errorCode = iti.getValidationError();
+            document.getElementById('error-msg').innerHTML = errorMap[errorCode];
+            document.getElementById('error-msg').classList.remove('hide');
+          }
+        }
+      });
+
+      // on keyup / change flag: reset
+      input.addEventListener('change', reset);
+      input.addEventListener('keyup', reset);
+    </script>
+    <script src="assets/js/index.js"></script>
+    <script src='https://www.google.com/recaptcha/api.js?render=6LeA2n8dAAAAAJJIrhPUbaa0y14JBU9SuXSjn0dm'></script>
+    <script>
+    document.getElementById('send-btn').addEventListener("click", (e) => {
+        e.preventDefault();
+        grecaptcha.ready(function () {
+            grecaptcha.execute('6LeA2n8dAAAAAJJIrhPUbaa0y14JBU9SuXSjn0dm', { action: 'Register' })
+                .then(function (token) {
+                    $("#captcha").val(token);
+                    document.getElementById("contact").submit();
+                });
+        });
+    });
+    </script>
+  </body>
+</html>

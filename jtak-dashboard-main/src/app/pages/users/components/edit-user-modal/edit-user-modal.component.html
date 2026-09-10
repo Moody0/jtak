@@ -1,0 +1,28 @@
+<app-edit-modal [item]="item" [itemName]="item.fullName" moduleName="User" [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid" (cancelClicked)="modal.dismiss()" (saveClicked)="save()">
+  <ng-container *ngIf="item">
+    <form class="form jtak-edit-form" [formGroup]="formGroup">
+      <section class="edit-section">
+        <div class="edit-section-heading"><span>01</span><div><h3>Personal information</h3><p>Identity and contact details for this account.</p></div></div>
+        <div class="row g-4">
+          <div class="col-md-6"><label for="firstName">First name</label><app-input-container [control]="formGroup.controls.firstName"><input type="text" class="form-control" formControlName="firstName" id="firstName" autocomplete="given-name" placeholder="First name" /></app-input-container></div>
+          <div class="col-md-6"><label for="lastName">Last name</label><app-input-container [control]="formGroup.controls.lastName"><input type="text" class="form-control" formControlName="lastName" id="lastName" autocomplete="family-name" placeholder="Last name" /></app-input-container></div>
+          <div class="col-md-6"><label for="email">Email address</label><app-input-container [control]="formGroup.controls.email"><input type="email" class="form-control" formControlName="email" id="email" autocomplete="email" placeholder="name@example.com" /></app-input-container></div>
+          <div class="col-md-6"><label for="phoneNumber">Phone number</label><app-input-container [control]="formGroup.controls.phoneNumber"><input type="tel" class="form-control" formControlName="phoneNumber" id="phoneNumber" autocomplete="tel" placeholder="Phone number" /></app-input-container></div>
+        </div>
+      </section>
+      <section class="edit-section">
+        <div class="edit-section-heading"><span>02</span><div><h3>Access</h3><p>Assign the correct role and account status.</p></div></div>
+        <div class="row g-4">
+          <div class="col-md-6"><label for="role">Role</label><ng-select id="role" formControlName="role" placeholder="Choose a role"><ng-option *ngFor="let role of userRoles" [value]="+role[0]">{{ role[1] }}</ng-option></ng-select></div>
+          <div class="col-md-6"><label class="setting-toggle"><input type="checkbox" formControlName="isActive" /><span><strong>Account is active</strong><small>User can sign in and access permitted features.</small></span></label></div>
+        </div>
+      </section>
+      <section class="edit-section edit-section--last">
+        <div class="edit-section-heading"><span>03</span><div><h3>Profile image</h3><p>Optional image used to identify this user.</p></div></div>
+        <app-file-uploader uploaderTitle="Choose profile image" (fileUploaded)="onFileUploaded($event, 'profilePhoto')"></app-file-uploader>
+        <div class="edit-image-grid"><app-uploaded-image [imageId]="formGroup.get('profilePhoto')?.value" [dimensions]="{ width: 600, height: 300 }" (imageDeleted)="onFileDelete('profilePhoto')"></app-uploaded-image></div>
+      </section>
+    </form>
+  </ng-container>
+</app-edit-modal>

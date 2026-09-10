@@ -1,0 +1,510 @@
+<main class="merchant-workspace">
+  <div class="merchant-workspace-loading" *ngIf="isLoading">
+    <span class="spinner-border" aria-hidden="true"></span><strong>Loading merchant workspace…</strong>
+  </div>
+
+  <div class="merchant-workspace-error" *ngIf="loadError">
+    <i class="fas fa-exclamation-circle"></i><h2>Couldn’t load this merchant</h2><p>Check your connection and try again.</p>
+    <button type="button" class="btn btn-primary" (click)="loadWorkspace()">Try again</button>
+  </div>
+
+  <ng-container *ngIf="merchant && !isLoading">
+    <header class="merchant-header">
+      <a routerLink="/merchants" class="merchant-back"><i class="fas fa-arrow-left"></i> All merchants</a>
+      <div class="merchant-identity">
+        <div class="merchant-logo">
+          <img *ngIf="merchant.photo" [src]="filesService.getFile(merchant.photo, 96, 96)" [alt]="merchant.title" (error)="onImageError($event)" />
+          <span *ngIf="!merchant.photo">{{ merchant.title.charAt(0) }}</span>
+        </div>
+        <div>
+          <div class="merchant-title-line">
+            <h2>
+              {{ merchantTitleAr }}
+              <span class="text-muted fs-5 ms-2 font-weight-normal" *ngIf="merchantTitleEn">({{ merchantTitleEn }})</span>
+            </h2>
+            <span class="badge" [ngClass]="merchant.active ? 'badge-light-success' : 'badge-light-danger'">{{ merchant.active ? 'Active' : 'Disabled' }}</span>
+          </div>
+          <p>{{ merchant.shortDescription || merchant.address || 'Merchant workspace' }}</p>
+          <div class="merchant-meta"><span><i class="fas fa-box"></i>{{ enabledProductsCount }} active products</span><span><i class="fas fa-folder"></i>{{ merchantMainCount }} main categories</span><span><i class="fas fa-tags"></i>{{ merchantSubCount }} subcategories</span></div>
+        </div>
+      </div>
+      <div class="merchant-header-actions">
+        <span class="unsaved-indicator" *ngIf="hasChanges"><i></i> Unsaved catalog changes</span>
+        <button type="button" class="btn btn-light" *ngIf="hasChanges" (click)="resetChanges()">Discard</button>
+        <button type="button" class="btn btn-primary" [disabled]="!hasChanges || isSaving" (click)="saveCatalog()">
+          <span *ngIf="isSaving" class="spinner-border spinner-border-sm"></span><i *ngIf="!isSaving" class="fas fa-check"></i>{{ isSaving ? 'Saving…' : 'Save catalog' }}
+        </button>
+      </div>
+    </header>
+
+    <nav class="merchant-tabs" aria-label="Merchant workspace sections">
+      <a [routerLink]="['/merchants', merchant.id, 'overview']" routerLinkActive="active"><i class="fas fa-store"></i><span>Overview</span></a>
+      <a [routerLink]="['/merchants', merchant.id, 'products']" routerLinkActive="active"><i class="fas fa-box-open"></i><span>Products</span><small>{{ enabledProductsCount }}</small></a>
+      <a [routerLink]="['/merchants', merchant.id, 'categories']" routerLinkActive="active"><i class="fas fa-tags"></i><span>Categories</span><small>{{ merchantMainCount }} main · {{ merchantSubCount }} sub</small></a>
+    </nav>
+
+    <section class="merchant-tab-panel" *ngIf="activeTab === 'overview'">
+      <div class="merchant-overview-grid">
+        <article class="merchant-detail-card merchant-detail-card--wide">
+          <div class="merchant-card-heading"><div><span>Business profile</span><h3>Merchant information</h3></div><button type="button" class="btn btn-sm btn-light" (click)="editMerchant()"><i class="fas fa-pen"></i>Edit details</button></div>
+          <dl class="merchant-details">
+            <div><dt>Owner</dt><dd>{{ merchant.owner || 'Not assigned' }}</dd></div>
+            <div><dt>Primary phone</dt><dd>{{ merchant.phone1 || 'Not provided' }}</dd></div>
+            <div><dt>Secondary phone</dt><dd>{{ merchant.phone2 || 'Not provided' }}</dd></div>
+            <div><dt>Address</dt><dd>{{ merchant.address || 'Not provided' }}</dd></div>
+          </dl>
+        </article>
+        <article class="merchant-detail-card">
+          <div class="merchant-card-heading"><div><span>Commercial</span><h3>Commission</h3></div></div>
+          <strong class="merchant-large-value">{{ merchant.profitOutOfMerchantPricePercent || 0 }}%</strong><p>JTAK profit from merchant price</p>
+        </article>
+        <article class="merchant-detail-card">
+          <div class="merchant-card-heading"><div><span>Delivery</span><h3>Coverage radius</h3></div></div>
+          <strong class="merchant-large-value">{{ merchant.shippingCoverageInMeters | number }}</strong><p>meters from pickup location</p>
+        </article>
+        <article class="merchant-detail-card merchant-detail-card--wide">
+          <div class="merchant-card-heading"><div><span>About</span><h3>Description</h3></div></div>
+          <p class="merchant-description">{{ merchant.description || 'No merchant description has been added.' }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="merchant-tab-panel" *ngIf="activeTab === 'products'">
+      <div class="workspace-toolbar">
+        <div><h3>Merchant products</h3><p>Manage product details, images, visibility, merchant availability, and profit.</p></div>
+        <div class="workspace-filters">
+          <button type="button" class="btn btn-primary" (click)="createProduct()"><i class="fas fa-plus"></i>Add product</button>
+          <select class="form-select" [(ngModel)]="categoryFilter" aria-label="Filter by category"><option value="">All categories</option><option *ngFor="let category of categoryNames" [value]="category">{{ category }}</option></select>
+          <div class="workspace-search"><i class="fas fa-search"></i><input type="search" class="form-control" [(ngModel)]="searchTerm" placeholder="Search products" /></div>
+        </div>
+      </div>
+      <div class="workspace-selection-row">
+        <label><input type="checkbox" class="form-check-input" [checked]="allVisibleSelected()" [indeterminate]="someVisibleSelected()" (change)="toggleAllVisible($any($event.target).checked)" /> Select all {{ visibleProducts.length }} visible products</label>
+        <span>{{ enabledProductsCount }} products enabled</span>
+      </div>
+      <div class="table-responsive merchant-products-table">
+        <table class="table">
+          <thead><tr><th class="table-select-cell">Available</th><th>Product</th><th>Category</th><th class="text-end">Customer price</th><th class="text-end">Additional profit</th><th class="text-end">Actions</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let item of visibleProducts; trackBy: trackByProduct" [class.table-row-selected]="item.isSelected">
+              <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="item.isSelected" [attr.aria-label]="'Enable ' + item.product" (change)="toggleProduct(item, $any($event.target).checked)" /></td>
+              <td><div class="workspace-product"><img [src]="filesService.getFile(item.productPhotos, 56, 56)" [alt]="item.product" loading="lazy" (error)="onImageError($event)" /><div><strong>{{ item.product }}</strong><small>Product #{{ item.productId }} · <span [class.text-danger]="item.productActive === false">{{ item.productActive === false ? 'Globally disabled' : 'Active' }}</span></small></div></div></td>
+              <td><span class="category-path"><span *ngIf="item.productCat2">{{ item.productCat2 }}</span><i *ngIf="item.productCat1 && item.productCat2" class="fas fa-chevron-right"></i><strong>{{ item.productCat1 || 'Uncategorized' }}</strong></span></td>
+              <td class="text-end"><span *ngIf="item.price !== item.finalPrice" class="old-price">{{ item.price | number }}</span><strong>{{ item.finalPrice | number }}</strong><small class="currency-label">SYP</small></td>
+              <td class="text-end"><div class="compact-percent"><input type="number" min="0" max="100" [(ngModel)]="item.additionalProfitPercent" [disabled]="!item.isSelected" [attr.aria-label]="'Additional profit for ' + item.product" /><span>%</span></div></td>
+              <td class="text-end"><div class="workspace-row-actions"><button type="button" class="btn btn-sm btn-light workspace-edit-button" (click)="editProduct(item)"><i class="fas fa-pen"></i>Edit</button><button type="button" class="btn btn-sm btn-light-danger" [attr.aria-label]="'Delete ' + item.product" (click)="deleteProduct(item)"><i class="fas fa-trash"></i></button></div></td>
+            </tr>
+            <tr *ngIf="!visibleProducts.length"><td colspan="6"><div class="ops-empty"><i class="fas fa-search"></i><strong>No matching products</strong><span>Try a different search or category.</span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="merchant-tab-panel" *ngIf="activeTab === 'categories'">
+      <div class="workspace-toolbar">
+        <div>
+          <h3>Merchant categories (تصنيفات المتجر)</h3>
+          <p>Split, organize, and toggle availability for main categories and subcategories.</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <button type="button" class="btn btn-primary" (click)="createCategory()">
+            <i class="fas fa-plus"></i> Add category
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Controls Bar: Level Split Pills, Filters, View Modes & Search -->
+      <div class="category-controls-bar">
+        <div class="category-filter-pills" role="tablist" aria-label="Filter categories by level">
+          <button type="button" [class.active]="categoryLevelFilter === 'all'" (click)="categoryLevelFilter = 'all'">
+            <i class="fas fa-layer-group"></i> All categories
+            <span class="count-badge">{{ categories.length }}</span>
+          </button>
+          <button type="button" [class.active]="categoryLevelFilter === 'main'" (click)="categoryLevelFilter = 'main'">
+            <i class="fas fa-folder"></i> Main categories (الرئيسية)
+            <span class="count-badge">{{ mainCategories.length }}</span>
+          </button>
+          <button type="button" [class.active]="categoryLevelFilter === 'sub'" (click)="categoryLevelFilter = 'sub'">
+            <i class="fas fa-tags"></i> Subcategories (الفرعية)
+            <span class="count-badge">{{ subCategories.length }}</span>
+          </button>
+        </div>
+
+        <div class="category-view-options">
+          <!-- Parent Category Filter Dropdown -->
+          <select
+            class="form-select category-parent-select"
+            [(ngModel)]="selectedMainCategoryId"
+            aria-label="Filter by parent category"
+          >
+            <option [ngValue]="null">All Main Categories</option>
+            <option *ngFor="let m of mainCategories" [ngValue]="m.id">
+              {{ m.name }} ({{ m.subcategories.length }} sub)
+            </option>
+          </select>
+
+          <!-- View Mode Toggle (Grouped vs Grid) when in All view -->
+          <div class="view-mode-toggle" *ngIf="categoryLevelFilter === 'all'">
+            <button
+              type="button"
+              [class.active]="categoryViewMode === 'grouped'"
+              (click)="categoryViewMode = 'grouped'"
+              title="Hierarchical Grouped View"
+            >
+              <i class="fas fa-sitemap"></i> Grouped
+            </button>
+            <button
+              type="button"
+              [class.active]="categoryViewMode === 'grid'"
+              (click)="categoryViewMode = 'grid'"
+              title="Flat Grid View"
+            >
+              <i class="fas fa-th-large"></i> Grid
+            </button>
+          </div>
+
+          <!-- Expand / Collapse All (in grouped view) -->
+          <div class="d-inline-flex gap-2" *ngIf="categoryLevelFilter === 'all' && categoryViewMode === 'grouped'">
+            <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="expandAll()">Expand all</button>
+            <span class="text-muted">·</span>
+            <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="collapseAll()">Collapse all</button>
+          </div>
+
+          <!-- Live Search Box -->
+          <div class="category-search-box">
+            <i class="fas fa-search"></i>
+            <input
+              type="search"
+              class="form-control"
+              [(ngModel)]="categorySearchTerm"
+              placeholder="Search categories…"
+              aria-label="Search categories"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 1: HIERARCHICAL GROUPED VIEW (Default when All + Grouped) -->
+      <div class="merchant-category-grouped-list" *ngIf="categoryLevelFilter === 'all' && categoryViewMode === 'grouped'">
+        <article
+          class="main-category-block"
+          *ngFor="let mainCat of displayMainCategories"
+          [class.has-enabled]="mainCat.enabledProducts > 0"
+        >
+          <!-- Main Category Header -->
+          <div class="main-category-header-row" [class.is-collapsed]="isMainCategoryCollapsed(mainCat.id)">
+            <div class="main-category-info-side">
+              <button
+                type="button"
+                class="collapse-toggle-btn"
+                [class.collapsed]="isMainCategoryCollapsed(mainCat.id)"
+                (click)="toggleCollapseMainCategory(mainCat.id)"
+                [attr.aria-label]="isMainCategoryCollapsed(mainCat.id) ? 'Expand ' + mainCat.name : 'Collapse ' + mainCat.name"
+              >
+                <i class="fas fa-chevron-down"></i>
+              </button>
+
+              <div class="main-category-icon-box">
+                <img *ngIf="mainCat.icon" [src]="filesService.getFile(mainCat.icon, 56, 56)" [alt]="mainCat.name" (error)="onImageError($event)" />
+                <i *ngIf="!mainCat.icon" class="fas fa-folder-open"></i>
+              </div>
+
+              <div class="main-category-texts">
+                <div class="main-category-title-line">
+                  <h4>{{ mainCat.name }}</h4>
+                  <span class="badge-main-cat">Main Category</span>
+                  <span class="badge" [ngClass]="mainCat.active ? 'badge-light-success' : 'badge-light-danger'">
+                    {{ mainCat.active ? 'Active' : 'Disabled' }}
+                  </span>
+                </div>
+
+                <div class="main-category-meta-line">
+                  <span><i class="fas fa-layer-group text-primary"></i> <strong>{{ mainCat.subcategories.length }}</strong> subcategories</span>
+                  <span><i class="fas fa-box text-muted"></i> <strong>{{ mainCat.enabledProducts }}</strong> of <strong>{{ mainCat.totalProducts }}</strong> products available</span>
+                </div>
+
+                <div class="category-progress mt-2" style="max-width: 320px;">
+                  <span [style.width.%]="mainCat.totalProducts ? (mainCat.enabledProducts / mainCat.totalProducts * 100) : 0"></span>
+                </div>
+
+                <div class="category-actions mt-2">
+                  <button type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(mainCat)">
+                    <i class="fas fa-plus"></i> Add subcategory
+                  </button>
+                  <button *ngIf="mainCat.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(mainCat)">
+                    <i class="fas fa-pen"></i> Edit details & image
+                  </button>
+                  <button *ngIf="mainCat.id && !mainCat.totalProducts && !mainCat.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(mainCat)">
+                    <i class="fas fa-trash"></i> Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Master Toggle Switch for Main Category & all its subcategories -->
+            <div class="main-category-actions-side">
+              <label class="category-switch" [title]="'Toggle all ' + mainCat.totalProducts + ' products in ' + mainCat.name">
+                <input
+                  type="checkbox"
+                  [disabled]="!mainCat.totalProducts"
+                  [checked]="isCategoryFullyEnabled(mainCat)"
+                  [indeterminate]="isCategoryPartiallyEnabled(mainCat)"
+                  (change)="toggleCategory(mainCat, $any($event.target).checked)"
+                />
+                <span></span>
+                <small>{{ getCategoryStatusLabel(mainCat) }}</small>
+              </label>
+            </div>
+          </div>
+
+          <!-- Nested Subcategories -->
+          <div class="subcategories-nested-area" *ngIf="!isMainCategoryCollapsed(mainCat.id)">
+            <div class="subcategories-grid" *ngIf="mainCat.subcategories.length > 0">
+              <div
+                class="subcategory-card-item"
+                *ngFor="let sub of mainCat.subcategories"
+                [class.sub-enabled]="sub.enabled > 0"
+              >
+                <div class="merchant-category-icon">
+                  <img *ngIf="sub.icon" [src]="filesService.getFile(sub.icon, 44, 44)" [alt]="sub.name" (error)="onImageError($event)" />
+                  <i *ngIf="!sub.icon" class="fas fa-tag"></i>
+                </div>
+
+                <div class="merchant-category-copy">
+                  <div class="category-title-row">
+                    <h4>{{ sub.name }}</h4>
+                    <span class="badge-sub-cat">Subcategory</span>
+                    <span class="badge" [ngClass]="sub.active ? 'badge-light-success' : 'badge-light-danger'">
+                      {{ sub.active ? 'Active' : 'Disabled' }}
+                    </span>
+                  </div>
+                  <p>{{ sub.enabled }} of {{ sub.total }} products available</p>
+                  <div class="category-progress">
+                    <span [style.width.%]="sub.total ? (sub.enabled / sub.total * 100) : 0"></span>
+                  </div>
+                  <div class="category-actions">
+                    <button *ngIf="sub.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(sub)">
+                      <i class="fas fa-pen"></i> Edit
+                    </button>
+                    <button *ngIf="sub.id && !sub.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(sub)">
+                      <i class="fas fa-trash"></i> Delete
+                    </button>
+                  </div>
+                </div>
+
+                <label class="category-switch">
+                  <input
+                    type="checkbox"
+                    [disabled]="!sub.total"
+                    [checked]="sub.total > 0 && sub.enabled === sub.total"
+                    [indeterminate]="sub.enabled > 0 && sub.enabled < sub.total"
+                    (change)="toggleCategory(sub, $any($event.target).checked)"
+                  />
+                  <span></span>
+                  <small>{{ !sub.total ? 'No products' : sub.enabled === sub.total ? 'Available' : sub.enabled > 0 ? 'Partial' : 'Unavailable' }}</small>
+                </label>
+              </div>
+            </div>
+
+            <!-- Empty Subcategories in Main Category -->
+            <div class="empty-subcategories-placeholder" *ngIf="!mainCat.subcategories.length">
+              <span>No subcategories created under <strong>{{ mainCat.name }}</strong> yet.</span>
+              <button type="button" class="btn btn-sm btn-light-primary" (click)="createSubcategory(mainCat)">
+                <i class="fas fa-plus"></i> Add first subcategory
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Empty state when searching in grouped mode -->
+        <div class="ops-empty" *ngIf="!displayMainCategories.length">
+          <i class="fas fa-search"></i>
+          <strong>No matching categories found</strong>
+          <span>Try clearing the search or category filter.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+        </div>
+      </div>
+
+      <!-- VIEW 2: MAIN CATEGORIES ONLY VIEW -->
+      <div class="merchant-category-grid" *ngIf="categoryLevelFilter === 'main'">
+        <article *ngFor="let category of displayMainCategories" [class.category-enabled]="category.enabledProducts > 0">
+          <div class="merchant-category-icon">
+            <img *ngIf="category.icon" [src]="filesService.getFile(category.icon, 56, 56)" [alt]="category.name" (error)="onImageError($event)" />
+            <i *ngIf="!category.icon" class="fas fa-folder"></i>
+          </div>
+
+          <div class="merchant-category-copy">
+            <div class="category-title-row">
+              <h4>{{ category.name }}</h4>
+              <span class="badge-main-cat">Main Category</span>
+              <span class="badge" [ngClass]="category.active ? 'badge-light-success' : 'badge-light-danger'">
+                {{ category.active ? 'Active' : 'Disabled' }}
+              </span>
+            </div>
+            <p>
+              <strong>{{ category.subcategories.length }}</strong> subcategories · {{ category.enabledProducts }} of {{ category.totalProducts }} products available
+            </p>
+            <div class="category-progress">
+              <span [style.width.%]="category.totalProducts ? (category.enabledProducts / category.totalProducts * 100) : 0"></span>
+            </div>
+            <div class="category-actions">
+              <button *ngIf="category.subcategories.length > 0" type="button" class="btn btn-sm btn-link category-edit-link" (click)="focusMainCategory(category.id)">
+                <i class="fas fa-tags"></i> View {{ category.subcategories.length }} subcategories
+              </button>
+              <button type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
+                <i class="fas fa-plus"></i> Add subcategory
+              </button>
+              <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
+                <i class="fas fa-pen"></i> Edit
+              </button>
+              <button *ngIf="category.id && !category.totalProducts && !category.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+
+          <label class="category-switch">
+            <input
+              type="checkbox"
+              [disabled]="!category.totalProducts"
+              [checked]="isCategoryFullyEnabled(category)"
+              [indeterminate]="isCategoryPartiallyEnabled(category)"
+              (change)="toggleCategory(category, $any($event.target).checked)"
+            />
+            <span></span>
+            <small>{{ getCategoryStatusLabel(category) }}</small>
+          </label>
+        </article>
+
+        <div class="ops-empty" *ngIf="!displayMainCategories.length">
+          <i class="fas fa-folder-open"></i>
+          <strong>No main categories found</strong>
+          <span>Try a different search or filter.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+        </div>
+      </div>
+
+      <!-- VIEW 3: SUBCATEGORIES ONLY VIEW -->
+      <div class="merchant-category-grid" *ngIf="categoryLevelFilter === 'sub'">
+        <article *ngFor="let category of displaySubCategories" [class.category-enabled]="category.enabled > 0">
+          <div class="merchant-category-icon">
+            <img *ngIf="category.icon" [src]="filesService.getFile(category.icon, 56, 56)" [alt]="category.name" (error)="onImageError($event)" />
+            <i *ngIf="!category.icon" class="fas fa-tag"></i>
+          </div>
+
+          <div class="merchant-category-copy">
+            <div class="category-title-row">
+              <h4>{{ category.name }}</h4>
+              <span class="badge-sub-cat">Subcategory</span>
+              <span class="badge" [ngClass]="category.active ? 'badge-light-success' : 'badge-light-danger'">
+                {{ category.active ? 'Active' : 'Disabled' }}
+              </span>
+            </div>
+            <p>
+              <span class="category-path d-inline-flex align-items-center me-2">
+                <i class="fas fa-folder text-muted"></i> {{ category.parent || 'Uncategorized parent' }}
+                <i class="fas fa-chevron-right text-muted"></i>
+              </span>
+              {{ category.enabled }} of {{ category.total }} products available
+            </p>
+            <div class="category-progress">
+              <span [style.width.%]="category.total ? (category.enabled / category.total * 100) : 0"></span>
+            </div>
+            <div class="category-actions">
+              <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
+                <i class="fas fa-pen"></i> Edit details & image
+              </button>
+              <button *ngIf="category.id && !category.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+
+          <label class="category-switch">
+            <input
+              type="checkbox"
+              [disabled]="!category.total"
+              [checked]="category.total > 0 && category.enabled === category.total"
+              [indeterminate]="category.enabled > 0 && category.enabled < category.total"
+              (change)="toggleCategory(category, $any($event.target).checked)"
+            />
+            <span></span>
+            <small>{{ !category.total ? 'No products' : category.enabled === category.total ? 'Available' : category.enabled > 0 ? 'Partial' : 'Unavailable' }}</small>
+          </label>
+        </article>
+
+        <div class="ops-empty" *ngIf="!displaySubCategories.length">
+          <i class="fas fa-tags"></i>
+          <strong>No subcategories found</strong>
+          <span>Try selecting a different main category or clearing your search.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+        </div>
+      </div>
+
+      <!-- VIEW 4: FLAT GRID VIEW (When All + Grid) -->
+      <div class="merchant-category-grid" *ngIf="categoryLevelFilter === 'all' && categoryViewMode === 'grid'">
+        <article *ngFor="let category of displayFlatCategories" [class.category-enabled]="(category.isMain ? category.enabledProducts : category.enabled) > 0">
+          <div class="merchant-category-icon">
+            <img *ngIf="category.icon" [src]="filesService.getFile(category.icon, 56, 56)" [alt]="category.name" (error)="onImageError($event)" />
+            <i *ngIf="!category.icon" [class]="category.isMain ? 'fas fa-folder' : 'fas fa-tag'"></i>
+          </div>
+
+          <div class="merchant-category-copy">
+            <div class="category-title-row">
+              <h4>{{ category.name }}</h4>
+              <span [class]="category.isMain ? 'badge-main-cat' : 'badge-sub-cat'">
+                {{ category.isMain ? 'Main Category' : 'Subcategory' }}
+              </span>
+              <span class="badge" [ngClass]="category.active ? 'badge-light-success' : 'badge-light-danger'">
+                {{ category.active ? 'Active' : 'Disabled' }}
+              </span>
+            </div>
+            <p>
+              <span *ngIf="category.parent" class="category-path d-inline-flex align-items-center me-2">
+                <i class="fas fa-folder text-muted"></i> {{ category.parent }}
+                <i class="fas fa-chevron-right text-muted"></i>
+              </span>
+              <span *ngIf="category.isMain && category.subcategories.length">
+                <strong>{{ category.subcategories.length }}</strong> subcategories ·
+              </span>
+              {{ category.isMain ? category.enabledProducts : category.enabled }} of {{ category.isMain ? category.totalProducts : category.total }} products available
+            </p>
+            <div class="category-progress">
+              <span [style.width.%]="category.isMain ? (category.totalProducts ? category.enabledProducts / category.totalProducts * 100 : 0) : (category.total ? category.enabled / category.total * 100 : 0)"></span>
+            </div>
+            <div class="category-actions">
+              <button *ngIf="category.isMain" type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
+                <i class="fas fa-plus"></i> Add subcategory
+              </button>
+              <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
+                <i class="fas fa-pen"></i> Edit details & image
+              </button>
+              <button *ngIf="category.id && !(category.isMain ? category.totalProducts : category.total)" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+
+          <label class="category-switch">
+            <input
+              type="checkbox"
+              [disabled]="!(category.isMain ? category.totalProducts : category.total)"
+              [checked]="isCategoryFullyEnabled(category)"
+              [indeterminate]="isCategoryPartiallyEnabled(category)"
+              (change)="toggleCategory(category, $any($event.target).checked)"
+            />
+            <span></span>
+            <small>{{ getCategoryStatusLabel(category) }}</small>
+          </label>
+        </article>
+
+        <div class="ops-empty" *ngIf="!displayFlatCategories.length">
+          <i class="fas fa-tags"></i>
+          <strong>No categories found</strong>
+          <span>Try a different search or filter.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+        </div>
+      </div>
+    </section>
+  </ng-container>
+</main>

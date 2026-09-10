@@ -1,0 +1,38 @@
+﻿@using Microsoft.AspNetCore.Mvc.Localization
+@using Solf
+@using App.Extensions
+@model string
+@{
+    var rows = ViewData["rows"] ?? "3";
+    var required = ViewData["required"];
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <textarea asp-for="@Model" rows="@rows" class="form-control" placeholder="@ViewData["placeholder"]" 
+            data-val="@(required!=null?"true":"false")"
+            data-val-required="@Html.Raw(required)">>
+        @Html.Raw(Model)
+    </textarea>
+    <span asp-validation-for="@Model" class="text-danger"></span>
+</div>
+<script src="~/vendor/tinymce/tinymce.js"></script>
+@Html.Script(@<script>
+                  tinymce.init({
+                      selector: 'textarea#@ViewData.TemplateInfo.HtmlFieldPrefix',
+                      height: 500,
+                      menubar: false,
+                      plugins: 'paste searchreplace autolink autosave save directionality visualblocks visualchars fullscreen image link media template codesample table charmap hr pagebreak nonbreaking anchor toc insertdatetime advlist lists wordcount imagetools textpattern noneditable help charmap quickbars emoticons',
+                      toolbar: 'bold italic underline strikethrough | fontsizeselect formatselect | alignleft aligncenter alignright | ltr rtl | outdent indent | insertfile image link | forecolor backcolor removeformat | numlist bullist',
+                      paste_data_images: true,
+                      relative_urls: false,
+                      convert_urls: false,
+                      images_upload_url: '/ar/Services/TinyMceUpload',
+                      automatic_uploads: true,
+                      content_css: [ '//fonts.googleapis.com/css?family=Lato:300,300i,400,400i' ],
+                      setup: function (editor) {
+                          editor.on('change', function () {
+                              tinymce.triggerSave();
+                          });
+                      }
+                  });
+</script>)

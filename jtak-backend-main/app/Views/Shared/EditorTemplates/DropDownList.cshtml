@@ -1,0 +1,19 @@
+﻿@model dynamic
+
+@{
+    var fieldName = ViewData.TemplateInfo.HtmlFieldPrefix;
+    var dataSource = (IEnumerable<SelectListItem>)ViewData[fieldName];
+    var multible = ViewData["multiple"] != null;
+}
+<div class="form-group">
+    <label asp-for="@Model" class="control-label"></label>
+    <select asp-for="@Model" asp-items="@dataSource"  class="@ViewData["class"]" multiple="@ViewData["multiple"]" placeholder="@(ViewBag.placeholder != null)">
+        @if (ViewBag.placeholder != null && !multible)
+        {
+            <option value="">@ViewBag.placeholder</option>
+        }
+    </select>
+    <div class="text-danger validationbox">
+        <span asp-validation-for="@Model" class="text-danger"></span>
+    </div>
+</div>
