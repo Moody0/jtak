@@ -2,8 +2,9 @@ class CustomException implements Exception {
   final String? message;
   final String? prefix;
   final int? statusCode;
+  final dynamic data;
 
-  CustomException([this.message, this.statusCode = 0, this.prefix = 'Error During Communication']);
+  CustomException([this.message, this.statusCode = 0, this.prefix = 'Error During Communication', this.data]);
 
   @override
   String toString() {
@@ -13,23 +14,23 @@ class CustomException implements Exception {
 }
 
 class NotFoundException extends CustomException {
-  NotFoundException([String? message, int statusCode = 404]) : super(message, statusCode, "Error !! ");
+  NotFoundException([String? message, int statusCode = 404, dynamic data]) : super(message, statusCode, "Error !! ", data);
 }
 
 class GeneralException extends CustomException {
-  GeneralException([String? message, int? statusCode]) : super(message, statusCode, "Error !! ");
+  GeneralException([String? message, int? statusCode, dynamic data]) : super(message, statusCode, "Error !! ", data);
 }
 
 class FetchDataException extends CustomException {
-  FetchDataException([String? message, int? statusCode]) : super(message, statusCode, "Error During Communication: ");
+  FetchDataException([String? message, int? statusCode, dynamic data]) : super(message, statusCode, "Error During Communication: ", data);
 }
 
 class BadRequestException extends CustomException {
-  BadRequestException([message, int? statusCode]) : super(message, statusCode, "Invalid Request: ");
+  BadRequestException([dynamic message, int? statusCode, dynamic data]) : super(message?.toString(), statusCode, "Invalid Request: ", data);
 }
 
 class UnauthorisedException extends CustomException {
-  UnauthorisedException([message, int? statusCode]) : super(message, statusCode, "Unauthorised: ");
+  UnauthorisedException([String? message, int? statusCode]) : super(message, statusCode, "Unauthorised: ");
 }
 
 class InvalidInputException extends CustomException {

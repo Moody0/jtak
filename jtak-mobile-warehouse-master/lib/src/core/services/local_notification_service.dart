@@ -1,4 +1,6 @@
+import 'package:app_jtak_warehouse/src/core/controllers/app/merchant_state_provider.dart';
 import 'package:app_jtak_warehouse/src/core/models/notifications_payload_model.dart';
+import 'package:app_jtak_warehouse/src/core/services/locator.dart';
 import 'package:app_jtak_warehouse/src/core/services/notification_routes_service.dart';
 import 'package:app_jtak_warehouse/src/utils/utilities/global_var.dart';
 import 'package:flutter/cupertino.dart';
@@ -45,15 +47,23 @@ class LocalNotificationService {
   }
 
   Future<void> _notification(NotificationPayloadModel item) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+    final bool isSoundEnabled = locator.isRegistered<MerchantStateProvider>()
+        ? locator<MerchantStateProvider>().isSoundAlertEnabled
+        : true;
+
+    final AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
       'GlobalNotification',
       'اشعارات التطبيق',
       channelDescription: 'اشعارات التطبيق',
       importance: Importance.max,
       priority: Priority.high,
+      playSound: isSoundEnabled,
+      enableVibration: isSoundEnabled,
       ticker: 'ticker',
     );
-    DarwinNotificationDetails iosNotificationDetails = const DarwinNotificationDetails();
+    final DarwinNotificationDetails iosNotificationDetails = DarwinNotificationDetails(
+      presentSound: isSoundEnabled,
+    );
     NotificationDetails notificationDetails = NotificationDetails(
       android: androidPlatformChannelSpecifics,
       iOS: iosNotificationDetails,

@@ -14,6 +14,7 @@ import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/init_widget.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/custom_widgets/messages.dart';
+import '../../../utils/custom_widgets/syrian_flag.dart';
 import '../../../utils/utilities/global_var.dart';
 
 class PhoneCodePage extends StatefulWidget {
@@ -152,8 +153,8 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('🇸🇾', style: TextStyle(fontSize: 16)),
-                              const SizedBox(width: 6),
+                              const SyrianFlag(width: 22, height: 14.5),
+                              const SizedBox(width: 7),
                               Text(
                                 _formatDisplayPhone(widget.phoneNumber),
                                 style: GoogleFonts.ibmPlexSansArabic(
@@ -345,7 +346,14 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
       AuthenticationService authenticationService = locator<AuthenticationService>();
       if (authenticationService.user != null) {
         if (authenticationService.user!.role == null || authenticationService.user!.role != kDeliveryRole) {
-          await userProvider.promoteCurrentDriverToDelivery();
+          await authenticationService.logOut();
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (ctx) => const CustomDialog(message: 'هذا الحساب غير مسجل ككابتن توصيل. يرجى التواصل مع إدارة جتك.'),
+            );
+          }
+          return;
         }
         InitWidget.restartApp(context);
       }

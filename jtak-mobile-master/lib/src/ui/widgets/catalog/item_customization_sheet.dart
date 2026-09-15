@@ -12,6 +12,7 @@ import '../../../core/controllers/order/cart_provider.dart';
 import '../../../core/data/mock_catalog_data.dart';
 import '../../../core/services/locator.dart';
 import 'replace_cart_bottom_sheet.dart';
+import '../../../utils/custom_widgets/image_view_page.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Food Item Customization Bottom Sheet
@@ -142,54 +143,117 @@ class _ItemCustomizationBottomSheetState
                   SliverToBoxAdapter(
                     child: Stack(
                       children: [
-                        Container(
-                          height: 230,
-                          width: double.infinity,
-                          color: const Color(0xFFF3F4F6),
-                          child: widget.item.imageUrl.isNotEmpty
-                              ? (widget.item.imageUrl.startsWith('assets')
-                                  ? Image.asset(
-                                      widget.item.imageUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        color: const Color(0xFFFDBA74),
-                                        child: const Center(
-                                          child: Icon(Icons.restaurant_rounded,
-                                              color: Colors.white, size: 54),
-                                        ),
+                        // Food Photo Container with Tap-to-Expand
+                        GestureDetector(
+                          onTap: () {
+                            if (widget.item.imageUrl.isNotEmpty) {
+                              HapticFeedback.lightImpact();
+                              ImageViewPage.open(
+                                context,
+                                image: widget.item.imageUrl,
+                                title: widget.item.title,
+                                heroTag: 'dish_image_${widget.item.id}',
+                              );
+                            }
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Hero(
+                            tag: 'dish_image_${widget.item.id}',
+                            child: Container(
+                              height: 230,
+                              width: double.infinity,
+                              color: const Color(0xFFF3F4F6),
+                              child: widget.item.imageUrl.isNotEmpty
+                                  ? (widget.item.imageUrl.startsWith('assets')
+                                      ? Image.asset(
+                                          widget.item.imageUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            color: const Color(0xFFFDBA74),
+                                            child: const Center(
+                                              child: Icon(Icons.restaurant_rounded,
+                                                  color: Colors.white, size: 54),
+                                            ),
+                                          ),
+                                        )
+                                      : CachedNetworkImage(
+                                          imageUrl: widget.item.imageUrl,
+                                          fit: BoxFit.cover,
+                                          placeholder: (_, __) => Container(color: const Color(0xFFF3F4F6)),
+                                          errorWidget: (_, __, ___) => Container(
+                                            color: const Color(0xFFFDBA74),
+                                            child: const Center(
+                                              child: Icon(Icons.restaurant_rounded,
+                                                  color: Colors.white, size: 54),
+                                            ),
+                                          ),
+                                        ))
+                                  : Container(
+                                      color: const Color(0xFFFDBA74),
+                                      child: const Center(
+                                        child: Icon(Icons.restaurant_rounded,
+                                            color: Colors.white, size: 54),
                                       ),
-                                    )
-                                  : CachedNetworkImage(
-                                      imageUrl: widget.item.imageUrl,
-                                      fit: BoxFit.cover,
-                                      placeholder: (_, __) => Container(color: const Color(0xFFF3F4F6)),
-                                      errorWidget: (_, __, ___) => Container(
-                                        color: const Color(0xFFFDBA74),
-                                        child: const Center(
-                                          child: Icon(Icons.restaurant_rounded,
-                                              color: Colors.white, size: 54),
-                                        ),
-                                      ),
-                                    ))
-                              : Container(
-                                  color: const Color(0xFFFDBA74),
-                                  child: const Center(
-                                    child: Icon(Icons.restaurant_rounded,
-                                        color: Colors.white, size: 54),
-                                  ),
-                                ),
-                        ),
-                        // Dark Gradient Overlay at Top for Button Visibility
-                        Container(
-                          height: 80,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0x70000000), Colors.transparent],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
+                                    ),
                             ),
                           ),
                         ),
+                        // Dark Gradient Overlay at Top for Button Visibility
+                        IgnorePointer(
+                          child: Container(
+                            height: 80,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0x70000000), Colors.transparent],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Sleek Expand Hint Pill at Bottom Corner
+                        if (widget.item.imageUrl.isNotEmpty)
+                          PositionedDirectional(
+                            bottom: 12,
+                            start: 14,
+                            child: GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                ImageViewPage.open(
+                                  context,
+                                  image: widget.item.imageUrl,
+                                  title: widget.item.title,
+                                  heroTag: 'dish_image_${widget.item.id}',
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(PhosphorIconsBold.arrowsOut, color: Colors.white, size: 12),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'تكبير الصورة',
+                                      style: GoogleFonts.ibmPlexSansArabic(
+                                        color: Colors.white,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         // Circular Close Button (Top-Left)
                         Positioned(
                           top: 14,
@@ -222,7 +286,8 @@ class _ItemCustomizationBottomSheetState
                               return GestureDetector(
                                 onTap: () {
                                   HapticFeedback.mediumImpact();
-                                  favProvider.toggleMealFavorite(widget.item.id);
+                                  favProvider.toggleMealFavorite(
+                                      widget.item.id, widget.item);
                                 },
                                 behavior: HitTestBehavior.opaque,
                                 child: Container(
@@ -622,38 +687,45 @@ class _ItemCustomizationBottomSheetState
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   onPressed: _quantity > 1
                       ? () {
                           HapticFeedback.lightImpact();
                           setState(() => _quantity--);
                         }
                       : null,
-                  icon: const Icon(Icons.remove, size: 18),
+                  icon: const Icon(Icons.remove, size: 17),
                   color: _quantity > 1
                       ? kCharcoalDark
                       : const Color(0xFFCBD5E1),
                 ),
-                Text(
-                  '$_quantity',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    color: kCharcoalDark,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    '$_quantity',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      color: kCharcoalDark,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 IconButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     setState(() => _quantity++);
                   },
-                  icon: const Icon(Icons.add, size: 18),
+                  icon: const Icon(Icons.add, size: 17),
                   color: kCharcoalDark,
                 ),
               ],
             ),
           ),
 
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
 
           // Add to Cart Button with Calculated Price
           Expanded(
@@ -668,7 +740,7 @@ class _ItemCustomizationBottomSheetState
                     if (!widget.isPreConfirmedReplace) {
                       final shouldReplace = await ReplaceCartBottomSheet.show(
                         context,
-                        currentStoreName: cart.currentMerchantName,
+                        currentStoreName: cart.getConflictingMerchantName(widget.item.restaurantId),
                         newStoreName: widget.item.restaurantName.split(' - ').first,
                       );
                       if (shouldReplace != true || !context.mounted) return;
@@ -702,6 +774,8 @@ class _ItemCustomizationBottomSheetState
                     widget.item.restaurantId,
                     _calculatedUnitPrice.toDouble(),
                     quantity: _quantity,
+                    title: widget.item.title,
+                    imageUrl: widget.item.imageUrl,
                   );
                   widget.onAddToCart?.call({
                     'item': widget.item,
@@ -721,26 +795,31 @@ class _ItemCustomizationBottomSheetState
                   backgroundColor: kPrimaryOrange,
                   foregroundColor: Colors.white,
                   elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'إضافة إلى السلة',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Text(
+                        'إضافة إلى السلة',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 4),
                     Text(
                       MockCatalogData.formatCurrency(_calculatedTotalPrice),
                       style: GoogleFonts.ibmPlexSansArabic(
                         color: Colors.white,
-                        fontSize: 15,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w900,
                       ),
                     ),

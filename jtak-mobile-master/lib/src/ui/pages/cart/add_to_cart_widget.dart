@@ -12,6 +12,7 @@ import 'package:jtek_app/src/ui/pages/cart/cart_page.dart';
 import 'package:jtek_app/src/utils/custom_widgets/messages.dart';
 import 'package:jtek_app/src/utils/utilities/global_var.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/catalog/replace_cart_bottom_sheet.dart';
 import '../../../../main_imports.dart';
 
 enum AddToCartType { circular, labelLarge }
@@ -46,9 +47,6 @@ class _AddToCartButtonState extends State<AddToCartButton> {
         return _buttonWidget(context);
       case AddToCartType.circular:
         return _circularWidget(context);
-
-      default:
-        return _buttonWidget(context);
     }
   }
 
@@ -141,18 +139,48 @@ class _AddToCartButtonState extends State<AddToCartButton> {
         locator<AddressProvider>().address = mainAddressService.mainAddress;
 
         await showDialog(context: context, builder: (context) => CustomDialog(message: str.msg.chooseLocationFirst));
+        if (!context.mounted) return;
         await context.navigatePage(const AddAddressPage());
+        if (!context.mounted) return;
       }
-      if (!mainAddressService.isAddressEmpty()) {
+      if (!mainAddressService.isAddressEmpty() && context.mounted) {
+        final mid = product.merchantId ?? 0;
+        if (cartProvider.isDifferentMerchant(mid)) {
+          final shouldReplace = await ReplaceCartBottomSheet.show(
+            context,
+            currentStoreName: cartProvider.getConflictingMerchantName(mid),
+            newStoreName: (product.merchant != null && product.merchant!.isNotEmpty)
+                ? product.merchant!.split(' - ').first
+                : 'المتجر الجديد',
+          );
+          if (shouldReplace != true || !context.mounted) return;
+          await cartProvider.replaceCartWithItem(
+            product.id!,
+            mid,
+            product.finalPrice ?? 0.0,
+            1,
+            title: product.title,
+            imageUrl: product.photos?.firstOrNull,
+          );
+          if (widget.showSuccessMessage && context.mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(str.msg.addedToCartSuccessfully, style: const TextStyle(fontWeight: FontWeight.bold)),
+              duration: const Duration(milliseconds: 2500),
+              action: SnackBarAction(label: 'السلة', onPressed: () => context.navigateName(CartPage.routeName)),
+            ));
+          }
+          return;
+        }
+
         await cartProvider.addToCart(
           product.id!,
-          product.merchantId!,
+          mid,
           product.finalPrice ?? 0.0,
         );
-        if (widget.showSuccessMessage) {
+        if (widget.showSuccessMessage && context.mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            // behavior: SnackBarBehavior.floating,
             content: Text(str.msg.addedToCartSuccessfully, style: const TextStyle(fontWeight: FontWeight.bold)),
             duration: const Duration(milliseconds: 2500),
             action: SnackBarAction(label: 'السلة', onPressed: () => context.navigateName(CartPage.routeName)),
@@ -160,7 +188,9 @@ class _AddToCartButtonState extends State<AddToCartButton> {
         }
       }
     } catch (err) {
-      showDialog(context: context, builder: (context) => CustomDialog(message: err.toString()));
+      if (context.mounted) {
+        showDialog(context: context, builder: (context) => CustomDialog(message: err.toString()));
+      }
     }
   }
 }

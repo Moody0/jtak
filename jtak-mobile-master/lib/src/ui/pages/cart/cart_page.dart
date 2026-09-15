@@ -9,6 +9,7 @@ import '../../../core/controllers/app/home_navigation_provider.dart';
 import '../../../core/controllers/app_parameters_provider.dart';
 import '../../../core/controllers/order/cart_provider.dart';
 import '../../../core/models/user/address_model.dart';
+import '../../../core/models/order/order_details_model.dart';
 import '../../../core/services/authentication_service.dart';
 import '../../../core/services/locator.dart';
 import '../../widgets/top_app_bar_widget.dart';
@@ -119,49 +120,50 @@ class _CartPageState extends State<CartPage> {
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
-    final orderDetails = cartProvider.order.orderDetails ?? [];
+    final orderDetails = cartProvider.effectiveOrderDetails;
     final hasItems = orderDetails.isNotEmpty;
 
     final deliveryFee = cartProvider.deliveryFee;
-    final subtotal = cartProvider.order.price ?? 0.0;
+    final subtotal = cartProvider.subtotal;
     final grandTotal = hasItems ? subtotal + deliveryFee : 0.0;
-    final minOrder = cartProvider.currentMerchantMinOrder;
+    final isLoading = cartProvider.isBusy && !hasItems;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: hasItems ? const Color(0xFFF8F9FA) : Colors.white,
       appBar: _buildAppBar(hasItems, cartProvider.totalQuantity),
-      body: hasItems
-          ? ListView(
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 120),
-              children: [
-                // 1. Delivery Address Summary Bar
-                _buildAddressBar(context),
-
-                const SizedBox(height: 12),
-
-                // 2. Store Header Card
-                _buildStoreHeader(orderDetails.first.merchantTitle ?? 'المطعم'),
-
-                const SizedBox(height: 8),
-
-                // 3. Cart Items List
-                ...orderDetails.map((item) => CartSingleItem(item)),
-
-                const SizedBox(height: 12),
-
-                // 4. Special Notes to Restaurant
-                _buildNotesCard(),
-
-                const SizedBox(height: 12),
-
-                // 5. Bill Breakdown Summary Card
-                _buildBillBreakdownCard(subtotal, deliveryFee, grandTotal),
-              ],
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: kPrimaryOrange,
+              ),
             )
-          : _buildEmptyState(context),
+          : hasItems
+              ? ListView(
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 120),
+                  children: [
+                    // 1. Delivery Address Summary Bar
+                    _buildAddressBar(context),
+
+                    const SizedBox(height: 12),
+
+                    // 2. Grouped Store Sections (supports multi-merchant orders seamlessly)
+                    ..._buildGroupedStoreSections(orderDetails, cartProvider),
+
+                    const SizedBox(height: 12),
+
+                    // 4. Special Notes to Restaurant
+                    _buildNotesCard(),
+
+                    const SizedBox(height: 12),
+
+                    // 5. Bill Breakdown Summary Card
+                    _buildBillBreakdownCard(subtotal, deliveryFee, grandTotal),
+                  ],
+                )
+              : _buildEmptyState(context),
       bottomNavigationBar: hasItems
-          ? _buildBottomCheckoutBar(context, subtotal, grandTotal, minOrder)
+          ? _buildBottomCheckoutBar(context, cartProvider, subtotal, grandTotal)
           : null,
     );
   }
@@ -189,7 +191,7 @@ class _CartPageState extends State<CartPage> {
               fontWeight: FontWeight.w800,
             ),
           ),
-          if (totalQuantity > 0) ...[
+          if (hasItems && totalQuantity > 0) ...[
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -300,14 +302,110 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildStoreHeader(String storeName) {
+  List<Widget> _buildGroupedStoreSections(
+      List<OrderDetailsModel> details, CartProvider cartProvider) {
+    final Map<int, List<OrderDetailsModel>> groups = {};
+    for (final item in details) {
+      final mid = item.merchantId ?? 1;
+      groups.putIfAbsent(mid, () => []).add(item);
+    }
+
+    final List<Widget> widgets = [];
+    final isMulti = groups.length > 1;
+
+    if (isMulti) {
+      widgets.add(
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFBFDBFE), width: 1.1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDBEAFE),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Center(
+                  child: Icon(
+                    PhosphorIconsFill.shoppingBag,
+                    color: Color(0xFF2563EB),
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'طلب مجمّع من ${groups.length} متاجر',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF1E40AF),
+                      ),
+                    ),
+                    Text(
+                      'سيتم جمع طلباتك وتوصيلها جميعاً في مسار واحد',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF3B82F6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      widgets.add(const SizedBox(height: 10));
+    }
+
+    for (final entry in groups.entries) {
+      final storeItems = entry.value;
+      final storeName = storeItems.first.merchantTitle ?? 'المتجر';
+      widgets.add(_buildStoreHeader(entry.key, storeName, cartProvider));
+      widgets.add(const SizedBox(height: 8));
+      for (final item in storeItems) {
+        widgets.add(CartSingleItem(item));
+      }
+      widgets.add(const SizedBox(height: 12));
+    }
+
+    return widgets;
+  }
+
+  Widget _buildStoreHeader(
+      int merchantId, String storeName, CartProvider cartProvider) {
+    final int storeMinOrder = cartProvider.getMinOrderForMerchant(merchantId);
+    final double storeSubtotal = cartProvider.getSubtotalForMerchant(merchantId);
+    final bool hasMinOrder = storeMinOrder > 0;
+    final bool reachedMin = !hasMinOrder || storeSubtotal >= storeMinOrder;
+    final double remaining =
+        (storeMinOrder - storeSubtotal).clamp(0.0, double.infinity);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.1),
+        border: Border.all(
+          color: hasMinOrder && !reachedMin
+              ? const Color(0xFFFDE68A)
+              : const Color(0xFFE5E7EB),
+          width: hasMinOrder && !reachedMin ? 1.3 : 1.1,
+        ),
       ),
       child: Row(
         children: [
@@ -331,19 +429,58 @@ class _CartPageState extends State<CartPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  storeName,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    color: kCharcoalDark,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
                 Row(
                   children: [
-                    const Icon(PhosphorIconsRegular.clock, size: 13, color: Color(0xFF6B7280)),
+                    Expanded(
+                      child: Text(
+                        storeName,
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          color: kCharcoalDark,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (hasMinOrder) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: reachedMin
+                              ? const Color(0xFFECFDF5)
+                              : const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: reachedMin
+                                ? const Color(0xFFA7F3D0)
+                                : const Color(0xFFFDE68A),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          reachedMin
+                              ? 'مستوفي الحد'
+                              : 'متبقي ${_formatPrice(remaining)} ل.س',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: reachedMin
+                                ? const Color(0xFF065F46)
+                                : const Color(0xFFB45309),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(PhosphorIconsRegular.clock,
+                        size: 13, color: Color(0xFF6B7280)),
                     const SizedBox(width: 4),
                     Text(
                       'توصيل خلال 15-25 دقيقة',
@@ -358,6 +495,7 @@ class _CartPageState extends State<CartPage> {
               ],
             ),
           ),
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: () => Navigator.pop(context),
             behavior: HitTestBehavior.opaque,
@@ -545,10 +683,17 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildBottomCheckoutBar(
-      BuildContext context, double subtotal, double grandTotal, int minOrder) {
-    final bool reachesMinOrder = subtotal >= minOrder;
-    final double remaining = (minOrder - subtotal).clamp(0.0, double.infinity);
+  Widget _buildBottomCheckoutBar(BuildContext context,
+      CartProvider cartProvider, double subtotal, double grandTotal) {
+    final bool reachesMinOrder = cartProvider.reachesAllMinOrders;
+    final violation = cartProvider.primaryMinOrderViolation;
+    final int minOrder =
+        violation?.minOrder ?? cartProvider.currentMerchantMinOrder;
+    final double remaining = violation?.remaining ??
+        (minOrder - subtotal).clamp(0.0, double.infinity);
+    final String storeLabel = (violation != null && violation.merchantName.isNotEmpty)
+        ? ' من «${violation.merchantName}»'
+        : '';
 
     return Container(
       decoration: const BoxDecoration(
@@ -558,7 +703,7 @@ class _CartPageState extends State<CartPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Minimum Order Notice Bar (Shown when subtotal hasn't reached minimum)
+          // Minimum Order Notice Bar (Shown when any merchant hasn't reached minimum)
           if (!reachesMinOrder)
             Container(
               width: double.infinity,
@@ -579,7 +724,7 @@ class _CartPageState extends State<CartPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'الحد الأدنى للطلب هو ${_formatPrice(minOrder.toDouble())} ل.س • متبقي ${_formatPrice(remaining)} ل.س للمتابعة',
+                      'الحد الأدنى للطلب$storeLabel هو ${_formatPrice(minOrder.toDouble())} ل.س • متبقي ${_formatPrice(remaining)} ل.س للمتابعة',
                       style: GoogleFonts.ibmPlexSansArabic(
                         color: const Color(0xFF92400E),
                         fontSize: 12.0,
@@ -633,16 +778,28 @@ class _CartPageState extends State<CartPage> {
                       ? () async {
                           HapticFeedback.mediumImpact();
                           final authService = locator<AuthenticationService>();
+                          if (!authService.isLogin()) {
+                            await authService.getAuthorizationData();
+                          }
                           if (authService.isLogin()) {
+                            if (!context.mounted) return;
                             Navigator.pushNamed(
                                 context, OrderPaymentPage.routeName);
                           } else {
+                            if (!context.mounted) return;
                             final loggedIn = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                   builder: (context) => const LoginPage()),
                             );
                             if (loggedIn == true && context.mounted) {
+                              await authService.getAuthorizationData();
+                              if (!context.mounted) return;
+                              await Provider.of<CartProvider>(context,
+                                      listen: false)
+                                  .cartInfo
+                                  .initData();
+                              if (!context.mounted) return;
                               Navigator.pushNamed(
                                   context, OrderPaymentPage.routeName);
                             }
@@ -664,7 +821,7 @@ class _CartPageState extends State<CartPage> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'الحد الأدنى للطلب من هذا المتجر هو ${_formatPrice(minOrder.toDouble())} ل.س (متبقي ${_formatPrice(remaining)} ل.س)',
+                                      'الحد الأدنى للطلب$storeLabel هو ${_formatPrice(minOrder.toDouble())} ل.س (متبقي ${_formatPrice(remaining)} ل.س)',
                                       style: GoogleFonts.ibmPlexSansArabic(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w700,
@@ -725,88 +882,69 @@ class _CartPageState extends State<CartPage> {
   // Empty Cart State
   // ---------------------------------------------------------------------------
   Widget _buildEmptyState(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Text(
-          'سلة المشتريات',
-          style: GoogleFonts.ibmPlexSansArabic(
-            color: kCharcoalDark,
-            fontSize: 18.0,
-            fontWeight: FontWeight.w800,
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 110,
+            height: 110,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFF3EB),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                PhosphorIconsThin.shoppingBag,
+                size: 56,
+                color: kPrimaryOrange,
+              ),
+            ),
           ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const JtakBackIcon(size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 110,
-              height: 110,
+          const SizedBox(height: 20),
+          Text(
+            'سلة المشتريات فارغة!',
+            style: GoogleFonts.ibmPlexSansArabic(
+              color: kCharcoalDark,
+              fontSize: 20.0,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'لم تقم بإضافة أي منتجات أو وجبات بعد.',
+            style: GoogleFonts.ibmPlexSansArabic(
+              color: const Color(0xFF6B7280),
+              fontSize: 14.0,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 28),
+          GestureDetector(
+            onTap: () {
+              Navigator.popUntil(context, (route) => route.isFirst);
+              Provider.of<HomeNavigationProvider>(context, listen: false)
+                  .changePage(0);
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 32, vertical: 14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF3EB),
-                shape: BoxShape.circle,
+                color: kPrimaryOrange,
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Center(
-                child: Icon(
-                  PhosphorIconsThin.shoppingBag,
-                  size: 56,
-                  color: kPrimaryOrange,
+              child: Text(
+                'ابدأ التسوق الآن',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  color: Colors.white,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'سلة المشتريات فارغة!',
-              style: GoogleFonts.ibmPlexSansArabic(
-                color: kCharcoalDark,
-                fontSize: 20.0,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'لم تقم بإضافة أي منتجات أو وجبات بعد.',
-              style: GoogleFonts.ibmPlexSansArabic(
-                color: const Color(0xFF6B7280),
-                fontSize: 14.0,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: () {
-                Navigator.popUntil(context, (route) => route.isFirst);
-                Provider.of<HomeNavigationProvider>(context, listen: false).changePage(0);
-              },
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                decoration: BoxDecoration(
-                  color: kPrimaryOrange,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  'ابدأ التسوق الآن',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    color: Colors.white,
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

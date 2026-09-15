@@ -61,12 +61,11 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
   late MockRestaurantData _restaurantData;
   late List<String> _categories;
   int _selectedCategoryIndex = 0;
+  final ScrollController _scrollController = ScrollController();
+  int? _highlightedProductId;
 
   int get _minOrderTarget =>
-      _restaurantData.minOrder > 0 ? _restaurantData.minOrder : 30000;
-  final Map<int, int> _cartQuantities = {};
-  final Set<int> _expandedProductIds = {};
-  final Map<int, Timer> _collapseTimers = {};
+      _restaurantData.minOrder > 0 ? _restaurantData.minOrder : 15000;
 
   String _formatPrice(int price) {
     return price.toString().replaceAllMapped(
@@ -75,36 +74,15 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
         );
   }
 
-  int get _cartItemCount =>
-      _cartQuantities.values.fold(0, (sum, qty) => sum + qty);
-
-  int get _cartTotalPrice {
-    int total = 0;
-    _cartQuantities.forEach((id, qty) {
-      for (final item in _restaurantData.menuItems) {
-        if (item.id == id) {
-          total += item.basePriceValue * qty;
-          break;
-        }
-      }
-    });
-    return total;
-  }
-
   void _onPlusTapped(MockMenuItemData product) async {
     final cart = locator<CartProvider>();
     if (cart.isDifferentMerchant(product.restaurantId)) {
       final shouldReplace = await ReplaceCartBottomSheet.show(
         context,
-        currentStoreName: cart.currentMerchantName,
+        currentStoreName: cart.getConflictingMerchantName(product.restaurantId),
         newStoreName: _restaurantData.name.split(' - ').first,
       );
       if (shouldReplace != true || !mounted) return;
-
-      setState(() {
-        _cartQuantities.clear();
-        _expandedProductIds.clear();
-      });
 
       // If item has options, open customization bottom sheet with pre-confirmed replacement
       if (product.optionGroups.isNotEmpty) {
@@ -112,10 +90,6 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
           context,
           item: product,
           isPreConfirmedReplace: true,
-          onAddToCart: (data) {
-            _expandedProductIds.add(product.id);
-            _resetCollapseTimer(product.id);
-          },
         );
         return;
       }
@@ -125,24 +99,20 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
         product.restaurantId,
         product.basePriceValue.toDouble(),
         1,
+        title: product.title,
+        imageUrl: product.imageUrl,
       );
-      _expandedProductIds.add(product.id);
-      _resetCollapseTimer(product.id);
       return;
     }
 
     HapticFeedback.lightImpact();
-    final currentQty = _cartQuantities[product.id] ?? 0;
+    final currentQty = cart.getProductQuantity(product.id);
 
     // If item has customization groups and not yet added, open bottom sheet
     if (currentQty == 0 && product.optionGroups.isNotEmpty) {
       ItemCustomizationBottomSheet.show(
         context,
         item: product,
-        onAddToCart: (data) {
-          _expandedProductIds.add(product.id);
-          _resetCollapseTimer(product.id);
-        },
       );
       return;
     }
@@ -152,81 +122,31 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
       product.restaurantId,
       product.basePriceValue.toDouble(),
       quantity: 1,
+      title: product.title,
+      imageUrl: product.imageUrl,
     );
-    _expandedProductIds.add(product.id);
-    _resetCollapseTimer(product.id);
   }
 
-  void _onMinusTapped(int productId) {
+  void _onMinusTapped(MockMenuItemData product) {
     HapticFeedback.lightImpact();
-    final currentQty = _cartQuantities[productId] ?? 0;
-    MockMenuItemData? product;
-    for (final item in _restaurantData.menuItems) {
-      if (item.id == productId) {
-        product = item;
-        break;
-      }
+    final cart = locator<CartProvider>();
+    final currentQty = cart.getProductQuantity(product.id);
+    if (currentQty <= 1) {
+      cart.removeFromCart(product.id, product.restaurantId);
+    } else {
+      cart.setToCart(
+        product.id,
+        product.restaurantId,
+        product.basePriceValue.toDouble(),
+        currentQty - 1,
+        title: product.title,
+        imageUrl: product.imageUrl,
+      );
     }
-    setState(() {
-      if (currentQty <= 1) {
-        _cartQuantities.remove(productId);
-        _expandedProductIds.remove(productId);
-        _collapseTimers[productId]?.cancel();
-        _collapseTimers.remove(productId);
-      } else {
-        _cartQuantities[productId] = currentQty - 1;
-        _resetCollapseTimer(productId);
-      }
-    });
-    if (product != null) {
-      if (currentQty <= 1) {
-        locator<CartProvider>().removeFromCart(productId, product.restaurantId);
-      } else {
-        locator<CartProvider>().setToCart(
-          productId,
-          product.restaurantId,
-          product.basePriceValue.toDouble(),
-          currentQty - 1,
-        );
-      }
-    }
-  }
-
-  void _onCollapsedBadgeTapped(int productId) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _expandedProductIds.add(productId);
-    });
-    _resetCollapseTimer(productId);
-  }
-
-  void _resetCollapseTimer(int productId) {
-    _collapseTimers[productId]?.cancel();
-    _collapseTimers[productId] = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _expandedProductIds.remove(productId);
-        });
-      }
-    });
   }
 
   void _syncCartFromProvider() {
-    if (!mounted) return;
-    final cart = locator<CartProvider>();
-    setState(() {
-      _cartQuantities.clear();
-      for (final item in _restaurantData.menuItems) {
-        final qty = cart.getProductQuantity(item.id);
-        if (qty > 0) {
-          _cartQuantities[item.id] = qty;
-        } else {
-          _expandedProductIds.remove(item.id);
-          _collapseTimers[item.id]?.cancel();
-          _collapseTimers.remove(item.id);
-        }
-      }
-    });
+    // No-op: Product cards and bottom cart bar are reactive via CartProvider!
   }
 
   @override
@@ -283,39 +203,63 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
     }
 
     _categories = _restaurantData.categories;
-    _tabController = TabController(length: _categories.length, vsync: this);
 
-    // Attach listener to CartProvider for live sync across navigation
-    locator<CartProvider>().addListener(_syncCartFromProvider);
-    _syncCartFromProvider();
+    final targetId = widget.initialSelectedItemId ?? widget.initialSelectedItem?.id;
+    if (targetId != null) {
+      _highlightedProductId = targetId;
+      final matchedItem = _restaurantData.menuItems
+          .where((m) => m.id == targetId)
+          .firstOrNull ?? widget.initialSelectedItem;
+      if (matchedItem != null) {
+        final catIndex = _categories.indexOf(matchedItem.category);
+        if (catIndex != -1) {
+          _selectedCategoryIndex = catIndex;
+        }
+      }
+    }
+
+    _tabController = TabController(
+      length: _categories.length,
+      vsync: this,
+      initialIndex: _selectedCategoryIndex,
+    );
 
     // Dynamically fetch and sync real products live from the backend API
     _loadLiveBackendMenu();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (widget.initialSelectedItem != null) {
+
+      // Scroll smoothly down to the menu section past the banner and overview card
+      if (targetId != null && _scrollController.hasClients) {
+        _scrollController.animateTo(
+          340.0,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeOutCubic,
+        );
+      }
+
+      final itemToShow = widget.initialSelectedItem ??
+          _restaurantData.menuItems
+              .where((m) => m.id == widget.initialSelectedItemId)
+              .firstOrNull;
+
+      if (itemToShow != null) {
         ItemCustomizationBottomSheet.show(
           context,
-          item: widget.initialSelectedItem!,
-          onAddToCart: (data) {
-            _expandedProductIds.add(widget.initialSelectedItem!.id);
-            _resetCollapseTimer(widget.initialSelectedItem!.id);
-          },
+          item: itemToShow,
         );
-      } else if (widget.initialSelectedItemId != null) {
-        final item = _restaurantData.menuItems.firstWhere(
-          (m) => m.id == widget.initialSelectedItemId,
-          orElse: () => _restaurantData.menuItems.first,
-        );
-        ItemCustomizationBottomSheet.show(
-          context,
-          item: item,
-          onAddToCart: (data) {
-            _expandedProductIds.add(item.id);
-            _resetCollapseTimer(item.id);
-          },
-        );
+      }
+
+      // Automatically clear highlight after 4 seconds
+      if (_highlightedProductId != null) {
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted && _highlightedProductId != null) {
+            setState(() {
+              _highlightedProductId = null;
+            });
+          }
+        });
       }
     });
   }
@@ -332,9 +276,20 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
       setState(() {
         _restaurantData = liveData;
         _categories = liveData.categories;
-        if (_selectedCategoryIndex >= _categories.length) {
+
+        final targetId = widget.initialSelectedItemId ?? widget.initialSelectedItem?.id;
+        if (targetId != null) {
+          final matched = liveData.menuItems.where((m) => m.id == targetId).firstOrNull;
+          if (matched != null) {
+            final catIdx = _categories.indexOf(matched.category);
+            if (catIdx != -1) {
+              _selectedCategoryIndex = catIdx;
+            }
+          }
+        } else if (_selectedCategoryIndex >= _categories.length) {
           _selectedCategoryIndex = 0;
         }
+
         _tabController.dispose();
         _tabController = TabController(
           length: _categories.length,
@@ -348,12 +303,8 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
 
   @override
   void dispose() {
-    locator<CartProvider>().removeListener(_syncCartFromProvider);
     _tabController.dispose();
-    for (final timer in _collapseTimers.values) {
-      timer.cancel();
-    }
-    _collapseTimers.clear();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -384,6 +335,7 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
               child: ScrollConfiguration(
                 behavior: const ScrollBehavior().copyWith(overscroll: false),
                 child: CustomScrollView(
+                  controller: _scrollController,
                   physics: const ClampingScrollPhysics(),
                   slivers: [
                     // 1. Unified Banner Header & Overview Card (Overview Card has higher Z-Index over Banner)
@@ -498,284 +450,19 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
     );
   }
 
-  /// 2-Column Interactive Food Card with Morphing Stepper (Exact Market Page UI/UX)
+  /// 2-Column Interactive Food Card with Morphing Stepper
   Widget _buildProductCard(MockMenuItemData product) {
-    final quantityInCart = _cartQuantities[product.id] ?? 0;
-    final isExpanded = _expandedProductIds.contains(product.id) && quantityInCart > 0;
-
-    final double btnWidth = isExpanded ? 112 : 34;
-    final double btnHeight = isExpanded ? 36 : 34;
-    final double btnRight = isExpanded ? 6 : 8;
-    final double btnBottom = isExpanded ? 6 : 8;
-
-    final BoxDecoration btnDecoration = isExpanded
-        ? BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-          )
-        : (quantityInCart > 0
-            ? BoxDecoration(
-                color: kPrimaryOrange,
-                borderRadius: BorderRadius.circular(17),
-              )
-            : BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(17),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-              ));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // White Squircle Card with Image & Animated Morphing Stepper / Button
-        AspectRatio(
-          aspectRatio: 1.0,
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFEBEBEF), width: 1.1),
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Product Image (Takes full cover with BoxFit.cover)
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: () {
-                      ItemCustomizationBottomSheet.show(
-                        context,
-                        item: product,
-                        onAddToCart: (data) {
-                          final qty = (data['quantity'] as int?) ?? 1;
-                          setState(() {
-                            _cartQuantities[product.id] = (_cartQuantities[product.id] ?? 0) + qty;
-                            _expandedProductIds.add(product.id);
-                          });
-                          _resetCollapseTimer(product.id);
-                        },
-                      );
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(17),
-                      child: product.imageUrl.startsWith('assets')
-                          ? Image.asset(
-                              product.imageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(
-                                child: Icon(Icons.fastfood_rounded, color: Color(0xFFCBD5E1), size: 36),
-                              ),
-                            )
-                          : CachedNetworkImage(
-                              imageUrl: product.imageUrl,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => const Center(
-                                child: Icon(Icons.fastfood_rounded, color: Color(0xFFCBD5E1), size: 36),
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
-
-                // Top-Left Favorite Button (Heart)
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Consumer<FavoriteProductProvider>(
-                    builder: (context, favProvider, _) {
-                      final isFav = favProvider.isMealFavorite(product.id);
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.mediumImpact();
-                          favProvider.toggleMealFavorite(product.id);
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-                          ),
-                          child: Center(
-                            child: Icon(
-                              isFav ? PhosphorIconsFill.heart : PhosphorIconsRegular.heart,
-                              color: isFav ? const Color(0xFFEF4444) : const Color(0xFF6B7280),
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                // Smoothly Morphing Button
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeInOutCubic,
-                  right: btnRight,
-                  bottom: btnBottom,
-                  width: btnWidth,
-                  height: btnHeight,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeInOutCubic,
-                    decoration: btnDecoration,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 320),
-                        child: isExpanded
-                            ? OverflowBox(
-                                key: const ValueKey('expanded_stepper'),
-                                minWidth: 112,
-                                maxWidth: 112,
-                                minHeight: 36,
-                                maxHeight: 36,
-                                alignment: Alignment.center,
-                                child: SizedBox(
-                                  width: 112,
-                                  height: 36,
-                                  child: Directionality(
-                                    textDirection: TextDirection.ltr,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // Minus Button (Left)
-                                        GestureDetector(
-                                          onTap: () => _onMinusTapped(product.id),
-                                          behavior: HitTestBehavior.opaque,
-                                          child: const SizedBox(
-                                            width: 32,
-                                            height: 36,
-                                            child: Center(
-                                              child: Icon(
-                                                Icons.remove_rounded,
-                                                color: kPrimaryOrange,
-                                                size: 20,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-
-                                        // Animated Sliding Number (Center)
-                                        _AnimatedCounterText(
-                                          count: quantityInCart,
-                                          style: GoogleFonts.ibmPlexSansArabic(
-                                            color: kCharcoalDark,
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-
-                                        // Plus Button (Right)
-                                        GestureDetector(
-                                          onTap: () => _onPlusTapped(product),
-                                          behavior: HitTestBehavior.opaque,
-                                          child: const SizedBox(
-                                            width: 32,
-                                            height: 36,
-                                            child: Center(
-                                              child: Icon(
-                                                Icons.add_rounded,
-                                                color: kPrimaryOrange,
-                                                size: 20,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : (quantityInCart > 0
-                                ? GestureDetector(
-                                    key: const ValueKey('collapsed_badge'),
-                                    onTap: () => _onCollapsedBadgeTapped(product.id),
-                                    behavior: HitTestBehavior.opaque,
-                                    child: Center(
-                                      child: _AnimatedCounterText(
-                                        count: quantityInCart,
-                                        style: GoogleFonts.ibmPlexSansArabic(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : GestureDetector(
-                                    key: const ValueKey('default_add_btn'),
-                                    onTap: () => _onPlusTapped(product),
-                                    behavior: HitTestBehavior.opaque,
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.add_rounded,
-                                        color: kPrimaryOrange,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  )),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 6),
-
-        // Product Title (2 Lines)
-        GestureDetector(
-          onTap: () {
-            ItemCustomizationBottomSheet.show(
-              context,
-              item: product,
-              onAddToCart: (data) {
-                _expandedProductIds.add(product.id);
-                _resetCollapseTimer(product.id);
-              },
-            );
-          },
-          behavior: HitTestBehavior.opaque,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                product.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.ibmPlexSansArabic(
-                  color: kCharcoalDark,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
-              ),
-
-              const SizedBox(height: 3),
-
-              // Product Price
-              Text(
-                product.price,
-                style: GoogleFonts.ibmPlexSansArabic(
-                  color: kPrimaryOrange,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return _RestaurantMenuItemCard(
+      product: product,
+      isHighlighted: _highlightedProductId == product.id,
+      onProductTap: () {
+        ItemCustomizationBottomSheet.show(
+          context,
+          item: product,
+        );
+      },
+      onPlusTap: () => _onPlusTapped(product),
+      onMinusTap: () => _onMinusTapped(product),
     );
   }
 
@@ -783,173 +470,182 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
   // 5. Persistent Bottom Minimum Order / Active Cart Bar (Exact Market Page Match)
   // ---------------------------------------------------------------------------
   Widget _buildBottomDeliveryBar() {
-    final count = _cartItemCount;
-    if (count == 0) {
-      return const SizedBox.shrink();
-    }
+    return Consumer<CartProvider>(
+      builder: (context, cart, _) {
+        final count = cart.totalQuantity;
+        if (count == 0) {
+          return const SizedBox.shrink();
+        }
 
-    final total = _cartTotalPrice;
-    final progress = (total / _minOrderTarget).clamp(0.0, 1.0);
-    final remaining = _minOrderTarget - total;
-    final bool reachedMin = total >= _minOrderTarget;
+        final int total = cart.subtotal.toInt();
+        final storeSubtotal =
+            cart.getSubtotalForMerchant(_restaurantData.id).toInt();
+        final storeMinOrder = cart.getMinOrderForMerchant(_restaurantData.id);
+        final target = storeMinOrder > 0 ? storeMinOrder : _minOrderTarget;
+        final progress =
+            target > 0 ? (storeSubtotal / target).clamp(0.0, 1.0) : 1.0;
+        final remaining = (target - storeSubtotal).clamp(0, 999999999);
+        final bool reachedMin = storeSubtotal >= target;
 
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
-        ),
-      ),
-      padding: EdgeInsets.fromLTRB(16, reachedMin ? 12 : 10, 16, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Animated Minimum Order Notice & Progress Line (Collapses when threshold is reached)
-          AnimatedSize(
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeInOutCubic,
-            child: !reachedMin
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 1. Minimum Order Notice & Lock Icon
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+        return Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(16, reachedMin ? 12 : 10, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animated Minimum Order Notice & Progress Line (Collapses when threshold is reached)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeInOutCubic,
+                child: !reachedMin
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'أضف أصناف بقيمة ${_formatPrice(remaining)} ل.س إلى طلبك!',
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              color: const Color(0xFF111827),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                          // 1. Minimum Order Notice & Lock Icon
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'أضف أصناف بقيمة ${_formatPrice(remaining)} ل.س إلى طلبك!',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  color: const Color(0xFF111827),
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.lock_rounded,
+                                color: Color(0xFF1F2937),
+                                size: 16,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // 2. Minimum Order Progress Line (RTL Directional Active Bar)
+                          Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final totalWidth = constraints.maxWidth;
+                                final fillWidth = totalWidth * progress;
+
+                                return Stack(
+                                  children: [
+                                    // Background track
+                                    Container(
+                                      width: totalWidth,
+                                      height: 3.5,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE5E7EB),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    // Active filled track (from right side in RTL)
+                                    Positioned(
+                                      right: 0,
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 350),
+                                        curve: Curves.easeOutCubic,
+                                        width: fillWidth,
+                                        height: 3.5,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1F2937),
+                                          borderRadius:
+                                              BorderRadius.circular(2),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.lock_rounded,
-                            color: Color(0xFF1F2937),
-                            size: 16,
-                          ),
+
+                          const SizedBox(height: 10),
                         ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // 2. Minimum Order Progress Line (RTL Directional Active Bar)
-                      Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final totalWidth = constraints.maxWidth;
-                            final fillWidth = totalWidth * progress;
-
-                            return Stack(
-                              children: [
-                                // Background track
-                                Container(
-                                  width: totalWidth,
-                                  height: 3.5,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE5E7EB),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                // Active filled track (from right side in RTL)
-                                Positioned(
-                                  right: 0,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 350),
-                                    curve: Curves.easeOutCubic,
-                                    width: fillWidth,
-                                    height: 3.5,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1F2937),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-                    ],
-                  )
-                : const SizedBox.shrink(),
-          ),
-
-          // 3. Orange "عرض السلة" Pill Button (Clean modern button, zero orange glow)
-          GestureDetector(
-            onTap: () {
-              Navigator.pushNamed(context, CartPage.routeName).then((_) {
-                _syncCartFromProvider();
-              });
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: kPrimaryOrange,
-                borderRadius: BorderRadius.circular(16),
+                      )
+                    : const SizedBox.shrink(),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Right Side in RTL: Dark Quantity Badge + "عرض السلة"
-                    Row(
+
+              // 3. Orange "عرض السلة" Pill Button (Clean modern button, zero orange glow)
+              GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(context, CartPage.routeName);
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: kPrimaryOrange,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0x38000000), // Dark translucent badge matching reference
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: _AnimatedCounterText(
-                              count: count,
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
+                        // Right Side in RTL: Dark Quantity Badge + "عرض السلة"
+                        Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: const BoxDecoration(
+                                color: Color(0x38000000), // Dark translucent badge matching reference
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: _AnimatedCounterText(
+                                  count: count,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'عرض السلة',
+                              style: GoogleFonts.ibmPlexSansArabic(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
+
+                        // Left Side in RTL: Total Price
                         Text(
-                          'عرض السلة',
+                          '${_formatPrice(total)} ل.س',
                           style: GoogleFonts.ibmPlexSansArabic(
                             color: Colors.white,
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
                     ),
-
-                    // Left Side in RTL: Total Price
-                    Text(
-                      '${_formatPrice(total)} ل.س',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1039,7 +735,7 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'حتى 3 ص',
+                    _restaurantData.workingHours.isNotEmpty ? _restaurantData.workingHours : 'حتى 3 ص',
                     style: GoogleFonts.ibmPlexSansArabic(
                       color: const Color(0xFF6B7280),
                       fontSize: 13,
@@ -1081,7 +777,8 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
                               : kCharcoalDark,
                           onTap: () {
                             HapticFeedback.mediumImpact();
-                            favProvider.toggleRestaurantFavorite(_restaurantData.id);
+                            favProvider.toggleRestaurantFavorite(
+                                _restaurantData.id, _restaurantData);
                             SnackBarWidget.showCustomSnackBar(
                               context,
                               isFav
@@ -1342,7 +1039,10 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
               _buildMetadataDivider(),
               _buildMetadataColumn('رسوم التوصيل', _restaurantData.deliveryFee),
               _buildMetadataDivider(),
-              _buildMetadataColumn('الحد الأدنى للطلب', '15,000 ل.س'),
+              _buildMetadataColumn(
+                'الحد الأدنى للطلب',
+                '${_formatPrice(_restaurantData.minOrder)} ل.س',
+              ),
             ],
           ),
         ],
@@ -1450,6 +1150,24 @@ class _StickyCategoryTabsBar extends StatefulWidget {
 
 class _StickyCategoryTabsBarState extends State<_StickyCategoryTabsBar> {
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.selectedIndex > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToTab(widget.selectedIndex);
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _StickyCategoryTabsBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _scrollToTab(widget.selectedIndex);
+    }
+  }
 
   @override
   void dispose() {
@@ -1636,6 +1354,360 @@ class _AnimatedCounterTextState extends State<_AnimatedCounterText> {
           style: widget.style,
         ),
       ),
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// Dedicated Reactive Restaurant Food Card
+/// ---------------------------------------------------------------------------
+class _RestaurantMenuItemCard extends StatefulWidget {
+  final MockMenuItemData product;
+  final bool isHighlighted;
+  final VoidCallback onProductTap;
+  final VoidCallback onPlusTap;
+  final VoidCallback onMinusTap;
+
+  const _RestaurantMenuItemCard({
+    required this.product,
+    required this.isHighlighted,
+    required this.onProductTap,
+    required this.onPlusTap,
+    required this.onMinusTap,
+  });
+
+  @override
+  State<_RestaurantMenuItemCard> createState() =>
+      _RestaurantMenuItemCardState();
+}
+
+class _RestaurantMenuItemCardState extends State<_RestaurantMenuItemCard> {
+  bool _isExpanded = false;
+  Timer? _collapseTimer;
+
+  void _resetCollapseTimer() {
+    _collapseTimer?.cancel();
+    _collapseTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _isExpanded = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handlePlus() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _isExpanded = true;
+    });
+    _resetCollapseTimer();
+    widget.onPlusTap();
+  }
+
+  void _handleMinus() {
+    HapticFeedback.selectionClick();
+    _resetCollapseTimer();
+    widget.onMinusTap();
+  }
+
+  void _handleCollapsedBadgeTap() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _isExpanded = true;
+    });
+    _resetCollapseTimer();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    return Selector<CartProvider, int>(
+      selector: (_, cart) => cart.getProductQuantity(product.id),
+      builder: (context, quantityInCart, _) {
+        final isExpanded = _isExpanded && quantityInCart > 0;
+
+        final double btnWidth = isExpanded ? 112 : 34;
+        final double btnHeight = isExpanded ? 36 : 34;
+        final double btnRight = isExpanded ? 6 : 8;
+        final double btnBottom = isExpanded ? 6 : 8;
+
+        final BoxDecoration btnDecoration = isExpanded
+            ? BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+              )
+            : (quantityInCart > 0
+                ? BoxDecoration(
+                    color: kPrimaryOrange,
+                    borderRadius: BorderRadius.circular(17),
+                  )
+                : BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(17),
+                    border:
+                        Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                  ));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // White Squircle Card with Image & Animated Morphing Stepper / Button
+            AspectRatio(
+              aspectRatio: 1.0,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: widget.isHighlighted
+                        ? kPrimaryOrange
+                        : const Color(0xFFEBEBEF),
+                    width: widget.isHighlighted ? 2.5 : 1.1,
+                  ),
+                  boxShadow: widget.isHighlighted
+                      ? [
+                          const BoxShadow(
+                            color: Color(0x59FF5400),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Product Image (Takes full cover with BoxFit.cover)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: widget.onProductTap,
+                        behavior: HitTestBehavior.opaque,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(17),
+                          child: product.imageUrl.startsWith('assets')
+                              ? Image.asset(
+                                  product.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.fastfood_rounded,
+                                        color: Color(0xFFCBD5E1), size: 36),
+                                  ),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: product.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => const Center(
+                                    child: Icon(Icons.fastfood_rounded,
+                                        color: Color(0xFFCBD5E1), size: 36),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+
+                    // Top-Left Favorite Button (Heart)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Consumer<FavoriteProductProvider>(
+                        builder: (context, favProvider, _) {
+                          final isFav = favProvider.isMealFavorite(product.id);
+                          return GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              favProvider.toggleMealFavorite(product.id, product);
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: const Color(0xFFE2E8F0), width: 1.0),
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  isFav
+                                      ? PhosphorIconsFill.heart
+                                      : PhosphorIconsRegular.heart,
+                                  color: isFav
+                                      ? const Color(0xFFEF4444)
+                                      : const Color(0xFF6B7280),
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Smoothly Morphing Button
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOutCubic,
+                      right: btnRight,
+                      bottom: btnBottom,
+                      width: btnWidth,
+                      height: btnHeight,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOutCubic,
+                        decoration: btnDecoration,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 320),
+                            child: isExpanded
+                                ? OverflowBox(
+                                    key: const ValueKey('expanded_stepper'),
+                                    minWidth: 112,
+                                    maxWidth: 112,
+                                    minHeight: 36,
+                                    maxHeight: 36,
+                                    alignment: Alignment.center,
+                                    child: SizedBox(
+                                      width: 112,
+                                      height: 36,
+                                      child: Directionality(
+                                        textDirection: TextDirection.ltr,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            // Minus Button (Left)
+                                            GestureDetector(
+                                              onTap: _handleMinus,
+                                              behavior: HitTestBehavior.opaque,
+                                              child: const SizedBox(
+                                                width: 32,
+                                                height: 36,
+                                                child: Center(
+                                                  child: Icon(
+                                                    Icons.remove_rounded,
+                                                    color: kPrimaryOrange,
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Animated Sliding Number (Center)
+                                            _AnimatedCounterText(
+                                              count: quantityInCart,
+                                              style:
+                                                  GoogleFonts.ibmPlexSansArabic(
+                                                color: kCharcoalDark,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+
+                                            // Plus Button (Right)
+                                            GestureDetector(
+                                              onTap: _handlePlus,
+                                              behavior: HitTestBehavior.opaque,
+                                              child: const SizedBox(
+                                                width: 32,
+                                                height: 36,
+                                                child: Center(
+                                                  child: Icon(
+                                                    Icons.add_rounded,
+                                                    color: kPrimaryOrange,
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : (quantityInCart > 0
+                                    ? GestureDetector(
+                                        key: const ValueKey('collapsed_badge'),
+                                        onTap: _handleCollapsedBadgeTap,
+                                        behavior: HitTestBehavior.opaque,
+                                        child: Center(
+                                          child: _AnimatedCounterText(
+                                            count: quantityInCart,
+                                            style:
+                                                GoogleFonts.ibmPlexSansArabic(
+                                              color: Colors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : GestureDetector(
+                                        key: const ValueKey('default_add_btn'),
+                                        onTap: _handlePlus,
+                                        behavior: HitTestBehavior.opaque,
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.add_rounded,
+                                            color: kPrimaryOrange,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      )),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            // Product Title & Price (Underneath Card)
+            GestureDetector(
+              onTap: widget.onProductTap,
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      color: kCharcoalDark,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    product.price,
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      color: kPrimaryOrange,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

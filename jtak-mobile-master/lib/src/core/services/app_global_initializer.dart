@@ -20,6 +20,10 @@ class AppGlobalInitializer {
     setupLocator();
     print("  -> initializAppState");
     await locator<AppStateManager>().initializAppState();
+    print("  -> getAuthorizationData");
+    await locator<AuthenticationService>().getAuthorizationData();
+    print("  -> loadLocal address");
+    await locator<AppParametersProvider>().mainAddressService.loadLocal();
     print("  -> DONE mainInitializer");
   }
 
@@ -42,7 +46,6 @@ class AppGlobalInitializer {
             .catchError((e) => print("  -> CartProvider error: $e")),
         Provider.of<AppParametersProvider>(context, listen: false)
             .loadMainParameters(context)
-            .timeout(const Duration(seconds: 3))
             .then((_) => print("  -> AppParametersProvider done"))
             .catchError((e) => print("  -> AppParametersProvider error: $e")),
         Provider.of<InitialDataProvider>(context, listen: false)

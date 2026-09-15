@@ -7,9 +7,6 @@ extension StringValue on ThemeType {
         return 'light Theme';
       case ThemeType.dark:
         return 'dark Theme';
-
-      default:
-        return '';
     }
   }
 }

@@ -108,25 +108,37 @@ class OrderDetailsModel {
   }
 
   factory OrderDetailsModel.fromMap(Map<String, dynamic> map) {
+    final statusRaw = map['orderDetailStatus'] ?? map['OrderDetailStatus'];
     return OrderDetailsModel(
-      id: map['id']?.toInt(),
-      quantity: map['quantity']?.toInt(),
-      singlePrice: map['singlePrice']?.toDouble(),
-      singleFinalPrice: map['singleFinalPrice']?.toDouble(),
-      totalPrice: map['totalPrice']?.toDouble(),
-      totalFinalPrice: map['totalFinalPrice']?.toDouble(),
-      currency: map['currency']?.toInt(),
-      currencyString: map['currencyString'],
-      orderDetailStatus: map['orderDetailStatus'] != null ? (map['orderDetailStatus'] as int).parseOrderDetailsStatus : null,
-      orderDetailStatusString: map['orderDetailStatusString'],
-      warning: map['warning'],
-      productId: map['productId']?.toInt(),
-      productTitle: map['productTitle'],
-      productUnit: map['productUnit'],
-      productImage: map['productImage'],
-      merchantId: map['merchantId']?.toInt(),
-      merchantTitle: map['merchantTitle'],
-      orderId: map['orderId']?.toInt(),
+      id: (map['id'] ?? map['Id']) != null ? int.tryParse((map['id'] ?? map['Id']).toString()) : null,
+      quantity: (map['quantity'] ?? map['Quantity']) != null ? int.tryParse((map['quantity'] ?? map['Quantity']).toString()) : null,
+      singlePrice: (map['singlePrice'] ?? map['SinglePrice']) != null ? double.tryParse((map['singlePrice'] ?? map['SinglePrice']).toString()) : null,
+      singleFinalPrice: (map['singleFinalPrice'] ?? map['SingleFinalPrice']) != null ? double.tryParse((map['singleFinalPrice'] ?? map['SingleFinalPrice']).toString()) : null,
+      totalPrice: (map['totalPrice'] ?? map['TotalPrice']) != null ? double.tryParse((map['totalPrice'] ?? map['TotalPrice']).toString()) : null,
+      totalFinalPrice: (map['totalFinalPrice'] ?? map['TotalFinalPrice']) != null ? double.tryParse((map['totalFinalPrice'] ?? map['TotalFinalPrice']).toString()) : null,
+      currency: (map['currency'] ?? map['Currency']) != null ? int.tryParse((map['currency'] ?? map['Currency']).toString()) : null,
+      currencyString: map['currencyString'] ?? map['CurrencyString'],
+      orderDetailStatus: statusRaw != null
+          ? (statusRaw is int
+              ? statusRaw.parseOrderDetailsStatus
+              : int.tryParse(statusRaw.toString())?.parseOrderDetailsStatus)
+          : null,
+      orderDetailStatusString: map['orderDetailStatusString'] ?? map['OrderDetailStatusString'],
+      warning: map['warning'] ?? map['Warning'],
+      productId: (map['productId'] ?? map['ProductId']) != null ? int.tryParse((map['productId'] ?? map['ProductId']).toString()) : null,
+      productTitle: map['productTitle'] ?? map['ProductTitle'],
+      productUnit: map['productUnit'] ?? map['ProductUnit'],
+      productImage: map['productImage'] ??
+          map['ProductImage'] ??
+          map['photos'] ??
+          map['Photos'] ??
+          map['image'] ??
+          map['Image'] ??
+          map['imageUrl'] ??
+          map['ImageUrl'],
+      merchantId: (map['merchantId'] ?? map['MerchantId']) != null ? int.tryParse((map['merchantId'] ?? map['MerchantId']).toString()) : null,
+      merchantTitle: map['merchantTitle'] ?? map['MerchantTitle'],
+      orderId: (map['orderId'] ?? map['OrderId']) != null ? int.tryParse((map['orderId'] ?? map['OrderId']).toString()) : null,
     );
   }
 

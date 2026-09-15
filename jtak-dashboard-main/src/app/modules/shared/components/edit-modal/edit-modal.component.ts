@@ -1,4 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-edit-modal',
@@ -13,7 +14,25 @@ export class EditModalComponent {
   @Output() saveClicked = new EventEmitter();
   @Output() cancelClicked = new EventEmitter();
 
-  constructor() {}
+  constructor(public translate: TranslateService) {}
+
+  getLocalizedModuleName(): string {
+    if (!this.moduleName) return '';
+    const isAr = (this.translate.currentLang || localStorage.getItem('language') || 'ar') === 'ar';
+    if (!isAr) return this.moduleName;
+    const map: { [key: string]: string } = {
+      'banner': 'الإعلان',
+      'category': 'التصنيف',
+      'user': 'المستخدم',
+      'merchant': 'التاجر',
+      'delivery captain': 'مندوب التوصيل',
+      'payment': 'الدفعة المالية',
+      'product': 'المنتج',
+      'notification': 'الإشعار',
+      'order': 'الطلب',
+    };
+    return map[this.moduleName.trim().toLowerCase()] || this.moduleName;
+  }
 
   onSaveClicked() {
     this.saveClicked.emit();

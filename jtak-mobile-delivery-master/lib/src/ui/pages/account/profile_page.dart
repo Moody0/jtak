@@ -13,6 +13,7 @@ import '../../../core/services/locator.dart';
 import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/custom_widgets/messages.dart';
+import '../../../utils/custom_widgets/syrian_flag.dart';
 import 'login_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -282,7 +283,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               child: Row(
                 children: [
-                  const Text('🇸🇾', style: TextStyle(fontSize: 18)),
+                  const SyrianFlag(width: 26, height: 17),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

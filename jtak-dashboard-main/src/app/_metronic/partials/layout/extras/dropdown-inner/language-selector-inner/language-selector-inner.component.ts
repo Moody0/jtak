@@ -31,7 +31,7 @@ export class LanguageSelectorComponent implements OnInit {
     },
     {
       lang: 'ar',
-      name: 'Arabic',
+      name: 'العربية',
       flag: './assets/media/flags/syria.svg',
     },
   ];

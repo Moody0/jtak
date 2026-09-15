@@ -1,0 +1,138 @@
+<div class="modal-header border-0 pb-0">
+  <h5 class="modal-title fw-bolder fs-5 text-dark">
+    <i class="fas fa-plus-circle text-primary me-2"></i>
+    إضافة منتج إلى قسم "الأكثر طلباً"
+  </h5>
+  <button type="button" class="btn btn-sm btn-icon btn-active-light-primary" (click)="modal.dismiss()">
+    <i class="fas fa-times"></i>
+  </button>
+</div>
+
+<div class="modal-body py-4">
+  <form [formGroup]="formGroup">
+    <!-- 1. Search Box -->
+    <div class="mb-3">
+      <label class="form-label fw-bold fs-7 mb-1">ابحث عن وجبة أو منتج من الكتالوج العام:</label>
+      <div class="input-group input-group-solid">
+        <span class="input-group-text"><i class="fas fa-search"></i></span>
+        <input
+          type="text"
+          class="form-control form-control-solid"
+          placeholder="اكتب اسم الوجبة، المتجر، أو التصنيف..."
+          formControlName="searchTerm"
+          (input)="onSearchChange($any($event.target).value)"
+        />
+        <span class="input-group-text" *ngIf="isSearching">
+          <i class="fas fa-spinner fa-spin text-primary"></i>
+        </span>
+      </div>
+    </div>
+
+    <!-- 2. Candidate Products List -->
+    <div class="candidates-viewport mb-4">
+      <div class="candidates-list" *ngIf="candidates.length > 0">
+        <div
+          class="candidate-card"
+          *ngFor="let prod of candidates"
+          [class.is-selected]="selectedProduct?.id === prod.id"
+          [class.already-in-popular]="prod.isAlreadyInPopular"
+          (click)="selectProduct(prod)"
+        >
+          <div class="candidate-thumb">
+            <img
+              *ngIf="prod.photos"
+              [src]="filesService.getFile(prod.photos, 54, 54)"
+              [alt]="prod.title"
+              loading="lazy"
+              (error)="onImageError($event)"
+            />
+            <div *ngIf="!prod.photos" class="thumb-placeholder">
+              <i class="fas fa-utensils"></i>
+            </div>
+          </div>
+          <div class="candidate-info">
+            <span class="candidate-title">{{ prod.title }}</span>
+            <div class="candidate-meta">
+              <span class="store-name"><i class="fas fa-store me-1"></i>{{ prod.merchantTitle }}</span>
+              <span class="category-name"><i class="fas fa-folder me-1"></i>{{ prod.categoryTitle }}</span>
+              <span class="price-tag">{{ prod.price | number }} ل.س</span>
+            </div>
+          </div>
+          <div class="candidate-badge">
+            <span class="badge badge-light-success fs-8" *ngIf="selectedProduct?.id === prod.id">
+              <i class="fas fa-check me-1"></i> محدد
+            </span>
+            <span class="badge badge-light-warning fs-8" *ngIf="prod.isAlreadyInPopular && selectedProduct?.id !== prod.id">
+              موجود بالقائمة
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-candidates text-center py-6" *ngIf="candidates.length === 0 && !isSearching">
+        <i class="fas fa-box-open fs-2 text-muted mb-2"></i>
+        <p class="text-muted fs-7 mb-0">لم يتم العثور على منتجات مطابقة للبحث</p>
+      </div>
+    </div>
+
+    <!-- 3. Selected Product Customization Box -->
+    <div class="selected-product-box p-3 rounded-3 mb-3" *ngIf="selectedProduct">
+      <h6 class="fw-bold fs-7 mb-3 text-dark">
+        <i class="fas fa-sliders-h text-primary me-1"></i>
+        خيارات عرض المنتج بقسم الأكثر طلباً
+      </h6>
+
+      <div class="row g-3">
+        <!-- Display Order -->
+        <div class="col-md-4">
+          <label class="form-label fw-bold fs-8 mb-1">أولوية الترتيب:</label>
+          <input
+            type="number"
+            class="form-control form-control-sm form-control-solid"
+            formControlName="order"
+            min="1"
+          />
+          <small class="text-muted fs-9">#1 تعني الظهور أولاً بالقسم</small>
+        </div>
+
+        <!-- Custom Badge -->
+        <div class="col-md-4">
+          <label class="form-label fw-bold fs-8 mb-1">شارة التمييز (Badge):</label>
+          <input
+            type="text"
+            class="form-control form-control-sm form-control-solid"
+            formControlName="customBadge"
+            placeholder="مثال: الأكثر طلباً، موصى به"
+          />
+        </div>
+
+        <!-- Custom Title Override -->
+        <div class="col-md-4">
+          <label class="form-label fw-bold fs-8 mb-1">عنوان العرض بالصفحة:</label>
+          <input
+            type="text"
+            class="form-control form-control-sm form-control-solid"
+            formControlName="customTitle"
+            [placeholder]="selectedProduct.title"
+          />
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer border-0 pt-0">
+  <button type="button" class="btn btn-light btn-sm" (click)="modal.dismiss()">
+    إلغاء
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary btn-sm"
+    (click)="submit()"
+    [disabled]="!selectedProduct || isSubmitting"
+  >
+    <i class="fas fa-plus me-1" *ngIf="!isSubmitting"></i>
+    <i class="fas fa-spinner fa-spin me-1" *ngIf="isSubmitting"></i>
+    إضافة إلى الأكثر طلباً
+  </button>
+</div>

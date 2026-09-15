@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 
 import '../app/base_provider.dart';
@@ -8,6 +7,7 @@ import '../../data/mock_catalog_data.dart';
 import '../../services/locator.dart';
 import '../../services/authentication_service.dart';
 import '../../../ui/widgets/catalog/restaurant_card_widget.dart';
+import '../../../ui/widgets/catalog/meal_card_widget.dart';
 import '../../../utils/utilities/global_var.dart';
 
 class MarketStoreModel {
@@ -112,17 +112,7 @@ class MarketStoreModel {
     String logoText = title.split(' ').first;
     String? logoBoxedText = 'ماركت';
 
-    if (title.contains('Best') || title.contains('بست')) {
-      logoColor = const Color(0xFF1D4ED8);
-      logoText = 'Best';
-      logoBoxedText = 'Market';
-    } else if (title.contains('Clover') ||
-        title.contains('كلوفر') ||
-        title.contains('Mall')) {
-      logoColor = const Color(0xFF047857);
-      logoText = 'Clover';
-      logoBoxedText = 'Mall';
-    } else if (title.contains('شمسين')) {
+    if (title.contains('شمسين')) {
       logoColor = const Color(0xFF0F766E);
       logoText = 'شمسين';
       logoBoxedText = 'سوبرماركت';
@@ -155,10 +145,7 @@ class MarketStoreModel {
     }
     assetPath ??= _resolveAssetByName(title);
 
-    final bool isUsd = (title.toLowerCase().contains('best') ||
-        title.contains('بست') ||
-        title.toLowerCase().contains('clover') ||
-        title.contains('كلوفر'));
+    const bool isUsd = false;
 
     int minOrder = 0;
     if (json['minimumOrder'] != null) {
@@ -206,13 +193,7 @@ class MarketStoreModel {
 
   static String? _resolveAssetByName(String title) {
     final t = title.toLowerCase();
-    if (t.contains('best') || t.contains('بست')) {
-      return 'assets/images/markets/best_market.webp';
-    }
-    if (t.contains('clover') || t.contains('كلوفر')) {
-      return 'assets/images/markets/clover_mall.webp';
-    }
-    if (t.contains('جيتك') || t.contains('jtak')) {
+    if (t.contains('جيتك') || t.contains('جتاك') || t.contains('jtak')) {
       return 'assets/images/markets/jtak_market.webp';
     }
     if (t.contains('شمسين')) {
@@ -271,6 +252,7 @@ class RestaurantStoreModel {
   final String deliveryFee;
   final double deliveryFeeAmount;
   final int minOrderAmount;
+  final String workingHours;
   final bool hasOffers;
   final bool isFast;
   final String coverUrl;
@@ -292,7 +274,8 @@ class RestaurantStoreModel {
     this.distance = '2.5 كم',
     this.deliveryFee = '5,000 ل.س',
     this.deliveryFeeAmount = 5000.0,
-    this.minOrderAmount = 35000,
+    this.minOrderAmount = 15000,
+    this.workingHours = 'حتى 3 ص',
     this.hasOffers = false,
     this.isFast = true,
     required this.coverUrl,
@@ -308,6 +291,7 @@ class RestaurantStoreModel {
       return {
         'cover': 'assets/images/restaurants/anas_cover.webp',
         'logo': 'assets/images/restaurants/anas_logo.webp',
+        'dish': 'assets/images/restaurants/anas_dish.webp',
       };
     } else if (t.contains('مشاوي') ||
         t.contains('كباب') ||
@@ -315,6 +299,7 @@ class RestaurantStoreModel {
       return {
         'cover': 'assets/images/restaurants/damascus_cover.webp',
         'logo': 'assets/images/restaurants/damascus_logo.webp',
+        'dish': 'assets/images/restaurants/damascus_dish.webp',
       };
     } else if (t.contains('بوز الجدي') ||
         t.contains('فول') ||
@@ -322,36 +307,43 @@ class RestaurantStoreModel {
       return {
         'cover': 'assets/images/restaurants/bouz_cover.webp',
         'logo': 'assets/images/restaurants/bouz_logo.webp',
+        'dish': 'assets/images/restaurants/bouz_dish.webp',
       };
     } else if (t.contains('بكداش') || t.contains('بوظة')) {
       return {
         'cover': 'assets/images/restaurants/bakdash_cover.webp',
         'logo': 'assets/images/restaurants/bakdash_logo.webp',
+        'dish': 'assets/images/restaurants/bakdash_dish.webp',
       };
     } else if (t.contains('النوفرة') || t.contains('نوفرة')) {
       return {
         'cover': 'assets/images/restaurants/noufara_cover.webp',
         'logo': 'assets/images/restaurants/noufara_logo.webp',
+        'dish': 'assets/images/restaurants/noufara_dish.webp',
       };
     } else if (t.contains('برغر') || t.contains('burger')) {
       return {
         'cover': 'assets/images/restaurants/burger_cover.webp',
         'logo': 'assets/images/restaurants/burger_logo.webp',
+        'dish': 'assets/images/restaurants/burger_dish.webp',
       };
     } else if (t.contains('داوود') || t.contains('مهنا')) {
       return {
         'cover': 'assets/images/restaurants/dawood_cover.webp',
         'logo': 'assets/images/restaurants/dawood_logo.webp',
+        'dish': 'assets/images/restaurants/dawood_dish.webp',
       };
     } else if (t.contains('أرت') || t.contains('art')) {
       return {
         'cover': 'assets/images/restaurants/art_cover.webp',
         'logo': 'assets/images/restaurants/art_logo.webp',
+        'dish': 'assets/images/restaurants/art_dish.webp',
       };
     }
     return {
       'cover': 'assets/images/restaurants/anas_cover.webp',
       'logo': 'assets/images/restaurants/anas_logo.webp',
+      'dish': 'assets/images/restaurants/anas_dish.webp',
     };
   }
 
@@ -383,6 +375,7 @@ class RestaurantStoreModel {
       distance: distance,
       deliveryFee: deliveryFee,
       minOrder: minOrderAmount,
+      workingHours: workingHours,
       hasOffers: hasOffers,
       isFast: isFast,
       coverUrl: coverUrl,
@@ -395,6 +388,13 @@ class RestaurantStoreModel {
     );
   }
 
+  static String _formatNumber(int n) {
+    return n.toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
+  }
+
   factory RestaurantStoreModel.fromJson(Map<String, dynamic> json) {
     final title = (json['title'] ?? '').toString().trim();
     final shortDesc = (json['shortDescription'] ?? '').toString().trim();
@@ -404,7 +404,11 @@ class RestaurantStoreModel {
 
     String cuisine = 'مطاعم وسريع';
     String eta = '20-30 دقيقة';
-    if (shortDesc.contains('•')) {
+    if (json['deliveryTime'] != null && json['deliveryTime'].toString().trim().isNotEmpty) {
+      eta = json['deliveryTime'].toString().trim();
+    } else if (json['eta'] != null && json['eta'].toString().trim().isNotEmpty) {
+      eta = json['eta'].toString().trim();
+    } else if (shortDesc.contains('•')) {
       final parts = shortDesc.split('•');
       cuisine = parts[0].trim();
       eta = parts[1].trim();
@@ -416,9 +420,14 @@ class RestaurantStoreModel {
 
     String categoryTag = 'وجبات سريعة';
     final tLower = title.toLowerCase();
-    int minOrder = 30000;
-
-    if (tLower.contains('أنس') ||
+    int minOrder = 15000;
+    if (json['minOrderAmount'] != null) {
+      minOrder = (json['minOrderAmount'] as num).toInt();
+    } else if (json['minimumOrder'] != null) {
+      minOrder = (json['minimumOrder'] as num).toInt();
+    } else if (json['minOrder'] != null) {
+      minOrder = (json['minOrder'] as num).toInt();
+    } else if (tLower.contains('أنس') ||
         title.contains('أنس') ||
         title.contains('شاورما')) {
       categoryTag = 'شاورما';
@@ -491,10 +500,17 @@ class RestaurantStoreModel {
     }
 
     double fee = 5000.0;
-    if (json['shippingCost'] != null) {
-      fee = (json['shippingCost'] as num).toDouble();
-    } else if (json['deliveryFee'] != null) {
+    if (json['deliveryFee'] != null) {
       fee = (json['deliveryFee'] as num).toDouble();
+    } else if (json['shippingCost'] != null) {
+      fee = (json['shippingCost'] as num).toDouble();
+    }
+
+    String workingHours = 'حتى 3 ص';
+    if (json['workingHours'] != null && json['workingHours'].toString().trim().isNotEmpty) {
+      workingHours = json['workingHours'].toString().trim();
+    } else if (json['openUntil'] != null && json['openUntil'].toString().trim().isNotEmpty) {
+      workingHours = json['openUntil'].toString().trim();
     }
 
     return RestaurantStoreModel(
@@ -510,9 +526,10 @@ class RestaurantStoreModel {
       ratingCount: 140,
       eta: eta,
       distance: '2.5 كم',
-      deliveryFee: '${fee.toInt()} ل.س',
+      deliveryFee: fee == 0 ? 'مجاني' : '${_formatNumber(fee.toInt())} ل.س',
       deliveryFeeAmount: fee,
       minOrderAmount: minOrder,
+      workingHours: workingHours,
       hasOffers: true,
       isFast: true,
       coverUrl: coverUrl,
@@ -537,6 +554,12 @@ class MarketsProvider extends BaseProvider {
       List.from(_defaultLiveSeededRestaurants);
   List<RestaurantStoreModel> get restaurants => _restaurants;
 
+  List<MealItemData> _popularMeals = [];
+  List<MealItemData> get popularMeals => _popularMeals;
+
+  bool _isLoadingPopularMeals = false;
+  bool get isLoadingPopularMeals => _isLoadingPopularMeals;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -552,50 +575,13 @@ class MarketsProvider extends BaseProvider {
   double get exchangeRate => _exchangeRate;
 
   MarketsProvider() {
-    _loadAllAssetProducts();
     loadMarkets();
     fetchExchangeRate();
+    loadPopularMeals();
   }
 
-  Future<void> _loadAllAssetProducts() async {
-    await Future.wait([
-      _loadAssetProducts(19),
-      _loadAssetProducts(18),
-    ]);
-  }
-
-  Future<List<Map<String, dynamic>>> _loadAssetProducts(int marketId) async {
-    if (_marketProductsCache.containsKey(marketId) &&
-        _marketProductsCache[marketId]!.isNotEmpty) {
-      return _marketProductsCache[marketId]!;
-    }
-    try {
-      String? assetPath;
-      if (marketId == 19) {
-        assetPath = 'assets/data/clover_mall_products.json';
-      } else if (marketId == 18) {
-        assetPath = 'assets/data/best_market_products.json';
-      }
-      if (assetPath != null) {
-        final jsonString = await rootBundle.loadString(assetPath);
-        final List decoded = jsonDecode(jsonString);
-        final list = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
-        if (list.isNotEmpty) {
-          _marketProductsCache[marketId] = list;
-          notifyListeners();
-          return list;
-        }
-      }
-    } catch (e) {
-      debugPrint(
-          'MarketsProvider: Error loading asset products for $marketId: $e');
-    }
-    return _marketProductsCache[marketId] ?? const [];
-  }
-
-  List<Map<String, dynamic>>? getCachedProducts(int marketId) {
-    return _marketProductsCache[marketId];
-  }
+  List<Map<String, dynamic>>? getCachedProducts(int marketId) =>
+      _marketProductsCache[marketId];
 
   List<MarketStoreModel> getCachedCategoryMerchants(int categoryId) {
     return List.unmodifiable(
@@ -711,18 +697,18 @@ class MarketsProvider extends BaseProvider {
           }
         }
 
-        if (fetchedMarkets.isNotEmpty) {
-          _markets = fetchedMarkets;
-        }
+        // The app is configured with ONE flagship supermarket: JTAK Market
+        // containing unified Best Market + Clover Mall inventory.
+        _markets = List.from(_defaultLiveSeededMarkets);
         if (fetchedRestaurants.isNotEmpty) {
           _restaurants = fetchedRestaurants;
         }
         _isLoading = false;
         notifyListeners();
 
-        // Silently pre-fetch real live products from backend for all active markets & restaurants
-        for (final store in fetchedMarkets) {
-          fetchMarketProducts(store.id);
+        // Silently pre-fetch market and restaurant products
+        for (final market in _markets) {
+          fetchMarketProducts(market.id);
         }
         for (final store in fetchedRestaurants) {
           fetchMarketProducts(store.id);
@@ -742,18 +728,193 @@ class MarketsProvider extends BaseProvider {
     }
     _isLoading = false;
     notifyListeners();
+    loadPopularMeals();
   }
 
-  /// Fetches products assigned to this market using the customer-facing endpoint
-  /// with instant asset cache and resilient fallback
-  Future<List<Map<String, dynamic>>> fetchMarketProducts(int marketId) async {
-    // 1. Ensure seed products from asset are populated immediately into cache
-    if (!_marketProductsCache.containsKey(marketId) ||
-        _marketProductsCache[marketId]!.isEmpty) {
-      await _loadAssetProducts(marketId);
+  /// Loads real popular / most ordered meals from backend with multi-tier resilience
+  Future<void> loadPopularMeals() async {
+    if (_popularMeals.isEmpty) {
+      _isLoadingPopularMeals = true;
+      notifyListeners();
     }
 
-    // 2. Refresh live from customer backend endpoint
+    // 1. Try dedicated customer popular endpoint (sorted by real order volume on backend)
+    try {
+      final userToken = locator<AuthenticationService>().getAccessToken;
+      final url =
+          Uri.parse('https://api.jtak.app/api/v1/Customer/Products/Popular?take=15');
+      final res = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          if (userToken.isNotEmpty) 'Authorization': 'Bearer $userToken',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          final List<MealItemData> items = [];
+          for (final item in decoded) {
+            final pid = int.tryParse(item['id']?.toString() ?? '0') ?? 0;
+            if (pid <= 0) continue;
+            final title = (item['title'] ?? '').toString().trim();
+            final numPrice = (item['finalPrice'] ?? item['price'] ?? 0) as num;
+            final photo = (item['photos'] ?? '').toString().trim();
+            final merchantLogo =
+                (item['merchantLogo'] ?? '').toString().trim();
+            final merchantTitle =
+                (item['merchantTitle'] ?? '').toString().trim();
+            final eta = (item['eta'] ?? '15-25 دقيقة').toString();
+            final distance = (item['distance'] ?? '1.8 كم').toString();
+            final merchantId =
+                int.tryParse(item['merchantId']?.toString() ?? '0') ?? 0;
+            final merchantKind =
+                int.tryParse(item['merchantKind']?.toString() ?? '0') ?? 0;
+            // Filter: restaurants only (merchantKind == 0)
+            if (merchantKind != 0) continue;
+
+            String coverUrl = '';
+            if (photo.isNotEmpty && photo != 'null') {
+              coverUrl = GlobalVar.getImageUrl(photo);
+            }
+            String logoUrl = '';
+            if (merchantLogo.isNotEmpty && merchantLogo != 'null') {
+              logoUrl = GlobalVar.getImageUrl(merchantLogo);
+            }
+
+            final assets =
+                RestaurantStoreModel._resolveRestaurantAssets(merchantTitle);
+            if (logoUrl.isEmpty || logoUrl == coverUrl) {
+              logoUrl = assets['logo'] ?? '';
+            }
+            if (coverUrl.isEmpty) {
+              coverUrl = assets['dish'] ?? assets['cover'] ?? '';
+            }
+
+            items.add(MealItemData(
+              id: pid,
+              title: title,
+              price: '${_formatNumber(numPrice.toInt())} ل.س',
+              coverUrl: coverUrl,
+              merchantLogoUrl: logoUrl,
+              merchantName: merchantTitle,
+              eta: eta,
+              distance: distance,
+              merchantId: merchantId,
+              numericPrice: numPrice.toDouble(),
+              isMarket: false,
+            ));
+          }
+
+          if (items.isNotEmpty) {
+            _popularMeals = items;
+            _isLoadingPopularMeals = false;
+            notifyListeners();
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('MarketsProvider: Error fetching /Customer/Products/Popular: $e');
+    }
+
+    // 2. Resilient live fallback: Query active merchant products across live backend restaurants only
+    try {
+      final List<MealItemData> fallbackItems = [];
+      final candidateMerchants = (_restaurants.isNotEmpty
+              ? _restaurants
+              : _defaultLiveSeededRestaurants)
+          .where((r) {
+            final t = r.name.toLowerCase();
+            return !t.contains('ماركت') &&
+                !t.contains('سوبرماركت') &&
+                !t.contains('سوبر ماركت') &&
+                !t.contains('market') &&
+                !t.contains('mall');
+          }).toList();
+
+      final List<List<MealItemData>> perMerchantDishes = [];
+
+      for (final rest in candidateMerchants) {
+        final products = await fetchMarketProducts(rest.id);
+        final List<MealItemData> storeDishes = [];
+        for (final p in products) {
+          final pid = (p['productId'] as num?)?.toInt() ?? 0;
+          if (pid <= 0) continue;
+          final title = (p['product'] ?? '').toString().trim();
+          final photo = (p['productPhotos'] ?? '').toString().trim();
+          final numPrice =
+              (p['finalPrice'] ?? p['merchantPrice'] ?? p['price'] ?? 0) as num;
+          if (numPrice <= 0) continue;
+
+          final assets =
+              RestaurantStoreModel._resolveRestaurantAssets(rest.name);
+          String coverUrl = '';
+          if (photo.isNotEmpty && photo != 'null') {
+            coverUrl = GlobalVar.getImageUrl(photo);
+          } else {
+            coverUrl = assets['dish'] ?? rest.coverUrl;
+          }
+
+          String logoUrl = rest.logoUrl;
+          if (logoUrl.isEmpty || logoUrl == coverUrl) {
+            logoUrl = assets['logo'] ?? rest.logoUrl;
+          }
+
+          storeDishes.add(MealItemData(
+            id: pid,
+            title: title,
+            price: '${_formatNumber(numPrice.toInt())} ل.س',
+            coverUrl: coverUrl,
+            merchantLogoUrl: logoUrl,
+            merchantName: rest.name,
+            eta: rest.eta,
+            distance: rest.distance,
+            merchantId: rest.id,
+            numericPrice: numPrice.toDouble(),
+            isMarket: false,
+          ));
+        }
+        if (storeDishes.isNotEmpty) {
+          perMerchantDishes.add(storeDishes);
+        }
+      }
+
+      // Interleave items from each restaurant to present diverse cuisines (Shawarma, Grills, Burgers, Sweets, Cafe)
+      for (int i = 0; i < 3; i++) {
+        for (final list in perMerchantDishes) {
+          if (i < list.length) {
+            fallbackItems.add(list[i]);
+            if (fallbackItems.length >= 15) break;
+          }
+        }
+        if (fallbackItems.length >= 15) break;
+      }
+
+      if (fallbackItems.isNotEmpty) {
+        _popularMeals = fallbackItems;
+        _isLoadingPopularMeals = false;
+        notifyListeners();
+        return;
+      }
+    } catch (e) {
+      debugPrint(
+          'MarketsProvider: Error aggregating fallback live popular meals: $e');
+    }
+
+    // 3. Fallback to mock meals if offline (restaurants only)
+    if (_popularMeals.isEmpty) {
+      _popularMeals =
+          MockCatalogData.allDeliveryMeals.where((m) => !m.isMarket).toList();
+    }
+    _isLoadingPopularMeals = false;
+    notifyListeners();
+  }
+
+  /// Fetches products assigned to this merchant from the customer endpoint.
+  /// On failure, returns the last successful API response (or empty).
+  Future<List<Map<String, dynamic>>> fetchMarketProducts(int marketId) async {
     try {
       final userToken = locator<AuthenticationService>().getAccessToken;
       final url = Uri.parse(
@@ -773,17 +934,15 @@ class MarketsProvider extends BaseProvider {
             .map((p) => Map<String, dynamic>.from(p))
             .toList();
 
-        if (list.isNotEmpty) {
-          _marketProductsCache[marketId] = list;
-          notifyListeners();
-          return list;
-        }
+        _marketProductsCache[marketId] = list;
+        notifyListeners();
+        return list;
       }
     } catch (e) {
       debugPrint('MarketsProvider: Error fetching customer market products: $e');
     }
 
-    return _marketProductsCache[marketId] ?? getDefaultSeededProducts(marketId);
+    return _marketProductsCache[marketId] ?? const [];
   }
 
   /// Loads explicitly typed merchants in one request. [categoryId] remains
@@ -792,6 +951,10 @@ class MarketsProvider extends BaseProvider {
     int categoryId,
     int merchantKind,
   ) async {
+    if (merchantKind == 1) {
+      // JTAK Market is the single flagship supermarket for grocery/store catalogs
+      return _markets;
+    }
     try {
       final userToken = locator<AuthenticationService>().getAccessToken;
       final url = Uri.parse(
@@ -838,11 +1001,6 @@ class MarketsProvider extends BaseProvider {
     }
 
     return const [];
-  }
-
-  /// Returns cached or verified seed products for the given market
-  List<Map<String, dynamic>> getDefaultSeededProducts(int marketId) {
-    return _marketProductsCache[marketId] ?? const [];
   }
 
   /// Converts live backend products into MockRestaurantData with full item details
@@ -910,6 +1068,7 @@ class MarketsProvider extends BaseProvider {
       distance: store.distance,
       deliveryFee: store.deliveryFee,
       minOrder: store.minOrderAmount,
+      workingHours: store.workingHours,
       hasOffers: store.hasOffers,
       isFast: store.isFast,
       coverUrl: store.coverUrl,
@@ -917,6 +1076,93 @@ class MarketsProvider extends BaseProvider {
       categories: categories,
       menuItems: items,
     );
+  }
+
+  /// Finds any menu item by ID from popular meals or cached products
+  MockMenuItemData? findMenuItemById(int itemId) {
+    // 1. Search in popularMeals
+    for (final meal in _popularMeals) {
+      if (meal.id == itemId) {
+        return MockMenuItemData(
+          id: meal.id,
+          restaurantId: meal.merchantId,
+          restaurantName:
+              meal.merchantName.isNotEmpty ? meal.merchantName : 'جيتك',
+          title: meal.title,
+          description: meal.title,
+          price: meal.price,
+          basePriceValue: meal.numericPrice > 0
+              ? meal.numericPrice.toInt()
+              : (int.tryParse(meal.price.replaceAll(RegExp(r'[^\d]'), '')) ?? 0),
+          imageUrl: meal.coverUrl,
+          category: 'وجبات',
+          eta: meal.eta,
+          distance: meal.distance,
+        );
+      }
+    }
+
+    // 2. Search in cached market/restaurant products
+    for (final entry in _marketProductsCache.entries) {
+      final merchantId = entry.key;
+      for (final p in entry.value) {
+        final pid = (p['productId'] as num?)?.toInt() ??
+            (p['id'] as num?)?.toInt() ??
+            0;
+        if (pid == itemId) {
+          final title = (p['product'] ?? p['title'] ?? '').toString();
+          final desc =
+              (p['productDescription'] ?? p['description'] ?? title).toString();
+          final photo =
+              (p['productPhotos'] ?? p['photos'] ?? p['imageUrl'] ?? '')
+                  .toString();
+          final numPrice =
+              (p['finalPrice'] ?? p['merchantPrice'] ?? p['price'] ?? 0) as num;
+          final intPrice = numPrice.toInt();
+
+          String imageUrl = '';
+          if (photo.isNotEmpty && photo != 'null') {
+            imageUrl =
+                photo.startsWith('http') ? photo : GlobalVar.getImageUrl(photo);
+          }
+
+          String merchantName = 'جيتك ماركت';
+          final rest =
+              restaurants.where((r) => r.id == merchantId).firstOrNull;
+          if (rest != null) {
+            merchantName = rest.name;
+          } else {
+            final mkt =
+                markets.where((m) => m.id == merchantId).firstOrNull;
+            if (mkt != null) merchantName = mkt.name;
+          }
+
+          return MockMenuItemData(
+            id: pid,
+            restaurantId: merchantId,
+            restaurantName: merchantName,
+            title: title,
+            description: desc.isNotEmpty ? desc : title,
+            price: '${_formatNumber(intPrice)} ل.س',
+            basePriceValue: intPrice,
+            imageUrl: imageUrl,
+            category:
+                (p['productCat1'] ?? p['category'] ?? 'قائمة الطعام').toString(),
+          );
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// Finds restaurant or market data by ID
+  MockRestaurantData? findRestaurantById(int restId) {
+    final rest = restaurants.where((r) => r.id == restId).firstOrNull;
+    if (rest != null) return rest.toRestaurantData();
+    final mkt = markets.where((m) => m.id == restId).firstOrNull;
+    if (mkt != null) return mkt.toRestaurantData();
+    return null;
   }
 
   static String _formatNumber(int number) {
@@ -931,92 +1177,27 @@ class MarketsProvider extends BaseProvider {
   static List<RestaurantStoreModel> get defaultLiveSeededRestaurants =>
       _defaultLiveSeededRestaurants;
 
-  // Verified seeded live backend markets
+  // The single flagship market: JTAK Market (incorporating Best Market & Clover Mall)
+  static const MarketStoreModel jtakMarketModel = MarketStoreModel(
+    id: 12,
+    name: 'جيتك ماركت - JTAK Market',
+    nameAr: 'جيتك ماركت',
+    nameEn: 'JTAK Market',
+    eta: '15-20 دقيقة',
+    tagline: 'سوبرماركت ومقاضي شاملة • آلاف المنتجات الطازجة والمنزلية',
+    logoText: 'جيتك',
+    logoBoxedText: 'ماركت',
+    logoColor: Color(0xFFFF5C00),
+    assetPath: 'assets/images/markets/jtak_market.webp',
+    shippingCoverageInMeters: 35000,
+    minOrderAmount: 0,
+    deliveryFeeAmount: 5000.0,
+    isUsd: false,
+    merchantKind: 1,
+  );
+
   static final List<MarketStoreModel> _defaultLiveSeededMarkets = [
-    const MarketStoreModel(
-      id: 18,
-      name: 'Best Market - بست ماركت',
-      eta: '20-30 دقيقة',
-      tagline: 'سوبرماركت ومقاضي شاملة بالدولار',
-      logoText: 'Best',
-      logoBoxedText: 'Market',
-      logoColor: Color(0xFF1D4ED8),
-      assetPath: 'assets/images/markets/best_market.webp',
-      logoUrl:
-          'https://api.jtak.app/api/v1/services/Download/2026_9_9_3c20568108304ee98d972785ebbff021.webp',
-    ),
-    const MarketStoreModel(
-      id: 19,
-      name: 'Clover Mall - كلوفر مول',
-      eta: '25-35 دقيقة',
-      tagline: 'مركز تسوق ومستلزمات منزلية ومنظفات',
-      logoText: 'Clover',
-      logoBoxedText: 'Mall',
-      logoColor: Color(0xFF047857),
-      assetPath: 'assets/images/markets/clover_mall.webp',
-      logoUrl:
-          'https://api.jtak.app/api/v1/services/Download/2026_9_9_f1797b5194ce434c88fb8000d6832642.webp',
-    ),
-    const MarketStoreModel(
-      id: 12,
-      name: 'جيتك ماركت - JTAK Market',
-      eta: '15-20 دقيقة',
-      tagline: 'توصيل فوري فائق السرعة',
-      logoText: 'جيتك',
-      logoBoxedText: 'ماركت',
-      logoColor: Color(0xFFFF5C00),
-      assetPath: 'assets/images/markets/jtak_market.webp',
-    ),
-    const MarketStoreModel(
-      id: 13,
-      name: 'سوبرماركت أبناء شمسين',
-      eta: '20-30 دقيقة',
-      tagline: 'أكبر تشكيلة مونة ومقاضي',
-      logoText: 'شمسين',
-      logoBoxedText: 'سوبرماركت',
-      logoColor: Color(0xFF0F766E),
-      assetPath: 'assets/images/markets/abnaa_shamsin.webp',
-    ),
-    const MarketStoreModel(
-      id: 14,
-      name: 'هايبرماركت قاسيون مول',
-      eta: '25-35 دقيقة',
-      tagline: 'عروض وتخفيضات أسبوعية',
-      logoText: 'قاسيون',
-      logoBoxedText: 'هايبر',
-      logoColor: Color(0xFF7C2D12),
-      assetPath: 'assets/images/markets/qasioun_hypermarket.webp',
-    ),
-    const MarketStoreModel(
-      id: 15,
-      name: 'سوبرماركت الهدى',
-      eta: '15-25 دقيقة',
-      tagline: 'أجبان، ألبان ومقاضي طازجة',
-      logoText: 'الهدى',
-      logoBoxedText: 'ماركت',
-      logoColor: Color(0xFF1E3A8A),
-      assetPath: 'assets/images/markets/al_huda.webp',
-    ),
-    const MarketStoreModel(
-      id: 16,
-      name: 'سوبرماركت البركة',
-      eta: '20-35 دقيقة',
-      tagline: 'منتجات بلدية ومستوردة فاخرة',
-      logoText: 'البركة',
-      logoBoxedText: 'سوبرماركت',
-      logoColor: Color(0xFF047857),
-      assetPath: 'assets/images/markets/al_baraka.webp',
-    ),
-    const MarketStoreModel(
-      id: 17,
-      name: 'سوبرماركت الدوحة',
-      eta: '20-30 دقيقة',
-      tagline: 'كل ما تحتاجه العائلة يومياً',
-      logoText: 'الدوحة',
-      logoBoxedText: 'ماركت',
-      logoColor: Color(0xFF4338CA),
-      assetPath: 'assets/images/markets/al_dawha.webp',
-    ),
+    jtakMarketModel,
   ];
 
   static final List<RestaurantStoreModel> _defaultLiveSeededRestaurants = [
@@ -1036,8 +1217,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 30000,
       hasOffers: true,
       isFast: true,
-      logoUrl: 'assets/images/products/Arabic Chicken Shawarma Platter.webp',
-      coverUrl: 'assets/images/products/Arabic Chicken Shawarma Platter.webp',
+      logoUrl: 'assets/images/restaurants/anas_logo.webp',
+      coverUrl: 'assets/images/restaurants/anas_cover.webp',
     ),
     const RestaurantStoreModel(
       id: 6,
@@ -1055,8 +1236,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 45000,
       hasOffers: true,
       isFast: false,
-      logoUrl: 'assets/images/categories/meat_poultry.png',
-      coverUrl: 'assets/images/categories/meat_poultry.png',
+      logoUrl: 'assets/images/restaurants/damascus_logo.webp',
+      coverUrl: 'assets/images/restaurants/damascus_cover.webp',
     ),
     const RestaurantStoreModel(
       id: 10,
@@ -1074,8 +1255,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 20000,
       hasOffers: true,
       isFast: true,
-      logoUrl: 'assets/images/categories/dish_syrian.png',
-      coverUrl: 'assets/images/categories/dish_syrian.png',
+      logoUrl: 'assets/images/restaurants/bouz_logo.webp',
+      coverUrl: 'assets/images/restaurants/bouz_cover.webp',
     ),
     const RestaurantStoreModel(
       id: 7,
@@ -1093,10 +1274,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 25000,
       hasOffers: true,
       isFast: true,
-      logoUrl:
-          'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80',
-      coverUrl:
-          'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'assets/images/restaurants/bakdash_logo.webp',
+      coverUrl: 'assets/images/restaurants/bakdash_cover.webp',
     ),
     const RestaurantStoreModel(
       id: 11,
@@ -1114,10 +1293,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 20000,
       hasOffers: true,
       isFast: true,
-      logoUrl:
-          'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=300&q=80',
-      coverUrl:
-          'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'assets/images/restaurants/noufara_logo.webp',
+      coverUrl: 'assets/images/restaurants/noufara_cover.webp',
     ),
     const RestaurantStoreModel(
       id: 9,
@@ -1135,8 +1312,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 35000,
       hasOffers: true,
       isFast: true,
-      logoUrl: 'assets/images/products/Double Angus Smash Burger.webp',
-      coverUrl: 'assets/images/products/Double Angus Smash Burger.webp',
+      logoUrl: 'assets/images/restaurants/burger_logo.webp',
+      coverUrl: 'assets/images/restaurants/burger_cover.webp',
     ),
     const RestaurantStoreModel(
       id: 5,
@@ -1154,10 +1331,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 40000,
       hasOffers: true,
       isFast: false,
-      logoUrl:
-          'https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80',
-      coverUrl:
-          'https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'assets/images/restaurants/dawood_logo.webp',
+      coverUrl: 'assets/images/restaurants/dawood_cover.webp',
     ),
     const RestaurantStoreModel(
       id: 4,
@@ -1175,10 +1350,8 @@ class MarketsProvider extends BaseProvider {
       minOrderAmount: 25000,
       hasOffers: true,
       isFast: true,
-      logoUrl:
-          'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=300&q=80',
-      coverUrl:
-          'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'assets/images/restaurants/art_logo.webp',
+      coverUrl: 'assets/images/restaurants/art_cover.webp',
     ),
   ];
 }

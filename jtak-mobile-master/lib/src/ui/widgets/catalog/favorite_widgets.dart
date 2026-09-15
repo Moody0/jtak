@@ -11,6 +11,7 @@ import '../../../core/controllers/order/cart_provider.dart';
 import '../../../core/data/mock_catalog_data.dart';
 import '../../../core/services/locator.dart';
 import 'item_customization_sheet.dart';
+import 'replace_cart_bottom_sheet.dart';
 import '../../pages/catalog/market_page.dart';
 import '../../pages/catalog/restaurant_menu_page.dart';
 
@@ -384,7 +385,9 @@ class FavoriteMealCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            item.restaurantName,
+                            item.restaurantName.isNotEmpty
+                                ? item.restaurantName
+                                : 'جيتك',
                             style: GoogleFonts.ibmPlexSansArabic(
                               color: const Color(0xFF6B7280),
                               fontSize: 12,
@@ -398,7 +401,13 @@ class FavoriteMealCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${_formatPrice(item.basePriceValue)} ل.س',
+                      item.basePriceValue > 0
+                          ? '${_formatPrice(item.basePriceValue)} ل.س'
+                          : (item.price.isNotEmpty
+                              ? (item.price.contains('ل.س')
+                                  ? item.price
+                                  : '${item.price} ل.س')
+                              : ''),
                       style: GoogleFonts.ibmPlexSansArabic(
                         color: kPrimaryOrange,
                         fontSize: 15.5,
@@ -473,8 +482,27 @@ class FavoriteMealCard extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         HapticFeedback.lightImpact();
+        final cart = locator<CartProvider>();
+        if (cart.isDifferentMerchant(item.restaurantId)) {
+          final shouldReplace = await ReplaceCartBottomSheet.show(
+            context,
+            currentStoreName: cart.getConflictingMerchantName(item.restaurantId),
+            newStoreName: item.restaurantName.split(' - ').first,
+          );
+          if (shouldReplace != true || !context.mounted) return;
+          await cart.replaceCartWithItem(
+            item.id,
+            item.restaurantId,
+            item.basePriceValue.toDouble(),
+            1,
+            title: item.title,
+            imageUrl: item.imageUrl,
+          );
+          return;
+        }
+
         if (item.optionGroups.isNotEmpty) {
           ItemCustomizationBottomSheet.show(
             context,

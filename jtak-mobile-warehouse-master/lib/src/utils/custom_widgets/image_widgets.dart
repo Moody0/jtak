@@ -62,8 +62,26 @@ class ImageView extends StatelessWidget {
   Widget getImageWidget() {
     if (image != null) {
       if (image is File) {
-        return Image.file(image, height: height, width: width, fit: fit);
+        return Image.file(
+          image,
+          height: height,
+          width: width,
+          fit: fit,
+          errorBuilder: (context, error, stackTrace) =>
+              Image.asset(kNoImage, width: width, height: height, fit: fit),
+        );
       } else if (image is String && image.isNotEmpty) {
+        final str = image.toString().trim();
+        if (str.startsWith('assets/') || str.startsWith('assets\\')) {
+          return Image.asset(
+            str,
+            height: height,
+            width: width,
+            fit: fit,
+            errorBuilder: (context, error, stackTrace) =>
+                Image.asset(kNoImage, width: width, height: height, fit: fit),
+          );
+        }
         String url;
         if (image.startsWith('http')) {
           url = image;

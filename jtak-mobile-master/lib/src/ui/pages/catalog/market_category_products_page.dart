@@ -1,9 +1,9 @@
-import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:provider/provider.dart';
 
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/order/cart_provider.dart';
@@ -64,10 +64,6 @@ class _MarketCategoryProductsPageState
   final ScrollController _subCategoryScrollController = ScrollController();
   final ScrollController _productsScrollController = ScrollController();
 
-  final Map<int, int> _cartQuantities = {};
-  final Set<int> _expandedProductIds = {};
-  final Map<int, Timer> _collapseTimers = {};
-
   static const double _maxBottomBarHeight = 130.0;
   int get _minOrderTarget =>
       locator<CartProvider>().currentMerchantMinOrder > 0
@@ -83,39 +79,13 @@ class _MarketCategoryProductsPageState
             _subCategories.contains(widget.initialSelectedSubCategory)
         ? widget.initialSelectedSubCategory!
         : 'الكل';
-
-    locator<CartProvider>().addListener(_syncCartFromProvider);
-    _syncCartFromProvider();
   }
 
   @override
   void dispose() {
-    locator<CartProvider>().removeListener(_syncCartFromProvider);
     _subCategoryScrollController.dispose();
     _productsScrollController.dispose();
-    for (final timer in _collapseTimers.values) {
-      timer.cancel();
-    }
-    _collapseTimers.clear();
     super.dispose();
-  }
-
-  void _syncCartFromProvider() {
-    if (!mounted) return;
-    final cart = locator<CartProvider>();
-    setState(() {
-      _cartQuantities.clear();
-      for (final item in widget.allMarketProducts) {
-        final qty = cart.getProductQuantity(item.id);
-        if (qty > 0) {
-          _cartQuantities[item.id] = qty;
-        } else {
-          _expandedProductIds.remove(item.id);
-          _collapseTimers[item.id]?.cancel();
-          _collapseTimers.remove(item.id);
-        }
-      }
-    });
   }
 
   void _initSubCategories() {
@@ -181,28 +151,12 @@ class _MarketCategoryProductsPageState
         );
   }
 
-  int get _cartItemCount =>
-      _cartQuantities.values.fold(0, (sum, qty) => sum + qty);
-
-  int get _cartTotalPrice {
-    int total = 0;
-    _cartQuantities.forEach((id, qty) {
-      for (final p in widget.allMarketProducts) {
-        if (p.id == id) {
-          total += p.priceValue * qty;
-          break;
-        }
-      }
-    });
-    return total;
-  }
-
   void _onPlusTapped(MarketProductItem product) async {
     final cart = locator<CartProvider>();
     if (cart.isDifferentMerchant(widget.marketId)) {
       final shouldReplace = await ReplaceCartBottomSheet.show(
         context,
-        currentStoreName: cart.currentMerchantName,
+        currentStoreName: cart.getConflictingMerchantName(widget.marketId),
         newStoreName: widget.marketName,
       );
       if (shouldReplace != true || !mounted) return;
@@ -211,71 +165,39 @@ class _MarketCategoryProductsPageState
         widget.marketId,
         product.priceValue.toDouble(),
         1,
+        title: product.title,
+        imageUrl: product.imageUrl,
       );
-      setState(() {
-        _cartQuantities.clear();
-        _expandedProductIds.clear();
-        _cartQuantities[product.id] = 1;
-        _expandedProductIds.add(product.id);
-      });
-      _resetCollapseTimer(product.id);
       return;
     }
 
-    final currentQty = _cartQuantities[product.id] ?? 0;
+    final currentQty = cart.getProductQuantity(product.id);
     final newQty = currentQty + 1;
-    setState(() {
-      _cartQuantities[product.id] = newQty;
-      _expandedProductIds.add(product.id);
-    });
-    _resetCollapseTimer(product.id);
     cart.setToCart(
       product.id,
       widget.marketId,
       product.priceValue.toDouble(),
       newQty,
+      title: product.title,
+      imageUrl: product.imageUrl,
     );
   }
 
   void _onMinusTapped(MarketProductItem product) {
-    final currentQty = _cartQuantities[product.id] ?? 0;
-    setState(() {
-      if (currentQty <= 1) {
-        _cartQuantities.remove(product.id);
-        _expandedProductIds.remove(product.id);
-        _collapseTimers[product.id]?.cancel();
-        _collapseTimers.remove(product.id);
-        locator<CartProvider>().removeFromCart(product.id, widget.marketId);
-      } else {
-        final newQty = currentQty - 1;
-        _cartQuantities[product.id] = newQty;
-        _resetCollapseTimer(product.id);
-        locator<CartProvider>().setToCart(
-          product.id,
-          widget.marketId,
-          product.priceValue.toDouble(),
-          newQty,
-        );
-      }
-    });
-  }
-
-  void _onCollapsedBadgeTapped(int productId) {
-    setState(() {
-      _expandedProductIds.add(productId);
-    });
-    _resetCollapseTimer(productId);
-  }
-
-  void _resetCollapseTimer(int productId) {
-    _collapseTimers[productId]?.cancel();
-    _collapseTimers[productId] = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _expandedProductIds.remove(productId);
-        });
-      }
-    });
+    final cart = locator<CartProvider>();
+    final currentQty = cart.getProductQuantity(product.id);
+    if (currentQty <= 1) {
+      cart.removeFromCart(product.id, widget.marketId);
+    } else {
+      cart.setToCart(
+        product.id,
+        widget.marketId,
+        product.priceValue.toDouble(),
+        currentQty - 1,
+        title: product.title,
+        imageUrl: product.imageUrl,
+      );
+    }
   }
 
   void _openProductDetail(MarketProductItem product) {
@@ -287,23 +209,11 @@ class _MarketCategoryProductsPageState
           marketId: widget.marketId,
           marketName: widget.marketName,
           allMarketProducts: widget.allMarketProducts,
-          initialQuantity: _cartQuantities[product.id] ?? 0,
-          totalCartCount: _cartItemCount,
-          onCartChanged: (productId, newQty) {
-            setState(() {
-              if (newQty <= 0) {
-                _cartQuantities.remove(productId);
-                _expandedProductIds.remove(productId);
-              } else {
-                _cartQuantities[productId] = newQty;
-              }
-            });
-          },
+          initialQuantity: locator<CartProvider>().getProductQuantity(product.id),
+          totalCartCount: locator<CartProvider>().totalQuantity,
         ),
       ),
-    ).then((_) {
-      if (mounted) _syncCartFromProvider();
-    });
+    );
   }
 
   @override
@@ -382,9 +292,7 @@ class _MarketCategoryProductsPageState
                                   left: 14,
                                   right: 14,
                                   top: 4,
-                                  bottom: _cartItemCount > 0
-                                      ? (_maxBottomBarHeight + 20)
-                                      : 30,
+                                  bottom: _maxBottomBarHeight + 20,
                                 ),
                                 sliver: SliverGrid(
                                   gridDelegate:
@@ -410,13 +318,12 @@ class _MarketCategoryProductsPageState
               ),
 
               // 4. Persistent Bottom Cart / Delivery Bar
-              if (_cartItemCount > 0)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _buildBottomCartBar(),
-                ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildBottomCartBar(),
+              ),
             ],
           ),
         ),
@@ -512,22 +419,14 @@ class _MarketCategoryProductsPageState
                     marketName: widget.marketName,
                     logoUrl: widget.logoUrl,
                     products: _filteredProducts,
-                    initialCartQuantities: _cartQuantities,
-                    onCartChanged: (productId, newQty) {
-                      setState(() {
-                        if (newQty <= 0) {
-                          _cartQuantities.remove(productId);
-                          _expandedProductIds.remove(productId);
-                        } else {
-                          _cartQuantities[productId] = newQty;
-                        }
-                      });
+                    initialCartQuantities: {
+                      for (final p in _filteredProducts)
+                        if (locator<CartProvider>().getProductQuantity(p.id) > 0)
+                          p.id: locator<CartProvider>().getProductQuantity(p.id)
                     },
                   ),
                 ),
-              ).then((_) {
-                if (mounted) _syncCartFromProvider();
-              });
+              );
             },
             behavior: HitTestBehavior.opaque,
             child: Container(
@@ -693,18 +592,12 @@ class _MarketCategoryProductsPageState
   // 3. Grid Product Card
   // ---------------------------------------------------------------------------
   Widget _buildGridProductCard(MarketProductItem product) {
-    final quantityInCart = _cartQuantities[product.id] ?? 0;
-    final isExpanded =
-        _expandedProductIds.contains(product.id) && quantityInCart > 0;
-
     return MarketProductCard(
       product: product,
-      quantityInCart: quantityInCart,
-      isExpanded: isExpanded,
+      marketId: widget.marketId,
       onProductTap: () => _openProductDetail(product),
       onPlusTap: () => _onPlusTapped(product),
       onMinusTap: () => _onMinusTapped(product),
-      onCollapsedBadgeTap: () => _onCollapsedBadgeTapped(product.id),
     );
   }
 
@@ -764,176 +657,181 @@ class _MarketCategoryProductsPageState
   // 4. Persistent Bottom Minimum Order / Active Cart Bar (Matches MarketPage)
   // ---------------------------------------------------------------------------
   Widget _buildBottomCartBar() {
-    final count = _cartItemCount;
-    if (count == 0) {
-      return const SizedBox.shrink();
-    }
+    return Consumer<CartProvider>(
+      builder: (context, cart, _) {
+        final count = cart.totalQuantity;
+        if (count == 0) {
+          return const SizedBox.shrink();
+        }
 
-    final total = _cartTotalPrice;
-    final progress = (total / _minOrderTarget).clamp(0.0, 1.0);
-    final remaining = _minOrderTarget - total;
-    final bool reachedMin = total >= _minOrderTarget;
+        final total = cart.subtotal.toInt();
+        final target = cart.currentMerchantMinOrder > 0
+            ? cart.currentMerchantMinOrder
+            : _minOrderTarget;
+        final progress = (total / target).clamp(0.0, 1.0);
+        final remaining = target - total;
+        final bool reachedMin = total >= target;
 
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
-        ),
-      ),
-      padding: EdgeInsets.fromLTRB(16, reachedMin ? 12 : 10, 16, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Animated Minimum Order Notice & Progress Line (Collapses when threshold is reached)
-          AnimatedSize(
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeInOutCubic,
-            child: !reachedMin
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 1. Minimum Order Notice & Lock Icon
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+        return Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(16, reachedMin ? 12 : 10, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animated Minimum Order Notice & Progress Line (Collapses when threshold is reached)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeInOutCubic,
+                child: !reachedMin
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'أضف منتجات بقيمة ${_formatPrice(remaining)} ل.س إلى طلبك!',
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              color: const Color(0xFF111827),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                          // 1. Minimum Order Notice & Lock Icon
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'أضف منتجات بقيمة ${_formatPrice(remaining)} ل.س إلى طلبك!',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  color: const Color(0xFF111827),
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.lock_rounded,
+                                color: Color(0xFF1F2937),
+                                size: 16,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // 2. Minimum Order Progress Line (RTL Directional Active Bar)
+                          Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final totalWidth = constraints.maxWidth;
+                                final fillWidth = totalWidth * progress;
+
+                                return Stack(
+                                  children: [
+                                    // Background track
+                                    Container(
+                                      width: totalWidth,
+                                      height: 3.5,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE5E7EB),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    // Active filled track (from right side in RTL)
+                                    Positioned(
+                                      right: 0,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 350),
+                                        curve: Curves.easeOutCubic,
+                                        width: fillWidth,
+                                        height: 3.5,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1F2937),
+                                          borderRadius: BorderRadius.circular(2),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.lock_rounded,
-                            color: Color(0xFF1F2937),
-                            size: 16,
-                          ),
+
+                          const SizedBox(height: 10),
                         ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // 2. Minimum Order Progress Line (RTL Directional Active Bar)
-                      Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final totalWidth = constraints.maxWidth;
-                            final fillWidth = totalWidth * progress;
-
-                            return Stack(
-                              children: [
-                                // Background track
-                                Container(
-                                  width: totalWidth,
-                                  height: 3.5,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE5E7EB),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                // Active filled track (from right side in RTL)
-                                Positioned(
-                                  right: 0,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 350),
-                                    curve: Curves.easeOutCubic,
-                                    width: fillWidth,
-                                    height: 3.5,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1F2937),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-                    ],
-                  )
-                : const SizedBox.shrink(),
-          ),
-
-          // 3. Orange "عرض السلة" Pill Button (Clean modern button, zero orange glow)
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CartPage()),
-              ).then((_) {
-                if (mounted) _syncCartFromProvider();
-              });
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: kPrimaryOrange,
-                borderRadius: BorderRadius.circular(16),
+                      )
+                    : const SizedBox.shrink(),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Right Side in RTL: Dark Quantity Badge + "عرض السلة"
-                    Row(
+
+              // 3. Orange "عرض السلة" Pill Button (Clean modern button, zero orange glow)
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CartPage()),
+                  );
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: kPrimaryOrange,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0x38000000), // Dark translucent badge matching reference
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: AnimatedCounterText(
-                              count: count,
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
+                        // Right Side in RTL: Dark Quantity Badge + "عرض السلة"
+                        Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: const BoxDecoration(
+                                color: Color(0x38000000), // Dark translucent badge matching reference
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: AnimatedCounterText(
+                                  count: count,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'عرض السلة',
+                              style: GoogleFonts.ibmPlexSansArabic(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
+
+                        // Left Side in RTL: Total Price
                         Text(
-                          'عرض السلة',
+                          '${_formatPrice(total)} ل.س',
                           style: GoogleFonts.ibmPlexSansArabic(
                             color: Colors.white,
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
                     ),
-
-                    // Left Side in RTL: Total Price
-                    Text(
-                      '${_formatPrice(total)} ل.س',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

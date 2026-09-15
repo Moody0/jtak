@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -54,6 +54,70 @@ namespace Modules.Accounting.Data
                 //}
 
                 #endregion
+
+                // Configure Ledger & Financial Core Entities
+                builder.Entity<Account>(b =>
+                {
+                    b.HasIndex(a => a.AccountCode).IsUnique();
+                    b.HasIndex(a => a.OwnerUserId);
+                    b.HasIndex(a => a.OwnerMerchantId);
+                });
+
+                builder.Entity<JournalTransaction>(b =>
+                {
+                    b.HasIndex(t => t.TransactionNumber).IsUnique();
+                    // A replay must never create a second financial transaction.
+                    b.HasIndex(t => t.IdempotencyKey).IsUnique();
+                    b.HasIndex(t => new { t.ReferenceType, t.ReferenceId });
+                    b.HasMany(t => t.Entries)
+                     .WithOne(e => e.Transaction)
+                     .HasForeignKey(e => e.JournalTransactionId)
+                     .OnDelete(DeleteBehavior.Restrict);
+                });
+
+                builder.Entity<LedgerEntry>(b =>
+                {
+                    b.Property(e => e.Debit).HasPrecision(18, 2);
+                    b.Property(e => e.Credit).HasPrecision(18, 2);
+                    b.HasIndex(e => new { e.AccountId, e.Currency });
+                    b.HasOne(e => e.Account)
+                     .WithMany(a => a.LedgerEntries)
+                     .HasForeignKey(e => e.AccountId)
+                     .OnDelete(DeleteBehavior.Restrict);
+                });
+
+                builder.Entity<DailySettlementBatch>(b =>
+                {
+                    b.HasIndex(s => s.BatchCode).IsUnique();
+                    b.HasIndex(s => new { s.CaptainUserId, s.BatchDate });
+                    b.Property(s => s.TotalCashCollected).HasPrecision(18, 2);
+                    b.Property(s => s.TotalWagesEarned).HasPrecision(18, 2);
+                    b.Property(s => s.NetCashRemitted).HasPrecision(18, 2);
+                    b.Property(s => s.DiscrepancyAmount).HasPrecision(18, 2);
+                });
+
+                builder.Entity<SettlementRequest>(b =>
+                {
+                    b.HasIndex(s => s.RequestNumber).IsUnique();
+                    b.HasIndex(s => new { s.PartyType, s.Status, s.CreatedDate });
+                    b.HasIndex(s => new { s.RequestedByUserId, s.Status });
+                    b.Property(s => s.Amount).HasPrecision(18, 2);
+                    b.HasMany(s => s.MerchantAllocations)
+                     .WithOne(a => a.SettlementRequest)
+                     .HasForeignKey(a => a.SettlementRequestId)
+                     .OnDelete(DeleteBehavior.Restrict);
+                });
+
+                builder.Entity<SettlementRequestMerchantAllocation>(b =>
+                {
+                    b.HasIndex(a => new { a.MerchantId, a.SettlementRequestId });
+                    b.Property(a => a.Amount).HasPrecision(18, 2);
+                });
+
+                builder.Entity<Bill>(b =>
+                {
+                    b.HasIndex(x => new { x.OrderId, x.MerchantId }).IsUnique();
+                });
 
                 base.OnModelCreating(builder);
             }
@@ -122,5 +186,11 @@ namespace Modules.Accounting.Data
             public DbSet<Bill> Bills { get; set; }
             public DbSet<Payment> Payments { get; set; }
             public DbSet<Balance> Balances { get; set; }
+            public DbSet<Account> Accounts { get; set; }
+            public DbSet<JournalTransaction> JournalTransactions { get; set; }
+            public DbSet<LedgerEntry> LedgerEntries { get; set; }
+            public DbSet<DailySettlementBatch> DailySettlementBatches { get; set; }
+            public DbSet<SettlementRequest> SettlementRequests { get; set; }
+            public DbSet<SettlementRequestMerchantAllocation> SettlementRequestMerchantAllocations { get; set; }
         }
     }

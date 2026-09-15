@@ -1,0 +1,316 @@
+<div class="popular-products-container">
+
+  <!-- 1. Operations Utility Bar -->
+  <div class="popular-utility-bar">
+    <div class="popular-utility-left">
+      <div class="popular-live-pulse-badge">
+        <span class="popular-pulse-dot"></span>
+        <span>التحكم الكامل بقسم الأكثر طلباً • الصفحة الرئيسية</span>
+      </div>
+      <span class="popular-sync-meta">
+        <i class="fas fa-fire-alt text-danger me-1"></i>
+        <span>عدد المنتجات المخصصة:</span>
+        <strong>{{ items.length }}</strong>
+        <span class="text-muted ms-2">({{ activeItemsCount }} مفعل حالياً)</span>
+      </span>
+    </div>
+    <div class="popular-utility-right">
+      <button type="button" class="btn-refresh" (click)="loadData()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>تحديث</span>
+      </button>
+      <button type="button" class="btn-add-product" (click)="openAddModal()" [disabled]="isLoading">
+        <i class="fas fa-plus"></i>
+        <span>إضافة منتج للأكثر طلباً</span>
+      </button>
+      <button type="button" class="btn-save-config" (click)="saveConfig(true)" [disabled]="isSaving">
+        <i class="fas fa-check-circle" *ngIf="!isSaving"></i>
+        <i class="fas fa-spinner fa-spin" *ngIf="isSaving"></i>
+        <span>حفظ التغييرات والترتيب</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-danger d-flex align-items-center justify-content-between" *ngIf="loadError">
+    <span><i class="fas fa-exclamation-triangle me-2"></i>تعذر الاتصال بخدمة قسم الأكثر طلباً. حاول التحديث مرة أخرى.</span>
+    <button type="button" class="btn btn-sm btn-danger" (click)="loadData()" [disabled]="isLoading">إعادة المحاولة</button>
+  </div>
+
+  <!-- 2. Section Mode & Strategy Controller Card -->
+  <div class="mode-controller-card mb-4">
+    <div class="row align-items-center g-3">
+      <div class="col-lg-6">
+        <div class="mode-info">
+          <div class="mode-icon-wrapper">
+            <i class="fas fa-sliders-h"></i>
+          </div>
+          <div>
+            <h4 class="mode-title">نمط عرض قسم "الأكثر طلباً" في تطبيق الزبون</h4>
+            <p class="mode-subtitle">حدد كيف يقوم التطبيق باختيار وترتيب الأصناف المعروضة في الصفحة الرئيسية</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="mode-options-cluster">
+          <!-- Hybrid Mode (Recommended) -->
+          <button
+            type="button"
+            class="mode-btn"
+            [class.active]="mode === 'Hybrid'"
+            (click)="setMode('Hybrid')"
+            title="يعرض الأصناف المحددة من الإدارة أولاً بترتيبك، ويكمل باقي المساحات بأعلى الأصناف طلباً تلقائياً"
+          >
+            <i class="fas fa-magic me-1 text-warning"></i>
+            <span class="fw-bold">الوضع الذكي (الهجين)</span>
+            <span class="mode-badge-rec">موصى به</span>
+          </button>
+
+          <!-- Manual Mode -->
+          <button
+            type="button"
+            class="mode-btn"
+            [class.active]="mode === 'Manual'"
+            (click)="setMode('Manual')"
+            title="يعرض فقط وحصرياً الأصناف التي تختارها وتحدد ترتيبها هنا"
+          >
+            <i class="fas fa-hand-pointer me-1 text-primary"></i>
+            <span class="fw-bold">الوضع اليدوي الصارم</span>
+          </button>
+
+          <!-- Auto Mode -->
+          <button
+            type="button"
+            class="mode-btn"
+            [class.active]="mode === 'Auto'"
+            (click)="setMode('Auto')"
+            title="حساب آلي بنسبة 100% بناءً على إجمالي المبيعات والطلبات الحقيقية"
+          >
+            <i class="fas fa-chart-line me-1 text-success"></i>
+            <span class="fw-bold">الوضع التلقائي (حسب المبيعات)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Explanation Bar -->
+    <div class="mode-desc-bar mt-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center text-muted fs-7">
+          <i class="fas fa-info-circle text-primary me-2"></i>
+          <span *ngIf="mode === 'Hybrid'">
+            <strong>الوضع الهجين:</strong> سيتم عرض المنتجات المحددة أدناه أولاً حسب ترتيب الأسبقية (1، 2، 3...)، وتُستكمل القائمة تلقائياً بأكثر الأطباق طلباً في المطاعم.
+          </span>
+          <span *ngIf="mode === 'Manual'">
+            <strong>الوضع اليدوي:</strong> سيتم عرض المنتجات المفعلة في هذا الجدول فقط بالترتيب المحدد تماماً، ولن يُعرض أي منتج آخر خارج هذه القائمة.
+          </span>
+          <span *ngIf="mode === 'Auto'">
+            <strong>الوضع التلقائي:</strong> يتم احتساب وترتيب المنتجات الأكثر طلباً في الصفحة الرئيسية ديناميكياً استناداً إلى أرقام المبيعات الحقيقية المسجلة في النظام.
+          </span>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+          <label class="form-check form-switch form-check-custom form-check-solid mb-0">
+            <input
+              class="form-check-input h-20px w-35px"
+              type="checkbox"
+              [checked]="enabled"
+              (change)="toggleSectionEnabled()"
+            />
+            <span class="form-check-label fs-7 fw-bolder" [class.text-success]="enabled" [class.text-danger]="!enabled">
+              {{ enabled ? 'القسم مفعل بالتطبيق' : 'القسم معطل مؤقتاً' }}
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Search & Filter Bar -->
+  <div class="popular-filter-bar mb-3">
+    <div class="search-box">
+      <i class="fas fa-search search-icon"></i>
+      <input
+        type="text"
+        class="search-input"
+        placeholder="ابحث بالاسم، المتجر، التصنيف، أو المعرف..."
+        [(ngModel)]="searchTerm"
+      />
+      <button *ngIf="searchTerm" type="button" class="btn-clear-search" (click)="searchTerm = ''">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="filter-stats">
+      <span class="badge badge-light-primary fw-bold">
+        عرض {{ displayedItems.length }} من إجمالي {{ items.length }} منتج
+      </span>
+    </div>
+  </div>
+
+  <!-- 4. Popular Products Sequence Table Card -->
+  <div class="popular-table-card">
+    <div class="table-responsive">
+      <table class="table popular-table align-middle">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 100px; text-align: center;">الترتيب</th>
+            <th scope="col" style="width: 70px;">المعرف</th>
+            <th scope="col">المنتج / الوجبة</th>
+            <th scope="col">المتجر / المطعم</th>
+            <th scope="col">التصنيف</th>
+            <th scope="col" style="width: 120px;">السعر</th>
+            <th scope="col" style="width: 110px;">الطلبات الفعلية</th>
+            <th scope="col" style="width: 100px; text-align: center;">الحالة بالقسم</th>
+            <th scope="col" style="width: 130px; text-align: center;">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of displayedItems; let idx = index" [class.row-disabled]="!item.active">
+            <!-- Rank / Reorder Controls -->
+            <td class="text-center">
+              <div class="rank-controls">
+                <button
+                  type="button"
+                  class="btn-rank-up"
+                  [disabled]="idx === 0 || hasSearchFilter || isSaving"
+                  (click)="moveUp(idx)"
+                  title="رفع الترتيب للأعلى (أولوية أكبر)"
+                >
+                  <i class="fas fa-chevron-up"></i>
+                </button>
+                <span class="rank-badge" [class.rank-top3]="item.order <= 3">
+                  #{{ item.order }}
+                </span>
+                <button
+                  type="button"
+                  class="btn-rank-down"
+                  [disabled]="idx === items.length - 1 || hasSearchFilter || isSaving"
+                  (click)="moveDown(idx)"
+                  title="خفض الترتيب للأسفل"
+                >
+                  <i class="fas fa-chevron-down"></i>
+                </button>
+              </div>
+            </td>
+
+            <!-- Product ID -->
+            <td>
+              <span class="badge badge-light fw-bold fs-8 text-muted">#{{ item.productId }}</span>
+            </td>
+
+            <!-- Product Image & Meta -->
+            <td>
+              <div class="product-cell">
+                <div class="product-thumb">
+                  <img
+                    *ngIf="item.photos"
+                    [src]="filesService.getFile(item.photos, 64, 64)"
+                    [alt]="item.title"
+                    loading="lazy"
+                    (error)="onImageError($event)"
+                  />
+                  <div *ngIf="!item.photos" class="thumb-fallback">
+                    <i class="fas fa-utensils"></i>
+                  </div>
+                </div>
+                <div class="product-meta">
+                  <span class="product-title">
+                    {{ item.title }}
+                    <span class="badge badge-light-danger ms-1 fs-9" *ngIf="!item.productActive" title="المنتج معطل في الكتالوج العام">
+                      معطل بالكتالوج
+                    </span>
+                  </span>
+                  <div class="product-sub">
+                    <span class="badge-custom-label" *ngIf="item.customBadge">
+                      <i class="fas fa-tag me-1"></i> {{ item.customBadge }}
+                    </span>
+                    <span class="unit-text" *ngIf="item.unit">
+                      {{ item.unit }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Store / Restaurant -->
+            <td>
+              <div class="merchant-cell">
+                <span class="merchant-tag">
+                  <i class="fas fa-store-alt text-primary me-1"></i>
+                  <span>{{ item.merchantTitle || 'متجر جيتك' }}</span>
+                </span>
+              </div>
+            </td>
+
+            <!-- Category -->
+            <td>
+              <span class="category-badge">
+                <i class="fas fa-folder me-1 text-muted"></i>
+                {{ item.categoryTitle || 'عام' }}
+              </span>
+            </td>
+
+            <!-- Price -->
+            <td>
+              <span class="price-val">
+                {{ item.finalPrice || item.price | number }}
+                <small class="currency">ل.س</small>
+              </span>
+            </td>
+
+            <!-- Real Sales / Orders Count -->
+            <td>
+              <span class="sales-count-badge" [class.has-sales]="(item.realOrdersCount || 0) > 0">
+                <i class="fas fa-shopping-cart me-1"></i>
+                {{ item.realOrdersCount || 0 }} طلب
+              </span>
+            </td>
+
+            <!-- Section Status Toggle -->
+            <td class="text-center">
+              <button
+                type="button"
+                class="btn-status-toggle"
+                [class.is-active]="item.active"
+                (click)="toggleItemActive(item)"
+                [disabled]="pendingToggleIds.has(item.productId)"
+                [title]="item.active ? 'انقر لإخفاء المنتج من قسم الأكثر طلباً' : 'انقر لإظهار المنتج في قسم الأكثر طلباً'"
+              >
+                <i class="fas" [class.fa-eye]="item.active" [class.fa-eye-slash]="!item.active"></i>
+                <span>{{ item.active ? 'معروض' : 'مخفي' }}</span>
+              </button>
+            </td>
+
+            <!-- Actions -->
+            <td class="text-center">
+              <div class="actions-group">
+                <button
+                  type="button"
+                  class="btn-action-delete"
+                  (click)="removeItem(item)"
+                  title="إزالة هذا المنتج نهائياً من قائمة الأكثر طلباً"
+                >
+                  <i class="fas fa-trash-alt"></i>
+                  <span>إزالة</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Empty State -->
+          <tr *ngIf="displayedItems.length === 0">
+            <td colspan="9" class="text-center py-12">
+              <div class="empty-state-box">
+                <i class="fas fa-fire-alt fs-1 text-muted mb-3"></i>
+                <h5 class="fw-bold mb-1">لا توجد منتجات في قائمة الأكثر طلباً</h5>
+                <p class="text-muted fs-7 mb-4">انقر على الزر أدناه لاختيار وإضافة وجبات ومأكولات إلى قسم الأكثر طلباً في الصفحة الرئيسية</p>
+                <button type="button" class="btn btn-primary btn-sm" (click)="openAddModal()">
+                  <i class="fas fa-plus me-1"></i> إضافة منتج الآن
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

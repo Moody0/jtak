@@ -4,6 +4,27 @@ import 'package:app_jtak_delivery/src/core/models/lat_lng_model.dart';
 import 'package:app_jtak_delivery/src/utils/utilities/global_var.dart';
 import 'package:geolocator/geolocator.dart';
 
+/// The specific reason live location access isn't available yet. The UI
+/// uses this to show a precise explanation and the one action that will
+/// actually move the user forward, instead of a generic error with a
+/// "try again" button that silently does nothing (which is what a second
+/// [Geolocator.requestPermission] call does once permission is already at
+/// [LocationPermission.whileInUse] on Android 11+).
+enum LocationAccessIssue {
+  serviceDisabled,
+  permissionDenied,
+  permissionDeniedForever,
+  needsAlwaysUpgrade,
+}
+
+class LocationAccessException implements Exception {
+  final LocationAccessIssue issue;
+  final String message;
+  LocationAccessException(this.issue, this.message);
+  @override
+  String toString() => message;
+}
+
 class LocationService {
   final bool isMandatory;
 
@@ -25,7 +46,10 @@ class LocationService {
     } catch (e) {
       if (isMandatory) {
         if (e is LocationServiceDisabledException && isMandatory) {
-          throw str.msg.locationServiceDisabled;
+          throw LocationAccessException(
+            LocationAccessIssue.serviceDisabled,
+            str.msg.locationServiceDisabled,
+          );
         }
         rethrow;
       }
@@ -42,7 +66,10 @@ class LocationService {
       // Location services are not enabled don't continue
       // accessing the position and request users of the
       // App to enable the location services.
-      return Future.error('Location services are disabled.');
+      throw LocationAccessException(
+        LocationAccessIssue.serviceDisabled,
+        str.msg.locationServiceDisabled,
+      );
     }
     return serviceEnabled;
   }
@@ -58,18 +85,26 @@ class LocationService {
         // Android's shouldShowRequestPermissionRationale
         // returned true. According to Android guidelines
         // your App should show an explanatory UI now.
-        return Future.error(str.msg.locationPermissionsDenied);
+        throw LocationAccessException(
+          LocationAccessIssue.permissionDenied,
+          str.msg.locationPermissionsDenied,
+        );
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever, handle appropriately.
-
+      // Permissions are denied forever: the OS will not show the system
+      // prompt again, so the only way forward is the app's own settings.
       if (Platform.isIOS) {
-        return Future.error(str.msg.pleaseEnableLocationService);
+        throw LocationAccessException(
+          LocationAccessIssue.permissionDeniedForever,
+          str.msg.pleaseEnableLocationService,
+        );
       } else {
-        await Geolocator.openLocationSettings();
-        return Future.error(str.msg.locationPermissionsDenied);
+        throw LocationAccessException(
+          LocationAccessIssue.permissionDeniedForever,
+          str.msg.locationPermissionsDenied,
+        );
       }
     }
 
@@ -85,22 +120,35 @@ class LocationService {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      throw Exception(str.msg.locationPermissionsDenied);
+      throw LocationAccessException(
+        LocationAccessIssue.permissionDeniedForever,
+        str.msg.locationPermissionsDenied,
+      );
     }
 
     if (permission == LocationPermission.denied) {
-      throw Exception(str.msg.locationPermissionsDenied);
+      throw LocationAccessException(
+        LocationAccessIssue.permissionDenied,
+        str.msg.locationPermissionsDenied,
+      );
     }
 
-    // If granted only while in use, request again to upgrade to 'always' (Allow all the time)
+    // Granted only "while in use". On Android 11+ a second requestPermission()
+    // call here is a silent no-op — the OS will not show the "Allow all the
+    // time" dialog again, so retrying this exact step forever gets the user
+    // nowhere. The only way to upgrade is the app's own Settings page.
     if (permission == LocationPermission.whileInUse) {
-      permission = await Geolocator.requestPermission();
+      throw LocationAccessException(
+        LocationAccessIssue.needsAlwaysUpgrade,
+        str.msg.locationAlwaysUpgradeRequired,
+      );
     }
 
     // Enforce LocationPermission.always strictly for continuous background tracking
     if (permission != LocationPermission.always) {
-      throw Exception(
-        'يتطلب تطبيق التوصيل صلاحية الموقع "دائماً" (Allow all the time) لضمان استمرار تتبع الطلبات في الخلفية وعند قفل الشاشة.',
+      throw LocationAccessException(
+        LocationAccessIssue.permissionDenied,
+        str.msg.locationPermissionsDenied,
       );
     }
 

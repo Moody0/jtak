@@ -13,5 +13,5 @@
     [(ngModel)]="paginator.pageSize" (change)="sizeChange()">
     <option *ngFor="let ps of pageSizes" [value]="ps">{{ ps }}</option>
   </select>
-  <span class="react-bootstrap-table-pagination-total">Page {{ paginator.page }} · {{ paginator.total }} total</span>
+  <span class="react-bootstrap-table-pagination-total">Page {{ paginator.total === 0 ? 0 : paginator.page + 1 }} · {{ paginator.total }} total</span>
 </div>

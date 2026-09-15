@@ -6,8 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/constants/app_constant.dart';
 import '../../config/themes/colors.dart';
 import '../../utils/utilities/global_var.dart';
+import '../../utils/utilities/lunch_url.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Modern Social Media & Community Channels Section
@@ -142,14 +144,7 @@ class SocialMediaWidget extends StatelessWidget {
   }
 
   void _call() async {
-    final Uri uri = Uri.parse('tel:+963933112233');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      GlobalVar.log(e.toString());
-    }
+    await LunchUrl.makeCall(kSupportPhoneNumber);
   }
 
   void _facebookFun() async {
@@ -179,21 +174,11 @@ class SocialMediaWidget extends StatelessWidget {
   }
 
   void _whatsappFun(BuildContext context) async {
-    const String whatsappPhone = "963933112233";
-    final Uri waUri = Uri.parse('https://wa.me/$whatsappPhone');
-    try {
-      if (await canLaunchUrl(waUri)) {
-        await launchUrl(waUri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('لا يوجد تطبيق واتساب مثبت!')),
-          );
-        }
-      }
-    } catch (e) {
-      GlobalVar.log(e.toString());
-    }
+    await LunchUrl.openWhatsApp(
+      phone: kSupportWhatsAppNumber,
+      message: 'مرحباً جيتك، أحتاج مساعدة واستفسار.',
+      context: context,
+    );
   }
 
   void _youtubeFun() async {

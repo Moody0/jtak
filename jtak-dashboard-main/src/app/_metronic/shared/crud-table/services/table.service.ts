@@ -1,7 +1,7 @@
 // tslint:disable:variable-name
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable, Subscription } from 'rxjs';
-import { finalize, tap, map } from 'rxjs/operators';
+import { BehaviorSubject, Observable, Subscription, of } from 'rxjs';
+import { finalize, tap, map, take, catchError } from 'rxjs/operators';
 import { PaginatorState } from '../models/paginator.model';
 import { ITableState, TableResponseModel } from '../models/table.model';
 import { BaseModel } from '../models/base.model';
@@ -113,9 +113,14 @@ export abstract class TableService<T> {
 
     const url = `${this.BASE_URL}/${this.GET_ALL_URL}`;
     this._isLoading$.next(true);
+
+    // Prune closed subscriptions to eliminate memory leaks
+    this._subscriptions = this._subscriptions.filter(s => !s.closed);
+
     const request = this.http
       .get<TableResponseModel<T>>(url, { params })
       .pipe(
+        take(1),
         tap((res: TableResponseModel<T>) => {
           this._items$.next(res.items);
           this._totalRecords$.next(res.totalRecords);
@@ -125,11 +130,17 @@ export abstract class TableService<T> {
             ),
           });
         }),
+        catchError(() => {
+          this._isLoading$.next(false);
+          return of({ items: [], totalRecords: 0 } as TableResponseModel<T>);
+        }),
         finalize(() => {
           this._isLoading$.next(false);
         })
       )
-      .subscribe();
+      .subscribe(() => {
+        this._subscriptions = this._subscriptions.filter(s => !s.closed);
+      });
     this._subscriptions.push(request);
   }
 
@@ -161,9 +172,14 @@ export abstract class TableService<T> {
 
     const url = `${this.BASE_URL}/${this.GET_ALL_URL}`;
     this._isLoading$.next(true);
+
+    // Prune closed subscriptions to eliminate memory leaks
+    this._subscriptions = this._subscriptions.filter(s => !s.closed);
+
     const request = this.http
       .post<TableResponseModel<T>>(url, body,  { params: params })
       .pipe(
+        take(1),
         tap((res: TableResponseModel<T>) => {
           this._items$.next(res.items);
           this._totalRecords$.next(res.totalRecords);
@@ -173,11 +189,17 @@ export abstract class TableService<T> {
             ),
           });
         }),
+        catchError(() => {
+          this._isLoading$.next(false);
+          return of({ items: [], totalRecords: 0 } as TableResponseModel<T>);
+        }),
         finalize(() => {
           this._isLoading$.next(false);
         })
       )
-      .subscribe();
+      .subscribe(() => {
+        this._subscriptions = this._subscriptions.filter(s => !s.closed);
+      });
     this._subscriptions.push(request);
   }
 

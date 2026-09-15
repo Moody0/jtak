@@ -191,7 +191,7 @@ export const DefaultLayoutConfig: ILayout = {
     fixed: true,
     minimized: false,
     minimize: true,
-    hoverable: true,
+    hoverable: false,
     menuIcon: 'svg',
   },
   content: {

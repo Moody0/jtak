@@ -8,6 +8,10 @@ import { Dashboard } from './models/dashboard.model';
 import { DashboardService } from './services/dashboard.service';
 import { Category } from '../categories/models/Category.model';
 import { CategoriesService } from '../categories/services/categories.service';
+import { OrdersService } from '../orders/services/orders.service';
+import { Order } from '../orders/models/orders.model';
+import { OrderDetailStatus } from '../orders/models/order-status.enum';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-dashboard',
@@ -38,7 +42,9 @@ searchGroup: FormGroup;
   constructor(
     private fb: FormBuilder,
     public service: DashboardService,
+    public ordersService: OrdersService,
     private categoriesService: CategoriesService,
+    private translate: TranslateService,
     private cdr: ChangeDetectorRef) { }
 
 
@@ -267,6 +273,60 @@ searchGroup: FormGroup;
     return item.productId;
   }
 
+  getJTakSharePercent(): number {
+    const total = this.data.totalOrdersValue || 0;
+    if (total <= 0) return 0;
+    return Math.min(100, Math.round(((this.data.jTakOrdersValue || 0) / total) * 100));
+  }
+
+  getMerchantSharePercent(): number {
+    const total = this.data.totalOrdersValue || 0;
+    if (total <= 0) return 0;
+    return Math.min(100, Math.round(((this.data.merchantOrdersValue || 0) / total) * 100));
+  }
+
+  getOrderStatus(order: Order): { label: string; badgeClass: string; icon: string } {
+    const isAr = (this.translate.currentLang || localStorage.getItem('language') || 'ar') === 'ar';
+    if (!order || !order.orderDetails || order.orderDetails.length === 0) {
+      return { label: isAr ? 'طلب جديد' : 'New Order', badgeClass: 'badge-light-warning text-warning', icon: 'fa-clock' };
+    }
+
+    const items = order.orderDetails;
+    const allTerminal = items.every(d =>
+      d.orderDetailStatus === OrderDetailStatus.CustomerCanceled ||
+      d.orderDetailStatus === OrderDetailStatus.DeliveryCanceled ||
+      d.orderDetailStatus === OrderDetailStatus.MerchantRejected);
+
+    if (allTerminal) {
+      if (items.some(d => d.orderDetailStatus === OrderDetailStatus.MerchantRejected)) {
+        return { label: isAr ? 'مرفوض من التاجر' : 'Rejected by Merchant', badgeClass: 'badge-light-danger text-danger', icon: 'fa-ban' };
+      }
+      return { label: isAr ? 'ملغي' : 'Canceled', badgeClass: 'badge-light-danger text-danger', icon: 'fa-ban' };
+    }
+
+    const active = items.filter(d =>
+      d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
+      d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
+      d.orderDetailStatus !== OrderDetailStatus.MerchantRejected);
+
+    if (active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.Delivered)) {
+      return { label: isAr ? 'تم التوصيل' : 'Delivered', badgeClass: 'badge-light-success text-success', icon: 'fa-check-double' };
+    }
+    if (active.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted)) {
+      return { label: isAr ? 'جاري التوصيل' : 'In Transit', badgeClass: 'badge-light-info text-info', icon: 'fa-motorcycle' };
+    }
+    if (active.some(d => d.orderDetailStatus === OrderDetailStatus.ReadyForPickup)) {
+      return { label: isAr ? 'جاهز للتوصيل' : 'Ready', badgeClass: 'badge-light-primary text-primary', icon: 'fa-box-open' };
+    }
+    if (active.some(d => d.orderDetailStatus === OrderDetailStatus.MerchantAccepted)) {
+      return { label: isAr ? 'مقبول من التاجر' : 'Accepted', badgeClass: 'badge-light-primary text-primary', icon: 'fa-box-open' };
+    }
+    if (active.some(d => d.orderDetailStatus === OrderDetailStatus.Pending || d.orderDetailStatus === OrderDetailStatus.CustomerPending)) {
+      return { label: isAr ? 'قيد الانتظار' : 'Pending', badgeClass: 'badge-light-warning text-warning', icon: 'fa-hourglass-half' };
+    }
+    return { label: isAr ? 'قيد المعالجة' : 'Processing', badgeClass: 'badge-light-primary text-primary', icon: 'fa-spinner' };
+  }
+
   ngOnInit(): void {
     this.refreshDashboard();
     this.service.setDefaults();
@@ -274,6 +334,7 @@ searchGroup: FormGroup;
     this.loadExchangeRate();
     this.loadFeaturedCategories();
     this.service.fetchPost();
+    this.ordersService.fetchPost();
     this.subs.sink = this.service.isLoading$.subscribe(res => this.isLoading = res);
     this.sorting = this.service.sorting;
     this.paginator = this.service.paginator;

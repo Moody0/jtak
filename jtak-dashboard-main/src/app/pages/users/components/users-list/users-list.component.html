@@ -1,114 +1,390 @@
-<div class="card card-custom gutter-b">
-  <div class="card-header">
-    <div class="card-title">
-      <div><h3 class="card-label">Users</h3><span class="card-subtitle">Manage customers, staff roles, and account access.</span></div>
+<div class="ops-users-container">
+
+  <!-- 1. Operations Utility Bar -->
+  <div class="ops-utility-bar">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span>{{ 'USERS_PAGE.LIVE_OPERATIONS' | translate }}</span>
+      </div>
+      <span class="ops-sync-meta">
+        <i class="fas fa-users-cog text-muted me-1"></i>
+        <span>{{ 'USERS_PAGE.TOTAL_RECORDS' | translate }}:</span>
+        <strong>{{ totalRecords | number }}</strong>
+      </span>
     </div>
-    <div class="card-toolbar">
-      <button type="button" class="btn btn-primary" (click)="create()">
-        <i class="fas fa-plus"></i> Add user
+    <div class="ops-utility-right">
+      <button type="button" class="ops-btn-refresh" (click)="refresh()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>{{ 'USERS_PAGE.REFRESH' | translate }}</span>
+      </button>
+      <button type="button" class="ops-btn-primary" (click)="create()">
+        <i class="fas fa-plus"></i>
+        <span>{{ 'USERS_PAGE.ADD_USER' | translate }}</span>
       </button>
     </div>
   </div>
-  <div class="card-body">
-    <!-- begin: Filtration form -->
-    <div class="form form-label-right">
-      <div class="form-group d-flex justify-content-between">
-        <div class="col-lg-2" [formGroup]="searchGroup">
-          <input
-            type="text"
-            class="form-control"
-            name="searchText"
-            placeholder="Search by name, email, or phone"
-            formControlName="searchTerm"
-          />
-        </div>
-      <div>
-        <ng-select style="min-width: 150px;" (change)="updateSelectedRole()" [(ngModel)]="selecctedRoleId" class="col-lg-2"
-              placeholder="All roles" aria-label="Filter by role">
-          <ng-option *ngFor="let role of userRoles" [value]="role.key">{{role.value}}</ng-option>
-        </ng-select>
-      </div>
-      </div>
 
+  <!-- 2. Real System Operational KPI Cards -->
+  <div class="row g-3">
+    <!-- Total Registered Accounts -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-total">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'USERS_PAGE.KPI_TOTAL' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-users"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value">{{ kpiTotal | number }}</span>
+          <span class="ops-kpi-unit">{{ 'USERS_PAGE.KPI_TOTAL_SUB' | translate }}</span>
+        </div>
+      </div>
     </div>
-    <!-- end: Filtration form -->
 
-    <ng-container *ngIf="service.items$ | async as items">
-      <div class="bulk-action-bar" *ngIf="selection.count > 0" role="region" aria-label="Bulk actions">
-        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-        <div class="bulk-action-buttons">
-          <button type="button" class="btn btn-sm btn-light" (click)="bulkSetStatus(items, true)"><i class="fas fa-check-circle"></i> Enable</button>
-          <button type="button" class="btn btn-sm btn-light" (click)="bulkSetStatus(items, false)"><i class="fas fa-ban"></i> Disable</button>
-          <button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'users')"><i class="fas fa-download"></i> Export</button>
-          <button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button>
+    <!-- Active Accounts -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-active">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'USERS_PAGE.KPI_ACTIVE' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-user-check"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-success">{{ kpiActive | number }}</span>
+          <span class="ops-kpi-unit">{{ 'USERS_PAGE.KPI_ACTIVE_SUB' | translate }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- Customers & Shoppers -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-customers">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'USERS_PAGE.KPI_CUSTOMERS' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-shopping-cart"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-primary">{{ kpiCustomers | number }}</span>
+          <span class="ops-kpi-unit">{{ 'USERS_PAGE.KPI_CUSTOMERS_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Staff & Partners -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-staff">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'USERS_PAGE.KPI_STAFF' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-user-tie"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-purple">{{ kpiStaff | number }}</span>
+          <span class="ops-kpi-unit">{{ 'USERS_PAGE.KPI_STAFF_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Consolidated Search & Filter Panel -->
+  <div class="ops-filter-panel">
+    <div class="ops-filter-row">
+      <!-- Search Input -->
+      <div class="ops-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search ops-search-icon"></i>
+        <input
+          type="text"
+          class="ops-search-input"
+          [placeholder]="'USERS_PAGE.SEARCH_PLACEHOLDER' | translate"
+          formControlName="searchTerm"
+        />
+      </div>
+
+      <!-- Role Dropdown Filter -->
+      <div class="ops-filter-dropdown">
+        <select
+          [ngModel]="selectedRoleId"
+          (ngModelChange)="filterByRole($event)"
+          aria-label="Filter by Role"
+        >
+          <option value="all">{{ 'USERS_PAGE.ALL_ROLES' | translate }}</option>
+          <option [ngValue]="0">🛡️ {{ 'USERS_PAGE.ROLE_ADMIN' | translate }}</option>
+          <option [ngValue]="1">👤 {{ 'USERS_PAGE.ROLE_CUSTOMER' | translate }}</option>
+          <option [ngValue]="2">🏪 {{ 'USERS_PAGE.ROLE_MERCHANT' | translate }}</option>
+          <option [ngValue]="3">🛵 {{ 'USERS_PAGE.ROLE_DELIVERY' | translate }}</option>
+        </select>
+      </div>
+
+      <!-- Status Filter Tabs -->
+      <div class="ops-status-tabs" role="tablist">
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'all'"
+          (click)="filterByStatus('all')"
+        >
+          {{ 'USERS_PAGE.ALL_STATUS' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'active'"
+          (click)="filterByStatus('active')"
+        >
+          <i class="fas fa-check-circle text-success me-1"></i>
+          {{ 'USERS_PAGE.STATUS_ACTIVE' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'disabled'"
+          (click)="filterByStatus('disabled')"
+        >
+          <i class="fas fa-ban text-danger me-1"></i>
+          {{ 'USERS_PAGE.STATUS_DISABLED' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Users Table Card -->
+  <div class="ops-table-card" *ngIf="service.items$ | async as rawItems">
+    <!-- Filtered visible items -->
+    <ng-container *ngIf="getDisplayedItems(rawItems) as items">
+
+      <!-- Bulk Action Bar -->
+      <div class="ops-bulk-bar" *ngIf="selection.count > 0">
+        <div class="ops-bulk-count">
+          <strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}
+        </div>
+        <div class="ops-bulk-actions">
+          <button
+            type="button"
+            class="btn btn-sm btn-light-primary"
+            (click)="selection.exportSelected(items, 'users')"
+          >
+            <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-light-success"
+            (click)="bulkSetStatus(items, true)"
+          >
+            <i class="fas fa-check-circle me-1"></i> {{ 'PRODUCTS_PAGE.ENABLE' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-light-warning"
+            (click)="bulkSetStatus(items, false)"
+          >
+            <i class="fas fa-ban me-1"></i> {{ 'PRODUCTS_PAGE.DISABLE' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-light-danger"
+            (click)="bulkDelete(items)"
+          >
+            <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-link text-muted"
+            (click)="selection.clear()"
+          >
+            {{ 'COMMON.CLEAR' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <!-- High-Density Responsive Table -->
+      <div class="table-responsive">
+        <table class="ops-table">
+          <thead>
+            <tr>
+              <th scope="col" class="table-select-cell" style="width: 44px;">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  aria-label="Select all users on this page"
+                  [checked]="selection.allSelected(items)"
+                  [indeterminate]="selection.partiallySelected(items)"
+                  (change)="selection.toggleAll(items, $any($event.target).checked)"
+                />
+              </th>
+              <th scope="col">
+                {{ 'USERS_PAGE.COL_NAME' | translate }}
+              </th>
+              <th scope="col" style="width: 220px;">
+                <span role="button" (click)="sort('email')">
+                  {{ 'USERS_PAGE.COL_EMAIL' | translate }}
+                  <app-sort-icon column="email" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
+              </th>
+              <th scope="col" style="width: 170px;">
+                {{ 'USERS_PAGE.COL_PHONE' | translate }}
+              </th>
+              <th scope="col" style="width: 160px;">
+                {{ 'USERS_PAGE.COL_ROLE' | translate }}
+              </th>
+              <th scope="col" style="width: 110px; text-align: center;">
+                {{ 'USERS_PAGE.COL_STATUS' | translate }}
+              </th>
+              <th scope="col" style="width: 130px; text-align: center;">
+                {{ 'USERS_PAGE.COL_ACTIONS' | translate }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let user of items"
+              [class.table-row-selected]="selection.isSelected(user)"
+            >
+              <!-- Select Checkbox -->
+              <td class="table-select-cell">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="selection.isSelected(user)"
+                  [attr.aria-label]="'Select ' + user.fullName"
+                  (change)="selection.toggle(user, $any($event.target).checked)"
+                />
+              </td>
+
+              <!-- User Identity (Name + ID) -->
+              <td>
+                <div class="ops-user-meta">
+                  <span class="ops-user-name" [title]="getUserDisplayName(user)">
+                    {{ getUserDisplayName(user) }}
+                  </span>
+                  <span class="ops-user-sub text-muted">
+                    #{{ user.id | slice:0:8 }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- Email Address -->
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fas fa-envelope text-muted fs-8"></i>
+                  <a
+                    *ngIf="user.email"
+                    [href]="'mailto:' + user.email"
+                    class="text-dark fw-bold text-hover-primary fs-7 text-truncate"
+                    style="max-width: 190px;"
+                    title="{{ user.email }}"
+                  >
+                    {{ user.email }}
+                  </a>
+                  <span *ngIf="!user.email" class="text-muted fs-8">-</span>
+                </div>
+              </td>
+
+              <!-- Contact & Phone -->
+              <td>
+                <a
+                  *ngIf="user.phoneNumber"
+                  [href]="'tel:' + formatPhone(user)"
+                  class="ops-phone-pill"
+                  title="اتصال مباشر"
+                >
+                  <i class="fas fa-phone-alt"></i>
+                  <span>{{ formatPhone(user) }}</span>
+                </a>
+                <span *ngIf="!user.phoneNumber" class="text-muted fs-8">-</span>
+              </td>
+
+              <!-- Role & Scope Badge -->
+              <td>
+                <span
+                  class="ops-role-badge"
+                  [ngClass]="getRoleBadgeInfo(user).badgeClass"
+                >
+                  <i [class]="getRoleBadgeInfo(user).icon"></i>
+                  <span>{{ getRoleBadgeInfo(user).label }}</span>
+                </span>
+              </td>
+
+              <!-- Status -->
+              <td style="text-align: center;">
+                <span
+                  class="ops-status-pill"
+                  [class.status-active]="user.isActive"
+                  [class.status-disabled]="!user.isActive"
+                >
+                  <span class="status-dot"></span>
+                  <span>
+                    {{ (user.isActive ? 'USERS_PAGE.STATUS_ACTIVE' : 'USERS_PAGE.STATUS_DISABLED') | translate }}
+                  </span>
+                </span>
+              </td>
+
+              <!-- Actions Group -->
+              <td style="text-align: center;">
+                <div class="ops-actions-group">
+                  <!-- Toggle Status Button -->
+                  <button
+                    type="button"
+                    class="ops-btn-action"
+                    [class.btn-toggle-disable]="user.isActive"
+                    [class.btn-toggle-active]="!user.isActive"
+                    (click)="toggleUserStatus(user)"
+                    [title]="user.isActive ? ('PRODUCTS_PAGE.DISABLE' | translate) : ('PRODUCTS_PAGE.ENABLE' | translate)"
+                  >
+                    <i [class]="user.isActive ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
+                  </button>
+
+                  <!-- Edit Button -->
+                  <button
+                    type="button"
+                    class="ops-btn-action btn-edit"
+                    (click)="edit(user)"
+                    title="تعديل المستخدم"
+                  >
+                    <i class="fas fa-pen"></i>
+                  </button>
+
+                  <!-- Delete Button -->
+                  <button
+                    type="button"
+                    class="ops-btn-action btn-delete"
+                    (click)="delete(user.id)"
+                    title="حذف المستخدم"
+                  >
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Empty State -->
+            <tr *ngIf="items.length === 0">
+              <td colspan="7" class="text-center py-10">
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                  <div style="width: 60px; height: 60px; border-radius: 50%; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #94a3b8; font-size: 24px;">
+                    <i class="fas fa-user-slash"></i>
+                  </div>
+                  <h5 class="text-dark fw-bold mb-1">{{ 'USERS_PAGE.EMPTY_TITLE' | translate }}</h5>
+                  <p class="text-muted fs-7 mb-3">{{ 'USERS_PAGE.EMPTY_DESC' | translate }}</p>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light-primary"
+                    (click)="searchGroup.get('searchTerm')?.setValue(''); selectedRoleId = 'all'; selectedStatus = 'all'; filterByRole('all');"
+                  >
+                    <i class="fas fa-redo me-1"></i> {{ 'USERS_PAGE.RESET_FILTERS' | translate }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
     </ng-container>
 
-    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="service.items$ | async as items">
-      <table
-        class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
-      >
-        <thead>
-          <tr class="fw-bolder text-muted">
-            <th scope="col" class="table-select-cell">
-              <input type="checkbox" class="form-check-input" aria-label="Select all users on this page"
-                [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)"
-                (change)="selection.toggleAll(items, $any($event.target).checked)" />
-            </th>
-            <th scope="col">Name</th>
-            <th scope="col">
-              Email
-              <app-sort-icon
-                column="email"
-                [activeColumn]="sorting.column"
-                [activeDirection]="sorting.direction"
-                (sort)="sort($event)"
-              ></app-sort-icon>
-            </th>
-            <th scope="col">Phone</th>
-            <th scope="col">Status</th>
-            <th scope="col" style="width: 120px;">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
-            <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)"
-              [attr.aria-label]="'Select ' + i.firstName" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
-            <td>{{ i.firstName }}</td>
-            <td>{{ i.email }}</td>
-            <td>{{ i.phoneNumber }}</td>
-            <td>
-              <button
-                title="Enable / Disable"
-                class="badge btn btn-sm"
-                [ngClass]="{'badge-light-success': i.isActive,'badge-warning': !i.isActive}"
-                (click)="changeUserStatus(i.isActive, i.id)"
-              >
-                {{ i.isActive ? "Active" : "Disabled" }}
-              </button>
-            </td>
-            <td>
-              <app-table-actions
-                (editClicked)="edit(i)"
-                (deleteClicked)="delete(i.id)"
-                [showDeleteButton]="true"
-              >
-              </app-table-actions>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Table Footer with Paginator -->
+    <div class="ops-table-footer">
+      <app-paginator
+        class="d-flex justify-content-between align-items-center flex-wrap"
+        [paginator]="paginator"
+        [isLoading]="isLoading"
+        (paginate)="paginate($event)"
+      ></app-paginator>
     </div>
-
-    <app-paginator
-      class="d-flex justify-content-between align-items-center flex-wrap"
-      [paginator]="paginator"
-      [isLoading]="isLoading"
-      (paginate)="paginate($event)"
-    ></app-paginator>
-
-    <!-- begin:Table -->
   </div>
-  <!-- end: Table -->
+
 </div>

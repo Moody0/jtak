@@ -4,6 +4,7 @@ import 'package:app_jtak_warehouse/src/core/models/order_model.dart';
 import 'package:app_jtak_warehouse/src/core/models/product_model.dart';
 import 'package:app_jtak_warehouse/src/ui/pages/account/phone_code_page.dart';
 import 'package:app_jtak_warehouse/src/ui/pages/catalog/product_detials_page.dart';
+import 'package:app_jtak_warehouse/src/ui/pages/catalog/product_edit_page.dart';
 import 'package:app_jtak_warehouse/src/ui/pages/order/order_details_page.dart';
 import 'package:app_jtak_warehouse/src/utils/utilities/global_var.dart';
 import 'package:flutter/cupertino.dart';
@@ -29,6 +30,17 @@ class RouteGenerator {
       ////////////////{ catalog routes } ////////////////
       case ProductDetailsPage.routeName:
         return CupertinoPageRoute(builder: (context) => ProductDetailsPage(args as ProductModel));
+
+      case ProductEditPage.routeName:
+        if (args is Map) {
+          return CupertinoPageRoute(
+            builder: (context) => ProductEditPage(
+              product: args['product'] as ProductModel?,
+              initialCategoryId: args['initialCategoryId'] as int?,
+            ),
+          );
+        }
+        return CupertinoPageRoute(builder: (context) => ProductEditPage(product: args as ProductModel?));
 
       ////////////////{ order routes } ////////////////
       case OrderDetailsPage.routeName:

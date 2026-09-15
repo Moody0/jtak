@@ -1,0 +1,247 @@
+:host {
+  display: block;
+}
+
+// Bulk Actions Toolbar
+.workspace-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 18px;
+  background: #fff7ed;
+  border: 1.5px solid #fed7aa;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  animation: slideInDown 0.25s ease-out;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.08);
+
+  .bulk-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .bulk-badge {
+      display: inline-flex;
+      align-items: center;
+      background: #ea580c;
+      color: #ffffff;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+
+      strong {
+        margin: 0 4px;
+      }
+    }
+  }
+
+  .bulk-bar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.82rem;
+      border-radius: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-light-success {
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+
+      &:hover {
+        background: #059669;
+        color: #ffffff;
+      }
+    }
+
+    .btn-light-warning {
+      background: #fefce8;
+      color: #ca8a04;
+      border: 1px solid #fef08a;
+
+      &:hover {
+        background: #ca8a04;
+        color: #ffffff;
+      }
+    }
+
+    .btn-danger {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #ffffff;
+
+      &:hover {
+        background: #b91c1c;
+      }
+    }
+  }
+}
+
+// Table row selection state
+.merchant-products-table {
+  .table {
+    margin-bottom: 0;
+
+    thead th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 12px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    tr.table-row-selected {
+      background-color: #fffaf0 !important;
+    }
+
+    tr:hover {
+      background-color: #f8fafc;
+    }
+  }
+
+  .table-select-cell {
+    width: 44px;
+    min-width: 44px;
+    text-align: center;
+    padding-inline: 12px !important;
+
+    .form-check-input {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      margin: 0;
+    }
+  }
+
+  .workspace-product {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    img {
+      width: 52px;
+      height: 52px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      flex-shrink: 0;
+    }
+
+    strong {
+      display: block;
+      font-size: 0.9rem;
+      color: #0f172a;
+      line-height: 1.3;
+    }
+
+    small {
+      display: block;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+  }
+
+  .in-store-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .form-check-input {
+      width: 36px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .store-status-badge {
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+
+      &.status-active {
+        background: #ecfdf5;
+        color: #059669;
+      }
+
+      &.status-inactive {
+        background: #f1f5f9;
+        color: #94a3b8;
+      }
+    }
+  }
+
+  .compact-percent {
+    display: inline-flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 2px 8px;
+    transition: all 0.2s ease;
+
+    &:focus-within {
+      border-color: #ea580c;
+      box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
+    }
+
+    input {
+      width: 48px;
+      border: none;
+      background: transparent;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #0f172a;
+      outline: none;
+
+      &:disabled {
+        color: #94a3b8;
+        cursor: not-allowed;
+      }
+    }
+
+    span {
+      font-size: 0.8rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+  }
+
+  .workspace-row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

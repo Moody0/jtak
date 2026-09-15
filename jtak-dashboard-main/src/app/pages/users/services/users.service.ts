@@ -2,8 +2,9 @@ import { Injectable, Inject, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Balance, User } from '../models/user.model';
 import { environment } from 'src/environments/environment';
-import { TableService } from 'src/app/_metronic/shared/crud-table';
+import { TableService, TableResponseModel } from 'src/app/_metronic/shared/crud-table';
 import { finalize, Observable, tap } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { TagVal } from '../models/TagVal-dto.model';
 
 @Injectable({
@@ -27,8 +28,18 @@ export class UsersService extends TableService<User> implements OnDestroy {
     super(http);
   }
 
-  getMerchantUsers() : Observable<User[]>{    
-    return this.http.get<User[]>(`${this.BASE_URL}/Admin/Users/Merchants`);
+  getAllUsers(): Observable<User[]> {
+    return this.http
+      .post<TableResponseModel<User>>(
+        `${this.BASE_URL}/${this.GET_ALL_URL}`,
+        { pageNumber: 0, pageSize: 500, filter: {} },
+        this.httpOptions
+      )
+      .pipe(map((res) => res.items || []));
+  }
+
+  getMerchantUsers(): Observable<User[]> {
+    return this.getAllUsers();
   }
 
   changeUserStatus(isActive: boolean, userId: string) {
@@ -47,21 +58,19 @@ export class UsersService extends TableService<User> implements OnDestroy {
       );
   }
 
-  getBalance(id:string) {
-    return this.http.get<Balance>(`${this.BASE_URL}/Admin/Balances/${id}`)
+  getBalance(id: string) {
+    return this.http.get<Balance>(`${this.BASE_URL}/Admin/Balances/${id}`);
   }
 
-  getRoles():Observable<TagVal[]>
-  {
-    return this.http.get<TagVal[]>(`${this.BASE_URL}/Admin/Users/Roles`)
+  getRoles(): Observable<TagVal[]> {
+    return this.http.get<TagVal[]>(`${this.BASE_URL}/Admin/Users/Roles`);
   }
-  getDeliveries():Observable<User[]>
-  {
-    return this.http.get<User[]>(`${this.BASE_URL}/Admin/Users/Deliveries`)
+
+  getDeliveries(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.BASE_URL}/Admin/Users/Deliveries`);
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach((sb) => sb.unsubscribe());
   }
-
 }

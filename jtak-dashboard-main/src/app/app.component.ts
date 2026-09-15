@@ -69,20 +69,7 @@ export class AppComponent implements OnInit {
   }
   
   setLayoutDirection(lang: string) {
-    this.document.documentElement.lang = lang;
-    this.document.documentElement.dir = lang !== 'ar' ? 'ltr' : 'rtl';
-    this.document.documentElement.style.direction =
-      lang !== 'ar' ? 'ltr' : 'rtl';
-    if (lang === 'ar') {
-      //const rtlStyle = this.document.createElement('link');
-      //rtlStyle.href = '/assets/sass/style.angular.rtl.css';
-      //rtlStyle.rel = 'stylesheet';
-      //this.document.head.appendChild(rtlStyle);
-      const customRtlStyle = this.document.createElement('link');
-      customRtlStyle.href = '/assets/sass/custom-rtl.css';
-      customRtlStyle.rel = 'stylesheet';
-      this.document.head.appendChild(customRtlStyle);
-    }
+    this.translationService.updateDirection(lang);
   }
 
   ngOnDestroy() {

@@ -2,15 +2,15 @@
   <div class="jtak-account-summary">
     <span class="jtak-account-avatar">{{ _user.fullName ? _user.fullName.charAt(0) : 'J' }}</span>
     <div>
-      <small>Signed in as</small>
-      <strong>{{ _user.fullName }} {{ _user.lastName }}</strong>
+      <small>{{ 'TOPBAR.SIGNED_IN_AS' | translate }}</small>
+      <strong>{{ _user.fullName }} {{ _user.lastName || '' }}</strong>
       <span>{{ _user.email }}</span>
     </div>
   </div>
   <div class="separator my-2"></div>
-  <div class="menu-item px-3">
+  <div class="p-1">
     <button type="button" (click)="logout()" class="menu-link jtak-signout w-100">
-      <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>Sign out</span>
+      <i class="fas fa-sign-out-alt" aria-hidden="true"></i><span>{{ 'TOPBAR.SIGN_OUT' | translate }}</span>
     </button>
   </div>
 </ng-container>

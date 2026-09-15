@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Extensions;
 using App.Shared.Services;
 using App.Shared.Services.Domain;
@@ -107,6 +107,10 @@ namespace App.ApiControllers.V1.Customer
                 return BadRequest("Not found!");
             }
             var uid = User.GetUserId();
+            if (uid == null || entity.UserId != uid.Value)
+            {
+                return Forbid();
+            }
 
             entity.Title = model.Title;
             entity.FullName = model.FullName;
@@ -140,6 +144,17 @@ namespace App.ApiControllers.V1.Customer
         [Route("{id}")]
         public async Task<ActionResult<bool>> Delete(int id)
         {
+            var entity = await _service.FindAsync(id);
+            if (entity == null)
+            {
+                return BadRequest("Not found!");
+            }
+            var uid = User.GetUserId();
+            if (uid == null || entity.UserId != uid.Value)
+            {
+                return Forbid();
+            }
+
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();
             return true;

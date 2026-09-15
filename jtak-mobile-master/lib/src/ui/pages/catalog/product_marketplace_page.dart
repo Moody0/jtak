@@ -125,35 +125,7 @@ class _ProductMarketplacePageState extends State<ProductMarketplacePage> {
   }
 
   List<MarketStoreModel> _legacyTypedFallback(MarketsProvider provider) {
-    if (widget.scope.kind == CatalogScopeKind.grocery) {
-      return provider.markets;
-    }
-
-    final keywords = widget.scope.kind == CatalogScopeKind.pharmacy
-        ? const ['صيدلي', 'pharmacy', 'drugstore']
-        : const ['متجر', 'store', 'shop', 'مول', 'mall', 'cosmetic', 'تجميل'];
-
-    return provider.restaurants.where((merchant) {
-      final text = '${merchant.name} ${merchant.cuisine}'.toLowerCase();
-      return keywords.any(text.contains);
-    }).map((merchant) {
-      return MarketStoreModel(
-        id: merchant.id,
-        name: merchant.name,
-        nameAr: merchant.nameAr,
-        nameEn: merchant.nameEn,
-        eta: merchant.eta,
-        tagline: merchant.cuisine,
-        logoUrl: merchant.logoUrl,
-        assetPath:
-            merchant.logoUrl.startsWith('assets/') ? merchant.logoUrl : null,
-        lat: merchant.lat,
-        lng: merchant.lng,
-        shippingCoverageInMeters: merchant.shippingCoverageInMeters,
-        minOrderAmount: merchant.minOrderAmount,
-        deliveryFeeAmount: merchant.deliveryFeeAmount,
-      );
-    }).toList();
+    return provider.markets;
   }
 
   String? _firstImage(Map<String, dynamic> product) {

@@ -7,6 +7,12 @@ class ProductModel {
   String? productPhotos;
   String? productCat1;
   String? productCat2;
+  String? productDescription;
+  String? productUnit;
+  int? productCategoryId;
+  bool productActive;
+  bool productIsFeatured;
+  String? categoryIcon;
   int? profitOutOfMerchantPricePercent;
   int? profitOutOfMerchantPrice;
   int? merchantProfit;
@@ -16,6 +22,7 @@ class ProductModel {
   double? discount;
   double? price;
   double? finalPrice;
+
   ProductModel({
     this.merchantId,
     this.productId,
@@ -23,6 +30,12 @@ class ProductModel {
     this.productPhotos,
     this.productCat1,
     this.productCat2,
+    this.productDescription,
+    this.productUnit,
+    this.productCategoryId,
+    this.productActive = true,
+    this.productIsFeatured = false,
+    this.categoryIcon,
     this.profitOutOfMerchantPricePercent,
     this.profitOutOfMerchantPrice,
     this.merchantProfit,
@@ -41,6 +54,12 @@ class ProductModel {
     String? productPhotos,
     String? productCat1,
     String? productCat2,
+    String? productDescription,
+    String? productUnit,
+    int? productCategoryId,
+    bool? productActive,
+    bool? productIsFeatured,
+    String? categoryIcon,
     int? profitOutOfMerchantPricePercent,
     int? profitOutOfMerchantPrice,
     int? merchantProfit,
@@ -58,6 +77,12 @@ class ProductModel {
       productPhotos: productPhotos ?? this.productPhotos,
       productCat1: productCat1 ?? this.productCat1,
       productCat2: productCat2 ?? this.productCat2,
+      productDescription: productDescription ?? this.productDescription,
+      productUnit: productUnit ?? this.productUnit,
+      productCategoryId: productCategoryId ?? this.productCategoryId,
+      productActive: productActive ?? this.productActive,
+      productIsFeatured: productIsFeatured ?? this.productIsFeatured,
+      categoryIcon: categoryIcon ?? this.categoryIcon,
       profitOutOfMerchantPricePercent: profitOutOfMerchantPricePercent ?? this.profitOutOfMerchantPricePercent,
       profitOutOfMerchantPrice: profitOutOfMerchantPrice ?? this.profitOutOfMerchantPrice,
       merchantProfit: merchantProfit ?? this.merchantProfit,
@@ -78,6 +103,12 @@ class ProductModel {
       'productPhotos': productPhotos,
       'productCat1': productCat1,
       'productCat2': productCat2,
+      'productDescription': productDescription,
+      'productUnit': productUnit,
+      'productCategoryId': productCategoryId,
+      'productActive': productActive,
+      'productIsFeatured': productIsFeatured,
+      'categoryIcon': categoryIcon,
       'profitOutOfMerchantPricePercent': profitOutOfMerchantPricePercent,
       'profitOutOfMerchantPrice': profitOutOfMerchantPrice,
       'merchantProfit': merchantProfit,
@@ -93,20 +124,30 @@ class ProductModel {
   factory ProductModel.fromMap(Map<String, dynamic> map) {
     return ProductModel(
       merchantId: map['merchantId']?.toInt(),
-      productId: map['productId']?.toInt(),
-      product: map['product'],
-      productPhotos: map['productPhotos'],
-      productCat1: map['productCat1'],
+      productId: map['productId']?.toInt() ?? map['id']?.toInt(),
+      product: map['product'] ?? map['title'],
+      productPhotos: map['productPhotos'] ?? map['photos'],
+      productCat1: map['productCat1'] ?? map['productCategory'],
       productCat2: map['productCat2'],
+      productDescription: map['productDescription'] ?? map['description'],
+      productUnit: map['productUnit'] ?? map['unit'],
+      productCategoryId: map['productCategoryId']?.toInt(),
+      productActive: map['productActive'] ?? map['active'] ?? true,
+      productIsFeatured: map['productIsFeatured'] ?? map['isFeatured'] ?? false,
+      categoryIcon: map['categoryIcon'],
       profitOutOfMerchantPricePercent: map['profitOutOfMerchantPricePercent']?.toInt(),
       profitOutOfMerchantPrice: map['profitOutOfMerchantPrice']?.toInt(),
       merchantProfit: map['merchantProfit']?.toInt(),
-      merchantPrice: map['merchantPrice']?.toInt(),
+      merchantPrice: map['merchantPrice']?.toInt() ?? (map['price'] != null ? (map['price'] as num).toInt() : null),
       additionalProfitPercent: map['additionalProfitPercent']?.toInt(),
       additionalProfit: map['additionalProfit']?.toInt(),
-      discount: map['discount']?.toDouble(),
-      price: map['price']?.toDouble(),
-      finalPrice: map['finalPrice']?.toDouble(),
+      discount: map['discount'] != null ? (map['discount'] as num).toDouble() : null,
+      price: map['price'] != null ? (map['price'] as num).toDouble() : null,
+      finalPrice: map['finalPrice'] != null
+          ? (map['finalPrice'] as num).toDouble()
+          : (map['merchantPrice'] != null
+              ? (map['merchantPrice'] as num).toDouble()
+              : (map['price'] != null ? (map['price'] as num).toDouble() : null)),
     );
   }
 
@@ -116,47 +157,15 @@ class ProductModel {
 
   @override
   String toString() {
-    return 'ProductModel(merchantId: $merchantId, productId: $productId, product: $product, productPhotos: $productPhotos, productCat1: $productCat1, productCat2: $productCat2, profitOutOfMerchantPricePercent: $profitOutOfMerchantPricePercent, profitOutOfMerchantPrice: $profitOutOfMerchantPrice, merchantProfit: $merchantProfit, merchantPrice: $merchantPrice, additionalProfitPercent: $additionalProfitPercent, additionalProfit: $additionalProfit, discount: $discount, price: $price, finalPrice: $finalPrice)';
+    return 'ProductModel(productId: $productId, product: $product, price: $finalPrice, active: $productActive)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-
-    return other is ProductModel &&
-        other.merchantId == merchantId &&
-        other.productId == productId &&
-        other.product == product &&
-        other.productPhotos == productPhotos &&
-        other.productCat1 == productCat1 &&
-        other.productCat2 == productCat2 &&
-        other.profitOutOfMerchantPricePercent == profitOutOfMerchantPricePercent &&
-        other.profitOutOfMerchantPrice == profitOutOfMerchantPrice &&
-        other.merchantProfit == merchantProfit &&
-        other.merchantPrice == merchantPrice &&
-        other.additionalProfitPercent == additionalProfitPercent &&
-        other.additionalProfit == additionalProfit &&
-        other.discount == discount &&
-        other.price == price &&
-        other.finalPrice == finalPrice;
+    return other is ProductModel && other.productId == productId;
   }
 
   @override
-  int get hashCode {
-    return merchantId.hashCode ^
-        productId.hashCode ^
-        product.hashCode ^
-        productPhotos.hashCode ^
-        productCat1.hashCode ^
-        productCat2.hashCode ^
-        profitOutOfMerchantPricePercent.hashCode ^
-        profitOutOfMerchantPrice.hashCode ^
-        merchantProfit.hashCode ^
-        merchantPrice.hashCode ^
-        additionalProfitPercent.hashCode ^
-        additionalProfit.hashCode ^
-        discount.hashCode ^
-        price.hashCode ^
-        finalPrice.hashCode;
-  }
+  int get hashCode => productId.hashCode;
 }

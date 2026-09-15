@@ -1,0 +1,594 @@
+<div class="ops-reconciliation-container">
+  <!-- 1. Streamlined Operations Utility Bar -->
+  <div class="ops-utility-bar mb-4">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span class="fw-bold">{{ 'RECONCILIATION_PAGE.EOD_MONITOR' | translate }}</span>
+      </div>
+      <div class="ops-sync-meta">
+        <i class="fas fa-vault text-primary me-1"></i>
+        <span>{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS' | translate }}: <strong>{{ activeFleetCount }}</strong></span>
+      </div>
+    </div>
+    <div class="ops-utility-right">
+      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="loadCaptains(); loadHistory(); loadSettlementRequests()" [disabled]="isLoading || isLoadingRequests">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>{{ 'COMMON.REFRESH' | translate }}</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="ops-orders-card mb-4">
+    <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+      <div>
+        <h3 class="mb-1">طلبات التسوية مع المندوبين والتجار</h3>
+        <div class="text-muted fs-8">لا تتحرك الأموال إلا بعد اعتماد الخطوة المناسبة وتسجيلها في دفتر القيود.</div>
+      </div>
+      <button class="btn btn-sm ops-btn-refresh" type="button" (click)="loadSettlementRequests()" [disabled]="isLoadingRequests">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoadingRequests"></i> تحديث
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table ops-orders-table align-middle mb-0">
+        <thead>
+          <tr class="ops-table-header text-muted fs-8">
+            <th>رقم الطلب</th><th>الطرف</th><th>المبلغ</th><th>طريقة التسوية</th><th>الحالة</th><th>التاريخ</th><th class="text-center">الإجراء</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="isLoadingRequests"><td colspan="7" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i></td></tr>
+          <tr *ngIf="!isLoadingRequests && settlementRequests.length === 0"><td colspan="7" class="text-center text-muted py-4">لا توجد طلبات تسوية حتى الآن.</td></tr>
+          <tr *ngFor="let request of settlementRequests">
+            <td><strong>{{ request.requestNumber }}</strong></td>
+            <td>
+              <span class="badge" [ngClass]="request.partyType === partyType.Captain ? 'badge-light-primary' : 'badge-light-info'">
+                {{ request.partyType === partyType.Captain ? 'مندوب توصيل' : 'تاجر' }}
+              </span>
+              <div class="fw-bold mt-1">{{ request.requestedByName }}</div>
+              <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
+            </td>
+            <td><strong>{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
+            <td>
+              <div>{{ request.method || 'نقدي' }}</div>
+              <small class="text-muted">{{ request.accountDetails }}</small>
+            </td>
+            <td>
+              <span class="badge" [ngClass]="{
+                'badge-light-warning': request.status === requestStatus.Pending,
+                'badge-light-primary': request.status === requestStatus.Approved,
+                'badge-light-danger': request.status === requestStatus.Rejected,
+                'badge-light-success': request.status === requestStatus.Completed
+              }">{{ requestStatusLabel(request.status) }}</span>
+              <div *ngIf="request.rejectionReason" class="text-danger small mt-1">{{ request.rejectionReason }}</div>
+            </td>
+            <td>{{ request.createdDate | date:'short' }}</td>
+            <td class="text-center">
+              <ng-container *ngIf="request.status === requestStatus.Pending">
+                <button class="btn btn-sm btn-success me-1" (click)="acceptSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                  <i class="fas fa-check"></i> قبول
+                </button>
+                <button class="btn btn-sm btn-light-danger" (click)="rejectSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                  <i class="fas fa-times"></i> رفض
+                </button>
+              </ng-container>
+              <button *ngIf="request.partyType === partyType.Merchant && request.status === requestStatus.Approved"
+                class="btn btn-sm btn-primary" (click)="completeMerchantSettlement(request)" [disabled]="processingRequestId === request.id">
+                <i class="fas fa-handshake"></i> تأكيد استلام التاجر
+              </button>
+              <i *ngIf="request.status === requestStatus.Completed" class="fas fa-check-circle text-success fs-4"></i>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 2. Financial KPI Metric Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+      <div class="ops-kpi-card ops-kpi-card--primary">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.GROSS_CASH' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--primary">
+            <i class="fas fa-hand-holding-usd"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-primary">
+          {{ totalFloatInField | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+        </div>
+        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.GROSS_CASH_HINT' | translate }}</div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="ops-kpi-card ops-kpi-card--info">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.EARNED_WAGES' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--info">
+            <i class="fas fa-coins"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-info">
+          {{ totalWagesEarned | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+        </div>
+        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.EARNED_WAGES_HINT' | translate }}</div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="ops-kpi-card ops-kpi-card--warning">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--warning">
+            <i class="fas fa-cash-register"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-warning">
+          {{ totalNetDue | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+        </div>
+        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE_HINT' | translate }}</div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="ops-kpi-card ops-kpi-card--success">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--success">
+            <i class="fas fa-motorcycle"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-success">
+          {{ activeFleetCount }}
+        </div>
+        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS_HINT' | translate }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Navigation Filter Tabs & Search Box -->
+  <div class="ops-tabs-toolbar mb-4">
+    <nav class="ops-status-tabs" aria-label="Reconciliation Navigation">
+      <button type="button" class="ops-status-tab" [class.active]="activeTab === 'couriers'" (click)="activeTab = 'couriers'">
+        <i class="fas fa-motorcycle me-2 text-primary"></i>
+        <span>{{ 'RECONCILIATION_PAGE.TAB_ACTIVE_SHIFTS' | translate }}</span>
+        <span class="ops-status-tab-count">{{ filteredCaptains.length }}</span>
+      </button>
+      <button type="button" class="ops-status-tab" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">
+        <i class="fas fa-history me-2 text-info"></i>
+        <span>{{ 'RECONCILIATION_PAGE.TAB_HISTORY' | translate }}</span>
+        <span class="ops-status-tab-count ops-status-tab-count--blue">{{ history.length }}</span>
+      </button>
+    </nav>
+
+    <div class="ops-search-box" *ngIf="activeTab === 'couriers'">
+      <i class="fas fa-search ops-search-icon"></i>
+      <input type="text" class="form-control ops-search-input" [(ngModel)]="searchTerm" (input)="applyFilter()"
+        [placeholder]="'RECONCILIATION_PAGE.SEARCH_DRIVER' | translate" />
+      <button type="button" class="btn ops-search-clear" *ngIf="searchTerm" (click)="searchTerm = ''; applyFilter()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 1: COURIER ACTIVE RECONCILIATION -->
+  <div class="ops-orders-card" *ngIf="activeTab === 'couriers'">
+    <div class="table-responsive">
+      <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
+        <thead>
+          <tr class="ops-table-header text-muted fs-8">
+            <th scope="col" style="min-width: 220px;">{{ 'RECONCILIATION_PAGE.COL_COURIER' | translate }}</th>
+            <th scope="col" style="width: 150px;">{{ 'RECONCILIATION_PAGE.COL_PHONE' | translate }}</th>
+            <th scope="col" style="width: 100px;" class="text-center">{{ 'RECONCILIATION_PAGE.COL_ORDERS' | translate }}</th>
+            <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_CASH_FLOAT' | translate }}</th>
+            <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_EARNED_WAGES' | translate }}</th>
+            <th scope="col" style="width: 170px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_NET_VAULT' | translate }}</th>
+            <th scope="col" style="width: 140px;">{{ 'RECONCILIATION_PAGE.COL_LAST_SETTLED' | translate }}</th>
+            <th scope="col" style="width: 160px; text-align: center;">{{ 'RECONCILIATION_PAGE.COL_ACTION' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="isLoading">
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="fas fa-spinner fa-spin me-2"></i> {{ 'COMMON.LOADING' | translate }}
+            </td>
+          </tr>
+          <tr *ngIf="!isLoading && filteredCaptains.length === 0">
+            <td colspan="8" class="text-center py-5 text-muted">
+              {{ 'RECONCILIATION_PAGE.NO_DRIVERS' | translate }}
+            </td>
+          </tr>
+          <tr *ngFor="let cap of filteredCaptains" class="ops-table-row">
+            <!-- 1. Courier Identity -->
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="ops-avatar">{{ getInitials(cap.captainName) }}</span>
+                <div class="min-w-0">
+                  <strong class="ops-customer-name d-block text-truncate">{{ cap.captainName || 'Unnamed Courier' }}</strong>
+                  <span class="ops-courier-role"><i class="fas fa-motorcycle text-primary me-1"></i>{{ 'RECONCILIATION_PAGE.COURIER_ROLE' | translate }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- 2. Phone Number -->
+            <td>
+              <a *ngIf="cap.phoneNumber" [href]="'tel:' + cap.phoneNumber" class="ops-phone" dir="ltr">
+                <i class="fas fa-phone-alt me-1 text-success"></i>{{ formatPhoneNumber(cap.phoneNumber) }}
+              </a>
+              <span *ngIf="!cap.phoneNumber" class="text-muted">-</span>
+            </td>
+
+            <!-- 3. Orders Delivered -->
+            <td class="text-center">
+              <span class="ops-orders-pill" [class.ops-orders-pill--active]="cap.totalDeliveredOrders > 0">
+                <i class="fas fa-box me-1" *ngIf="cap.totalDeliveredOrders > 0"></i>{{ cap.totalDeliveredOrders }}
+              </span>
+            </td>
+
+            <!-- 4. Cash Float (Collected) -->
+            <td class="text-end">
+              <span class="ops-price-amount" [class.text-muted]="(cap.cashFloatBalance || 0) === 0">
+                {{ cap.cashFloatBalance | number: '1.0-0' }}
+              </span>
+              <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            </td>
+
+            <!-- 5. Earned Wages -->
+            <td class="text-end">
+              <span class="ops-price-amount" [ngClass]="(cap.wagesEarnedBalance || 0) > 0 ? 'text-info' : 'text-muted'">
+                {{ cap.wagesEarnedBalance | number: '1.0-0' }}
+              </span>
+              <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            </td>
+
+            <!-- 6. Net Vault Due -->
+            <td class="text-end">
+              <ng-container *ngIf="isSettled(cap)">
+                <div class="d-flex align-items-center justify-content-end gap-1">
+                  <span class="ops-price-amount text-muted">0</span>
+                  <span class="ops-price-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                  <i class="fas fa-check-circle text-success ms-1" [title]="'RECONCILIATION_PAGE.SETTLED_NO_FLOAT' | translate"></i>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue > 0">
+                <span class="badge ops-pill-due">
+                  <i class="fas fa-arrow-down me-1"></i>{{ cap.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+                </span>
+              </ng-container>
+              <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue < 0">
+                <span class="badge ops-pill-pay">
+                  <i class="fas fa-arrow-up me-1"></i>{{ (cap.expectedNetCashDue * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+                </span>
+              </ng-container>
+            </td>
+
+            <!-- 7. Last Settled Date -->
+            <td>
+              <div class="ops-order-meta" *ngIf="cap.lastSettlementDate; else neverSettled">
+                <span>{{ cap.lastSettlementDate | date: 'd MMM y' }}</span>
+                <span class="ops-dot-sep">•</span>
+                <span>{{ cap.lastSettlementDate | date: 'shortTime' }}</span>
+              </div>
+              <ng-template #neverSettled>
+                <span class="text-muted fs-8">-</span>
+              </ng-template>
+            </td>
+
+            <!-- 8. Actions -->
+            <td class="text-center">
+              <div class="ops-actions-cluster">
+                <button type="button" class="btn ops-btn-statement" [title]="'RECONCILIATION_PAGE.STATEMENT_TITLE' | translate" (click)="openStatementModal(statementModal, cap)">
+                  <i class="fas fa-file-invoice"></i>
+                </button>
+                <ng-container *ngIf="isSettled(cap)">
+                  <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled [title]="'RECONCILIATION_PAGE.ZERO_BALANCE_HINT' | translate">
+                    <i class="fas fa-check me-1"></i>{{ 'RECONCILIATION_PAGE.SETTLED_NO_FLOAT' | translate }}
+                  </button>
+                </ng-container>
+                <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue >= 0">
+                  <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled title="يجب أن يرسل المندوب طلب تسوية أولاً">
+                    <i class="fas fa-hourglass-half me-1"></i>بانتظار طلب المندوب
+                  </button>
+                </ng-container>
+                <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue < 0">
+                  <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled title="تسوية الأجور منفصلة عن عهدة التحصيل">
+                    <i class="fas fa-info-circle me-1"></i>رصيد أجور
+                  </button>
+                </ng-container>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: SETTLEMENT BATCH HISTORY -->
+  <div class="ops-orders-card" *ngIf="activeTab === 'history'">
+    <div class="table-responsive">
+      <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
+        <thead>
+          <tr class="ops-table-header text-muted fs-8">
+            <th scope="col" style="width: 140px;">{{ 'INVENTORY_BATCHES_PAGE.COL_BATCH_NUM' | translate }}</th>
+            <th scope="col" style="min-width: 180px;">{{ 'RECONCILIATION_PAGE.COL_COURIER' | translate }}</th>
+            <th scope="col" style="width: 160px;">{{ 'COMMON.DATE' | translate }}</th>
+            <th scope="col" style="width: 130px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_CASH_FLOAT' | translate }}</th>
+            <th scope="col" style="width: 130px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_EARNED_WAGES' | translate }}</th>
+            <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_NET_VAULT' | translate }}</th>
+            <th scope="col" style="width: 130px;" class="text-center">{{ 'COMMON.STATUS' | translate }}</th>
+            <th scope="col" style="min-width: 150px;">{{ 'COMMON.DESCRIPTION' | translate }}</th>
+            <th scope="col" style="width: 70px;" class="text-center">{{ 'RECONCILIATION_PAGE.COL_ACTION' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="history.length === 0">
+            <td colspan="9" class="text-center py-5 text-muted">
+              {{ 'COMMON.NO_RECORDS' | translate }}
+            </td>
+          </tr>
+          <tr *ngFor="let b of history" class="ops-table-row">
+            <td>
+              <span class="badge badge-light-primary fw-bold font-monospace">{{ b.batchCode }}</span>
+            </td>
+            <td>
+              <strong class="ops-customer-name">{{ b.captainName }}</strong>
+            </td>
+            <td>
+              <div class="ops-order-meta">
+                <span>{{ b.batchDate | date: 'd MMM y' }}</span>
+                <span class="ops-dot-sep">•</span>
+                <span>{{ b.batchDate | date: 'shortTime' }}</span>
+              </div>
+            </td>
+            <td class="text-end font-weight-bold">
+              {{ b.totalCashCollected | number: '1.0-0' }} <small class="text-muted">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
+            </td>
+            <td class="text-end font-weight-bold text-info">
+              {{ b.totalWagesEarned | number: '1.0-0' }} <small class="text-muted">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
+            </td>
+            <td class="text-end font-weight-bolder text-success">
+              {{ b.netCashRemitted | number: '1.0-0' }} <small class="text-muted">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
+            </td>
+            <td class="text-center">
+              <span class="badge font-weight-bold py-1 px-2" [ngClass]="{
+                'badge-light-success text-success': b.discrepancyAmount === 0,
+                'badge-light-danger text-danger': b.discrepancyAmount < 0,
+                'badge-light-primary text-primary': b.discrepancyAmount > 0
+              }">
+                {{ b.discrepancyAmount === 0 ? ('RECONCILIATION_PAGE.EXACT_MATCH' | translate) : (b.discrepancyAmount > 0 ? ('+' + (b.discrepancyAmount | number: '1.0-0')) : (b.discrepancyAmount | number: '1.0-0')) }}
+              </span>
+            </td>
+            <td>
+              <span class="text-muted fs-8 text-truncate d-block" style="max-width: 160px;" [title]="b.discrepancyReason || b.notes || '-'">
+                {{ b.discrepancyReason || b.notes || '-' }}
+              </span>
+            </td>
+            <td class="text-center">
+              <button type="button" class="btn btn-icon btn-sm btn-light" (click)="printVoucher(b)" [title]="'RECONCILIATION_PAGE.PRINT_VOUCHER' | translate">
+                <i class="fas fa-print text-muted"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SETTLE SHIFT -->
+<ng-template #settleModal let-modal>
+  <div class="modal-header">
+    <h4 class="modal-title font-weight-bolder text-dark">
+      <i class="fas fa-cash-register text-primary mr-2 me-2"></i> {{ 'RECONCILIATION_PAGE.SETTLE_SHIFT' | translate }}
+    </h4>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+  </div>
+  <div class="modal-body">
+    <div *ngIf="settlementSuccess" class="alert alert-custom alert-light-success fade show mb-5" role="alert">
+      <div class="alert-icon"><i class="flaticon2-check-mark"></i></div>
+      <div class="alert-text">
+        <strong>تمت التسوية بنجاح!</strong> تم ترحيل الدفعة <code>{{ settlementSuccess.batchCode }}</code> وتصفية العهدة إلى الخزينة المركزية.
+      </div>
+    </div>
+
+    <div *ngIf="settlementError" class="alert alert-custom alert-light-danger fade show mb-5" role="alert">
+      <div class="alert-icon"><i class="flaticon-warning"></i></div>
+      <div class="alert-text">{{ settlementError }}</div>
+    </div>
+
+    <div *ngIf="selectedCaptain">
+      <!-- Courier Summary Panel -->
+      <div class="bg-light-primary p-4 rounded mb-5">
+        <div class="row">
+          <div class="col-md-6">
+            <span class="text-muted font-size-xs text-uppercase font-weight-bold d-block">{{ 'RECONCILIATION_PAGE.COL_COURIER' | translate }}</span>
+            <strong class="font-size-h6 text-dark">{{ selectedCaptain.captainName }}</strong>
+          </div>
+          <div class="col-md-6 text-end">
+            <span class="text-muted font-size-xs text-uppercase font-weight-bold d-block">{{ 'RECONCILIATION_PAGE.COL_ORDERS' | translate }}</span>
+            <span class="badge badge-primary font-weight-bold">{{ selectedCaptain.totalDeliveredOrders }}</span>
+          </div>
+        </div>
+        <hr class="my-3" />
+        <div class="row">
+          <div class="col-md-4">
+            <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.GROSS_CASH' | translate }}</span>
+            <strong class="text-dark">{{ selectedCaptain.cashFloatBalance | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+          </div>
+          <div class="col-md-4">
+            <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.EARNED_WAGES' | translate }}</span>
+            <strong class="text-info">-{{ selectedCaptain.wagesEarnedBalance | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+          </div>
+          <div class="col-md-4">
+            <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE' | translate }}</span>
+            <strong class="text-warning font-size-lg">{{ selectedCaptain.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Physical Cash Handover Form -->
+      <div class="form-group mb-4">
+        <label class="font-weight-bolder mb-2">النقد الفعلي المستلم في الخزينة ({{ 'COMMON.CURRENCY_SYP' | translate }}) <span class="text-danger">*</span></label>
+        <div class="input-group input-group-lg">
+          <span class="input-group-text"><i class="fas fa-money-bill-wave text-success"></i></span>
+          <input
+            type="number"
+            class="form-control form-control-solid font-weight-bolder font-size-h5"
+            [(ngModel)]="settleCashReceived"
+            placeholder="أدخل المبلغ النقدي الفعلي المستلم"
+          />
+        </div>
+        <span class="form-text text-muted">المبلغ النقدي المعدود والمستلم فعلياً من سائق التوصيل.</span>
+      </div>
+
+      <!-- Live Variance Badge -->
+      <div class="p-3 rounded mb-4" [ngClass]="{
+        'bg-light-success text-success': settleDiscrepancy === 0,
+        'bg-light-danger text-danger': settleDiscrepancy < 0,
+        'bg-light-primary text-primary': settleDiscrepancy > 0
+      }">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <strong *ngIf="settleDiscrepancy === 0"><i class="fas fa-check-circle mr-1 me-1"></i> تطابق تام: النقد المستلم يطابق صافي المبلغ المتوقع تماماً.</strong>
+            <strong *ngIf="settleDiscrepancy < 0"><i class="fas fa-exclamation-triangle mr-1 me-1"></i> عجز نقدي: السائق لديه عجز بمقدار {{ (settleDiscrepancy * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. سيتم قيده كعجز صندوق.</strong>
+            <strong *ngIf="settleDiscrepancy > 0"><i class="fas fa-plus-circle mr-1 me-1"></i> فائض نقدي: السائق سلّم زيادة بمقدار {{ settleDiscrepancy | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. سيتم قيده كفائض صندوق.</strong>
+          </div>
+          <span class="badge badge-white font-weight-bolder font-size-sm py-2 px-3">
+            الفارق: {{ settleDiscrepancy > 0 ? '+' : '' }}{{ settleDiscrepancy | number: '1.0-0' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Discrepancy Reason (Conditional) -->
+      <div class="form-group mb-4" *ngIf="settleDiscrepancy !== 0">
+        <label class="font-weight-bolder text-danger mb-2">سبب الفارق المالي <span class="text-danger">*</span></label>
+        <input
+          type="text"
+          class="form-control form-control-solid"
+          [(ngModel)]="settleReason"
+          placeholder="مثال: فكة مفقودة مع العميل، ورقة نقدية تالفة، إكرامية..."
+        />
+        <span class="form-text text-danger font-size-xs">حقل إلزامي عند عدم تطابق النقد الفعلي مع صافي التوريد المتوقع.</span>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-group mb-4">
+        <label class="font-weight-bold mb-2">ملاحظات الوردية (اختياري)</label>
+        <textarea
+          class="form-control form-control-solid"
+          rows="2"
+          [(ngModel)]="settleNotes"
+          placeholder="ملاحظات أمين الصندوق أو تفاصيل الوردية..."
+        ></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-light" [disabled]="isSettling" (click)="modal.close()">{{ 'COMMON.CANCEL' | translate }}</button>
+    <button
+      type="button"
+      class="btn btn-primary font-weight-bolder"
+      [disabled]="isSettling || !selectedCaptain"
+      (click)="confirmSettlement(modal)"
+    >
+      <i class="fas fa-spinner fa-spin mr-1 me-1" *ngIf="isSettling"></i>
+      <i class="fas fa-check-double mr-1 me-1" *ngIf="!isSettling"></i>
+      {{ 'RECONCILIATION_PAGE.SETTLE_SHIFT' | translate }}
+    </button>
+  </div>
+</ng-template>
+
+<!-- MODAL: LEDGER STATEMENT -->
+<ng-template #statementModal let-modal>
+  <div class="modal-header">
+    <h4 class="modal-title font-weight-bolder text-dark">
+      <i class="fas fa-book-open text-primary mr-2 me-2"></i> كشف حساب السائق المالي
+    </h4>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+  </div>
+  <div class="modal-body">
+    <div *ngIf="isLoadingStatement" class="text-center py-5">
+      <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+      <p class="mt-2 text-muted">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+
+    <div *ngIf="!isLoadingStatement && statementDetails">
+      <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded">
+        <div>
+          <h5 class="font-weight-bolder mb-0 text-dark">{{ statementDetails.captainName }}</h5>
+          <span class="text-muted font-size-xs font-family-monospace">{{ statementDetails.captainUserId }}</span>
+        </div>
+        <div class="text-end">
+          <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE' | translate }}</span>
+          <strong class="text-primary font-size-h6">{{ statementDetails.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+        </div>
+      </div>
+
+      <h6 class="font-weight-bolder text-primary mb-3">كشف حساب العهدة النقدية (الأموال المحصلة في عهدة السائق)</h6>
+      <div class="table-responsive mb-5">
+        <table class="table table-bordered table-sm font-size-sm">
+          <thead class="thead-light">
+            <tr>
+              <th>{{ 'COMMON.DATE' | translate }}</th>
+              <th>رقم الحركة</th>
+              <th>النوع</th>
+              <th class="text-end">مدين (المحصل)</th>
+              <th class="text-end">دائن (المسدد)</th>
+              <th class="text-end">الرصيد التراكمي</th>
+              <th>البيان</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="statementDetails.floatStatement.length === 0">
+              <td colspan="7" class="text-center py-3 text-muted">{{ 'COMMON.NO_RECORDS' | translate }}</td>
+            </tr>
+            <tr *ngFor="let entry of statementDetails.floatStatement">
+              <td>{{ entry.postedDate | date: 'short' }}</td>
+              <td><code>{{ entry.transactionNumber }}</code></td>
+              <td><span class="badge badge-light-primary">{{ entry.referenceType }}</span></td>
+              <td class="text-end text-success font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-0') : '-' }}</td>
+              <td class="text-end text-danger font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-0') : '-' }}</td>
+              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-0' }}</td>
+              <td>{{ entry.memo }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h6 class="font-weight-bolder text-info mb-3">كشف أجور واستحقاقات السائق (الأجور المستحقة للسائق)</h6>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm font-size-sm">
+          <thead class="thead-light">
+            <tr>
+              <th>{{ 'COMMON.DATE' | translate }}</th>
+              <th>رقم الحركة</th>
+              <th>النوع</th>
+              <th class="text-end">مدين (المدفوع)</th>
+              <th class="text-end">دائن (المستحق)</th>
+              <th class="text-end">الرصيد التراكمي</th>
+              <th>البيان</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="statementDetails.earningsStatement.length === 0">
+              <td colspan="7" class="text-center py-3 text-muted">{{ 'COMMON.NO_RECORDS' | translate }}</td>
+            </tr>
+            <tr *ngFor="let entry of statementDetails.earningsStatement">
+              <td>{{ entry.postedDate | date: 'short' }}</td>
+              <td><code>{{ entry.transactionNumber }}</code></td>
+              <td><span class="badge badge-light-info">{{ entry.referenceType }}</span></td>
+              <td class="text-end text-danger font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-0') : '-' }}</td>
+              <td class="text-end text-success font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-0') : '-' }}</td>
+              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-0' }}</td>
+              <td>{{ entry.memo }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="modal.close()">{{ 'COMMON.CLOSE' | translate }}</button>
+  </div>
+</ng-template>

@@ -1,96 +1,280 @@
-<div class="card card-custom gutter-b">
-    <div class="card-header">
-      <div class="card-title">
-        <div><h3 class="card-label">Payments</h3><span class="card-subtitle">Review and record merchant settlements.</span></div>
+<div class="ops-payments-container">
+
+  <!-- 1. Operations Utility Bar -->
+  <div class="ops-utility-bar">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span>{{ 'PAYMENTS_PAGE.LIVE_OPERATIONS' | translate }}</span>
       </div>
-      <div class="card-toolbar">
-        <button type="button" class="btn btn-primary" (click)="create(null)">
-          <i class="fas fa-plus"></i> Add payment
-        </button>
+      <span class="ops-sync-meta">
+        <i class="fas fa-hand-holding-usd text-muted me-1"></i>
+        <span>{{ 'PAYMENTS_PAGE.TOTAL_RECORDS' | translate }}:</span>
+        <strong>{{ totalRecords | number }}</strong>
+      </span>
+    </div>
+    <div class="ops-utility-right">
+      <button type="button" class="ops-btn-refresh" (click)="refresh()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>{{ 'PAYMENTS_PAGE.REFRESH' | translate }}</span>
+      </button>
+      <button type="button" class="ops-btn-primary" (click)="create()">
+        <i class="fas fa-plus"></i>
+        <span>{{ 'PAYMENTS_PAGE.ADD_PAYMENT' | translate }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. Real Financial Operational KPI Cards -->
+  <div class="row g-3">
+    <!-- Total Disbursed Amount -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-total">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PAYMENTS_PAGE.KPI_TOTAL_PAID' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-money-bill-wave"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-success">{{ kpiTotalPaid | number }}</span>
+          <span class="ops-kpi-unit">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+        </div>
       </div>
     </div>
-    <div class="card-body">
-      <!-- begin: Filtration form -->
-      <div class="form form-label-right">
-        <div class="form-group row">
-          <div class="col-lg-2" [formGroup]="searchGroup">
-            <input
-              type="text"
-              class="form-control"
-              name="searchText"
-              placeholder="Search payments"
-              formControlName="searchTerm"
-            />
-          </div>
+
+    <!-- Total Transactions Count -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-transactions">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PAYMENTS_PAGE.KPI_TRANSACTIONS' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-receipt"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value">{{ kpiTransactions | number }}</span>
+          <span class="ops-kpi-unit">{{ 'PAYMENTS_PAGE.KPI_TRANSACTIONS_SUB' | translate }}</span>
         </div>
       </div>
-      <!-- end: Filtration form -->
-      <ng-container *ngIf="paymentsService.items$ | async as items">
-        <div class="bulk-action-bar" *ngIf="selection.count > 0">
-          <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-          <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'payments')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
+    </div>
+
+    <!-- Average Settlement Amount -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-average">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PAYMENTS_PAGE.KPI_AVG_PAYMENT' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-calculator"></i></div>
         </div>
-      </ng-container>
-  
-      <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="paymentsService.items$ | async as items">
-        <table
-          class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
-        >
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-primary">{{ kpiAvgPayment | number }}</span>
+          <span class="ops-kpi-unit">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payee Merchants Count -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-merchants">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PAYMENTS_PAGE.KPI_ACTIVE_MERCHANTS' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-store"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-purple">{{ kpiUniqueMerchants | number }}</span>
+          <span class="ops-kpi-unit">{{ 'PAYMENTS_PAGE.KPI_ACTIVE_MERCHANTS_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Consolidated Search & Filter Panel -->
+  <div class="ops-filter-panel">
+    <div class="ops-filter-row">
+      <!-- Search Input -->
+      <div class="ops-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search ops-search-icon"></i>
+        <input
+          type="text"
+          class="ops-search-input"
+          [placeholder]="'PAYMENTS_PAGE.SEARCH_PLACEHOLDER' | translate"
+          formControlName="searchTerm"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Payments Table Card -->
+  <div class="ops-table-card" *ngIf="paymentsService.items$ | async as rawItems">
+    <!-- Filtered visible items -->
+    <ng-container *ngIf="getDisplayedItems(rawItems) as items">
+
+      <!-- Bulk Action Bar -->
+      <div class="ops-bulk-bar" *ngIf="selection.count > 0">
+        <div class="ops-bulk-count">
+          <strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}
+        </div>
+        <div class="ops-bulk-actions">
+          <button
+            type="button"
+            class="btn btn-sm btn-light-primary"
+            (click)="selection.exportSelected(items, 'payments')"
+          >
+            <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-link text-muted"
+            (click)="selection.clear()"
+          >
+            {{ 'COMMON.CLEAR' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <!-- High-Density Responsive Financial Table -->
+      <div class="table-responsive">
+        <table class="ops-table">
           <thead>
-            <tr class="fw-bolder text-muted">
-              <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all payments on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-              <th scope="col">
-                Id
+            <tr>
+              <th scope="col" class="table-select-cell" style="width: 44px;">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  aria-label="Select all payments on this page"
+                  [checked]="selection.allSelected(items)"
+                  [indeterminate]="selection.partiallySelected(items)"
+                  (change)="selection.toggleAll(items, $any($event.target).checked)"
+                />
+              </th>
+              <th scope="col" style="width: 140px;">
+                <span role="button" (click)="sort('id')">
+                  {{ 'PAYMENTS_PAGE.COL_ID' | translate }}
+                  <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
               <th scope="col">
-                To Merchant
+                {{ 'PAYMENTS_PAGE.COL_TO_MERCHANT' | translate }}
               </th>
-              <th scope="col">
-                By User
+              <th scope="col" style="width: 180px;">
+                {{ 'PAYMENTS_PAGE.COL_BY_USER' | translate }}
               </th>
-              <th scope="col">
-                Amount
+              <th scope="col" style="width: 160px; text-align: left;">
+                <span role="button" (click)="sort('amount')">
+                  {{ 'PAYMENTS_PAGE.COL_AMOUNT' | translate }}
+                  <app-sort-icon column="amount" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <th scope="col">
-                New Balance
+              <th scope="col" style="width: 160px; text-align: left;">
+                <span role="button" (click)="sort('newBalance')">
+                  {{ 'PAYMENTS_PAGE.COL_NEW_BALANCE' | translate }}
+                  <app-sort-icon column="newBalance" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <th scope="col">
-                Hand Over Date
+              <th scope="col" style="width: 140px;">
+                {{ 'PAYMENTS_PAGE.COL_HANDOVER_DATE' | translate }}
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
-              <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select payment ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
-              <td>
-                <div>#{{ i.id }}</div>
-                <div>{{ i.createdDate | date:'d/M/yy, h:mm a' }}</div>
+            <tr
+              *ngFor="let payment of items"
+              [class.table-row-selected]="selection.isSelected(payment)"
+            >
+              <!-- Select Checkbox -->
+              <td class="table-select-cell">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="selection.isSelected(payment)"
+                  [attr.aria-label]="'Select payment ' + payment.id"
+                  (change)="selection.toggle(payment, $any($event.target).checked)"
+                />
               </td>
-              <td>{{ i.toUser }}</td>
-              <td>{{ i.byUser }}</td>
+
+              <!-- Reference & Date -->
               <td>
-                <span class="fw-bolder">{{ i.amount | number }}</span>
-                <span class="currency-badge">SYP</span>
+                <div class="ops-payment-ref">
+                  <span class="ref-num">#{{ payment.id }}</span>
+                  <span class="ref-date text-muted" *ngIf="payment.createdDate">
+                    {{ payment.createdDate | date:'yyyy/MM/dd, h:mm a' }}
+                  </span>
+                </div>
               </td>
+
+              <!-- To Merchant -->
               <td>
-                <span class="fw-bolder">{{ i.newBalance | number }}</span>
-                <span class="currency-badge">SYP</span>
+                <div class="ops-payee-cell">
+                  <div class="ops-payee-icon">
+                    <i class="fas fa-store"></i>
+                  </div>
+                  <span class="ops-payee-name">{{ payment.toUser || ('COMMON.NOT_AVAILABLE' | translate) }}</span>
+                </div>
               </td>
-              <td>{{ i.handoverDate | date }}</td>
+
+              <!-- By User (Admin) -->
+              <td>
+                <div class="ops-admin-cell">
+                  <i class="fas fa-user-shield text-muted me-1"></i>
+                  <span class="ops-admin-name text-muted">{{ payment.byUser || '-' }}</span>
+                </div>
+              </td>
+
+              <!-- Disbursed Amount -->
+              <td style="text-align: left;">
+                <div class="ops-amount-cell">
+                  <span class="amount-val fw-bold text-success">+{{ payment.amount | number }}</span>
+                  <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                </div>
+              </td>
+
+              <!-- Remaining Balance -->
+              <td style="text-align: left;">
+                <div class="ops-amount-cell">
+                  <span class="amount-val fw-bold text-dark">{{ payment.newBalance | number }}</span>
+                  <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                </div>
+              </td>
+
+              <!-- Handover Date -->
+              <td>
+                <span class="ops-date-cell" *ngIf="payment.handoverDate">
+                  {{ payment.handoverDate | date:'yyyy/MM/dd' }}
+                </span>
+                <span class="text-muted fs-8" *ngIf="!payment.handoverDate">-</span>
+              </td>
+            </tr>
+
+            <!-- Empty State -->
+            <tr *ngIf="items.length === 0">
+              <td colspan="7" class="text-center py-10">
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                  <div style="width: 60px; height: 60px; border-radius: 50%; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #94a3b8; font-size: 24px;">
+                    <i class="fas fa-hand-holding-usd"></i>
+                  </div>
+                  <h5 class="text-dark fw-bold mb-1">{{ 'PAYMENTS_PAGE.EMPTY_TITLE' | translate }}</h5>
+                  <p class="text-muted fs-7 mb-3">{{ 'PAYMENTS_PAGE.EMPTY_DESC' | translate }}</p>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light-primary"
+                    (click)="searchGroup.get('searchTerm')?.setValue('');"
+                  >
+                    <i class="fas fa-redo me-1"></i> {{ 'PAYMENTS_PAGE.RESET_FILTERS' | translate }}
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-  
+
+    </ng-container>
+
+    <!-- Table Footer with Paginator -->
+    <div class="ops-table-footer">
       <app-paginator
         class="d-flex justify-content-between align-items-center flex-wrap"
         [paginator]="paginator"
         [isLoading]="isLoading"
         (paginate)="paginate($event)"
       ></app-paginator>
-  
-      <!-- begin:Table -->
     </div>
-    <!-- end: Table -->
   </div>
-  
+
+</div>

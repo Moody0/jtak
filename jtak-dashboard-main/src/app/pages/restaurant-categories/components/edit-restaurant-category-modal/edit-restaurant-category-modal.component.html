@@ -1,0 +1,175 @@
+<div class="modal-header border-0 pb-0">
+  <h5 class="modal-title fw-bolder fs-5 text-dark">
+    <i class="fas text-primary me-2" [ngClass]="isEdit ? 'fa-edit' : 'fa-plus-circle'"></i>
+    {{ isEdit ? 'تعديل تصنيف المطاعم' : 'إضافة تصنيف مطاعم جديد' }}
+  </h5>
+  <button type="button" class="btn btn-sm btn-icon btn-active-light-primary" (click)="modal.dismiss()">
+    <i class="fas fa-times"></i>
+  </button>
+</div>
+
+<div class="modal-body py-4">
+  <form [formGroup]="formGroup" (ngSubmit)="save()">
+    <div class="row g-4">
+      
+      <!-- Left Column: Live Mobile Preview -->
+      <div class="col-lg-4 d-flex flex-column align-items-center justify-content-center p-3 rounded bg-light border border-dashed border-primary">
+        <span class="badge badge-light-primary mb-3 fs-8 fw-bold">معاينة كما يظهر في التطبيق</span>
+        
+        <!-- Circular Chip Preview matching Mobile App design -->
+        <div class="mobile-chip-preview text-center">
+          <div class="chip-avatar-circle" [class.active-border]="formGroup.get('active')?.value">
+            <img
+              [src]="getImageUrl()"
+              alt="Category Preview"
+              (error)="$any($event.target).src = './assets/media/svg/files/blank-image.svg'"
+            />
+          </div>
+          <div class="chip-title mt-2 fw-bold" [class.text-primary]="formGroup.get('active')?.value">
+            {{ formGroup.get('title')?.value || 'اسم التصنيف' }}
+          </div>
+          <div class="text-muted fs-9" *ngIf="formGroup.get('titleEn')?.value">
+            {{ formGroup.get('titleEn')?.value }}
+          </div>
+        </div>
+
+        <div class="mt-4 text-center">
+          <span class="badge" [ngClass]="formGroup.get('active')?.value ? 'badge-light-success' : 'badge-light-danger'">
+            <i class="fas me-1" [ngClass]="formGroup.get('active')?.value ? 'fa-check' : 'fa-ban'"></i>
+            {{ formGroup.get('active')?.value ? 'نشط في التطبيق' : 'معطل' }}
+          </span>
+          <div class="text-muted fs-8 mt-1">الترتيب: #{{ formGroup.get('order')?.value }}</div>
+        </div>
+      </div>
+
+      <!-- Right Column: Form Controls -->
+      <div class="col-lg-8">
+        <div class="row g-3">
+          
+          <!-- Title (Arabic) -->
+          <div class="col-md-6">
+            <label class="form-label fw-bold required">اسم التصنيف (بالعربية)</label>
+            <input
+              type="text"
+              class="form-control form-control-solid"
+              formControlName="title"
+              placeholder="مثال: شاورما، مشاوي، برجر..."
+            />
+            <div
+              *ngIf="formGroup.get('title')?.invalid && formGroup.get('title')?.touched"
+              class="text-danger fs-8 mt-1"
+            >
+              اسم التصنيف مطلوب
+            </div>
+          </div>
+
+          <!-- Title (English) -->
+          <div class="col-md-6">
+            <label class="form-label fw-bold">الاسم بالإنجليزية (اختياري)</label>
+            <input
+              type="text"
+              class="form-control form-control-solid"
+              formControlName="titleEn"
+              placeholder="e.g. Shawarma, Grills..."
+            />
+          </div>
+
+          <!-- Filter Tag / Matching Keyword -->
+          <div class="col-md-8">
+            <label class="form-label fw-bold">
+              كلمة التصفية والربط بالمطاعم (Filter Tag)
+            </label>
+            <input
+              type="text"
+              class="form-control form-control-solid"
+              formControlName="filterTag"
+              placeholder="مثال: شاورما أو burger"
+            />
+            <div class="form-text text-muted fs-8">
+              الكلمة التي يُفلتر بها تطبيق الهاتف المطاعم عند النقر على هذه الدائرة (تطابق تصنيف المطعم، المطبخ، أو الاسم).
+            </div>
+          </div>
+
+          <!-- Order -->
+          <div class="col-md-4">
+            <label class="form-label fw-bold required">الترتيب (الأولوية)</label>
+            <input
+              type="number"
+              class="form-control form-control-solid"
+              formControlName="order"
+              min="1"
+            />
+          </div>
+
+          <!-- Active Switch -->
+          <div class="col-12">
+            <div class="form-check form-switch form-check-custom form-check-solid">
+              <input
+                class="form-check-input h-20px w-35px"
+                type="checkbox"
+                formControlName="active"
+                id="catActiveSwitch"
+              />
+              <label class="form-check-label fw-bold ms-2" for="catActiveSwitch">
+                تفعيل وإظهار هذا التصنيف في صفحة المطاعم
+              </label>
+            </div>
+          </div>
+
+          <!-- Image Selection & Upload -->
+          <div class="col-12 mt-4">
+            <label class="form-label fw-bold mb-2">صورة التصنيف / الأيقونة</label>
+            
+            <!-- Preset Quick Image Buttons -->
+            <div class="mb-3">
+              <div class="fs-8 text-muted mb-2">اختيار سريع من الصور الجاهزة:</div>
+              <div class="d-flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-light border py-1 px-2 fs-8 d-flex align-items-center"
+                  *ngFor="let preset of presetImages"
+                  [class.btn-primary]="formGroup.get('image')?.value === preset.path"
+                  [class.text-white]="formGroup.get('image')?.value === preset.path"
+                  (click)="selectPresetImage(preset.path)"
+                >
+                  <img [src]="preset.path" class="rounded-circle me-1" style="width: 20px; height: 20px; object-fit: cover;" alt="" />
+                  {{ preset.label }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom Upload -->
+            <div class="card p-3 bg-light-secondary border border-dashed">
+              <div class="fs-8 fw-bold mb-2">أو ارفع صورة مخصصة عالية الدقة من جهازك:</div>
+              <app-file-uploader
+                uploaderTitle="رفع صورة التصنيف"
+                (fileUploaded)="onFileUploaded($event, 'image')"
+              ></app-file-uploader>
+
+              <div class="mt-2" *ngIf="formGroup.get('image')?.value && !formGroup.get('image')?.value.startsWith('assets')">
+                <app-uploaded-image
+                  [imageId]="formGroup.get('image')?.value"
+                  [dimensions]="{ width: 120, height: 120 }"
+                  (imageDeleted)="onFileDelete('image')"
+                ></app-uploaded-image>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer border-0 pt-0">
+  <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isSaving">
+    إلغاء
+  </button>
+  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="isSaving || formGroup.invalid">
+    <i class="fas fa-spinner fa-spin me-1" *ngIf="isSaving"></i>
+    <i class="fas fa-check me-1" *ngIf="!isSaving"></i>
+    {{ isEdit ? 'حفظ التعديلات' : 'إضافة التصنيف' }}
+  </button>
+</div>

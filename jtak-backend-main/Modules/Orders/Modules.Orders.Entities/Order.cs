@@ -1,4 +1,4 @@
-﻿using App.Shared.Entities.Resources;
+using App.Shared.Entities.Resources;
 using Solf.Base;
 using System;
 using System.Collections.Generic;
@@ -37,7 +37,23 @@ namespace Modules.Orders.Entities
         //public Point Location { get; set; }
         public OrderStatus OrderStatus { get; set; }
 
+        [StringLength(16)]
+        public string DeliveryOtp { get; set; }
+        public DateTime? DeliveredAt { get; set; }
+        public string ProofOfDeliverySignature { get; set; }
+        public string ProofOfDeliveryPhotoUrl { get; set; }
+        public string DeliveryNotes { get; set; }
+
         public virtual ICollection<OrderDetail> OrderDetails { get; set; }
+    }
+
+    public class DeliverOrderRequest
+    {
+        public int OrderId { get; set; }
+        public string Otp { get; set; }
+        public string Signature { get; set; }
+        public string PhotoUrl { get; set; }
+        public string Notes { get; set; }
     }
 
     public class OrderDto
@@ -52,6 +68,7 @@ namespace Modules.Orders.Entities
         public Guid UserId { get; set; }
         public Guid? DeliveryId { get; set; }
         public string DeliveryUser { get; set; }
+        public string DeliveryUserPhone { get; set; }
         public decimal? DeliveryLat { get; set; }
         public decimal? DeliveryLng { get; set; }
         public DateTime? DeliveryLocationUpdatedAt { get; set; }
@@ -61,6 +78,7 @@ namespace Modules.Orders.Entities
 
         [Display(Name = "Description", ResourceType = typeof(_Entities))]
         public string Description { get; set; }
+        public string Notes { get; set; }
 
         [Display(Name = "PhoneNumber", ResourceType = typeof(_AppUser))]
         public string Phonenumber { get; set; }
@@ -72,6 +90,17 @@ namespace Modules.Orders.Entities
 
         [Display(Name = "OrderStatus", ResourceType = typeof(_Order))]
         public OrderStatus OrderStatus { get; set; }
+
+        public string DeliveryOtp { get; set; }
+        public DateTime? DeliveredAt { get; set; }
+        public bool IsJtakMarketOrder { get; set; }
+        public bool RequiresMerchantDecision { get; set; }
+        public bool CanAdminApprove { get; set; }
+        public bool CanAdminMarkReady { get; set; }
+        public string AdminFlowMessage { get; set; }
+        public string ProofOfDeliverySignature { get; set; }
+        public string ProofOfDeliveryPhotoUrl { get; set; }
+        public string DeliveryNotes { get; set; }
 
         [Display(Name = "OrderDetails", ResourceType = typeof(_Order))]
         public OrderDetailDto[] OrderDetails { get; set; } = Array.Empty<OrderDetailDto>();
@@ -133,6 +162,44 @@ namespace Modules.Orders.Entities
 
         [Range(-180, 180)]
         public decimal Lng { get; set; }
+
+        public double? Heading { get; set; }
+        public double? Speed { get; set; }
+    }
+
+    public class ShippingStopProgressDto
+    {
+        public int Index { get; set; }
+        public string Title { get; set; }
+        public bool IsDarkStore { get; set; }
+        public bool IsCompleted { get; set; }
+        public decimal Lat { get; set; }
+        public decimal Lng { get; set; }
+        public int StopType { get; set; }
+    }
+
+    public class OrderLiveTrackDto
+    {
+        public int OrderId { get; set; }
+        public int OrderStatus { get; set; }
+        public Guid? DriverId { get; set; }
+        public string DriverName { get; set; }
+        public string DriverPhoneNumber { get; set; }
+        public decimal? DriverLat { get; set; }
+        public decimal? DriverLng { get; set; }
+        public double? Heading { get; set; }
+        public double? Speed { get; set; }
+        public DateTime? LocationUpdatedAt { get; set; }
+        public bool IsLive { get; set; }
+        public int EtaMinutes { get; set; }
+        public int RemainingDistanceMeters { get; set; }
+        public decimal DestinationLat { get; set; }
+        public decimal DestinationLng { get; set; }
+        public string DestinationAddress { get; set; }
+        public int CurrentStopIndex { get; set; }
+        public string CurrentStopTitle { get; set; }
+        public bool CurrentStopIsDarkStore { get; set; }
+        public List<ShippingStopProgressDto> Stops { get; set; } = new List<ShippingStopProgressDto>();
     }
     public class DeliveryOrderDto
     {
@@ -153,18 +220,15 @@ namespace Modules.Orders.Entities
         {
             get
             {
-                // TODO: Update this to use delivery service instead
-                const string googleMapsBaseUrl = "https://www.google.com/maps/dir/";
-                var nextMerchant = OrderDetails.FirstOrDefault(dd => dd.OrderDetailStatus != OrderDetailStatus.ShippingStarted);
-                var nextPoint = nextMerchant != null ? (nextMerchant.Lat, nextMerchant.Lng) : (Lat, Lng);
-                var locationList = new List<(decimal lat, decimal lng)>();
-
-                locationList.AddRange(OrderDetails.Select(d => (d.Lat, d.Lng)));
-                locationList.Add((Lat, Lng));
-
-                return googleMapsBaseUrl +
-                        string.Join("/", locationList.Select(d => $"{d.lat.ToString(System.Globalization.CultureInfo.InvariantCulture)},{d.lng.ToString(System.Globalization.CultureInfo.InvariantCulture)}")) +
-                        $"/@{nextPoint.Lat.ToString(System.Globalization.CultureInfo.InvariantCulture)},{nextPoint.Lng.ToString(System.Globalization.CultureInfo.InvariantCulture)},15z";
+                if (Lat != 0 && Lng != 0)
+                {
+                    return $"https://www.google.com/maps/dir/?api=1&destination={Lat.ToString(System.Globalization.CultureInfo.InvariantCulture)},{Lng.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+                }
+                if (!string.IsNullOrWhiteSpace(Address))
+                {
+                    return $"https://www.google.com/maps/dir/?api=1&destination={Uri.EscapeDataString(Address)}";
+                }
+                return null;
             }
         }
         public decimal Price => PaymentMethod == PaymentMethod.PayOnDelivery ? OrderDetails.Sum(x => x.Price) : 0;

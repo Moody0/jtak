@@ -2,9 +2,9 @@ import { Component, OnInit, Input, OnDestroy, ChangeDetectorRef } from '@angular
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { tap } from 'rxjs/operators';
+import { tap, catchError, finalize } from 'rxjs/operators';
 import { Merchant } from '../../models/merchant.model';
 import { MerchantsService } from '../../services/merchants.service';
 import { AppUserRoleMap } from 'src/app/_metronic/config/settings';
@@ -12,6 +12,8 @@ import { UserModel } from 'src/app/modules/auth';
 import { UsersService } from 'src/app/pages/users/services/users.service';
 import { User } from 'src/app/pages/users/models/user.model';
 import { HttpClient } from '@angular/common/http';
+
+import { FilesService } from 'src/app/modules/shared/services/files.service';
 
 const EMPTY_Merchant: Merchant = {  
   id: 0,
@@ -29,6 +31,10 @@ const EMPTY_Merchant: Merchant = {
   lng: 37.378656,
   active: false,
   merchantKind: 0,
+  deliveryTime: '20-30 دقيقة',
+  deliveryFee: 5000,
+  minOrderAmount: 15000,
+  workingHours: 'حتى 3 ص',
   ownerId: '-',
   owner: '',
   photo: ''
@@ -37,12 +43,13 @@ const EMPTY_Merchant: Merchant = {
 @Component({
   selector: 'app-edit-merchant-modal',
   templateUrl: './edit-merchant-modal.component.html',
-  styles: [],
+  styleUrls: ['./edit-merchant-modal.component.scss'],
 })
 export class EditMerchantModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
   @Input() item: Merchant;
-  merchantUsers: User[];
+  merchantUsers: User[] = [];
+  loadingUsers = false;
   isLoading$: Observable<boolean>;
   formGroup: FormGroup;
   userRoles = Object.entries(AppUserRoleMap);
@@ -58,14 +65,98 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
     minZoom: 8,
   };
 
+  commissionPresets: number[] = [5, 10, 15, 20, 25];
+  coveragePresets: number[] = [1000, 2000, 3000, 5000, 10000];
+  deliveryTimePresets: string[] = ['15-25 دقيقة', '20-30 دقيقة', '25-40 دقيقة', '30-45 دقيقة', '40-60 دقيقة'];
+  deliveryFeePresets: number[] = [0, 3000, 5000, 7000, 10000];
+  minOrderPresets: number[] = [10000, 15000, 20000, 25000, 30000, 50000];
+  workingHoursPresets: string[] = ['حتى 12 ص', 'حتى 1 ص', 'حتى 2 ص', 'حتى 3 ص', '24 ساعة'];
+
+  setDeliveryTime(val: string): void {
+    this.formGroup.patchValue({ deliveryTime: val });
+  }
+
+  setDeliveryFee(val: number): void {
+    this.formGroup.patchValue({ deliveryFee: val });
+  }
+
+  setMinOrder(val: number): void {
+    this.formGroup.patchValue({ minOrderAmount: val });
+  }
+
+  setWorkingHours(val: string): void {
+    this.formGroup.patchValue({ workingHours: val });
+  }
+
+  userSearchFn = (term: string, item: User) => {
+    if (!term) return true;
+    const cleanTerm = term.trim().toLowerCase().replace(/[+\s-]/g, '');
+    
+    // Check fullName
+    const fullName = (item.fullName || '').toLowerCase();
+    if (fullName.includes(term.trim().toLowerCase())) return true;
+    
+    // Check firstName and lastName
+    const first = (item.firstName || '').toLowerCase();
+    const last = (item.lastName || '').toLowerCase();
+    if (first.includes(term.trim().toLowerCase()) || last.includes(term.trim().toLowerCase())) return true;
+
+    // Check email
+    const email = (item.email || '').toLowerCase();
+    if (email.includes(term.trim().toLowerCase())) return true;
+
+    // Check phoneNumber (raw, with/without country code, with/without leading zero)
+    const phone = (item.phoneNumber || '').replace(/[+\s-]/g, '');
+    if (phone.includes(cleanTerm)) return true;
+
+    // E.g. searching 09... when stored as +9639...
+    if (cleanTerm.startsWith('0') && phone.includes(cleanTerm.substring(1))) return true;
+    if (cleanTerm.startsWith('963') && phone.includes(cleanTerm)) return true;
+    if (phone.startsWith('963') && cleanTerm.length >= 4 && phone.includes(cleanTerm)) return true;
+
+    return false;
+  };
+
   constructor(
     private service: MerchantsService,
     private userService: UsersService,
     private fb: FormBuilder,
     public modal: NgbActiveModal,
+    public filesService: FilesService,
     private toasterService: ToastrService,
     private cdk: ChangeDetectorRef
   ) {}
+
+  setCommission(val: number): void {
+    this.formGroup.get('profitOutOfMerchantPricePercent')?.setValue(val);
+  }
+
+  setCoverage(val: number): void {
+    this.formGroup.get('shippingCoverageInMeters')?.setValue(val);
+  }
+
+  setMerchantKind(val: number): void {
+    this.formGroup.get('merchantKind')?.setValue(val);
+  }
+
+  getStorePhoto(): string | null {
+    return this.formGroup?.get('photo')?.value || null;
+  }
+
+  getKindInfo(): { label: string; icon: string; emoji: string } {
+    const kind = Number(this.formGroup?.get('merchantKind')?.value ?? 0);
+    switch (kind) {
+      case 1:
+      case 3:
+        return { label: 'سوبرماركت / بقالية', icon: 'fas fa-shopping-basket', emoji: '🛒' };
+      default:
+        return { label: 'مطعم', icon: 'fas fa-utensils', emoji: '🍽️' };
+    }
+  }
+
+  onImageError(event: any): void {
+    event.target.src = './assets/media/svg/files/blank-image.svg';
+  }
 
   ngOnInit(): void {
     this.isLoading$ = this.service.isLoading$;
@@ -76,13 +167,40 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   loadItem() {
     if (!this.item) {
       this.item = EMPTY_Merchant;
-    } else {
-      //this.service.getItem(this.item.id).subscribe(merch => {
-      //  this.item = merch as Merchant;
-      //});
     }
-    this.userService.getMerchantUsers()
-                    .subscribe(users => this.merchantUsers = users);
+    this.loadingUsers = true;
+    this.userService
+      .getMerchantUsers()
+      .pipe(
+        catchError(() => of([])),
+        finalize(() => {
+          this.loadingUsers = false;
+          this.cdk.detectChanges();
+        })
+      )
+      .subscribe((users) => {
+        this.merchantUsers = users || [];
+        if (
+          this.item.ownerId &&
+          this.item.ownerId !== '-' &&
+          !this.merchantUsers.some((u) => u.id === this.item.ownerId)
+        ) {
+          this.merchantUsers.unshift({
+            id: this.item.ownerId,
+            fullName: this.item.owner || 'مالك المتجر الحالي',
+            phoneNumber: this.item.phone1 || '',
+            email: '',
+            firstName: '',
+            lastName: '',
+            profilePhoto: '',
+            isActive: true,
+            role: 'Merchant' as any,
+            lang: 'ar',
+            countryPhoneCode: '+963',
+          });
+        }
+        this.cdk.detectChanges();
+      });
   }
 
   loadForm() {
@@ -132,6 +250,10 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       lat: [this.item.lat ?? 37.064258, [Validators.required]],
       lng: [this.item.lng ?? 37.378656, [Validators.required]],
       profitOutOfMerchantPricePercent: [this.item.profitOutOfMerchantPricePercent ?? 0, [Validators.required]],    
+      deliveryTime: [this.item.deliveryTime || '20-30 دقيقة'],
+      deliveryFee: [this.item.deliveryFee !== undefined && this.item.deliveryFee !== null ? this.item.deliveryFee : 5000, [Validators.required, Validators.min(0)]],
+      minOrderAmount: [this.item.minOrderAmount !== undefined && this.item.minOrderAmount !== null ? this.item.minOrderAmount : 15000, [Validators.required, Validators.min(0)]],
+      workingHours: [this.item.workingHours || 'حتى 3 ص'],
       active: [this.item.active ?? true],
       ownerId: [this.item.ownerId],
       photo: [this.item.photo || '']
@@ -159,10 +281,6 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         this.formGroup.patchValue({
           shortDescription: cleaned || 'مطعم ومأكولات متنوعة',
         });
-      } else if (type === 2 && !currentDesc) {
-        this.formGroup.patchValue({ shortDescription: 'صيدلية وأدوية وعناية صحية' });
-      } else if (type === 3 && !currentDesc) {
-        this.formGroup.patchValue({ shortDescription: 'متجر ومنتجات متنوعة' });
       }
       this.cdk.detectChanges();
     });
@@ -225,12 +343,16 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       if (!desc) {
         desc = 'مطعم ومأكولات متنوعة';
       }
-    } else if (merchantKind === 2 && !desc) {
-      desc = 'صيدلية وأدوية وعناية صحية';
-    } else if (merchantKind === 3 && !desc) {
-      desc = 'متجر ومنتجات متنوعة';
     }
     formValues.shortDescription = desc;
+
+    // Synchronize owner display title
+    const selectedUser = this.merchantUsers.find((u) => u.id === formValues.ownerId);
+    if (selectedUser) {
+      formValues.owner = selectedUser.fullName;
+    } else if (!formValues.ownerId || formValues.ownerId === '-') {
+      formValues.owner = '';
+    }
 
     if (this.item.id) {
       this.edit(formValues);

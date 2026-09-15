@@ -8,12 +8,15 @@ import { NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import { SharedModule } from 'src/app/modules/shared/shared.module';
 import { ReactiveFormsModule } from '@angular/forms';
 import { EditDilevry } from './components/orders-list/EditDilevry/edit-dilevry.component';
+import { LiveTrackModalComponent } from './components/orders-list/LiveTrackModal/live-track-modal.component';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { GoogleMapsModule } from '@angular/google-maps';
 
 @NgModule({
   declarations: [
     OrdersListComponent,
-    EditDilevry
+    EditDilevry,
+    LiveTrackModalComponent
   ],
   imports: [
     CommonModule,
@@ -28,7 +31,8 @@ import { NgSelectModule } from '@ng-select/ng-select';
     CommonModule,
     CRUDTableModule,
     NgbModalModule,
-    NgSelectModule
+    NgSelectModule,
+    GoogleMapsModule
   ]
 })
 export class OrdersModule { }

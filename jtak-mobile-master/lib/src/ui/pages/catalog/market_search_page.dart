@@ -97,12 +97,7 @@ class _MarketSearchPageState extends State<MarketSearchPage> {
     return MarketStoreModel.extractLocalizedName(widget.marketName, langCode);
   }
 
-  List<String> _recentSearches = [
-    'حليب',
-    'شيبس',
-    'شوكولا',
-    'عصير',
-  ];
+  List<String> _recentSearches = [];
 
   static const List<_PopularSearchConcept> _popularConcepts = [
     _PopularSearchConcept(label: 'حليب', query: 'حليب', words: ['حليب', 'لبن', 'زبادي']),
@@ -295,7 +290,7 @@ class _MarketSearchPageState extends State<MarketSearchPage> {
     if (cart.isDifferentMerchant(widget.marketId)) {
       final shouldReplace = await ReplaceCartBottomSheet.show(
         context,
-        currentStoreName: cart.currentMerchantName,
+        currentStoreName: cart.getConflictingMerchantName(widget.marketId),
         newStoreName: widget.marketName,
       );
       if (shouldReplace != true || !mounted) return;
@@ -308,6 +303,8 @@ class _MarketSearchPageState extends State<MarketSearchPage> {
         widget.marketId,
         product.priceValue.toDouble(),
         1,
+        title: product.title,
+        imageUrl: product.imageUrl,
       );
       setState(() {
         _cartQuantities.clear();
@@ -332,6 +329,8 @@ class _MarketSearchPageState extends State<MarketSearchPage> {
       widget.marketId,
       product.priceValue.toDouble(),
       newQty,
+      title: product.title,
+      imageUrl: product.imageUrl,
     );
     widget.onCartChanged?.call(productId, newQty);
   }

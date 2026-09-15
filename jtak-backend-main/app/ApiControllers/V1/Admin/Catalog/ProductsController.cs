@@ -58,8 +58,12 @@ namespace App.ApiControllers.V1.Admin
             {
                 Id = x.Id,
                 Title = x.Title,
+                TitleEn = x.TitleEn,
+                Barcode = x.Barcode,
+                Brand = x.Brand,
                 Unit = x.Unit,
                 Description = x.Description,
+                DescriptionEn = x.DescriptionEn,
                 Photos = x.Photos,
                 Currency = x.Currency,
                 ExpiryDate = x.ExpiryDate,
@@ -161,11 +165,17 @@ namespace App.ApiControllers.V1.Admin
             var entity = new Product
             {
                 Title = item.Title,
+                TitleEn = item.TitleEn,
+                Barcode = item.Barcode,
+                Brand = item.Brand,
                 Description = item.Description,
+                DescriptionEn = item.DescriptionEn,
                 Unit = item.Unit,
                 Photos = item.Photos != null ? string.Join(",", item.Photos.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) : null,
                 ProductCategoryId = item.ProductCategoryId,
-                Active = item.Active
+                Active = item.Active,
+                IsFeatured = item.IsFeatured,
+                Currency = item.Currency
             };
             _service.Insert(entity);
             await _uow.SaveChangesAsync();
@@ -188,11 +198,17 @@ namespace App.ApiControllers.V1.Admin
             var entity = await _service.FindAsync(id);
 
             entity.Title = item.Title;
+            entity.TitleEn = item.TitleEn;
+            entity.Barcode = item.Barcode;
+            entity.Brand = item.Brand;
             entity.Description = item.Description;
+            entity.DescriptionEn = item.DescriptionEn;
             entity.Unit = item.Unit;
             entity.Photos = item.Photos != null ? string.Join(",", item.Photos.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) : null;
             entity.ProductCategoryId = item.ProductCategoryId;
             entity.Active = item.Active;
+            entity.IsFeatured = item.IsFeatured;
+            entity.Currency = item.Currency;
 
             await _tagService.SetTags(entity.Id, item.Tags?.Select(x => x.Id).ToArray() ?? Array.Empty<int>());
 

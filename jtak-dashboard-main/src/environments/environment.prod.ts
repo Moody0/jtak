@@ -3,7 +3,7 @@
 // The list of file replacements can be found in `angular.json`.
 
 export const environment = {
-  production: false,
+  production: true,
   appVersion: 'v1.0.0',
   USERDATA_KEY: 'tr-gate',
   copyRightUrl: 'https://sol-gr.com',

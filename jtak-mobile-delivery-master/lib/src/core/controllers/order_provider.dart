@@ -1,5 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:app_jtak_delivery/src/core/controllers/app/base_provider.dart';
 import 'package:app_jtak_delivery/src/core/enums/order_details_status_enum.dart';
 import 'package:app_jtak_delivery/src/core/models/order_model.dart';
@@ -8,6 +12,7 @@ import 'package:app_jtak_delivery/src/core/services/locator.dart';
 import 'package:app_jtak_delivery/src/utils/providers/sol_api.dart';
 import 'package:app_jtak_delivery/src/utils/utilities/global_var.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderProvider extends BaseProvider<OrderModel> {
   final SolApi _api = locator<SolApi>();
@@ -16,7 +21,235 @@ class OrderProvider extends BaseProvider<OrderModel> {
   int? _trackingOrderId;
   bool _locationRequestInFlight = false;
 
+  bool isOnline = true;
+  DateTime? shiftStartedAt;
+  bool _shiftLoading = false;
+  bool get shiftLoading => _shiftLoading;
+
+  final Set<int> _acknowledgedOrders = {};
+  OrderModel? incomingOrderAlert;
+
+  OrderProvider() {
+    _loadAcknowledgedOrders();
+  }
+
+  Future<void> _loadAcknowledgedOrders() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('ack_orders') ?? [];
+      for (final s in list) {
+        final id = int.tryParse(s);
+        if (id != null) _acknowledgedOrders.add(id);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistAcknowledgedOrder(int id) async {
+    _acknowledgedOrders.add(id);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final recent = _acknowledgedOrders.toList();
+      if (recent.length > 100) {
+        recent.removeRange(0, recent.length - 100);
+      }
+      await prefs.setStringList('ack_orders', recent.map((e) => e.toString()).toList());
+    } catch (_) {}
+  }
+
   Future<void> startLocationTracking() => _beginLocationSharing();
+
+  Future<void> fetchShiftStatus() async {
+    try {
+      final res = await _api.getRequest('/Orders/Shift/Status');
+      if (res is Map) {
+        isOnline = res['isOnline'] ?? true;
+        if (res['shiftStartedAt'] != null) {
+          shiftStartedAt = DateTime.tryParse(res['shiftStartedAt'].toString());
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      GlobalVar.log('fetchShiftStatus error: $e');
+    }
+  }
+
+  Future<void> setShiftStatus(bool online) async {
+    _shiftLoading = true;
+    notifyListeners();
+    try {
+      await _api.postRequest('/Orders/Shift/Status', {'isOnline': online});
+      isOnline = online;
+      if (online) {
+        shiftStartedAt = DateTime.now();
+        await startLocationTracking();
+        await refreshData();
+      } else {
+        shiftStartedAt = null;
+        await pauseLocationSharing();
+      }
+    } catch (e) {
+      GlobalVar.log('setShiftStatus error: $e');
+    } finally {
+      _shiftLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void dismissIncomingOrderAlert() {
+    if (incomingOrderAlert?.id != null) {
+      _persistAcknowledgedOrder(incomingOrderAlert!.id!);
+    }
+    incomingOrderAlert = null;
+    notifyListeners();
+  }
+
+  Future<void> pauseLocationSharing() async {
+    await _locationSubscription?.cancel();
+    _locationSubscription = null;
+    _trackingOrderId = null;
+  }
+
+  List<OrderModel> availableOrders = [];
+  bool _isFetchingAvailable = false;
+  bool get isFetchingAvailable => _isFetchingAvailable;
+
+  Future<void> fetchAvailableOrders() async {
+    if (_isFetchingAvailable) return;
+    _isFetchingAvailable = true;
+    try {
+      final body = {
+        'pageNumber': 0,
+        'pageSize': 50,
+        'sortField': 'id',
+        'sortOrder': 'desc'
+      };
+      final res = await _api.postRequest('/Orders/Available', body);
+      if (res is Map && res['items'] is List) {
+        final List data = res['items'];
+        availableOrders = data.map((e) => OrderModel.fromMap(e)).toList();
+
+        // Alert rider ONLY for new available orders in the pool that are not acknowledged and not already claimed
+        if (isOnline && availableOrders.isNotEmpty) {
+          final myOrderIds = dataList.map((e) => e.id).toSet();
+          for (final o in availableOrders) {
+            if (o.id != null && !_acknowledgedOrders.contains(o.id) && !myOrderIds.contains(o.id)) {
+              if (incomingOrderAlert == null || incomingOrderAlert!.id != o.id) {
+                incomingOrderAlert = o;
+                HapticFeedback.heavyImpact();
+                break;
+              }
+            }
+          }
+        }
+      } else {
+        availableOrders = [];
+      }
+    } catch (e) {
+      GlobalVar.log('fetchAvailableOrders error: $e');
+    } finally {
+      _isFetchingAvailable = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> claimOrder(int orderId) async {
+    try {
+      await _api.postRequest('/Orders/Claim/$orderId', {});
+      await _persistAcknowledgedOrder(orderId);
+      availableOrders.removeWhere((o) => o.id == orderId);
+      await refreshData();
+      HapticFeedback.mediumImpact();
+      return true;
+    } catch (e) {
+      GlobalVar.log('claimOrder error: $e');
+      rethrow;
+    }
+  }
+
+  bool _isSilentSyncing = false;
+
+  /// Smoothly syncs active and available orders in the background.
+  /// Does NOT clear dataList, and only calls notifyListeners() if data actually changed.
+  Future<void> silentSync() async {
+    if (_isSilentSyncing || isBusy) return;
+    _isSilentSyncing = true;
+    try {
+      await _silentSyncMine();
+    } catch (e) {
+      GlobalVar.log('silentSync error: $e');
+    } finally {
+      _isSilentSyncing = false;
+    }
+  }
+
+  Future<void> _silentSyncMine() async {
+    final body = {
+      'pageNumber': 0,
+      'pageSize': 20,
+      'sortField': 'id',
+      'sortOrder': 'desc',
+    };
+    final res = await _api.postRequest('/Orders/Mine', body);
+    if (res is Map && res['items'] is List) {
+      final List data = res['items'];
+      final List<OrderModel> newOrders = data.map((e) => OrderModel.fromMap(e)).toList();
+
+      bool changed = false;
+      if (dataList.length != newOrders.length) {
+        changed = true;
+      } else {
+        for (int i = 0; i < newOrders.length; i++) {
+          final curr = dataList[i];
+          final next = newOrders[i];
+          if (curr.id != next.id ||
+              curr.orderStatus != next.orderStatus ||
+              getOrderStatus(curr) != getOrderStatus(next) ||
+              curr.orderDetails?.length != next.orderDetails?.length) {
+            changed = true;
+            break;
+          }
+        }
+      }
+
+      if (changed) {
+        dataList = newOrders;
+        for (final o in newOrders) {
+          if (o.id != null) {
+            _acknowledgedOrders.add(o.id!);
+          }
+        }
+        notifyListeners();
+      }
+
+      final active = (dataList.cast<OrderModel?>()).firstWhere(
+        (item) => item != null && getOrderStatus(item) == OrderDetailsStatus.shipping,
+        orElse: () => null,
+      );
+      if (active?.id != null && isOnline) {
+        _beginLocationSharing(active!.id!);
+      } else {
+        _trackingOrderId = null;
+      }
+    }
+  }
+
+  /// Silently checks if the current single order has any status changes without blinking the UI
+  Future<void> silentSyncOrder(int id) async {
+    try {
+      var data = await _api.getRequest('/Orders/$id');
+      if (data != null && data is Map) {
+        final updated = OrderModel.fromMap(Map<String, dynamic>.from(data));
+        if (order == null ||
+            order!.orderStatus != updated.orderStatus ||
+            order!.orderDetails?.length != updated.orderDetails?.length) {
+          order = updated;
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      GlobalVar.log('silentSyncOrder error: $e');
+    }
+  }
 
   Future refreshData() async {
     final selectedId = order?.id;
@@ -42,13 +275,21 @@ class OrderProvider extends BaseProvider<OrderModel> {
         var res = await _api.postRequest('/Orders/Mine', body);
         List data = res['items'];
         final orders = data.map((e) => OrderModel.fromMap(e)).toList();
+
+        // Mark all active orders belonging to this driver as acknowledged so they never trigger incoming popups
+        for (final o in orders) {
+          if (o.id != null) {
+            _acknowledgedOrders.add(o.id!);
+          }
+        }
+
         final active = orders.cast<OrderModel?>().firstWhere(
               (item) =>
                   item != null &&
                   getOrderStatus(item) == OrderDetailsStatus.shipping,
               orElse: () => null,
             );
-        if (active?.id != null) {
+        if (active?.id != null && isOnline) {
           _beginLocationSharing(active!.id!);
         } else {
           _trackingOrderId = null;
@@ -82,14 +323,52 @@ class OrderProvider extends BaseProvider<OrderModel> {
     });
   }
 
-  Future deliverOrder(int orderId) async {
+  Future<bool> deliverOrder(int orderId, {String? otp, String? notes, String? photoUrl}) async {
+    bool result = false;
     await loadBaseData(loadBody: () async {
-      var location = await LocationService().getCurrentLocation();
-      GlobalVar.log(location.toString());
-      await _api.postRequest('/Orders/DeliverOrder/$orderId', {});
+      final res = await _api.postRequest('/Orders/DeliverOrder/$orderId', {
+        'orderId': orderId,
+        'otp': otp,
+        'notes': notes,
+        'photoUrl': photoUrl,
+      });
+      if (res == false || res == 'false') {
+        throw Exception('تعذر تأكيد تسليم الطلب. يرجى التأكد من استلام كافة أصناف المتاجر وصحة رمز التحقق.');
+      }
+      result = true;
       await _stopLocationSharing(orderId);
       await refreshData();
     });
+    return result;
+  }
+
+  Future<String?> uploadPoDPhoto(XFile file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final uri = Uri.parse('${SolApi.baseURL}/api/v1/services/SaveUploaded');
+      final request = http.MultipartRequest('POST', uri);
+      final headers = _api.getHeaders();
+      request.headers.addAll(headers);
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: file.name.isNotEmpty ? file.name : 'pod_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      ));
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = json.decode(response.body);
+        if (decoded is String) return decoded;
+        if (decoded is Map && decoded['id'] != null) return decoded['id'].toString();
+        return response.body.replaceAll('"', '').trim();
+      } else {
+        GlobalVar.log('PoD photo upload failed: ${response.statusCode} ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      GlobalVar.log('Error uploading PoD photo: $e');
+      return null;
+    }
   }
 
   Future cancelOrder(int orderId) async {
@@ -111,13 +390,52 @@ class OrderProvider extends BaseProvider<OrderModel> {
   OrderDetailsStatus getOrderStatus(OrderModel order) {
     OrderDetailsStatus status = OrderDetailsStatus.pending;
     if (GlobalVar.checkListNotEmpty(order.orderDetails)) {
-      status = order.orderDetails!.first.orderDetailStatus ??
-          OrderDetailsStatus.pending;
-      for (var element in order.orderDetails!) {
-        if (element.orderDetailStatus!.index < status.index) {
-          status = element.orderDetailStatus ?? OrderDetailsStatus.pending;
-        }
+      final items = order.orderDetails!;
+
+      // 1. If all items were rejected by the merchant
+      if (items.every((e) => e.orderDetailStatus == OrderDetailsStatus.merchantRejected)) {
+        return OrderDetailsStatus.merchantRejected;
       }
+
+      // 2. If all items are in terminal canceled/rejected states
+      final allTerminal = items.every((e) =>
+          e.orderDetailStatus == OrderDetailsStatus.merchantRejected ||
+          e.orderDetailStatus == OrderDetailsStatus.customerCanceled ||
+          e.orderDetailStatus == OrderDetailsStatus.deliveryCanceled);
+      if (allTerminal) {
+        if (items.any((e) => e.orderDetailStatus == OrderDetailsStatus.merchantRejected)) {
+          return OrderDetailsStatus.merchantRejected;
+        }
+        if (items.any((e) => e.orderDetailStatus == OrderDetailsStatus.deliveryCanceled)) {
+          return OrderDetailsStatus.deliveryCanceled;
+        }
+        return OrderDetailsStatus.customerCanceled;
+      }
+
+      // Active (non-terminal) items for fulfillment evaluation
+      final activeItems = items.where((e) =>
+          e.orderDetailStatus != OrderDetailsStatus.merchantRejected &&
+          e.orderDetailStatus != OrderDetailsStatus.customerCanceled &&
+          e.orderDetailStatus != OrderDetailsStatus.deliveryCanceled).toList();
+
+      if (activeItems.isNotEmpty && activeItems.every((e) => e.orderDetailStatus == OrderDetailsStatus.delivered)) {
+        return OrderDetailsStatus.delivered;
+      }
+
+      // 3. Active fulfillment stages
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.shipping)) {
+        return OrderDetailsStatus.shipping;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.readyForPickup)) {
+        return OrderDetailsStatus.readyForPickup;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.merchantAccepted)) {
+        return OrderDetailsStatus.merchantAccepted;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.customerPending)) {
+        return OrderDetailsStatus.customerPending;
+      }
+      return OrderDetailsStatus.pending;
     }
     return status;
   }
@@ -143,8 +461,8 @@ class OrderProvider extends BaseProvider<OrderModel> {
     if (defaultTargetPlatform == TargetPlatform.android) {
       settings = AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 15,
-        intervalDuration: const Duration(seconds: 8),
+        distanceFilter: 10,
+        intervalDuration: const Duration(seconds: 6),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'جيتك - توصيل طلب',
           notificationText: 'تتم مشاركة موقعك مع العميل أثناء التوصيل',
@@ -157,7 +475,7 @@ class OrderProvider extends BaseProvider<OrderModel> {
         defaultTargetPlatform == TargetPlatform.macOS) {
       settings = AppleSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 15,
+        distanceFilter: 10,
         activityType: ActivityType.automotiveNavigation,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
@@ -166,7 +484,7 @@ class OrderProvider extends BaseProvider<OrderModel> {
     } else {
       settings = const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 15,
+        distanceFilter: 10,
       );
     }
     _locationSubscription =
@@ -183,6 +501,8 @@ class OrderProvider extends BaseProvider<OrderModel> {
       final payload = {
         'lat': position.latitude,
         'lng': position.longitude,
+        'heading': position.heading,
+        'speed': position.speed,
       };
       await _api.putRequest('/Orders/Location', payload);
 

@@ -5,6 +5,7 @@ namespace App.Shared.Entities.Enums
         Restaurant = 0,
         Grocery = 1,
         Pharmacy = 2,
-        Store = 3
+        Store = 3,
+        DarkStore = 4
     }
 }

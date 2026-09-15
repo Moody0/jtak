@@ -1,0 +1,421 @@
+<div class="restaurant-categories-container">
+
+  <!-- 1. Utility Operations Bar -->
+  <div class="rc-utility-bar">
+    <div class="rc-utility-left">
+      <div class="rc-live-pulse-badge">
+        <span class="rc-pulse-dot"></span>
+        <span>التحكم الكامل بقسم "كل المطاعم" • تطبيق الهاتف</span>
+      </div>
+      <span class="rc-sync-meta">
+        <i class="fas fa-utensils text-primary me-1"></i>
+        <span>عدد التصنيفات:</span>
+        <strong>{{ items.length }}</strong>
+        <span class="text-muted ms-2">({{ activeItemsCount }} معروض للعميل حالياً)</span>
+      </span>
+    </div>
+    <div class="rc-utility-right">
+      <button type="button" class="btn-refresh" (click)="loadData()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>تحديث</span>
+      </button>
+      <button type="button" class="btn-add" (click)="openAddModal()" [disabled]="isLoading">
+        <i class="fas fa-plus"></i>
+        <span>إضافة تصنيف جديد</span>
+      </button>
+      <button type="button" class="btn-save" (click)="saveConfig(true)" [disabled]="isSaving">
+        <i class="fas fa-check-circle" *ngIf="!isSaving"></i>
+        <i class="fas fa-spinner fa-spin" *ngIf="isSaving"></i>
+        <span>حفظ التغييرات</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-danger d-flex align-items-center justify-content-between mb-4" *ngIf="loadError">
+    <span><i class="fas fa-exclamation-triangle me-2"></i>تعذر الاتصال بالخدمة لتحميل بيانات قسم المطاعم.</span>
+    <button type="button" class="btn btn-sm btn-danger" (click)="loadData()" [disabled]="isLoading">إعادة المحاولة</button>
+  </div>
+
+  <!-- 2. Section Header & Master Toggle Control Card -->
+  <div class="section-settings-card mb-4">
+    <div class="row align-items-center g-3">
+      <div class="col-lg-6">
+        <div class="d-flex align-items-center">
+          <div class="settings-icon-wrapper me-3">
+            <i class="fas fa-heading"></i>
+          </div>
+          <div>
+            <h4 class="settings-title mb-1">إعدادات عنوان وحالة القسم في صفحة المطاعم</h4>
+            <p class="settings-subtitle text-muted mb-0">
+              تحكم بالعنوان الرئيسي الظاهر أعلى الدوائر وحالة تفعيل القسم بالكامل في تطبيق الزبائن
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="d-flex align-items-center justify-content-lg-end gap-3 flex-wrap">
+          <!-- Section Title Arabic -->
+          <div class="title-input-wrapper">
+            <label class="form-label fs-8 fw-bold text-muted mb-1">عنوان القسم (عربي):</label>
+            <input
+              type="text"
+              class="form-control form-control-sm form-control-solid"
+              [(ngModel)]="sectionTitle"
+              placeholder="كل المطاعم"
+              style="width: 180px;"
+            />
+          </div>
+
+          <!-- Section Title English -->
+          <div class="title-input-wrapper">
+            <label class="form-label fs-8 fw-bold text-muted mb-1">Title (EN):</label>
+            <input
+              type="text"
+              class="form-control form-control-sm form-control-solid"
+              [(ngModel)]="sectionTitleEn"
+              placeholder="All Restaurants"
+              style="width: 150px;"
+            />
+          </div>
+
+          <!-- Home strip heading: the same categories appear on Home, where
+               different wording reads correctly. -->
+          <div class="title-input-wrapper">
+            <label class="form-label fs-8 fw-bold text-muted mb-1">عنوان شريط الرئيسية:</label>
+            <input
+              type="text"
+              class="form-control form-control-sm form-control-solid"
+              [(ngModel)]="homeSectionTitle"
+              placeholder="أصناف متنوعة"
+              style="width: 180px;"
+            />
+          </div>
+
+          <div class="title-input-wrapper">
+            <label class="form-label fs-8 fw-bold text-muted mb-1">Home strip (EN):</label>
+            <input
+              type="text"
+              class="form-control form-control-sm form-control-solid"
+              [(ngModel)]="homeSectionTitleEn"
+              placeholder="Browse by kind"
+              style="width: 150px;"
+            />
+          </div>
+
+          <div class="toggle-wrapper pt-3">
+            <label class="form-check form-switch form-check-custom form-check-solid mb-0">
+              <input
+                class="form-check-input h-25px w-45px"
+                type="checkbox"
+                [(ngModel)]="showOnHome"
+                (change)="saveConfig()"
+              />
+              <span class="form-check-label fs-8 fw-bold">إظهار في الرئيسية</span>
+            </label>
+          </div>
+
+          <!-- Master Active Toggle Switch -->
+          <div class="toggle-wrapper pt-3">
+            <label class="form-check form-switch form-check-custom form-check-solid mb-0">
+              <input
+                class="form-check-input h-25px w-45px"
+                type="checkbox"
+                [checked]="enabled"
+                (change)="toggleSectionEnabled()"
+              />
+              <span class="form-check-label fs-7 fw-bolder ms-2" [class.text-success]="enabled" [class.text-danger]="!enabled">
+                {{ enabled ? 'القسم مفعل' : 'القسم مخفي' }}
+              </span>
+            </label>
+          </div>
+
+          <!-- Quick Save Button -->
+          <div class="pt-3">
+            <button
+              type="button"
+              class="btn btn-sm btn-light-primary fw-bold"
+              (click)="saveConfig(true)"
+              [disabled]="isSaving"
+            >
+              <i class="fas fa-save me-1"></i>
+              حفظ
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Real KPI Cards -->
+  <div class="row g-3 mb-4">
+    <!-- Total Categories -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="kpi-card kpi-total">
+        <div class="kpi-header">
+          <span class="kpi-label">إجمالي التصنيفات</span>
+          <div class="kpi-icon"><i class="fas fa-layer-group"></i></div>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-value">{{ items.length }}</span>
+          <span class="kpi-unit">تصنيف مسجل</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Categories in App -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="kpi-card kpi-active">
+        <div class="kpi-header">
+          <span class="kpi-label">معروض بالتطبيق</span>
+          <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-value text-success">{{ activeItemsCount }}</span>
+          <span class="kpi-unit">دائرة نشطة ومفعلة</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disabled Categories -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="kpi-card kpi-disabled">
+        <div class="kpi-header">
+          <span class="kpi-label">تصنيفات معطلة</span>
+          <div class="kpi-icon"><i class="fas fa-ban"></i></div>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-value text-muted">{{ disabledItemsCount }}</span>
+          <span class="kpi-unit">مخفية مؤقتاً</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section Live Status -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="kpi-card kpi-status">
+        <div class="kpi-header">
+          <span class="kpi-label">حالة القسم بالكامل</span>
+          <div class="kpi-icon">
+            <i class="fas" [ngClass]="enabled ? 'fa-eye text-success' : 'fa-eye-slash text-danger'"></i>
+          </div>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-value fs-4" [ngClass]="enabled ? 'text-success' : 'text-danger'">
+            {{ enabled ? 'ظاهر للعملاء' : 'مخفي بالتطبيق' }}
+          </span>
+          <span class="kpi-unit">{{ sectionTitle }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Filter & Search Bar -->
+  <div class="rc-filter-bar mb-3">
+    <div class="search-box">
+      <i class="fas fa-search search-icon"></i>
+      <input
+        type="text"
+        class="search-input"
+        placeholder="ابحث باسم التصنيف (شاورما، مشاوي، برجر...) أو كلمة الفلترة..."
+        [(ngModel)]="searchTerm"
+      />
+      <button *ngIf="searchTerm" type="button" class="btn-clear-search" (click)="searchTerm = ''">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="filter-stats">
+      <span class="badge badge-light-primary fw-bold">
+        عرض {{ displayedItems.length }} من إجمالي {{ items.length }} تصنيف
+      </span>
+    </div>
+  </div>
+
+  <!-- 5. Categories Sequence & Management Table Card -->
+  <div class="rc-table-card">
+    <div *ngIf="hiddenCount > 0" class="alert alert-warning d-flex align-items-center py-3 mb-4">
+        <i class="fas fa-eye-slash me-2"></i>
+        <span>
+          <strong>{{ hiddenCount }}</strong>
+          من التصنيفات المفعّلة لا تحتوي على أي متجر، ولذلك لا تظهر للعملاء في التطبيق.
+        </span>
+      </div>
+
+      <div class="table-responsive">
+      <table class="table rc-table align-middle">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 100px; text-align: center;">الترتيب</th>
+            <th scope="col" style="width: 80px; text-align: center;">معاينة الدائرة</th>
+            <th scope="col">اسم التصنيف (بالتطبيق)</th>
+            <th scope="col">الاسم بالإنجليزي</th>
+            <th scope="col">القسم المرتبط</th>
+            <th scope="col" style="width: 110px; text-align: center;">المتاجر</th>
+            <th scope="col">كلمة الفلترة (Filter Tag)</th>
+            <th scope="col" style="width: 120px; text-align: center;">الحالة</th>
+            <th scope="col" style="width: 140px; text-align: center;">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of displayedItems; let idx = index" [class.row-disabled]="!item.active">
+            
+            <!-- Order Controls -->
+            <td class="text-center">
+              <div class="rank-controls">
+                <button
+                  type="button"
+                  class="btn-rank-up"
+                  [disabled]="idx === 0 || hasSearchFilter || isSaving"
+                  (click)="moveUp(idx)"
+                  title="رفع الترتيب لليمين (أولوية أكبر)"
+                >
+                  <i class="fas fa-chevron-up"></i>
+                </button>
+                <span class="rank-badge" [class.rank-top3]="item.order <= 3">
+                  #{{ item.order }}
+                </span>
+                <button
+                  type="button"
+                  class="btn-rank-down"
+                  [disabled]="idx === items.length - 1 || hasSearchFilter || isSaving"
+                  (click)="moveDown(idx)"
+                  title="تنزيل الترتيب"
+                >
+                  <i class="fas fa-chevron-down"></i>
+                </button>
+              </div>
+            </td>
+
+            <!-- Circular Avatar Preview (matching mobile app 68px circle) -->
+            <td class="text-center">
+              <div class="table-chip-circle mx-auto" [class.active-border]="item.active">
+                <img
+                  [src]="getImageUrl(item.image)"
+                  alt="{{ item.title }}"
+                  loading="lazy"
+                  (error)="$any($event.target).src = './assets/media/svg/files/blank-image.svg'"
+                />
+              </div>
+            </td>
+
+            <!-- Title (Arabic) -->
+            <td>
+              <div class="d-flex flex-column">
+                <span class="fw-bolder fs-6 text-dark">{{ item.title }}</span>
+                <span class="text-muted fs-8">المعرف: #{{ item.id }}</span>
+              </div>
+            </td>
+
+            <!-- Title (English) -->
+            <td>
+              <span class="text-muted fs-7">{{ item.titleEn || '-' }}</span>
+            </td>
+
+            <!-- Linked catalog category: the real association behind the
+                 merchant count and the app's routing. -->
+            <td>
+              <select
+                class="form-select form-select-sm form-select-solid"
+                style="min-width: 210px;"
+                [(ngModel)]="item.productCategoryId"
+                (ngModelChange)="onCategoryLinkChange(item)"
+              >
+                <option [ngValue]="null">— غير مرتبط —</option>
+                <option *ngFor="let target of availableCategories" [ngValue]="target.id">
+                  {{ target.parentTitle ? target.parentTitle + ' ← ' : '' }}{{ target.title }}
+                  ({{ target.merchantCount }})
+                </option>
+              </select>
+              <div *ngIf="hiddenReason(item)" class="text-warning fs-9 mt-1">
+                <i class="fas fa-eye-slash me-1"></i>{{ hiddenReason(item) }}
+              </div>
+            </td>
+
+            <!-- Live merchant count -->
+            <td class="text-center">
+              <span
+                class="badge fs-8"
+                [ngClass]="{
+                  'badge-light-success': (item.merchantCount ?? 0) > 0,
+                  'badge-light-danger': item.productCategoryId && (item.merchantCount ?? 0) === 0,
+                  'badge-light-secondary': !item.productCategoryId
+                }"
+              >
+                {{ item.productCategoryId ? (item.merchantCount ?? 0) : '—' }}
+              </span>
+            </td>
+
+            <!-- Filter Tag -->
+            <td>
+              <span class="badge badge-light-secondary font-monospace fs-8">
+                <i class="fas fa-tag me-1 text-primary"></i>
+                {{ item.filterTag || item.title }}
+              </span>
+            </td>
+
+            <!-- Status Active Switch -->
+            <td class="text-center">
+              <label class="form-check form-switch form-check-custom form-check-solid d-inline-block">
+                <input
+                  class="form-check-input h-20px w-35px"
+                  type="checkbox"
+                  [checked]="item.active"
+                  [disabled]="pendingToggleIds.has(item.id)"
+                  (change)="toggleItemActive(item)"
+                />
+              </label>
+              <div class="fs-9" [class.text-success]="item.active" [class.text-muted]="!item.active">
+                {{ item.active ? 'نشط' : 'معطل' }}
+              </div>
+            </td>
+
+            <!-- Actions -->
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-2">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-icon btn-light-primary"
+                  (click)="openEditModal(item)"
+                  title="تعديل التصنيف"
+                >
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-icon btn-light-danger"
+                  (click)="openDeleteModal(item)"
+                  title="حذف التصنيف"
+                >
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </td>
+
+          </tr>
+
+          <!-- Empty State -->
+          <tr *ngIf="displayedItems.length === 0">
+            <td colspan="9" class="text-center py-5 text-muted">
+              <div class="empty-state">
+                <i class="fas fa-utensils fs-2x mb-3 text-muted"></i>
+                <h5>لا توجد تصنيفات مطابقة</h5>
+                <p class="fs-7">
+                  {{ hasSearchFilter ? 'جرب البحث بكلمة أخرى' : 'لم يتم إضافة أي تصنيفات حتى الآن' }}
+                </p>
+                <button
+                  *ngIf="!hasSearchFilter"
+                  type="button"
+                  class="btn btn-sm btn-primary mt-2"
+                  (click)="openAddModal()"
+                >
+                  <i class="fas fa-plus me-1"></i> إضافة أول تصنيف
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>

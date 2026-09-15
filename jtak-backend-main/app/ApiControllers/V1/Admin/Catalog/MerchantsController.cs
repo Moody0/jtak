@@ -73,6 +73,10 @@ namespace App.ApiControllers.V1.Admin
                 OwnerId = x.OwnerId,
                 Active = x.Active,
                 MerchantKind = x.MerchantKind,
+                DeliveryTime = x.DeliveryTime,
+                DeliveryFee = x.DeliveryFee,
+                MinOrderAmount = x.MinOrderAmount,
+                WorkingHours = x.WorkingHours,
                 Address = x.Address,
                 Photo = x.Photo
             }, x => x.DeletionDate == null);
@@ -105,6 +109,10 @@ namespace App.ApiControllers.V1.Admin
                 Lng = item.Lng,
                 Active = false,
                 MerchantKind = item.MerchantKind,
+                DeliveryTime = !string.IsNullOrWhiteSpace(item.DeliveryTime) ? item.DeliveryTime : "20-30 دقيقة",
+                DeliveryFee = item.DeliveryFee >= 0 ? item.DeliveryFee : 5000m,
+                MinOrderAmount = item.MinOrderAmount >= 0 ? item.MinOrderAmount : 15000m,
+                WorkingHours = !string.IsNullOrWhiteSpace(item.WorkingHours) ? item.WorkingHours : "حتى 3 ص",
                 OwnerId = item.OwnerId
             };
             _service.Insert(entity);
@@ -144,6 +152,10 @@ namespace App.ApiControllers.V1.Admin
             entity.Lng = item.Lng;
             entity.Active = item.Active;
             entity.MerchantKind = item.MerchantKind;
+            entity.DeliveryTime = !string.IsNullOrWhiteSpace(item.DeliveryTime) ? item.DeliveryTime : (entity.DeliveryTime ?? "20-30 دقيقة");
+            entity.DeliveryFee = item.DeliveryFee;
+            entity.MinOrderAmount = item.MinOrderAmount;
+            entity.WorkingHours = !string.IsNullOrWhiteSpace(item.WorkingHours) ? item.WorkingHours : (entity.WorkingHours ?? "حتى 3 ص");
             entity.OwnerId = item.OwnerId;
 
             await _uow.SaveChangesAsync();
@@ -195,6 +207,8 @@ namespace App.ApiControllers.V1.Admin
                                       {
                                           ProductId = x.Id,
                                           Product = x.Title,
+                                          ProductBarcode = x.Barcode,
+                                          ProductBrand = x.Brand,
                                           ProductCat1 = x.ProductCategory != null ? x.ProductCategory.Title : "Uncategorized",
                                           ProductCat2 = x.ProductCategory != null && x.ProductCategory.Parent != null ? x.ProductCategory.Parent.Title : "",
                                           ProductPhotos = x.Photos,

@@ -1,136 +1,250 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../config/themes/colors.dart';
+
+/// ---------------------------------------------------------------------------
+/// JTAK Modern Discrete OTP Code Input Widget (4 / 6 Squircles)
+///
+/// Features:
+/// - Unified single-input architecture:
+///   1. Deleting via keyboard immediately clears the last digit.
+///   2. Completely eliminates the native selection effect.
+///   3. Supports tapping directly on any box to rewind to that position.
+///   4. Full SMS autofill & clipboard paste support.
+///   5. Same IBM Plex Sans Arabic font as the customer app.
+/// ---------------------------------------------------------------------------
 
 class CodeInputWidget extends StatefulWidget {
   final int codeLength;
   final void Function(String code) onEnd;
   final void Function(String code)? onChange;
-  const CodeInputWidget({required this.onEnd, this.onChange, this.codeLength = 6});
+  final String? initialValue;
+
+  const CodeInputWidget({
+    super.key,
+    required this.onEnd,
+    this.onChange,
+    this.codeLength = 6,
+    this.initialValue,
+  });
 
   @override
-  _CodeInputWidgetState createState() => _CodeInputWidgetState();
+  State<CodeInputWidget> createState() => _CodeInputWidgetState();
 }
 
 class _CodeInputWidgetState extends State<CodeInputWidget> {
-  List<TextEditingController> controllerList = [];
-  List<FocusNode> focusNodeList = [];
-  List<String> codeList = [];
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _isFixingSelection = false;
+
   @override
   void initState() {
-    codeList = List.generate(widget.codeLength, (index) => '');
-    focusNodeList = List.generate(widget.codeLength, (index) => FocusNode());
-    controllerList = List.generate(widget.codeLength, (index) => TextEditingController());
-    for (var i = 0; i < widget.codeLength; i++) {
-      FocusNode focusNode = focusNodeList[i];
-      focusNode.addListener(() {
-        if (focusNode.hasFocus) {
-          controllerList[i].selection = TextSelection(baseOffset: 0, extentOffset: controllerList[i].text.length);
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue ?? '');
+    _focusNode = FocusNode();
+
+    if (_controller.text.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onChange?.call(_controller.text);
+        if (_controller.text.length == widget.codeLength) {
+          widget.onEnd(_controller.text);
         }
       });
     }
-    focusNodeList[0].requestFocus();
-    super.initState();
+
+    _controller.addListener(() {
+      if (_isFixingSelection) return;
+      final len = _controller.text.length;
+      if (_controller.selection.baseOffset != len ||
+          _controller.selection.extentOffset != len) {
+        _isFixingSelection = true;
+        _controller.value = _controller.value.copyWith(
+          selection: TextSelection.collapsed(offset: len),
+        );
+        _isFixingSelection = false;
+      }
+      if (mounted) setState(() {});
+    });
+
+    _focusNode.addListener(() {
+      if (mounted) setState(() {});
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
+    });
   }
 
   @override
-  Widget build(BuildContext context) {
-    List<Widget> inputList = [];
-    for (var i = 0; i < widget.codeLength; i++) {
-      inputList.add(
-        Expanded(
-          child: Container(
-            // width: inputWidth,
-            decoration: BoxDecoration(
-              borderRadius: _getBorderRaduis(i),
-              border: Border.all(color: Colors.grey),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: RawKeyboardListener(
-              autofocus: i == 0,
-              focusNode: FocusNode(),
-              key: ValueKey(i.toString()),
-              onKey: (event) {
-                if (event.runtimeType.toString() == 'RawKeyUpEvent') {
-                  if (event.logicalKey == LogicalKeyboardKey.backspace && i > 0) {
-                    focusNodeList[i - 1].requestFocus();
-                  }
-                }
-              },
-              child: _textField(i),
-            ),
-          ),
-        ),
-      );
+  void didUpdateWidget(covariant CodeInputWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != null &&
+        widget.initialValue != oldWidget.initialValue &&
+        widget.initialValue != _controller.text) {
+      _controller.text = widget.initialValue!;
+      widget.onChange?.call(_controller.text);
+      if (_controller.text.length == widget.codeLength) {
+        widget.onEnd(_controller.text);
+      }
     }
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 600),
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: inputList,
-        ),
-      ),
-    );
-  }
-
-  TextFormField _textField(int i) {
-    return TextFormField(
-      controller: controllerList[i],
-      focusNode: focusNodeList[i],
-      keyboardType: TextInputType.number,
-      maxLength: 1,
-      textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 25),
-      showCursor: false,
-      decoration: const InputDecoration(
-        contentPadding: EdgeInsets.zero,
-        counterText: "",
-        border: UnderlineInputBorder(),
-      ),
-      onChanged: (value) {
-        codeList[i] = value;
-        if (widget.onChange != null) {
-          widget.onChange!(codeList.join());
-        }
-        if (value.isNotEmpty) {
-          if (i < widget.codeLength - 1) {
-            focusNodeList[i + 1].requestFocus();
-          }
-          if (i == widget.codeLength - 1) {
-            widget.onEnd(codeList.join());
-          }
-        }
-      },
-    );
-  }
-
-  // double _calcInputWidth() {
-  //   double initWidth = 60;
-  //   if ((initWidth * widget.codeLength) * 0.9 > context.width) {
-  //     initWidth = context.width * 0.9 / widget.codeLength;
-  //   }
-  //   return initWidth;
-  // }
-
-  BorderRadiusGeometry _getBorderRaduis(int i) {
-    BorderRadiusGeometry borderRadius = BorderRadius.circular(0);
-    if (i == 0) {
-      borderRadius = const BorderRadiusDirectional.horizontal(start: Radius.circular(4));
-    } else if (i == widget.codeLength - 1) {
-      borderRadius = const BorderRadiusDirectional.horizontal(end: Radius.circular(4));
-    }
-    return borderRadius;
   }
 
   @override
   void dispose() {
-    for (var element in controllerList) {
-      element.dispose();
-    }
-    for (var element in focusNodeList) {
-      element.dispose();
-    }
+    _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = _controller.text;
+    final isFocused = _focusNode.hasFocus;
+
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final double availableWidth = constraints.maxWidth;
+            final int count = widget.codeLength;
+            final double gap = count <= 4 ? 8.0 : 5.0;
+            final double calculatedWidth =
+                ((availableWidth - (gap * (count - 1))) / count).floorToDouble();
+            final double boxWidth = calculatedWidth.clamp(28.0, count <= 4 ? 54.0 : 44.0);
+            final double boxHeight = (boxWidth * 1.25).clamp(44.0, 58.0);
+            final double fontSize = (boxWidth * 0.45).clamp(15.0, 22.0);
+
+            return SizedBox(
+              height: boxHeight,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // 1. Transparent real input field capturing keyboard, backspace, and paste events
+                  Positioned.fill(
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(widget.codeLength),
+                      ],
+                      maxLength: widget.codeLength,
+                      enableInteractiveSelection: false,
+                      showCursor: false,
+                      cursorColor: Colors.transparent,
+                      cursorWidth: 0,
+                      autofocus: true,
+                      style: const TextStyle(
+                        color: Colors.transparent,
+                        fontSize: 1,
+                        height: 1,
+                      ),
+                      decoration: const InputDecoration(
+                        counterText: '',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: (value) {
+                        final clean = value.replaceAll(RegExp(r'[^0-9]'), '');
+                        final trimmed = clean.length > widget.codeLength
+                            ? clean.substring(0, widget.codeLength)
+                            : clean;
+
+                        if (trimmed != value) {
+                          _controller.value = TextEditingValue(
+                            text: trimmed,
+                            selection: TextSelection.collapsed(offset: trimmed.length),
+                          );
+                          return;
+                        }
+
+                        widget.onChange?.call(trimmed);
+                        if (trimmed.length == widget.codeLength) {
+                          widget.onEnd(trimmed);
+                        }
+                      },
+                    ),
+                  ),
+
+                  // 2. Discrete visual OTP Squircles
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (int index = 0; index < count; index++) ...[
+                        if (index > 0) SizedBox(width: gap),
+                        GestureDetector(
+                          onTap: () {
+                            _focusNode.requestFocus();
+                            if (index < _controller.text.length) {
+                              final newText = _controller.text.substring(0, index);
+                              _controller.value = TextEditingValue(
+                                text: newText,
+                                selection: TextSelection.collapsed(offset: newText.length),
+                              );
+                              widget.onChange?.call(newText);
+                            } else {
+                              _controller.selection =
+                                  TextSelection.collapsed(offset: _controller.text.length);
+                            }
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            width: boxWidth,
+                            height: boxHeight,
+                            decoration: BoxDecoration(
+                              color: (isFocused &&
+                                      (index == text.length ||
+                                          (text.length == count && index == count - 1)))
+                                  ? Colors.white
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: (isFocused &&
+                                        (index == text.length ||
+                                            (text.length == count && index == count - 1)))
+                                    ? kPrimaryOrange
+                                    : (index < text.length
+                                        ? const Color(0xFFCBD5E1)
+                                        : const Color(0xFFE2E8F0)),
+                                width: (isFocused &&
+                                        (index == text.length ||
+                                            (text.length == count && index == count - 1)))
+                                    ? 1.8
+                                    : 1.1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                index < text.length ? text[index] : '',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  fontSize: fontSize,
+                                  fontWeight: FontWeight.w900,
+                                  color: kCharcoalDark,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 }

@@ -1,4 +1,15 @@
-<div class="jtak-workspace-label">
-  <span class="jtak-workspace-icon"><i class="fas fa-store" aria-hidden="true"></i></span>
-  <span><small>Workspace</small><strong>JTAK Operations</strong></span>
+<div class="jtak-workspace-card d-flex align-items-center gap-3">
+  <div class="jtak-workspace-icon-box">
+    <i class="fas fa-store" aria-hidden="true"></i>
+  </div>
+  <div class="d-flex flex-column">
+    <div class="d-flex align-items-center gap-2">
+      <small class="jtak-workspace-kicker">{{ 'HEADER.WORKSPACE' | translate }}</small>
+      <span class="jtak-live-tag">
+        <span class="jtak-live-dot"></span>
+        {{ 'HEADER.LIVE_STATUS' | translate }}
+      </span>
+    </div>
+    <strong class="jtak-workspace-title">{{ 'HEADER.WORKSPACE_NAME' | translate }}</strong>
+  </div>
 </div>

@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
@@ -20,8 +19,22 @@ import '../cart/cart_page.dart';
 import 'market_category_products_page.dart';
 import 'market_product_detail_page.dart';
 import 'market_search_page.dart';
+import 'restaurant_menu_page.dart';
 import '../../widgets/catalog/market_product_card.dart';
 import '../../widgets/clean_shimmer_skeletons.dart';
+import '../../../core/controllers/initial_data_provider.dart';
+import '../../../core/models/banner_model.dart';
+import '../../../utils/providers/sol_api.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+class _MarketHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
 
 /// ---------------------------------------------------------------------------
 /// JTAK Market & Supermarket Page (تجربة تسوق السوبرماركت والمارت المتخصصة)
@@ -117,7 +130,7 @@ class MarketProductItem {
       price: price,
       basePriceValue: priceValue,
       imageUrl: imageUrl,
-      calories: weight ?? 'طازج',
+      calories: weight ?? '',
     );
   }
 }
@@ -154,9 +167,6 @@ class _MarketPageState extends State<MarketPage> {
       _storeModel != null && _storeModel!.minOrderAmount > 0
           ? _storeModel!.minOrderAmount
           : 50000;
-  final Map<int, int> _cartQuantities = {};
-  final Set<int> _expandedProductIds = {};
-  final Map<int, Timer> _collapseTimers = {};
   MarketStoreModel? _storeModel;
 
   String get _currentMarketName {
@@ -165,14 +175,16 @@ class _MarketPageState extends State<MarketPage> {
       langCode = Localizations.localeOf(context).languageCode;
     } catch (_) {}
 
+    String name = '';
     if (_storeModel != null) {
-      return _storeModel!.localizedName(langCode);
-    }
-    if (widget.marketName != null && widget.marketName!.trim().isNotEmpty) {
-      return MarketStoreModel.extractLocalizedName(
+      name = _storeModel!.localizedName(langCode);
+    } else if (widget.marketName != null && widget.marketName!.trim().isNotEmpty) {
+      name = MarketStoreModel.extractLocalizedName(
           widget.marketName!, langCode);
+    } else {
+      name = langCode == 'ar' ? 'جيتك ماركت' : 'JTAK Market';
     }
-    return langCode == 'ar' ? 'المتجر' : 'Market';
+    return name.replaceAll('جتاك', 'جيتك');
   }
 
   int get _effectiveMarketId {
@@ -196,7 +208,7 @@ class _MarketPageState extends State<MarketPage> {
       }
     }
     final first = _getMarketsProvider().markets.firstOrNull;
-    return first?.id ?? 19;
+    return first?.id ?? 12;
   }
 
   void _initStoreModel() {
@@ -207,11 +219,13 @@ class _MarketPageState extends State<MarketPage> {
         (m) => m.id == marketId,
         orElse: () => MarketStoreModel(
           id: marketId,
-          name: widget.marketName ?? 'المتجر',
-          eta: '20-30 دقيقة',
-          tagline: 'توصيل مقاضي وسوبرماركت',
-          logoText: widget.marketName?.split(' ').first ?? 'ماركت',
-          logoColor: const Color(0xFF047857),
+          name: widget.marketName ?? 'جيتك ماركت - JTAK Market',
+          eta: '15-20 دقيقة',
+          tagline: 'سوبرماركت ومقاضي شاملة • آلاف المنتجات',
+          logoText: 'جيتك',
+          logoBoxedText: 'ماركت',
+          logoColor: const Color(0xFFFF5C00),
+          assetPath: 'assets/images/markets/jtak_market.webp',
         ),
       );
     } catch (_) {
@@ -221,6 +235,7 @@ class _MarketPageState extends State<MarketPage> {
 
   // Dynamic Market State
   bool _isLoadingProducts = true;
+  List<BannerModel> _marketBanners = [];
   List<MarketCategoryItem> _allCategories = [];
   List<MarketProductItem> _allMarketProducts = [];
   Map<String, List<MarketProductItem>> _shelves = {};
@@ -232,21 +247,6 @@ class _MarketPageState extends State<MarketPage> {
         );
   }
 
-  int get _cartItemCount =>
-      _cartQuantities.values.fold(0, (sum, qty) => sum + qty);
-
-  int get _cartTotalPrice {
-    int total = 0;
-    _cartQuantities.forEach((id, qty) {
-      for (final p in _allMarketProducts) {
-        if (p.id == id) {
-          total += p.priceValue * qty;
-          break;
-        }
-      }
-    });
-    return total;
-  }
 
   void _onPlusTapped(int productId) async {
     final marketId = _effectiveMarketId;
@@ -255,7 +255,7 @@ class _MarketPageState extends State<MarketPage> {
       final marketName = _currentMarketName;
       final shouldReplace = await ReplaceCartBottomSheet.show(
         context,
-        currentStoreName: cart.currentMerchantName,
+        currentStoreName: cart.getConflictingMerchantName(marketId),
         newStoreName: marketName,
       );
       if (shouldReplace != true || !mounted) return;
@@ -275,24 +275,14 @@ class _MarketPageState extends State<MarketPage> {
         marketId,
         product.priceValue.toDouble(),
         1,
+        title: product.title,
+        imageUrl: product.imageUrl,
       );
-      setState(() {
-        _cartQuantities.clear();
-        _expandedProductIds.clear();
-        _cartQuantities[productId] = 1;
-        _expandedProductIds.add(productId);
-      });
-      _resetCollapseTimer(productId);
       return;
     }
 
-    final currentQty = _cartQuantities[productId] ?? 0;
+    final currentQty = cart.getProductQuantity(productId);
     final newQty = currentQty + 1;
-    setState(() {
-      _cartQuantities[productId] = newQty;
-      _expandedProductIds.add(productId);
-    });
-    _resetCollapseTimer(productId);
     final product = _allMarketProducts.firstWhere(
       (p) => p.id == productId,
       orElse: () => MarketProductItem(
@@ -309,78 +299,42 @@ class _MarketPageState extends State<MarketPage> {
       marketId,
       product.priceValue.toDouble(),
       newQty,
+      title: product.title,
+      imageUrl: product.imageUrl,
     );
   }
 
   void _onMinusTapped(int productId) {
     final marketId = _effectiveMarketId;
-    final currentQty = _cartQuantities[productId] ?? 0;
-    final product = _allMarketProducts.firstWhere(
-      (p) => p.id == productId,
-      orElse: () => MarketProductItem(
-        id: productId,
-        title: 'منتج',
-        price: '0 ل.س',
-        priceValue: 0,
-        imageUrl: '',
-        category: 'عام',
-      ),
-    );
-    setState(() {
-      if (currentQty <= 1) {
-        _cartQuantities.remove(productId);
-        _expandedProductIds.remove(productId);
-        _collapseTimers[productId]?.cancel();
-        _collapseTimers.remove(productId);
-        locator<CartProvider>().removeFromCart(productId, marketId);
-      } else {
-        final newQty = currentQty - 1;
-        _cartQuantities[productId] = newQty;
-        _resetCollapseTimer(productId);
-        locator<CartProvider>().setToCart(
-          productId,
-          marketId,
-          product.priceValue.toDouble(),
-          newQty,
-        );
-      }
-    });
-  }
-
-  void _onCollapsedBadgeTapped(int productId) {
-    setState(() {
-      _expandedProductIds.add(productId);
-    });
-    _resetCollapseTimer(productId);
-  }
-
-  void _resetCollapseTimer(int productId) {
-    _collapseTimers[productId]?.cancel();
-    _collapseTimers[productId] = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _expandedProductIds.remove(productId);
-        });
-      }
-    });
+    final cart = locator<CartProvider>();
+    final currentQty = cart.getProductQuantity(productId);
+    if (currentQty <= 1) {
+      cart.removeFromCart(productId, marketId);
+    } else {
+      final product = _allMarketProducts.firstWhere(
+        (p) => p.id == productId,
+        orElse: () => MarketProductItem(
+          id: productId,
+          title: 'منتج',
+          price: '0 ل.س',
+          priceValue: 0,
+          imageUrl: '',
+          category: 'عام',
+        ),
+      );
+      cart.setToCart(
+        productId,
+        marketId,
+        product.priceValue.toDouble(),
+        currentQty - 1,
+        title: product.title,
+        imageUrl: product.imageUrl,
+      );
+    }
   }
 
   void _syncCartFromProvider() {
-    if (!mounted) return;
-    final cart = locator<CartProvider>();
-    setState(() {
-      _cartQuantities.clear();
-      for (final item in _allMarketProducts) {
-        final qty = cart.getProductQuantity(item.id);
-        if (qty > 0) {
-          _cartQuantities[item.id] = qty;
-        } else {
-          _expandedProductIds.remove(item.id);
-          _collapseTimers[item.id]?.cancel();
-          _collapseTimers.remove(item.id);
-        }
-      }
-    });
+    // No-op: product cards and bottom cart bar are reactive via CartProvider!
   }
 
   MarketsProvider _getMarketsProvider() {
@@ -410,8 +364,9 @@ class _MarketPageState extends State<MarketPage> {
     if (s.contains('بسكو')) return 'بسكويت';
     if (s.contains('شيبس')) return 'شيبسات';
     if (s.contains('صاب')) return 'صابون';
-    if (s.contains('العناية بالشعر') || s.contains('عناية بالشعر'))
+    if (s.contains('العناية بالشعر') || s.contains('عناية بالشعر')) {
       return 'عناية بالشعر والجسم';
+    }
     if (s.contains('اجبان')) return 'أجبان';
     if (s.contains('ادوات تنظيف')) return 'أدوات تنظيف';
     return s.isNotEmpty ? s : 'عام';
@@ -463,7 +418,9 @@ class _MarketPageState extends State<MarketPage> {
       if (id == 0 || title.isEmpty) continue;
 
       final rawPrice =
-          ((raw['merchantPrice'] ?? raw['price'] ?? 0) as num).toDouble();
+          ((raw['finalPrice'] ?? raw['merchantPrice'] ?? raw['price'] ?? 0)
+                  as num)
+              .toDouble();
       final isUsd =
           (_storeModel?.isUsd ?? false) || (rawPrice > 0 && rawPrice < 500);
       final int priceVal =
@@ -477,12 +434,11 @@ class _MarketPageState extends State<MarketPage> {
           : (cleanSub.isNotEmpty ? cleanSub : 'عام'));
       final subCat =
           normalizeSubCategory(cleanSub.isNotEmpty ? cleanSub : mainCat);
-      final brand = cleanMain.isNotEmpty ? cleanMain : null;
-      final desc = raw['description']?.toString();
-      final weight = raw['unit']?.toString() ?? raw['weight']?.toString();
+      final brand = _nonEmpty(raw['productBrand']);
+      final desc = _nonEmpty(raw['productDescription'] ?? raw['description']);
+      final weight = _nonEmpty(raw['productUnit'] ?? raw['unit']);
 
-      String? photo = raw['productPhotos'] ?? raw['photos'];
-      String imageUrl = _resolveProductImage(photo, title, subCat);
+      final imageUrl = _resolveProductImage(raw['productPhotos'] ?? raw['photos']);
 
       converted.add(MarketProductItem(
         id: id,
@@ -519,11 +475,8 @@ class _MarketPageState extends State<MarketPage> {
   void _prepopulateMarketProducts() {
     final int marketId = _effectiveMarketId;
     final marketsProv = _getMarketsProvider();
-    var initialRaw = marketsProv.getCachedProducts(marketId);
-    if (initialRaw == null || initialRaw.isEmpty) {
-      initialRaw = marketsProv.getDefaultSeededProducts(marketId);
-    }
-    if (initialRaw.isNotEmpty) {
+    final initialRaw = marketsProv.getCachedProducts(marketId);
+    if (initialRaw != null && initialRaw.isNotEmpty) {
       final converted = _convertRawProducts(initialRaw);
       final shelves = _buildShelvesFromProducts(converted);
       _allMarketProducts = converted;
@@ -546,21 +499,8 @@ class _MarketPageState extends State<MarketPage> {
     }
 
     final int marketId = _effectiveMarketId;
-    var rawProducts = await _getMarketsProvider().fetchMarketProducts(marketId);
-
-    // Direct fallback from asset bundle if network failed or provider hadn't completed loading
-    if (rawProducts.isEmpty && (marketId == 18 || marketId == 19)) {
-      try {
-        final assetPath = marketId == 19
-            ? 'assets/data/clover_mall_products.json'
-            : 'assets/data/best_market_products.json';
-        final jsonStr = await rootBundle.loadString(assetPath);
-        final List decoded = jsonDecode(jsonStr);
-        rawProducts = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
-      } catch (e) {
-        debugPrint('Direct asset load error in MarketPage: $e');
-      }
-    }
+    final rawProducts =
+        await _getMarketsProvider().fetchMarketProducts(marketId);
 
     if (!mounted) return;
 
@@ -584,80 +524,20 @@ class _MarketPageState extends State<MarketPage> {
     }
   }
 
-  String _resolveProductImage(dynamic photos, String title, String category) {
-    if (photos != null && photos.toString().trim().isNotEmpty) {
-      final pStr = photos.toString().split(',').first.trim();
-      if (pStr.startsWith('http') || pStr.startsWith('assets/')) {
-        return pStr;
-      }
-      return GlobalVar.getImageUrl(pStr);
-    }
+  static String? _nonEmpty(dynamic value) {
+    final s = value?.toString().trim() ?? '';
+    return s.isEmpty || s == 'null' ? null : s;
+  }
 
-    final lowerTitle = title.toLowerCase();
-    if (lowerTitle.contains('شيبس') || lowerTitle.contains('chipsy')) {
-      return 'assets/images/products/Chipsy Family Bag.webp';
-    }
-    if (lowerTitle.contains('بيبسي') || lowerTitle.contains('pepsi')) {
-      return 'assets/images/products/Pepsi 2.25L Bottle.webp';
-    }
-    if (lowerTitle.contains('حليب') && lowerTitle.contains('جهينة')) {
-      return 'assets/images/products/Juhayna Milk 1L Tetra Pak.webp';
-    }
-    if (lowerTitle.contains('كيري') || lowerTitle.contains('kiri')) {
-      return 'assets/images/products/Kiri Square Cheese Box.webp';
-    }
-    if (lowerTitle.contains('زبادي') && lowerTitle.contains('جهينة')) {
-      return 'assets/images/products/Juhayna Yogurt Tub.webp';
-    }
-    if (lowerTitle.contains('زبادي') && lowerTitle.contains('المراعي')) {
-      return 'assets/images/products/Almarai Yogurt 6-Pack.webp';
-    }
-    if (lowerTitle.contains('زبادي') && lowerTitle.contains('دينا')) {
-      return 'assets/images/products/Dina Farms Yogurt 4-Pack.webp';
-    }
-    if (lowerTitle.contains('زبدة') || lowerTitle.contains('لورباك')) {
-      return 'assets/images/products/Lurpak Butter 200g Foil.webp';
-    }
-    if (lowerTitle.contains('قهوة') ||
-        lowerTitle.contains('حموي') ||
-        lowerTitle.contains('بن')) {
-      return 'assets/images/products/Al-Hamwi Coffee Pouch.webp';
-    }
-    if (lowerTitle.contains('شاي') || lowerTitle.contains('كبوس')) {
-      return 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=300&q=80';
-    }
-    if (lowerTitle.contains('نسكافيه') || lowerTitle.contains('nescafe')) {
-      return 'https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=300&q=80';
-    }
-    if (lowerTitle.contains('بيض')) {
-      return 'https://images.unsplash.com/photo-1516448620398-c5f44bf9f441?auto=format&fit=crop&w=300&q=80';
-    }
-    if (lowerTitle.contains('برغر') || lowerTitle.contains('لحم')) {
-      return 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=300&q=80';
-    }
-    if (lowerTitle.contains('دجاج') || lowerTitle.contains('ناجتس')) {
-      return 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=300&q=80';
-    }
-    if (lowerTitle.contains('سجق') ||
-        lowerTitle.contains('هوت دوج') ||
-        lowerTitle.contains('نقانق')) {
-      return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=300&q=80';
-    }
-
-    if (category.contains('ألبان') || category.contains('أجبان')) {
-      return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=300&q=80';
-    }
-    if (category.contains('مشروب')) {
-      return 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80';
-    }
-    if (category.contains('خضار') || category.contains('فواكه')) {
-      return 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=300&q=80';
-    }
-    if (category.contains('مونة') || category.contains('معلبات')) {
-      return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=300&q=80';
-    }
-
-    return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80';
+  /// Returns the product's own photo from the API, or '' so the card shows
+  /// its neutral placeholder. AVIF is skipped because Flutter can't decode it.
+  String _resolveProductImage(dynamic photos) {
+    final pStr = (_nonEmpty(photos) ?? '').split(',').first.trim();
+    if (pStr.isEmpty || pStr == 'null') return '';
+    final lowerP = pStr.toLowerCase();
+    if (lowerP.endsWith('.avif') || lowerP.contains('.avif?')) return '';
+    if (pStr.startsWith('http') || pStr.startsWith('assets/')) return pStr;
+    return GlobalVar.getImageUrl(pStr);
   }
 
   String _getCategoryAssetOrNetworkUrl(String title) {
@@ -815,17 +695,172 @@ class _MarketPageState extends State<MarketPage> {
   @override
   void initState() {
     super.initState();
+    try {
+      HttpOverrides.global = _MarketHttpOverrides();
+    } catch (_) {}
     _categoryScrollController.addListener(_onCategoryScroll);
     _initStoreModel();
-    // Attach listener to CartProvider for live sync
-    locator<CartProvider>().addListener(_syncCartFromProvider);
-    _syncCartFromProvider();
-
+    _initBanners();
     // Instant Pre-population (0ms frame-0 rendering)
     _prepopulateMarketProducts();
 
     // Fetch dynamic categories and products from live backend
     _loadMarketData();
+  }
+
+  void _initBanners() {
+    if (locator.isRegistered<InitialDataProvider>()) {
+      final initialData = locator<InitialDataProvider>();
+      final preloaded = initialData.marketBanners;
+      if (preloaded.isNotEmpty) {
+        _marketBanners = List.from(preloaded);
+      }
+    }
+    unawaited(_fetchLiveMarketBanners());
+  }
+
+  Future<void> _fetchLiveMarketBanners() async {
+    try {
+      if (!locator.isRegistered<SolApi>()) return;
+      final api = locator<SolApi>();
+      final res = await api.getRequest('/Banner/3');
+      List items = [];
+      if (res is List) {
+        items = res;
+      } else if (res is Map && res['data'] is List) {
+        items = res['data'];
+      } else if (res is Map && res['items'] is List) {
+        items = res['items'];
+      }
+
+      if (items.isNotEmpty) {
+        final List<BannerModel> fetched = [];
+        for (final item in items) {
+          if (item is Map<String, dynamic>) {
+            fetched.add(BannerModel.fromMap(item));
+          } else if (item is Map) {
+            fetched.add(BannerModel.fromMap(Map<String, dynamic>.from(item)));
+          }
+        }
+        if (mounted && fetched.isNotEmpty) {
+          setState(() {
+            _marketBanners = fetched;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching live market banners: $e');
+    }
+  }
+
+  void _handleBannerTap(BannerModel banner) async {
+    final rawUrl = (banner.url ?? '').trim();
+    if (rawUrl.isEmpty) return;
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      final uri = Uri.tryParse(rawUrl);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+
+    final cleanUrl = rawUrl.split('#').first.trim();
+    if (cleanUrl.startsWith('restaurant:')) {
+      final id = int.tryParse(cleanUrl.split(':').last);
+      if (id != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RestaurantMenuPage(
+              restaurantId: id,
+              restaurantName: banner.title ?? 'المطعم',
+            ),
+          ),
+        );
+        return;
+      }
+    } else if (cleanUrl.startsWith('merchant:') ||
+        cleanUrl.startsWith('market:')) {
+      final id = int.tryParse(cleanUrl.split(':').last);
+      if (id != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarketPage(
+              marketId: id,
+              marketName: banner.title ?? 'المتجر',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+  }
+
+  Widget _buildMarketBannersSection() {
+    if (_marketBanners.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      height: 140,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _marketBanners.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final banner = _marketBanners[index];
+          final rawImg = (banner.featuredImage ?? '').trim();
+          final fullUrl = rawImg.startsWith('http')
+              ? rawImg
+              : (rawImg.startsWith('assets')
+                  ? rawImg
+                  : GlobalVar.getImageUrl(rawImg,
+                      width: 600, height: 600, crop: false));
+
+          return GestureDetector(
+            onTap: () => _handleBannerTap(banner),
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: fullUrl.startsWith('assets')
+                    ? Image.asset(
+                        fullUrl,
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: fullUrl,
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: const Color(0xFFF1F5F9),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _onCategoryScroll() {
@@ -844,14 +879,9 @@ class _MarketPageState extends State<MarketPage> {
 
   @override
   void dispose() {
-    locator<CartProvider>().removeListener(_syncCartFromProvider);
     _searchController.dispose();
     _categoryScrollController.removeListener(_onCategoryScroll);
     _categoryScrollController.dispose();
-    for (final timer in _collapseTimers.values) {
-      timer.cancel();
-    }
-    _collapseTimers.clear();
     super.dispose();
   }
 
@@ -904,33 +934,40 @@ class _MarketPageState extends State<MarketPage> {
                       },
                       child: ListView(
                         physics: const ClampingScrollPhysics(),
-                        padding: EdgeInsets.only(
-                          bottom: _cartItemCount > 0
-                              ? (_maxBottomBarHeight + 24)
-                              : 24,
+                        padding: const EdgeInsets.only(
+                          bottom: _maxBottomBarHeight + 24,
                         ),
                         children: [
                           const SizedBox(height: 12),
 
-                          // "تسوق حسب الفئة" Continuous Horizontal Grid with Slider
-                          if (_allCategories.isNotEmpty) ...[
-                            _buildShopByCategorySection(),
-                            const SizedBox(height: 20),
-                          ],
-
-                          // Dynamic Product Shelves or Skeleton / Empty State
+                          // Keep skeleton effect on ALL elements until everything is fetched successfully
                           if (_isLoadingProducts)
                             _buildShelvesSkeleton()
-                          else if (_shelves.isNotEmpty) ...[
-                            for (final entry in _shelves.entries) ...[
-                              _buildProductShelf(
-                                title: entry.key,
-                                products: entry.value,
-                              ),
-                              const SizedBox(height: 24),
+                          else ...[
+                            // Dynamic Market Banners (Controlled from Dashboard: Placement = Market Page)
+                            if (_marketBanners.isNotEmpty) ...[
+                              _buildMarketBannersSection(),
+                              const SizedBox(height: 16),
                             ],
-                          ] else
-                            _buildEmptyProductsState(),
+
+                            // "تسوق حسب الفئة" Continuous Horizontal Grid with Slider
+                            if (_allCategories.isNotEmpty) ...[
+                              _buildShopByCategorySection(),
+                              const SizedBox(height: 20),
+                            ],
+
+                            // Dynamic Product Shelves or Empty State
+                            if (_shelves.isNotEmpty) ...[
+                              for (final entry in _shelves.entries) ...[
+                                _buildProductShelf(
+                                  title: entry.key,
+                                  products: entry.value,
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                            ] else
+                              _buildEmptyProductsState(),
+                          ],
 
                           const SizedBox(height: 30),
                         ],
@@ -1079,34 +1116,14 @@ class _MarketPageState extends State<MarketPage> {
                         marketName: marketName,
                         logoUrl: widget.logoUrl,
                         products: _allMarketProducts,
-                        initialCartQuantities: _cartQuantities,
-                        onCartChanged: (productId, newQty) {
-                          setState(() {
-                            if (newQty <= 0) {
-                              _cartQuantities.remove(productId);
-                              _expandedProductIds.remove(productId);
-                            } else {
-                              _cartQuantities[productId] = newQty;
-                            }
-                          });
+                        initialCartQuantities: {
+                          for (final p in _allMarketProducts)
+                            if (locator<CartProvider>().getProductQuantity(p.id) > 0)
+                              p.id: locator<CartProvider>().getProductQuantity(p.id)
                         },
                       ),
                     ),
-                  ).then((_) {
-                    if (mounted) {
-                      final cart = locator<CartProvider>();
-                      setState(() {
-                        for (final item in _allMarketProducts) {
-                          final qty = cart.getProductQuantity(item.id);
-                          if (qty > 0) {
-                            _cartQuantities[item.id] = qty;
-                          } else {
-                            _cartQuantities.remove(item.id);
-                          }
-                        }
-                      });
-                    }
-                  });
+                  );
                 },
                 behavior: HitTestBehavior.opaque,
                 child: Container(
@@ -1186,7 +1203,7 @@ class _MarketPageState extends State<MarketPage> {
     if (n.contains('clover') || n.contains('كلوفر')) {
       return 'assets/images/markets/clover_mall.webp';
     }
-    if (n.contains('جيتك') || n.contains('jtak')) {
+    if (n.contains('جيتك') || n.contains('جتاك') || n.contains('jtak')) {
       return 'assets/images/markets/jtak_market.webp';
     }
     if (n.contains('شمسين')) {
@@ -1389,35 +1406,40 @@ class _MarketPageState extends State<MarketPage> {
           Container(
             width: 80,
             height: 80,
-            padding: const EdgeInsets.all(8),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: const Color(0xFFF4F4F6),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
             ),
             child: cat.imageUrl.startsWith('assets')
-                ? Image.asset(
-                    cat.imageUrl,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Icon(
-                        cat.fallbackIcon,
-                        color: kPrimaryOrange,
-                        size: 28,
+                ? Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Image.asset(
+                      cat.imageUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Center(
+                        child: Icon(
+                          cat.fallbackIcon,
+                          color: kPrimaryOrange,
+                          size: 28,
+                        ),
                       ),
                     ),
                   )
                 : CachedNetworkImage(
                     imageUrl: cat.imageUrl,
                     fit: BoxFit.contain,
-                    placeholder: (context, url) => const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFFD1D5DB),
-                        ),
+                    imageBuilder: (context, imageProvider) => Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Image(
+                        image: imageProvider,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    placeholder: (context, url) => const CleanShimmer(
+                      child: SizedBox.expand(
+                        child: ColoredBox(color: Colors.white),
                       ),
                     ),
                     errorWidget: (_, __, ___) => Center(
@@ -1619,50 +1641,21 @@ class _MarketPageState extends State<MarketPage> {
           marketId: _effectiveMarketId,
           marketName: _currentMarketName,
           allMarketProducts: _allMarketProducts,
-          initialQuantity: _cartQuantities[product.id] ?? 0,
-          totalCartCount: _cartItemCount,
-          onCartChanged: (productId, newQty) {
-            setState(() {
-              if (newQty <= 0) {
-                _cartQuantities.remove(productId);
-                _expandedProductIds.remove(productId);
-              } else {
-                _cartQuantities[productId] = newQty;
-              }
-            });
-          },
+          initialQuantity:
+              locator<CartProvider>().getProductQuantity(product.id),
+          totalCartCount: locator<CartProvider>().totalQuantity,
         ),
       ),
-    ).then((_) {
-      if (mounted) {
-        final cart = locator<CartProvider>();
-        setState(() {
-          for (final item in _allMarketProducts) {
-            final qty = cart.getProductQuantity(item.id);
-            if (qty > 0) {
-              _cartQuantities[item.id] = qty;
-            } else {
-              _cartQuantities.remove(item.id);
-            }
-          }
-        });
-      }
-    });
+    );
   }
 
   Widget _buildProductCard(MarketProductItem product) {
-    final quantityInCart = _cartQuantities[product.id] ?? 0;
-    final isExpanded =
-        _expandedProductIds.contains(product.id) && quantityInCart > 0;
-
     return MarketProductCard(
       product: product,
-      quantityInCart: quantityInCart,
-      isExpanded: isExpanded,
+      marketId: _effectiveMarketId,
       onProductTap: () => _openProductDetail(product),
       onPlusTap: () => _onPlusTapped(product.id),
       onMinusTap: () => _onMinusTapped(product.id),
-      onCollapsedBadgeTap: () => _onCollapsedBadgeTapped(product.id),
       width: 124,
     );
   }
@@ -1671,186 +1664,182 @@ class _MarketPageState extends State<MarketPage> {
   // 5. Persistent Bottom Minimum Order / Active Cart Bar (Screenshots 1 - 4)
   // ---------------------------------------------------------------------------
   Widget _buildBottomDeliveryBar() {
-    final count = _cartItemCount;
-    if (count == 0) {
-      return const SizedBox.shrink();
-    }
+    return Consumer<CartProvider>(
+      builder: (context, cart, _) {
+        final count = cart.totalQuantity;
+        if (count == 0) {
+          return const SizedBox.shrink();
+        }
 
-    final total = _cartTotalPrice;
-    final progress = (total / _minOrderTarget).clamp(0.0, 1.0);
-    final remaining = _minOrderTarget - total;
-    final bool reachedMin = total >= _minOrderTarget;
+        final int total = cart.subtotal.toInt();
+        final storeSubtotal =
+            cart.getSubtotalForMerchant(_effectiveMarketId).toInt();
+        final storeMinOrder = cart.getMinOrderForMerchant(_effectiveMarketId);
+        final target = storeMinOrder > 0 ? storeMinOrder : _minOrderTarget;
+        final progress =
+            target > 0 ? (storeSubtotal / target).clamp(0.0, 1.0) : 1.0;
+        final remaining = (target - storeSubtotal).clamp(0, 999999999);
+        final bool reachedMin = storeSubtotal >= target;
 
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
-        ),
-      ),
-      padding: EdgeInsets.fromLTRB(16, reachedMin ? 12 : 10, 16, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Animated Minimum Order Notice & Progress Line (Collapses when threshold is reached)
-          AnimatedSize(
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeInOutCubic,
-            child: !reachedMin
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 1. Minimum Order Notice & Lock Icon
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+        return Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(16, reachedMin ? 12 : 10, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animated Minimum Order Notice & Progress Line (Collapses when threshold is reached)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeInOutCubic,
+                child: !reachedMin
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'أضف منتجات بقيمة ${_formatPrice(remaining)} ل.س إلى طلبك!',
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              color: const Color(0xFF111827),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                          // 1. Minimum Order Notice & Lock Icon
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'أضف منتجات بقيمة ${_formatPrice(remaining)} ل.س إلى طلبك!',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  color: const Color(0xFF111827),
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.lock_rounded,
+                                color: Color(0xFF1F2937),
+                                size: 16,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // 2. Minimum Order Progress Line (RTL Directional Active Bar)
+                          Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final totalWidth = constraints.maxWidth;
+                                final fillWidth = totalWidth * progress;
+
+                                return Stack(
+                                  children: [
+                                    // Background track
+                                    Container(
+                                      width: totalWidth,
+                                      height: 3.5,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE5E7EB),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    // Active filled track (from right side in RTL)
+                                    Positioned(
+                                      right: 0,
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 350),
+                                        curve: Curves.easeOutCubic,
+                                        width: fillWidth,
+                                        height: 3.5,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1F2937),
+                                          borderRadius:
+                                              BorderRadius.circular(2),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.lock_rounded,
-                            color: Color(0xFF1F2937),
-                            size: 16,
-                          ),
+
+                          const SizedBox(height: 10),
                         ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // 2. Minimum Order Progress Line (RTL Directional Active Bar)
-                      Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final totalWidth = constraints.maxWidth;
-                            final fillWidth = totalWidth * progress;
-
-                            return Stack(
-                              children: [
-                                // Background track
-                                Container(
-                                  width: totalWidth,
-                                  height: 3.5,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE5E7EB),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                // Active filled track (from right side in RTL)
-                                Positioned(
-                                  right: 0,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 350),
-                                    curve: Curves.easeOutCubic,
-                                    width: fillWidth,
-                                    height: 3.5,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1F2937),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-                    ],
-                  )
-                : const SizedBox.shrink(),
-          ),
-
-          // 3. Orange "عرض السلة" Pill Button (Clean modern button, zero orange glow)
-          GestureDetector(
-            onTap: () {
-              Navigator.pushNamed(context, CartPage.routeName).then((_) {
-                if (mounted) {
-                  final cart = locator<CartProvider>();
-                  setState(() {
-                    for (final item in _allMarketProducts) {
-                      final qty = cart.getProductQuantity(item.id);
-                      if (qty > 0) {
-                        _cartQuantities[item.id] = qty;
-                      } else {
-                        _cartQuantities.remove(item.id);
-                      }
-                    }
-                  });
-                }
-              });
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: kPrimaryOrange,
-                borderRadius: BorderRadius.circular(16),
+                      )
+                    : const SizedBox.shrink(),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Right Side in RTL: Dark Quantity Badge + "عرض السلة"
-                    Row(
+
+              // 3. Orange "عرض السلة" Pill Button (Clean modern button, zero orange glow)
+              GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(context, CartPage.routeName);
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: kPrimaryOrange,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(
-                                0x38000000), // Dark translucent badge matching reference
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: _AnimatedCounterText(
-                              count: count,
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
+                        // Right Side in RTL: Dark Quantity Badge + "عرض السلة"
+                        Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: const BoxDecoration(
+                                color: Color(0x38000000),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: _AnimatedCounterText(
+                                  count: count,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'عرض السلة',
+                              style: GoogleFonts.ibmPlexSansArabic(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
+
+                        // Left Side in RTL: Total Price
                         Text(
-                          'عرض السلة',
+                          '${_formatPrice(total)} ل.س',
                           style: GoogleFonts.ibmPlexSansArabic(
                             color: Colors.white,
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
                     ),
-
-                    // Left Side in RTL: Total Price
-                    Text(
-                      '${_formatPrice(total)} ل.س',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

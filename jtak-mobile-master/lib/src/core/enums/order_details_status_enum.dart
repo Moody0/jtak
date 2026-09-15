@@ -9,6 +9,7 @@ enum OrderDetailsStatus {
   customerPending,
   customerCanceled,
   deliveryCanceled,
+  readyForPickup,
 }
 
 extension StringValueExtention on OrderDetailsStatus {
@@ -37,6 +38,8 @@ extension StringValueExtention on OrderDetailsStatus {
 
       case OrderDetailsStatus.deliveryCanceled:
         return str.app.orderDetailsStatusDeliveryCanceled;
+      case OrderDetailsStatus.readyForPickup:
+        return 'جاهز للاستلام';
     }
   }
 }
@@ -60,6 +63,8 @@ extension ParseEnumExtention on int {
         return OrderDetailsStatus.customerCanceled;
       case 7:
         return OrderDetailsStatus.deliveryCanceled;
+      case 8:
+        return OrderDetailsStatus.readyForPickup;
       default:
         throw Exception('order details status not recognized');
     }

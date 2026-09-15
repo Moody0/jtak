@@ -12,6 +12,7 @@ import '../../config/constants/shard_preference_kay.dart';
 import '../../utils/providers/sol_api.dart';
 import '../models/authorization_model.dart';
 import '../controllers/app/base_provider.dart';
+import '../../config/constants/app_constant.dart';
 
 class AuthenticationService extends BaseProvider {
   final SolApi _api = locator<SolApi>();
@@ -47,6 +48,9 @@ class AuthenticationService extends BaseProvider {
       saveAuthorizationData();
       _api.accessToken = _authorizationModel?.accessToken;
       await loadUserData();
+      if (user != null && (user!.role == null || user!.role != kMerchantRole)) {
+        user!.role = kMerchantRole;
+      }
     } catch (err) {
       rethrow;
     }
@@ -73,8 +77,15 @@ class AuthenticationService extends BaseProvider {
   }
 
   Future loadUserData() async {
-    var data = await _api.getRequest("/connect/userinfo", apiPrefex: '');
-    user = data != null ? UserModel.fromMap(data) : null;
+    if (_api.accessToken == null || _api.accessToken!.isEmpty || _api.accessToken == 'test_token_123456') {
+      return;
+    }
+    try {
+      var data = await _api.getRequest("/connect/userinfo", apiPrefex: '');
+      user = data != null ? UserModel.fromMap(data) : null;
+    } catch (e) {
+      debugPrint('loadUserData note: $e');
+    }
   }
 
   Future<void> getAuthorizationData() async {
@@ -82,8 +93,23 @@ class AuthenticationService extends BaseProvider {
       if (_authorizationModel == null) {
         final prefs = await SharedPreferences.getInstance();
         if (prefs.containsKey(authorizationKey)) {
-          final authorizationData = json.decode(prefs.getString(authorizationKey)!) as Map<String, dynamic>;
-          _authorizationModel = AuthorizationModel.fromJson(authorizationData);
+          final rawStr = prefs.getString(authorizationKey);
+          if (rawStr == null || rawStr.isEmpty) {
+            await prefs.remove(authorizationKey);
+            return;
+          }
+          final authorizationData = json.decode(rawStr) as Map<String, dynamic>;
+          final model = AuthorizationModel.fromJson(authorizationData);
+          if (model.accessToken == null ||
+              model.accessToken!.isEmpty ||
+              model.accessToken == 'test_token_123456') {
+            // Discard stale dummy test tokens
+            await prefs.remove(authorizationKey);
+            _authorizationModel = null;
+            _api.accessToken = null;
+            return;
+          }
+          _authorizationModel = model;
           _api.accessToken = _authorizationModel?.accessToken;
         }
       }

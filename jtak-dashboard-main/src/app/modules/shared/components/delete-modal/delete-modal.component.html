@@ -4,7 +4,7 @@
 
 <div class="modal-header">
   <div class="modal-title h4" *ngIf="moduleName; else fullTitle">
-    Delete {{ moduleName | lowercase }}
+    {{ 'COMMON.DELETE' | translate }} {{ getLocalizedModuleName() }}
   </div>
   <ng-template #fullTitle>
     <div class="modal-title h4">{{ title }}</div>
@@ -12,18 +12,13 @@
 </div>
 <div class="modal-body">
   <ng-container *ngIf="isLoading">
-    <span *ngIf="moduleName; else fullDeletingText"
-      >{{ moduleName }} is deleting...</span
-    >
-    <ng-template #fullDeletingText>
-      <span>{{ deletingText }}</span>
-    </ng-template>
+    <span>{{ 'COMMON.LOADING' | translate }}</span>
   </ng-container>
 
   <ng-container *ngIf="!isLoading">
-    <span *ngIf="moduleName; else fullConfirmationText"
-      >This will permanently delete the {{ moduleName | lowercase }}. This action cannot be undone.</span
-    >
+    <span *ngIf="moduleName; else fullConfirmationText">
+      {{ 'COMMON.DELETE_CONFIRM_TEXT' | translate }}
+    </span>
     <ng-template #fullConfirmationText>
       <span>{{ confirmationText }}</span>
     </ng-template>
@@ -37,14 +32,14 @@
       class="btn btn-light btn-elevate"
       (click)="onCancelClicked()"
     >
-      Cancel</button
-    >&nbsp;
+      {{ 'COMMON.CANCEL' | translate }}
+    </button>&nbsp;
     <button
       type="button"
       class="btn btn-danger btn-elevate"
       (click)="onDeleteClicked()"
     >
-      {{ confirmLabel }}
+      {{ (confirmLabel === 'Delete' ? 'COMMON.DELETE' : confirmLabel) | translate }}
     </button>
   </div>
 </div>

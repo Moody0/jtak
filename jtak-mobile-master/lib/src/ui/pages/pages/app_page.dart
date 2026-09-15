@@ -4,16 +4,20 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../main_imports.dart';
 import '../../../config/constants/constants.dart';
+import '../../../config/constants/app_constant.dart';
+import '../../../utils/utilities/lunch_url.dart';
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/app_pages_provider.dart';
 import '../../widgets/header_circle_button.dart';
 import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/utilities/global_var.dart';
+import '../../../core/services/locator.dart';
+import '../../../core/services/authentication_service.dart';
+import '../../../utils/providers/sol_api.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Help & Support Page (المساعدة والدعم الفني)
@@ -35,9 +39,16 @@ class AppPage extends StatefulWidget {
 }
 
 class _AppPageState extends State<AppPage> {
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int _selectedCategoryIndex = 0;
   final Set<int> _expandedIndices = {};
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   final List<String> _categories = [
     'الكل',
@@ -134,7 +145,8 @@ class _AppPageState extends State<AppPage> {
                 ),
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: _buildContent(modelProvider),
                 ),
               ),
@@ -154,8 +166,13 @@ class _AppPageState extends State<AppPage> {
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
       leading: Center(
-        child: HeaderCircleButton.back(
+        child: HeaderCircleButton(
           onTap: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: kCharcoalDark,
+            size: 20,
+          ),
         ),
       ),
       title: Text(
@@ -246,6 +263,7 @@ class _AppPageState extends State<AppPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
+                  controller: _searchController,
                   onChanged: (val) => setState(() => _searchQuery = val.trim()),
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 14,
@@ -263,10 +281,14 @@ class _AppPageState extends State<AppPage> {
                   ),
                 ),
               ),
-              if (_searchQuery.isNotEmpty)
+              if (_searchController.text.isNotEmpty || _searchQuery.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.clear, size: 18, color: Color(0xFF94A3B8)),
-                  onPressed: () => setState(() => _searchQuery = ''),
+                  icon: const Icon(Icons.clear,
+                      size: 18, color: Color(0xFF94A3B8)),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
                 ),
             ],
           ),
@@ -283,42 +305,48 @@ class _AppPageState extends State<AppPage> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const ClampingScrollPhysics(),
-          child: Row(
-            children: List.generate(_categories.length, (idx) {
-              final isSelected = _selectedCategoryIndex == idx;
-              return Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _selectedCategoryIndex = idx);
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? kPrimaryOrange : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isSelected ? kPrimaryOrange : const Color(0xFFE2E8F0),
-                        width: 1.0,
+            child: Row(
+              children: List.generate(_categories.length, (idx) {
+                final isSelected = _selectedCategoryIndex == idx;
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedCategoryIndex = idx);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? kPrimaryOrange : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? kPrimaryOrange
+                              : const Color(0xFFE2E8F0),
+                          width: 1.0,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      _categories[idx],
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? Colors.white : const Color(0xFF64748B),
+                      child: Text(
+                        _categories[idx],
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
-      ),
 
         const SizedBox(height: 18),
 
@@ -336,22 +364,48 @@ class _AppPageState extends State<AppPage> {
         // 5. FAQ Accordions with Distinct Category Icons
         if (filtered.isEmpty)
           Container(
-            padding: const EdgeInsets.all(32),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(PhosphorIconsRegular.question, size: 36, color: Color(0xFF94A3B8)),
-                const SizedBox(height: 10),
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      PhosphorIconsRegular.magnifyingGlass,
+                      size: 26,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text(
                   'لا توجد نتائج مطابقة لبحثك',
                   style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 14,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w700,
                     color: kCharcoalDark,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'جرّب البحث بكلمات أخرى أو اختر قسماً مختلفاً',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF94A3B8),
                   ),
                 ),
               ],
@@ -406,7 +460,8 @@ class _AppPageState extends State<AppPage> {
                               child: Icon(
                                 Icons.help_outline_rounded,
                                 size: 19,
-                                color: isExpanded ? Colors.white : kPrimaryOrange,
+                                color:
+                                    isExpanded ? Colors.white : kPrimaryOrange,
                               ),
                             ),
                           ),
@@ -417,7 +472,8 @@ class _AppPageState extends State<AppPage> {
                               style: GoogleFonts.ibmPlexSansArabic(
                                 fontSize: 13.8,
                                 fontWeight: FontWeight.w700,
-                                color: isExpanded ? kPrimaryOrange : kCharcoalDark,
+                                color:
+                                    isExpanded ? kPrimaryOrange : kCharcoalDark,
                                 height: 1.3,
                               ),
                             ),
@@ -440,7 +496,9 @@ class _AppPageState extends State<AppPage> {
                                 child: Icon(
                                   Icons.keyboard_arrow_down_rounded,
                                   size: 20,
-                                  color: isExpanded ? kPrimaryOrange : const Color(0xFF94A3B8),
+                                  color: isExpanded
+                                      ? kPrimaryOrange
+                                      : const Color(0xFF94A3B8),
                                 ),
                               ),
                             ),
@@ -457,7 +515,10 @@ class _AppPageState extends State<AppPage> {
                         ? Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Divider(height: 1, color: Color(0xFFF1F5F9), thickness: 1),
+                              const Divider(
+                                  height: 1,
+                                  color: Color(0xFFF1F5F9),
+                                  thickness: 1),
                               Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Row(
@@ -568,7 +629,11 @@ class _AppPageState extends State<AppPage> {
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
-              _launchUrl('https://wa.me/963933112233');
+              LunchUrl.openWhatsApp(
+                phone: kSupportWhatsAppNumber,
+                message: 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص التطبيق.',
+                context: context,
+              );
             },
             behavior: HitTestBehavior.opaque,
             child: Container(
@@ -576,7 +641,9 @@ class _AppPageState extends State<AppPage> {
               decoration: BoxDecoration(
                 color: const Color(0xFFEBFBF0),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.3), width: 1.0),
+                border: Border.all(
+                    color: const Color(0xFF25D366).withValues(alpha: 0.3),
+                    width: 1.0),
               ),
               child: Text(
                 'تواصل الآن',
@@ -605,6 +672,7 @@ class _AppPageState extends State<AppPage> {
         border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 46,
@@ -631,15 +699,38 @@ class _AppPageState extends State<AppPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'الخط الساخن: 0933 112 233',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                    color: kCharcoalDark,
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    LunchUrl.makeCall(kSupportPhoneNumber, context: context);
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'الخط الساخن: ',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: kCharcoalDark,
+                        ),
+                      ),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(
+                          '\u202A$kSupportPhoneFormatted\u202C',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: kCharcoalDark,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   'يومياً 9:00 ص - 12:00 منتصف الليل',
                   style: GoogleFonts.ibmPlexSansArabic(
@@ -648,29 +739,42 @@ class _AppPageState extends State<AppPage> {
                     color: const Color(0xFF64748B),
                   ),
                 ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              _launchUrl('tel:+963933112233');
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: kPrimaryOrange,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'اتصال',
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    LunchUrl.makeCall(kSupportPhoneNumber, context: context);
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: kPrimaryOrange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          PhosphorIconsBold.phoneCall,
+                          size: 15,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'اتصال',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -699,7 +803,8 @@ class _AppPageState extends State<AppPage> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Center(
-              child: Icon(PhosphorIconsFill.notePencil, size: 22, color: kCharcoalDark),
+              child: Icon(PhosphorIconsFill.notePencil,
+                  size: 22, color: kCharcoalDark),
             ),
           ),
           const SizedBox(width: 14),
@@ -735,7 +840,8 @@ class _AppPageState extends State<AppPage> {
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF3EB),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kPrimaryOrange.withValues(alpha: 0.3), width: 1.0),
+                border: Border.all(
+                    color: kPrimaryOrange.withValues(alpha: 0.3), width: 1.0),
               ),
               child: Text(
                 'كتابة رسالة',
@@ -753,95 +859,256 @@ class _AppPageState extends State<AppPage> {
   }
 
   void _showSupportMessageDialog() {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
     final messageController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
+    if (locator.isRegistered<AuthenticationService>()) {
+      final user = locator<AuthenticationService>().user;
+      final savedName = user?.fullName?.trim();
+      if (savedName != null &&
+          savedName.isNotEmpty &&
+          savedName != 'عميل جيتك' &&
+          savedName != 'مستخدم جيتك') {
+        nameController.text = savedName;
+      }
+      phoneController.text = user?.phoneNumber?.trim() ?? '';
+    }
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'رسالة إلى الدعم الفني',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w800,
-            fontSize: 17,
-            color: kCharcoalDark,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (sbContext, setDialogState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'رسالة إلى الدعم الفني',
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: FontWeight.w800,
+              fontSize: 17,
+              color: kCharcoalDark,
+            ),
           ),
-        ),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'اكتب استفسارك أو مشكلتك وسنقوم بمتابعتها بأسرع وقت:',
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'أدخل بياناتك واكتب استفسارك أو مشكلتك وسنقوم بمتابعتها بأسرع وقت:',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: nameController,
+                    enabled: !isSubmitting,
+                    textInputAction: TextInputAction.next,
+                    style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 14, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      labelText: 'الاسم الكامل',
+                      hintText: 'أدخل اسمك الكامل',
+                      prefixIcon: const Icon(Icons.person_outline, size: 20),
+                      hintStyle: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13, color: const Color(0xFF94A3B8)),
+                      labelStyle: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13, color: const Color(0xFF64748B)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide:
+                            const BorderSide(color: kPrimaryOrange, width: 1.5),
+                      ),
+                    ),
+                    validator: (val) => (val == null || val.trim().length < 2)
+                        ? 'يرجى إدخال الاسم'
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: phoneController,
+                    enabled: !isSubmitting,
+                    keyboardType: TextInputType.phone,
+                    textDirection: TextDirection.ltr,
+                    textInputAction: TextInputAction.next,
+                    style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 14, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      labelText: 'رقم الهاتف',
+                      hintText: 'أدخل رقم الهاتف للتواصل معك',
+                      prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                      hintStyle: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13, color: const Color(0xFF94A3B8)),
+                      labelStyle: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13, color: const Color(0xFF64748B)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide:
+                            const BorderSide(color: kPrimaryOrange, width: 1.5),
+                      ),
+                    ),
+                    validator: (val) {
+                      final digits =
+                          val?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+                      return digits.length < 7
+                          ? 'يرجى إدخال رقم هاتف صحيح'
+                          : null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: messageController,
+                    maxLines: 4,
+                    enabled: !isSubmitting,
+                    style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 14, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      labelText: 'الرسالة',
+                      hintText: 'اكتب رسالتك هنا بالتفصيل...',
+                      hintStyle: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13, color: const Color(0xFF94A3B8)),
+                      labelStyle: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13, color: const Color(0xFF64748B)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide:
+                            const BorderSide(color: kPrimaryOrange, width: 1.5),
+                      ),
+                    ),
+                    validator: (val) => (val == null || val.trim().length < 5)
+                        ? 'يرجى كتابة رسالة واضحة'
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: Text(
+                'إلغاء',
                 style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w700,
                   color: const Color(0xFF64748B),
                 ),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: messageController,
-                maxLines: 4,
-                style: GoogleFonts.ibmPlexSansArabic(fontSize: 14, fontWeight: FontWeight.w600),
-                decoration: InputDecoration(
-                  hintText: 'اكتب رسالتك هنا بالتفصيل...',
-                  hintStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 13, color: const Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: kPrimaryOrange, width: 1.5),
-                  ),
-                ),
-                validator: (val) =>
-                    (val == null || val.trim().length < 5) ? 'يرجى كتابة رسالة واضحة' : null,
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryOrange,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
-            ],
-          ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (!(formKey.currentState?.validate() ?? false)) return;
+
+                      setDialogState(() {
+                        isSubmitting = true;
+                      });
+
+                      try {
+                        String? senderEmail;
+
+                        if (locator.isRegistered<AuthenticationService>()) {
+                          final auth = locator<AuthenticationService>();
+                          final user = auth.user;
+                          if (user != null) {
+                            senderEmail = user.email;
+                          }
+                        }
+
+                        final body = {
+                          'DisplayName': nameController.text.trim(),
+                          'PhoneNumber': phoneController.text.trim(),
+                          'Email': senderEmail,
+                          'Title': 'رسالة إلى الدعم الفني',
+                          'Message': messageController.text.trim(),
+                        };
+
+                        final api = locator<SolApi>();
+                        await api.postRequest('/Contact', body);
+
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+                        if (mounted) {
+                          context.showSnakBar(
+                              'تم استلام رسالتك بنجاح وسيقوم فريق الإدارة بمتابعتها');
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          setDialogState(() {
+                            isSubmitting = false;
+                          });
+                        }
+                        if (mounted) {
+                          context.showSnakBar(
+                              'حدث خطأ أثناء إرسال الرسالة، يرجى المحاولة لاحقاً');
+                        }
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.2,
+                      ),
+                    )
+                  : Text(
+                      'إرسال الرسالة',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'إلغاء',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF64748B),
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimaryOrange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(ctx);
-                context.showSnakBar('تم استلام رسالتك بنجاح، وسيتواصل معك فريق الدعم');
-              }
-            },
-            child: Text(
-              'إرسال الرسالة',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -922,8 +1189,12 @@ class _AppPageState extends State<AppPage> {
                       color: const Color(0xFFFFF3EB),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Center(
-                      child: Icon(PhosphorIconsFill.fileText, color: kPrimaryOrange, size: 24),
+                    child: Center(
+                      child: Transform.flip(
+                        flipX: true,
+                        child: const Icon(PhosphorIconsFill.fileText,
+                            color: kPrimaryOrange, size: 24),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -955,16 +1226,22 @@ class _AppPageState extends State<AppPage> {
               ),
               const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+                  border:
+                      Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(PhosphorIconsFill.shieldCheck, size: 14, color: Color(0xFF10B981)),
+                    Transform.flip(
+                      flipX: true,
+                      child: const Icon(PhosphorIconsFill.shieldCheck,
+                          size: 14, color: Color(0xFF10B981)),
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'سارية ومحدثة لعام 2026',
@@ -1007,10 +1284,13 @@ class _AppPageState extends State<AppPage> {
                         borderRadius: BorderRadius.circular(11),
                       ),
                       child: Center(
-                        child: Icon(
-                          sec['icon'] as IconData,
-                          size: 18,
-                          color: sec['iconColor'] as Color,
+                        child: Transform.flip(
+                          flipX: true,
+                          child: Icon(
+                            sec['icon'] as IconData,
+                            size: 18,
+                            color: sec['iconColor'] as Color,
+                          ),
                         ),
                       ),
                     ),
@@ -1026,7 +1306,8 @@ class _AppPageState extends State<AppPage> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(8),
@@ -1060,17 +1341,5 @@ class _AppPageState extends State<AppPage> {
         const SizedBox(height: 24),
       ],
     );
-  }
-
-
-  void _launchUrl(String urlStr) async {
-    try {
-      final uri = Uri.parse(urlStr);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint('Error launching url: $e');
-    }
   }
 }

@@ -1,4 +1,4 @@
-﻿using App.Shared.Entities.Enums;
+using App.Shared.Entities.Enums;
 using Solf.Base;
 using Solf.Extensions;
 using System;
@@ -39,6 +39,10 @@ namespace Modules.Catalog.Entities
         public decimal Lng { get; set; } = 37.378656m;
         public bool Active { get; set; } = true;
         public MerchantKind MerchantKind { get; set; } = MerchantKind.Restaurant;
+        public string DeliveryTime { get; set; } = "20-30 دقيقة";
+        public decimal DeliveryFee { get; set; } = 5000m;
+        public decimal MinOrderAmount { get; set; } = 15000m;
+        public string WorkingHours { get; set; } = "حتى 3 ص";
         public Currency DefaultCurrency { set; get; } = Currency.TRY;
         public string DefaultCurrencyString => DefaultCurrency.ToLocalizedName();
 
@@ -81,6 +85,10 @@ namespace Modules.Catalog.Entities
         public decimal Lat { get; set; }
         public bool Active { get; set; }
         public MerchantKind MerchantKind { get; set; }
+        public string DeliveryTime { get; set; }
+        public decimal DeliveryFee { get; set; }
+        public decimal MinOrderAmount { get; set; }
+        public string WorkingHours { get; set; }
         //public Currency DefaultCurrency { set; get; }
         //public string DefaultCurrencyString => DefaultCurrency.ToLocalizedName();
 

@@ -1,6 +1,8 @@
 const String kAppName = 'جيتك تاجر';
 
+const String kCurrencySyria = " ل.س ";
 const String kCurrencyTurkey = " ₺ ";
+
 
 ////////////{ DateTime format Variable}
 const String kDateFormat = "y/M/d";

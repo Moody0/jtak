@@ -1,28 +1,256 @@
-<app-edit-modal [item]="item" [itemName]="item.fullName" moduleName="User" [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid" (cancelClicked)="modal.dismiss()" (saveClicked)="save()">
+<app-edit-modal
+  [item]="item"
+  [itemName]="item.fullName || ''"
+  moduleName="User"
+  [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid"
+  (cancelClicked)="modal.dismiss()"
+  (saveClicked)="save()"
+>
   <ng-container *ngIf="item">
-    <form class="form jtak-edit-form" [formGroup]="formGroup">
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>01</span><div><h3>Personal information</h3><p>Identity and contact details for this account.</p></div></div>
-        <div class="row g-4">
-          <div class="col-md-6"><label for="firstName">First name</label><app-input-container [control]="formGroup.controls.firstName"><input type="text" class="form-control" formControlName="firstName" id="firstName" autocomplete="given-name" placeholder="First name" /></app-input-container></div>
-          <div class="col-md-6"><label for="lastName">Last name</label><app-input-container [control]="formGroup.controls.lastName"><input type="text" class="form-control" formControlName="lastName" id="lastName" autocomplete="family-name" placeholder="Last name" /></app-input-container></div>
-          <div class="col-md-6"><label for="email">Email address</label><app-input-container [control]="formGroup.controls.email"><input type="email" class="form-control" formControlName="email" id="email" autocomplete="email" placeholder="name@example.com" /></app-input-container></div>
-          <div class="col-md-6"><label for="phoneNumber">Phone number</label><app-input-container [control]="formGroup.controls.phoneNumber"><input type="tel" class="form-control" formControlName="phoneNumber" id="phoneNumber" autocomplete="tel" placeholder="Phone number" /></app-input-container></div>
+    <div class="user-editor-layout">
+
+      <!-- Form Column -->
+      <div class="user-form-column">
+        <form class="form jtak-edit-form" [formGroup]="formGroup">
+
+          <!-- Section 01: Personal Identity -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>01</span>
+              <div>
+                <h3>البيانات الشخصية</h3>
+                <p>بيانات الهوية والتواصل الخاصة بهذا الحساب.</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- First Name -->
+              <div class="col-md-6">
+                <label for="firstName" class="form-label fw-bold mb-2">
+                  الاسم الأول
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.firstName">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="firstName"
+                    id="firstName"
+                    autocomplete="given-name"
+                    placeholder="الاسم الأول"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Last Name -->
+              <div class="col-md-6">
+                <label for="lastName" class="form-label fw-bold mb-2">
+                  اسم العائلة
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.lastName">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="lastName"
+                    id="lastName"
+                    autocomplete="family-name"
+                    placeholder="اسم العائلة"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Email -->
+              <div class="col-md-6">
+                <label for="email" class="form-label fw-bold mb-2">
+                  {{ 'USERS_PAGE.COL_EMAIL' | translate }}
+                </label>
+                <app-input-container [control]="formGroup.controls.email">
+                  <input
+                    type="email"
+                    class="form-control"
+                    formControlName="email"
+                    id="email"
+                    autocomplete="email"
+                    placeholder="name@example.com"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Phone with Country Code -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold mb-2">
+                  {{ 'USERS_PAGE.COL_PHONE' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <div class="row g-2">
+                  <div class="col-4">
+                    <input
+                      type="text"
+                      class="form-control text-center"
+                      formControlName="countryPhoneCode"
+                      id="countryPhoneCode"
+                      placeholder="+963"
+                    />
+                  </div>
+                  <div class="col-8">
+                    <app-input-container [control]="formGroup.controls.phoneNumber">
+                      <input
+                        type="tel"
+                        class="form-control"
+                        formControlName="phoneNumber"
+                        id="phoneNumber"
+                        autocomplete="tel"
+                        placeholder="09xxxxxxxx"
+                      />
+                    </app-input-container>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 02: Access & Credentials -->
+          <section class="edit-section edit-section--last">
+            <div class="edit-section-heading">
+              <span>02</span>
+              <div>
+                <h3>الصلاحيات وبيانات الدخول</h3>
+                <p>تعيين الدور الوظيفي، وبيانات المرور، وحالة تفعيل الحساب.</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- Role Selection -->
+              <div class="col-md-6">
+                <label for="role" class="form-label fw-bold mb-2">
+                  {{ 'USERS_PAGE.COL_ROLE' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <ng-select
+                  id="role"
+                  formControlName="role"
+                  placeholder="اختر دور المستخدم"
+                  [clearable]="false"
+                >
+                  <ng-option *ngFor="let role of userRoles" [value]="+role[0]">
+                    {{ role[1] }}
+                  </ng-option>
+                </ng-select>
+              </div>
+
+              <!-- Password -->
+              <div class="col-md-6">
+                <label for="password" class="form-label fw-bold mb-2">
+                  {{ item?.id ? 'كلمة المرور الجديدة (اختياري)' : 'كلمة المرور' }}
+                  <span class="text-danger" *ngIf="!item?.id">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.password">
+                  <input
+                    type="password"
+                    class="form-control"
+                    formControlName="password"
+                    id="password"
+                    autocomplete="new-password"
+                    placeholder="{{ item?.id ? 'اترك الحقل فارغاً للإبقاء على الحالية' : '6 أحرف على الأقل' }}"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Active Status Switch Card -->
+              <div class="col-12">
+                <div
+                  class="custom-switch-card"
+                  (click)="formGroup.patchValue({ isActive: !formGroup.get('isActive')?.value })"
+                >
+                  <div class="switch-info">
+                    <span class="switch-title">
+                      {{ formGroup.get('isActive')?.value ? 'الحساب نشط ومفعّل' : 'الحساب معطل ومحظور' }}
+                    </span>
+                    <span class="switch-desc">
+                      {{ formGroup.get('isActive')?.value ? 'يمكن للمستخدم تسجيل الدخول واستخدام الصلاحيات الممنوحة في التطبيق ولوحة التحكم' : 'لن يتمكن هذا المستخدم من تسجيل الدخول إلى حسابه' }}
+                    </span>
+                  </div>
+                  <div class="form-check form-switch m-0">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      formControlName="isActive"
+                      (click)="$event.stopPropagation()"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </form>
+      </div>
+
+      <!-- Preview Column: Live ID Profile Card -->
+      <div class="user-preview-column">
+        <div class="preview-phone-card">
+          <!-- Top Phone Bar -->
+          <div class="preview-phone-header">
+            <div class="preview-notch-info">
+              <span class="preview-dot-pulse"></span>
+              <span>{{ 'USERS_PAGE.PREVIEW_HEADING' | translate }}</span>
+            </div>
+            <span class="preview-app-title">JTAK</span>
+          </div>
+
+          <!-- Customer Profile Card Mockup -->
+          <div class="preview-card-viewport">
+            <div class="customer-profile-card">
+              <!-- Role Badge -->
+              <span
+                class="profile-role-badge"
+                [ngClass]="getRoleBadgeInfo().badgeClass"
+              >
+                <i [class]="getRoleBadgeInfo().icon"></i>
+                <span>{{ getRoleBadgeInfo().label }}</span>
+              </span>
+
+              <!-- Full Name -->
+              <h4 class="profile-user-name">
+                {{ (formGroup.get('firstName')?.value || '') + ' ' + (formGroup.get('lastName')?.value || '') || 'اسم المستخدم' }}
+              </h4>
+
+              <!-- Contact List -->
+              <div class="profile-contact-list">
+                <!-- Phone -->
+                <div class="contact-item" *ngIf="formGroup.get('phoneNumber')?.value">
+                  <i class="fas fa-phone-alt"></i>
+                  <span>{{ formGroup.get('countryPhoneCode')?.value }} {{ formGroup.get('phoneNumber')?.value }}</span>
+                </div>
+
+                <!-- Email -->
+                <div class="contact-item" *ngIf="formGroup.get('email')?.value">
+                  <i class="fas fa-envelope"></i>
+                  <span class="text-truncate" style="max-width: 220px;">{{ formGroup.get('email')?.value }}</span>
+                </div>
+              </div>
+
+              <!-- Status Badge -->
+              <span
+                class="profile-status-badge"
+                [class.active]="formGroup.get('isActive')?.value"
+                [class.inactive]="!formGroup.get('isActive')?.value"
+              >
+                <i [class]="formGroup.get('isActive')?.value ? 'fas fa-check-circle me-1' : 'fas fa-ban me-1'"></i>
+                {{ (formGroup.get('isActive')?.value ? 'USERS_PAGE.STATUS_ACTIVE' : 'USERS_PAGE.STATUS_DISABLED') | translate }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Bottom Meta Note -->
+          <div class="preview-card-meta">
+            {{ 'USERS_PAGE.PREVIEW_SUB' | translate }}
+          </div>
         </div>
-      </section>
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>02</span><div><h3>Access</h3><p>Assign the correct role and account status.</p></div></div>
-        <div class="row g-4">
-          <div class="col-md-6"><label for="role">Role</label><ng-select id="role" formControlName="role" placeholder="Choose a role"><ng-option *ngFor="let role of userRoles" [value]="+role[0]">{{ role[1] }}</ng-option></ng-select></div>
-          <div class="col-md-6"><label class="setting-toggle"><input type="checkbox" formControlName="isActive" /><span><strong>Account is active</strong><small>User can sign in and access permitted features.</small></span></label></div>
-        </div>
-      </section>
-      <section class="edit-section edit-section--last">
-        <div class="edit-section-heading"><span>03</span><div><h3>Profile image</h3><p>Optional image used to identify this user.</p></div></div>
-        <app-file-uploader uploaderTitle="Choose profile image" (fileUploaded)="onFileUploaded($event, 'profilePhoto')"></app-file-uploader>
-        <div class="edit-image-grid"><app-uploaded-image [imageId]="formGroup.get('profilePhoto')?.value" [dimensions]="{ width: 600, height: 300 }" (imageDeleted)="onFileDelete('profilePhoto')"></app-uploaded-image></div>
-      </section>
-    </form>
+      </div>
+
+    </div>
   </ng-container>
 </app-edit-modal>

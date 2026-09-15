@@ -46,7 +46,7 @@ namespace App.Controllers
                 return Redirect(AppDomainHelper.BaseUrl);
             }
 
-            await _service.SendContactMessage(model.Name, model.Phone, model.Email, model.Message, null);
+            await _service.SendContactMessage(model.Name, model.Phone, model.Email, model.Message, null, model.Phone);
 
             return Redirect($"{AppDomainHelper.BaseUrl}/contact.html?msg=success");
         }

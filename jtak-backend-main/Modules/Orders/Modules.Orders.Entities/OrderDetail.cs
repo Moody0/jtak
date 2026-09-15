@@ -1,4 +1,4 @@
-﻿using App.Shared.Entities.Enums;
+using App.Shared.Entities.Enums;
 using Solf.Base;
 using Solf.Extensions;
 using System.ComponentModel.DataAnnotations;
@@ -75,8 +75,12 @@ namespace Modules.Orders.Entities
         public string OrderDetailStatusString => OrderDetailStatus.ToLocalizedName();
         public int MerchantId { get; set; }
         public string MerchantTitle { get; set; }
+        public string MerchantLogo { get; set; }
         public decimal Lat { get; set; }
         public decimal Lng { get; set; }
+        public string MerchantPhone { get; set; }
+        public string MerchantAddress { get; set; }
+        public bool IsDarkStore { get; set; }
         public OrderDetailDto[] OrderDetails { get; set; }
         public decimal Price => OrderDetails.Sum(x => x.TotalFinalPrice);
     }

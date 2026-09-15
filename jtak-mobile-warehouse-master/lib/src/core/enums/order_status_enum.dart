@@ -10,9 +10,6 @@ extension StringValueExtention on OrderStatus {
 
       case OrderStatus.success:
         return str.app.orderStatusSuccess;
-
-      default:
-        return '';
     }
   }
 }
@@ -29,4 +26,19 @@ extension ParseEnumExtention on int {
         return OrderStatus.pending;
     }
   }
+}
+
+OrderStatus parseOrderStatusSafe(dynamic val) {
+  if (val == null) return OrderStatus.pending;
+  if (val is OrderStatus) return val;
+  if (val is int) return val.parseOrderStatus;
+  if (val is num) return val.toInt().parseOrderStatus;
+  if (val is String) {
+    final parsed = int.tryParse(val.trim());
+    if (parsed != null) return parsed.parseOrderStatus;
+    final s = val.trim().toLowerCase();
+    if (s == 'success' || s == '1') return OrderStatus.success;
+    return OrderStatus.pending;
+  }
+  return OrderStatus.pending;
 }

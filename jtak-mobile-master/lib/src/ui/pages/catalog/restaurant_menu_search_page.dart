@@ -330,7 +330,7 @@ class _RestaurantMenuSearchPageState extends State<RestaurantMenuSearchPage> {
                           return GestureDetector(
                             onTap: () {
                               HapticFeedback.mediumImpact();
-                              favProvider.toggleMealFavorite(item.id);
+                              favProvider.toggleMealFavorite(item.id, item);
                             },
                             behavior: HitTestBehavior.opaque,
                             child: Container(

@@ -22,6 +22,8 @@ class OrderModel {
   double? deliveryLat;
   double? deliveryLng;
   String? deliveryLocationUpdatedAt;
+  String? deliveryOtp;
+  String? deliveredAt;
   String? address;
   PaymentMethod? paymentMethod;
   OrderStatus? orderStatus;
@@ -29,6 +31,7 @@ class OrderModel {
   double? price;
   String? createdDate;
   String? warning;
+  String? notes;
   bool? canSubmit;
 
   OrderModel({
@@ -46,6 +49,8 @@ class OrderModel {
     this.deliveryLat,
     this.deliveryLng,
     this.deliveryLocationUpdatedAt,
+    this.deliveryOtp,
+    this.deliveredAt,
     this.address,
     this.paymentMethod,
     this.orderStatus,
@@ -53,6 +58,7 @@ class OrderModel {
     this.price,
     this.createdDate,
     this.warning,
+    this.notes,
     this.canSubmit,
   });
 
@@ -70,6 +76,8 @@ class OrderModel {
     double? deliveryLat,
     double? deliveryLng,
     String? deliveryLocationUpdatedAt,
+    String? deliveryOtp,
+    String? deliveredAt,
     String? address,
     PaymentMethod? paymentMethod,
     OrderStatus? orderStatus,
@@ -77,6 +85,7 @@ class OrderModel {
     double? price,
     String? createdDate,
     String? warning,
+    String? notes,
     bool? canSubmit,
   }) {
     return OrderModel(
@@ -94,6 +103,8 @@ class OrderModel {
       deliveryLng: deliveryLng ?? this.deliveryLng,
       deliveryLocationUpdatedAt:
           deliveryLocationUpdatedAt ?? this.deliveryLocationUpdatedAt,
+      deliveryOtp: deliveryOtp ?? this.deliveryOtp,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
       address: address ?? this.address,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       orderStatus: orderStatus ?? this.orderStatus,
@@ -121,6 +132,8 @@ class OrderModel {
       'deliveryLat': deliveryLat,
       'deliveryLng': deliveryLng,
       'deliveryLocationUpdatedAt': deliveryLocationUpdatedAt,
+      'deliveryOtp': deliveryOtp,
+      'deliveredAt': deliveredAt,
       'address': address,
       'paymentMethod': paymentMethod?.index,
       'orderStatus': orderStatus?.index,
@@ -128,6 +141,7 @@ class OrderModel {
       'price': price,
       'createdDate': createdDate,
       'warning': warning,
+      'notes': notes,
       'canSubmit': canSubmit,
     };
   }
@@ -148,6 +162,8 @@ class OrderModel {
       deliveryLat: map['deliveryLat']?.toDouble(),
       deliveryLng: map['deliveryLng']?.toDouble(),
       deliveryLocationUpdatedAt: map['deliveryLocationUpdatedAt'],
+      deliveryOtp: map['deliveryOtp']?.toString(),
+      deliveredAt: map['deliveredAt']?.toString(),
       address: map['address'],
       paymentMethod: map['paymentMethod'] != null
           ? (map['paymentMethod'] as int).parsePaymentMethod
@@ -155,13 +171,15 @@ class OrderModel {
       orderStatus: map['orderStatus'] != null
           ? (map['orderStatus'] as int).parseOrderStatus
           : null,
-      orderDetails: map['orderDetails'] != null
+      orderDetails: (map['orderDetails'] ?? map['OrderDetails']) != null
           ? List<OrderDetailsModel>.from(
-              map['orderDetails']?.map((x) => OrderDetailsModel.fromMap(x)))
+              (map['orderDetails'] ?? map['OrderDetails'])
+                  ?.map((x) => OrderDetailsModel.fromMap(x)))
           : null,
       price: map['price']?.toDouble(),
       createdDate: map['createdDate'],
-      warning: map['warning'],
+      notes: map['notes'] ?? map['Notes'],
+      warning: map['warning'] ?? map['Warning'] ?? map['notes'] ?? map['Notes'],
       canSubmit: map['canSubmit'],
     );
   }

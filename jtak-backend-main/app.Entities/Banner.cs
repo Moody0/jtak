@@ -38,7 +38,15 @@ namespace App.Shared.Entities.Domain
     public enum BannerLocation
     {
         [Display(Name = "HomePage", ResourceType = typeof(_Banner))]
-        HomePage = 0
+        HomePage = 0,
+        [Display(Name = "DontMiss", ResourceType = typeof(_Banner))]
+        DontMiss = 1,
+        [Display(Name = "RestaurantsPage", ResourceType = typeof(_Banner))]
+        RestaurantsPage = 2,
+        [Display(Name = "MarketPage", ResourceType = typeof(_Banner))]
+        MarketPage = 3,
+        [Display(Name = "All", ResourceType = typeof(_Banner))]
+        All = 4
     }
 
     public class BannerDto
@@ -88,5 +96,11 @@ namespace App.Shared.Entities.Domain
 
         [Display(Name = "FeaturedImage", ResourceType = typeof(_Banner))]
         public string FeaturedImage { get; set; }
+
+        [Display(Name = "Order", ResourceType = typeof(_Banner))]
+        public int Order { get; set; }
+
+        [Display(Name = "BannerLocation", ResourceType = typeof(_Banner))]
+        public BannerLocation BannerLocation { get; set; }
     }
 }

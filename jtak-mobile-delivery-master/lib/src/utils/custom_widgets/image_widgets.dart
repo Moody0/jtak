@@ -61,36 +61,56 @@ class ImageView extends StatelessWidget {
   Widget getImageWidget() {
     if (image != null) {
       if (image is File) {
-        return Image.file(image, height: height, width: width, fit: fit);
+        return Image.file(
+          image,
+          height: height,
+          width: width,
+          fit: fit,
+          errorBuilder: (context, error, stackTrace) =>
+              Image.asset(kNoImage, width: width, height: height, fit: fit),
+        );
       } else if (image is String && image.isNotEmpty) {
-        String url;
-        if (image.startsWith('http')) {
-          url = image;
-        } else {
-          url = GlobalVar.getImageUrl(image, width: imageWidth.toInt(), height: imageHeight.toInt(), crop: false);
+        final str = image.toString().trim();
+        if (str.startsWith('assets/') || str.startsWith('assets\\')) {
+          return Image.asset(
+            str,
+            height: height,
+            width: width,
+            fit: fit,
+            errorBuilder: (context, error, stackTrace) =>
+                Image.asset(kNoImage, width: width, height: height, fit: fit),
+          );
         }
-        return Hero(
-          tag: image?.toString() ?? DateTime.now().toString(),
-          child: CachedNetworkImage(
+        final url = str.startsWith('http://') || str.startsWith('https://')
+            ? str
+            : GlobalVar.getImageUrl(str, width: imageWidth.toInt(), height: imageHeight.toInt(), crop: false);
+        if (url.isEmpty) {
+          return Image.asset(kNoImage, width: width, height: height, fit: fit);
+        }
+        return CachedNetworkImage(
+          width: width,
+          height: height,
+          imageUrl: url,
+          fit: fit,
+          fadeInDuration: const Duration(milliseconds: 200),
+          placeholder: (context, url) => Container(
+            color: Colors.grey.shade100,
             width: width,
             height: height,
-            imageUrl: url,
-            placeholder: (context, url) =>
-                Container(color: Colors.grey.shade200, width: width, height: height, child: const Center(child: CircularProgressIndicator())),
-            errorWidget: (context, url, error) => Image.asset(kNoImage, width: width, height: height),
-            imageBuilder: (context, imageProvider) {
-              return Container(
-                width: width,
-                height: height,
-                decoration: BoxDecoration(image: DecorationImage(image: imageProvider)),
-              );
-            },
+            child: const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           ),
+          errorWidget: (context, url, error) => Image.asset(kNoImage, width: width, height: height, fit: fit),
         );
       }
     }
 
-    return Image.asset(kNoImage, width: width, height: height);
+    return Image.asset(kNoImage, width: width, height: height, fit: fit);
   }
 
   ImageProvider<dynamic> getImageProviderWidget() {
@@ -98,9 +118,16 @@ class ImageView extends StatelessWidget {
       if (image is File) {
         return FileImage(image);
       } else if (image is String && image.isNotEmpty) {
-        return NetworkImage(
-          image.startsWith('http') ? image : GlobalVar.getImageUrl(image, width: imageWidth.toInt(), height: imageHeight.toInt()),
-        );
+        final str = image.toString().trim();
+        if (str.startsWith('assets/') || str.startsWith('assets\\')) {
+          return AssetImage(str);
+        }
+        final url = str.startsWith('http://') || str.startsWith('https://')
+            ? str
+            : GlobalVar.getImageUrl(str, width: imageWidth.toInt(), height: imageHeight.toInt());
+        if (url.isNotEmpty) {
+          return NetworkImage(url);
+        }
       }
     }
     return const AssetImage(kNoImage);
@@ -138,9 +165,16 @@ class CircularImageView extends StatelessWidget {
       if (image is File) {
         return FileImage(image);
       } else if (image is String && image.isNotEmpty) {
-        return NetworkImage(
-          image.startsWith('http') ? image : GlobalVar.getImageUrl(image, width: imageDimension, height: imageDimension),
-        );
+        final str = image.toString().trim();
+        if (str.startsWith('assets/') || str.startsWith('assets\\')) {
+          return AssetImage(str);
+        }
+        final url = str.startsWith('http://') || str.startsWith('https://')
+            ? str
+            : GlobalVar.getImageUrl(str, width: imageDimension, height: imageDimension);
+        if (url.isNotEmpty) {
+          return NetworkImage(url);
+        }
       }
     }
     return defaultImage ?? const AssetImage(kPerson);

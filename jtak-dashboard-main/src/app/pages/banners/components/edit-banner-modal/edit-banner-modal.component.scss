@@ -1,0 +1,21 @@
+:host {
+  display: block;
+}
+
+.custom-modern-select {
+  width: 100%;
+}
+
+.selected-merchant-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f0fdf4;
+  color: #15803d;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}

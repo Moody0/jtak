@@ -16,8 +16,10 @@ class GlobalVar {
   static String getAssetsImage(String imageName) => "assets/images/$imageName";
 
   static String getImageUrl(String imageName, {int width = 300, int height = 200, bool crop = true}) {
-    final clean = getString(imageName).trim();
-    if (clean.isEmpty) return '';
+    final raw = getString(imageName).trim();
+    if (raw.isEmpty) return '';
+    final clean = raw.split(',').first.trim();
+    if (clean.isEmpty || clean == 'null') return '';
     if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('assets/')) {
       return clean;
     }

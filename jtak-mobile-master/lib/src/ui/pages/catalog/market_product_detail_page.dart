@@ -12,7 +12,9 @@ import '../../../core/services/locator.dart';
 import '../../widgets/catalog/replace_cart_bottom_sheet.dart';
 import '../../widgets/header_circle_button.dart';
 import '../cart/cart_page.dart';
+import '../../widgets/clean_shimmer_skeletons.dart';
 import 'market_page.dart';
+import '../../../utils/custom_widgets/image_view_page.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Market Dedicated Product Detail Page
@@ -91,7 +93,7 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
     if (cart.isDifferentMerchant(widget.marketId)) {
       final shouldReplace = await ReplaceCartBottomSheet.show(
         context,
-        currentStoreName: cart.currentMerchantName,
+        currentStoreName: cart.getConflictingMerchantName(widget.marketId),
         newStoreName: widget.marketName,
       );
       if (shouldReplace != true || !mounted) return;
@@ -100,6 +102,8 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
         widget.marketId,
         widget.product.priceValue.toDouble(),
         1,
+        title: widget.product.title,
+        imageUrl: widget.product.imageUrl,
       );
       setState(() {
         _quantity = 1;
@@ -119,6 +123,8 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
       widget.marketId,
       widget.product.priceValue.toDouble(),
       1,
+      title: widget.product.title,
+      imageUrl: widget.product.imageUrl,
     );
     widget.onCartChanged?.call(widget.product.id, _quantity);
   }
@@ -133,6 +139,8 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
       widget.marketId,
       widget.product.priceValue.toDouble(),
       _quantity,
+      title: widget.product.title,
+      imageUrl: widget.product.imageUrl,
     );
     widget.onCartChanged?.call(widget.product.id, _quantity);
   }
@@ -151,6 +159,8 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
         widget.marketId,
         widget.product.priceValue.toDouble(),
         _quantity,
+        title: widget.product.title,
+        imageUrl: widget.product.imageUrl,
       );
     }
     widget.onCartChanged?.call(widget.product.id, _quantity);
@@ -161,7 +171,7 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
     if (cart.isDifferentMerchant(widget.marketId)) {
       final shouldReplace = await ReplaceCartBottomSheet.show(
         context,
-        currentStoreName: cart.currentMerchantName,
+        currentStoreName: cart.getConflictingMerchantName(widget.marketId),
         newStoreName: widget.marketName,
       );
       if (shouldReplace != true || !mounted) return;
@@ -174,6 +184,8 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
         widget.marketId,
         companionProduct.priceValue.toDouble(),
         1,
+        title: companionProduct.title,
+        imageUrl: companionProduct.imageUrl,
       );
       setState(() {
         _quantity = 0;
@@ -202,6 +214,8 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
       widget.marketId,
       companionProduct.priceValue.toDouble(),
       newQty,
+      title: companionProduct.title,
+      imageUrl: companionProduct.imageUrl,
     );
     widget.onCartChanged?.call(productId, newQty);
   }
@@ -265,7 +279,7 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
   Widget build(BuildContext context) {
     final product = widget.product;
     final brandName = product.brand ?? widget.marketName;
-    final weightLabel = product.weight ?? 'حجم قياسي';
+    final weightLabel = product.weight;
     final relatedProducts = _frequentlyBoughtTogether;
 
     return Directionality(
@@ -316,38 +330,39 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
                             ),
                           ),
 
-                          const SizedBox(height: 10),
-
                           // Weight Spec Capsule
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  PhosphorIconsRegular.scales,
-                                  color: Color(0xFF4B5563),
-                                  size: 15,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  weightLabel,
-                                  style: GoogleFonts.ibmPlexSansArabic(
-                                    color: const Color(0xFF374151),
-                                    fontSize: 13.0,
-                                    fontWeight: FontWeight.w700,
+                          if (weightLabel != null) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    PhosphorIconsRegular.scales,
+                                    color: Color(0xFF4B5563),
+                                    size: 15,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    weightLabel,
+                                    style: GoogleFonts.ibmPlexSansArabic(
+                                      color: const Color(0xFF374151),
+                                      fontSize: 13.0,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
 
                           if (product.description != null &&
                               product.description!.isNotEmpty) ...[
@@ -433,7 +448,8 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
                               return GestureDetector(
                                 onTap: () {
                                   HapticFeedback.mediumImpact();
-                                  favProvider.toggleMealFavorite(widget.product.id);
+                                  favProvider.toggleMealFavorite(
+                                      widget.product.id, widget.product);
                                 },
                                 behavior: HitTestBehavior.opaque,
                                 child: Container(
@@ -566,64 +582,136 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
   // A. Hero Showcase Canvas (Straight flush bottom edge, not rounded)
   // ---------------------------------------------------------------------------
   Widget _buildHeroShowcase(MarketProductItem product) {
+    final heroTag = 'market_product_hero_${product.id}';
+
+    void openExpandedImage() {
+      HapticFeedback.lightImpact();
+      ImageViewPage.open(
+        context,
+        image: product.imageUrl,
+        title: product.title,
+        heroTag: heroTag,
+        subtitle: product.brand ?? widget.marketName,
+      );
+    }
+
     return Container(
       width: double.infinity,
       height: 340,
       color: const Color(0xFFF9FAFB),
       child: Stack(
         children: [
-          // Full-Bleed Product Image (straight bottom edge)
+          // Full-Bleed Product Image with Tap-to-Expand
           Positioned.fill(
-            child: product.imageUrl.startsWith('assets')
-                ? Image.asset(
-                    product.imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 340,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: const Color(0xFFF1F5F9),
-                      child: const Center(
-                        child: Icon(
-                          Icons.shopping_bag_outlined,
-                          color: Color(0xFFCBD5E1),
-                          size: 54,
+            child: GestureDetector(
+              onTap: openExpandedImage,
+              behavior: HitTestBehavior.opaque,
+              child: Hero(
+                tag: heroTag,
+                child: product.imageUrl.startsWith('assets')
+                    ? Image.asset(
+                        product.imageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 340,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: const Center(
+                            child: Icon(
+                              Icons.shopping_bag_outlined,
+                              color: Color(0xFFCBD5E1),
+                              size: 54,
+                            ),
+                          ),
+                        ),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: product.imageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 340,
+                        placeholder: (_, __) => const CleanShimmer(
+                          child: SizedBox.expand(
+                            child: ColoredBox(color: Colors.white),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: const Center(
+                            child: Icon(
+                              Icons.shopping_bag_outlined,
+                              color: Color(0xFFCBD5E1),
+                              size: 54,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  )
-                : CachedNetworkImage(
-                    imageUrl: product.imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 340,
-                    placeholder: (_, __) => Container(color: const Color(0xFFF1F5F9)),
-                    errorWidget: (_, __, ___) => Container(
-                      color: const Color(0xFFF1F5F9),
-                      child: const Center(
-                        child: Icon(
-                          Icons.shopping_bag_outlined,
-                          color: Color(0xFFCBD5E1),
-                          size: 54,
-                        ),
-                      ),
-                    ),
-                  ),
+              ),
+            ),
           ),
 
-          // Subtle Top Gradient for Button Contrast
+          // Subtle Top Gradient for Button Contrast (IgnorePointer so taps pass through)
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             height: 90,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.28),
-                    Colors.transparent,
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.28),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Sleek Expand Photo Pill Hint at Bottom Corner
+          PositionedDirectional(
+            bottom: 16,
+            start: 16,
+            child: GestureDetector(
+              onTap: openExpandedImage,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.62),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      PhosphorIconsBold.arrowsOut,
+                      color: Colors.white,
+                      size: 13,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'تكبير الصورة',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -759,6 +847,11 @@ class _MarketProductDetailPageState extends State<MarketProductDetailPage> {
                               width: 142,
                               height: 142,
                               fit: BoxFit.cover,
+                              placeholder: (_, __) => const CleanShimmer(
+                                child: SizedBox.expand(
+                                  child: ColoredBox(color: Colors.white),
+                                ),
+                              ),
                               errorWidget: (_, __, ___) => const Center(
                                 child: Icon(
                                   Icons.shopping_bag_outlined,

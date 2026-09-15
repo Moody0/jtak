@@ -60,24 +60,7 @@ class AccountPage extends StatelessWidget {
             // 5. App Version Tag & Social Media
             const SocialMediaWidget(),
 
-            const SizedBox(height: 16),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'جيتك • الإصدار 2.4.0',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    color: const Color(0xFF64748B),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
+            const SizedBox(height: 20),
 
             // Dynamic bottom padding for bottom navigation bar
             SizedBox(height: BottomNavigation.height * 1.4),
@@ -139,10 +122,6 @@ class AccountPage extends StatelessWidget {
               ? user.fullName!
               : (GlobalVar.checkString(user.phoneNumber) ? user.phoneNumber! : 'مستخدم جيتك');
 
-          final String initialChar = displayName.trim().isNotEmpty
-              ? displayName.trim().substring(0, 1).toUpperCase()
-              : 'ج';
-
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -152,28 +131,6 @@ class AccountPage extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // Avatar Squircle with Initial
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF0E8),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFFFD6C2), width: 1.5),
-                  ),
-                  child: Center(
-                    child: Text(
-                      initialChar,
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: kPrimaryOrange,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-
                 // User Metadata
                 Expanded(
                   child: Column(
@@ -235,7 +192,10 @@ class AccountPage extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(PhosphorIconsRegular.pencilSimple, size: 14, color: kCharcoalDark),
+                        Transform.flip(
+                          flipX: true,
+                          child: const Icon(PhosphorIconsRegular.pencilSimple, size: 14, color: kCharcoalDark),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'تعديل',
@@ -274,8 +234,11 @@ class AccountPage extends StatelessWidget {
                       color: const Color(0xFFFFF0E8),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Center(
-                      child: Icon(PhosphorIconsFill.user, size: 24, color: kPrimaryOrange),
+                    child: Center(
+                      child: Transform.flip(
+                        flipX: true,
+                        child: const Icon(PhosphorIconsFill.user, size: 24, color: kPrimaryOrange),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -383,17 +346,6 @@ class AccountPage extends StatelessWidget {
               Navigator.pushNamed(context, AddressPage.routeName);
             },
           ),
-          _buildDivider(),
-          _buildMenuItem(
-            icon: PhosphorIconsFill.bell,
-            iconColor: const Color(0xFF8B5CF6),
-            iconBg: const Color(0xFFF5F3FF),
-            title: 'الإشعارات والتنبيهات',
-            trailingText: 'مفعلة',
-            onTap: () {
-              HapticFeedback.lightImpact();
-            },
-          ),
         ],
       ),
     );
@@ -483,7 +435,7 @@ class AccountPage extends StatelessWidget {
                 ),
                 child: Center(
                   child: Transform.flip(
-                    flipX: icon == PhosphorIconsFill.signOut,
+                    flipX: icon != PhosphorIconsFill.signOut,
                     child: Icon(
                       icon,
                       size: 19,

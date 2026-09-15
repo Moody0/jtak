@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Extensions;
 using App.Shared.Services;
 using App.Shared.Services.eCommerce;
@@ -20,6 +20,8 @@ using Modules.Catalog.Services;
 using App.Orders.Data;
 using System;
 using Modules.Orders.Services;
+using Modules.Catalog.Entities;
+using App.Shared.Entities.Enums;
 
 namespace App.ApiControllers.V1.Customer.Orders
 {
@@ -37,6 +39,7 @@ namespace App.ApiControllers.V1.Customer.Orders
         private readonly IOrderService _orderService;
         private readonly IOrderDetailService _orderDetailService;
         private readonly IMerchantService _merchantService;
+        private readonly IInventoryBatchService _batchService;
 
         public CartController(IOrdersUnitOfWork unitOfWork,
             INotificationService notificationService,
@@ -45,6 +48,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             IOrderService orderService,
             IOrderDetailService orderDetailService,
             IMerchantService merchantService,
+            IInventoryBatchService batchService,
             ILogger<CartController> logger,
             IMapper mapper)
         {
@@ -57,6 +61,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             _orderService = orderService;
             _orderDetailService = orderDetailService;
             _merchantService = merchantService;
+            _batchService = batchService;
         }
 
         /// <summary>
@@ -85,8 +90,23 @@ namespace App.ApiControllers.V1.Customer.Orders
         [Route("SubmitOrder")]
         public async Task<ActionResult<OrderDto>> SubmitOrder(CartSubmit m)
         {
-            //_logger.LogError(JsonSerializer.Serialize(m));
-            var user = await _userManager.GetUserAsync(User);
+            // Cash on delivery is the only payment method currently supported.
+            // Keep the legacy enum values for compatibility, but never allow an
+            // unsupported method to create a pending/fulfillable order through
+            // a direct API call.
+            if (m == null || m.PaymentMethod != Modules.Orders.Entities.PaymentMethod.PayOnDelivery)
+                return BadRequest(ApiErr.Create("الدفع عند الاستلام هو طريقة الدفع المتاحة حالياً."));
+
+            var user = await _userManager.GetUserAsync(User)
+                ?? (User.GetUserId() != null ? await _userManager.FindByIdAsync(User.GetUserId().ToString()) : null);
+
+            if (user == null && !string.IsNullOrWhiteSpace(m.Phonenumber))
+            {
+                var cleanPhone = m.Phonenumber.Trim().Replace(" ", "");
+                user = await _userManager.FindByPhoneNumberAsync(cleanPhone)
+                    ?? await _userManager.FindByNameAsync(cleanPhone);
+            }
+
             if (user == null)
                 return Unauthorized();
             // Normalize PhoneNumber
@@ -95,6 +115,24 @@ namespace App.ApiControllers.V1.Customer.Orders
             var orderDetails = await GetOrderDetails(m.CartItems, m.Lat, m.Lng);
             var isPayOnDelivery = m.PaymentMethod == Modules.Orders.Entities.PaymentMethod.PayOnDelivery;
             var isEmptyDetails = orderDetails.Count == 0;
+
+            // Business rule: An order can have at most 1 Restaurant and at most 1 Market
+            var distinctMerchantIds = orderDetails.Select(x => x.MerchantId).Distinct().ToList();
+            if (distinctMerchantIds.Count > 1)
+            {
+                var merchantsInOrder = await _merchantService.Queryable()
+                    .Where(m => distinctMerchantIds.Contains(m.Id))
+                    .Select(m => new { m.Id, m.MerchantKind })
+                    .ToListAsync();
+
+                int restaurantCount = merchantsInOrder.Count(m => m.MerchantKind == MerchantKind.Restaurant);
+                int marketCount = merchantsInOrder.Count(m => m.MerchantKind != MerchantKind.Restaurant);
+
+                if (restaurantCount > 1 || marketCount > 1)
+                {
+                    return BadRequest("لا يمكن الطلب من أكثر من مطعم واحد وماركت واحد في نفس الطلب");
+                }
+            }
 
             var lastPurchase = await _orderService.Queryable()
                                            .Where(x => x.UserId == user.Id && x.OrderStatus == OrderStatus.Success)
@@ -132,6 +170,21 @@ namespace App.ApiControllers.V1.Customer.Orders
                 _orderService.Insert(cart);
                 await _uow.SaveChangesAsync();
             }
+            else
+            {
+                // Remove existing order details from the previous pending session to prevent item accumulation
+                var existingDetails = await _orderDetailService.Queryable()
+                                                              .Where(x => x.OrderId == cart.Id)
+                                                              .ToListAsync();
+                foreach (var item in existingDetails)
+                {
+                    _orderDetailService.Delete(item);
+                }
+                if (existingDetails.Count > 0)
+                {
+                    await _uow.SaveChangesAsync();
+                }
+            }
 
             cart.User = user.FullName;
             cart.Phonenumber = m.Phonenumber;
@@ -141,9 +194,40 @@ namespace App.ApiControllers.V1.Customer.Orders
             cart.PaymentMethod = m.PaymentMethod;
             cart.OrderStatus = order.OrderStatus;
             cart.PurchaseDate = order.OrderStatus == OrderStatus.Success ? DateTime.UtcNow : null;
+            if (string.IsNullOrEmpty(cart.DeliveryOtp))
+            {
+                cart.DeliveryOtp = new System.Random().Next(1000, 9999).ToString();
+            }
             SetOrderId(orderDetails, cart.Id);
             _orderDetailService.Insert(orderDetails);
             await _uow.SaveChangesAsync();
+
+            // Reserve stock via FEFO for any dark store / batch-managed items
+            if (cart.OrderStatus == OrderStatus.Success)
+            {
+                foreach (var detail in orderDetails)
+                {
+                    try
+                    {
+                        await _batchService.ReserveStockFEFOAsync(cart.Id, detail.Id, detail.ProductId, detail.MerchantId, detail.Quantity);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to reserve batch stock for order {OrderId}, detail {DetailId}", cart.Id, detail.Id);
+
+                        // Compensate: release any reservations made so far for this cart
+                        await _batchService.ReleaseReservationAsync(cart.Id, reason: "Insufficient stock during checkout");
+
+                        // Rollback inserted details and reset cart state
+                        _uow.Context.OrderDetails.RemoveRange(orderDetails);
+                        cart.OrderStatus = OrderStatus.Pending;
+                        cart.PurchaseDate = null;
+                        await _uow.SaveChangesAsync();
+
+                        return BadRequest(ApiErr.Create($"الكمية المطلوبة من المنتج '{detail.ProductTitle}' غير متوفرة حالياً في المخزون."));
+                    }
+                }
+            }
 
             // Notify merchants
             var merchantOrders = orderDetails.GroupBy(x => x.MerchantId).ToArray();
@@ -154,8 +238,17 @@ namespace App.ApiControllers.V1.Customer.Orders
                 await _notificationService.SendMerchantNewOrderRecived(new[] { ownerId }, cart.Id, details);
             }
 
+            var orderedMerchantIds = merchantOrders.Select(x => x.Key).ToArray();
+            var hasExternalMerchant = await _merchantService.Queryable()
+                .AnyAsync(x => orderedMerchantIds.Contains(x.Id) && x.MerchantKind != MerchantKind.DarkStore);
+            var adminIds = (await _userManager.GetUsersInRoleAsync(AppRoleName.Admin.ToString()))
+                .Where(x => x.IsActive).Select(x => x.Id).ToArray();
+            if (adminIds.Length > 0)
+                await _notificationService.SendAdminNewOrder(adminIds, cart.Id, hasExternalMerchant);
+
             order.Id = cart.Id;
             order.PurchaseDate = cart.PurchaseDate;
+            order.DeliveryOtp = cart.DeliveryOtp;
             order.OrderDetails = orderDetails.Select(x => x.ToDto()).ToArray();
 
             //_logger.LogError(JsonSerializer.Serialize(order));
@@ -172,28 +265,95 @@ namespace App.ApiControllers.V1.Customer.Orders
                 string warning = null;
 
                 if (item.Quantity <= 0)
+                {
                     warning = "Invalid product quantity." + Environment.NewLine;
-
-                if (item.MerchantId <= 0)
-                    warning += "Invalid merchant." + Environment.NewLine;
+                }
 
                 var p = await _service.GetProduct(item.ProductId);
                 if (p == null)
-                    warning = $"!للأسف، هذا المنتج لم يعد متوفرا" + Environment.NewLine;
-
-                // Price and validate the exact merchant selected by the customer.
-                // Using the global best price while storing a different merchant causes
-                // incorrect balances and sends the order to the wrong owner.
-                var mp = await _merchantService.GetBestProductPrice(item.ProductId, new[] { item.MerchantId }, lat, lng);
-
-                if (mp == null || mp.FinalPrice <= 0)
                 {
-                    warning += $"!للأسف، المتجر لم يعد يوفر هذا المنتج" + Environment.NewLine;
+                    warning += "!للأسف، هذا المنتج لم يعد متوفراً" + Environment.NewLine;
                 }
-                //else if (item.SingleFinalPrice.HasValue && item.SingleFinalPrice > 0 && mp != null && mp.FinalPrice != item.SingleFinalPrice)
-                //{
-                //    warning += $"لقد تغير سعر هذا المنتج من {item.SingleFinalPrice:0.00} إلى {mp?.FinalPrice ?? 0:0.00}";
-                //}
+
+                MerchantProductDto mp = null;
+
+                // 1. Try exact merchant with delivery range check
+                if (item.MerchantId > 0 && lat != 0 && lng != 0)
+                {
+                    try
+                    {
+                        mp = await _merchantService.GetBestProductPrice(item.ProductId, new[] { item.MerchantId }, lat, lng);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "GetBestProductPrice with lat/lng failed for product {ProductId}, merchant {MerchantId}", item.ProductId, item.MerchantId);
+                    }
+                }
+
+                // 2. If range check excluded the merchant (e.g. customer ordering from outside radius or radius not set),
+                // query merchant directly without geographic restriction
+                if (mp == null && item.MerchantId > 0)
+                {
+                    try
+                    {
+                        mp = await _merchantService.GetBestProductPrice(item.ProductId, new[] { item.MerchantId });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "GetBestProductPrice without lat/lng failed for product {ProductId}, merchant {MerchantId}", item.ProductId, item.MerchantId);
+                    }
+                }
+
+                // 3. If still null (or item.MerchantId was 0 / mismatched), check any active merchant globally
+                if (mp == null)
+                {
+                    try
+                    {
+                        mp = await _merchantService.GetBestProductPrice(item.ProductId, null);
+                        if (mp != null && mp.MerchantId > 0)
+                        {
+                            item.MerchantId = mp.MerchantId;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "GetBestProductPrice global failed for product {ProductId}", item.ProductId);
+                    }
+                }
+
+                // Ensure a positive valid merchant ID
+                if (item.MerchantId <= 0)
+                {
+                    item.MerchantId = mp?.MerchantId ?? 1;
+                }
+
+                decimal singlePrice = 0m;
+                decimal singleFinalPrice = 0m;
+                decimal merchantProfit = 0m;
+                decimal additionalProfit = 0m;
+
+                if (mp != null && mp.FinalPrice > 0)
+                {
+                    singlePrice = mp.Price;
+                    singleFinalPrice = mp.FinalPrice;
+                    merchantProfit = mp.MerchantProfit;
+                    additionalProfit = mp.AdditionalProfit;
+                }
+                else if (item.SingleFinalPrice.HasValue && item.SingleFinalPrice.Value > 0)
+                {
+                    singlePrice = item.SingleFinalPrice.Value;
+                    singleFinalPrice = item.SingleFinalPrice.Value;
+                }
+
+                // Only emit warning if product doesn't exist in DB at all or has 0 price
+                if (p == null)
+                {
+                    if (warning == null) warning = "!للأسف، هذا المنتج لم يعد متوفراً" + Environment.NewLine;
+                }
+                else if (singleFinalPrice <= 0)
+                {
+                    warning += "!للأسف، المتجر لم يعد يوفر هذا المنتج" + Environment.NewLine;
+                }
 
                 var prevCartItem = orderDetails.FirstOrDefault(x => x.ProductId == item.ProductId && x.MerchantId == item.MerchantId);
                 if (prevCartItem != null)
@@ -209,12 +369,11 @@ namespace App.ApiControllers.V1.Customer.Orders
                         ProductTitle = p?.Title,
                         ProductUnit = p?.Unit,
                         ProductImage = p?.Photos,
-                        //MerchantId = mp?.MerchantId ?? item.MerchantId,
                         MerchantId = item.MerchantId,
-                        SingleMerchantProfit = mp?.MerchantProfit ?? 0m,
-                        SinglePrice = mp?.Price ?? item.SingleFinalPrice ?? 0m,
-                        SingleFinalPrice = mp?.FinalPrice ?? item.SingleFinalPrice ?? 0m,
-                        SingleAdditionalProfit = mp?.AdditionalProfit ?? 0m,
+                        SingleMerchantProfit = merchantProfit,
+                        SinglePrice = singlePrice,
+                        SingleFinalPrice = singleFinalPrice,
+                        SingleAdditionalProfit = additionalProfit,
                         Warning = warning
                     });
                 }

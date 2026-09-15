@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/catalog/products_provider.dart';
@@ -141,18 +142,57 @@ class _SearchPageState extends State<SearchPage> {
     ),
   ];
 
-  final List<String> _recentSearches = [
-    'شاورما عربي سوبر',
-    'دبل برغر كلاسيك',
-    'بيتزا بيبروني',
-    'سينابون رول',
-    'فتة شاورما كرم الشام',
-    'جيتك مارت',
-  ];
+  static const String _recentSearchesPrefKey = 'jtek_search_recent_searches';
+  List<String> _recentSearches = [];
+
+  Future<void> _loadRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList(_recentSearchesPrefKey);
+      if (saved != null && mounted) {
+        setState(() {
+          _recentSearches = saved;
+        });
+      }
+    } catch (e) {
+      debugPrint('SearchPage: Error loading recent searches: $e');
+    }
+  }
+
+  Future<void> _saveRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_recentSearchesPrefKey, _recentSearches);
+    } catch (e) {
+      debugPrint('SearchPage: Error saving recent searches: $e');
+    }
+  }
+
+  void _addRecentSearch(String term) {
+    final clean = term.trim();
+    if (clean.isEmpty) return;
+    setState(() {
+      _recentSearches
+          .removeWhere((item) => item.toLowerCase() == clean.toLowerCase());
+      _recentSearches.insert(0, clean);
+      if (_recentSearches.length > 8) {
+        _recentSearches = _recentSearches.sublist(0, 8);
+      }
+    });
+    _saveRecentSearches();
+  }
+
+  void _clearRecentSearches() {
+    setState(() {
+      _recentSearches.clear();
+    });
+    _saveRecentSearches();
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadRecentSearches();
     if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
       _searchController.text = widget.initialQuery!;
       _currentQuery = widget.initialQuery!;
@@ -189,6 +229,7 @@ class _SearchPageState extends State<SearchPage> {
     _searchController.selection =
         TextSelection.fromPosition(TextPosition(offset: query.length));
     _onQueryChanged(query, provider);
+    _addRecentSearch(query);
   }
 
   void _clearQuery(ProductsProvider provider) {
@@ -313,6 +354,7 @@ class _SearchPageState extends State<SearchPage> {
                             contentPadding: EdgeInsets.zero,
                           ),
                           onChanged: (val) => _onQueryChanged(val, provider),
+                          onSubmitted: (val) => _addRecentSearch(val),
                         ),
                       ],
                     ),
@@ -380,9 +422,7 @@ class _SearchPageState extends State<SearchPage> {
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    setState(() {
-                      _recentSearches.clear();
-                    });
+                    _clearRecentSearches();
                   },
                   child: Text(
                     'مسح السجل',
@@ -548,7 +588,13 @@ class _SearchPageState extends State<SearchPage> {
 
   // Section E: Popular Meals Showcase Carousel
   Widget _buildPopularMealsShowcase(ProductsProvider provider) {
-    final meals = MockCatalogData.allDeliveryMeals;
+    List<MealItemData> meals = MockCatalogData.allDeliveryMeals;
+    if (locator.isRegistered<MarketsProvider>()) {
+      final prov = locator<MarketsProvider>();
+      if (prov.popularMeals.isNotEmpty) {
+        meals = prov.popularMeals;
+      }
+    }
     return SizedBox(
       height: 230,
       child: ListView.separated(
@@ -564,18 +610,68 @@ class _SearchPageState extends State<SearchPage> {
             width: 165,
             height: 225,
             onTap: () {
-              final parentRest = MockCatalogData.restaurants.firstWhere(
-                (r) => r.menuItems.any((m) => m.id == meal.id),
-                orElse: () => MockCatalogData.restaurants.first,
-              );
+              final mockItem = MockCatalogData.getMenuItemById(meal.id);
+              int resId = meal.merchantId;
+              if (resId <= 0 && mockItem != null) {
+                resId = mockItem.restaurantId;
+              }
+
+              RestaurantStoreModel? storeModel;
+              if (locator.isRegistered<MarketsProvider>()) {
+                final prov = locator<MarketsProvider>();
+                if (resId > 0) {
+                  storeModel = prov.restaurants
+                      .where((r) => r.id == resId)
+                      .firstOrNull;
+                }
+                if (storeModel == null) {
+                  final nameLower = meal.merchantName.toLowerCase().trim();
+                  storeModel = prov.restaurants.where((r) =>
+                      r.name.toLowerCase().contains(nameLower) ||
+                      nameLower.contains(r.name.toLowerCase())).firstOrNull;
+                }
+              }
+
+              final mockRes = resId > 0
+                  ? MockCatalogData.getRestaurantById(resId)
+                  : MockCatalogData.getRestaurantByName(meal.merchantName);
+
+              final targetResId =
+                  storeModel?.id ?? (resId > 0 ? resId : mockRes.id);
+              final targetResName = storeModel?.name ??
+                  (meal.merchantName.isNotEmpty
+                      ? meal.merchantName
+                      : mockRes.name);
+              final targetCover =
+                  storeModel?.coverUrl ?? mockRes.coverUrl;
+              final targetLogo =
+                  storeModel?.logoUrl ?? mockRes.logoUrl;
+
+              if (meal.isMarket || (storeModel == null && mockRes.isMarket)) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MarketPage(
+                      marketId: targetResId,
+                      marketName: targetResName,
+                      coverUrl: targetCover,
+                      logoUrl: targetLogo,
+                    ),
+                  ),
+                );
+                return;
+              }
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => RestaurantMenuPage(
-                    restaurantId: parentRest.id,
-                    restaurantName: parentRest.name,
-                    coverUrl: parentRest.coverUrl,
-                    logoUrl: parentRest.logoUrl,
+                    restaurantId: targetResId,
+                    restaurantName: targetResName,
+                    coverUrl: targetCover,
+                    logoUrl: targetLogo,
+                    initialSelectedItemId: meal.id,
+                    initialSelectedItem: mockItem,
                   ),
                 ),
               );
@@ -616,8 +712,9 @@ class _SearchPageState extends State<SearchPage> {
       final tNoAl = t.startsWith('ال') ? t.substring(2) : t;
       if (t.isNotEmpty && normSource.contains(t)) return true;
       if (tNoAl.isNotEmpty &&
-          (normSource.contains(tNoAl) || sourceNoAl.contains(tNoAl)))
+          (normSource.contains(tNoAl) || sourceNoAl.contains(tNoAl))) {
         return true;
+      }
     }
 
     return false;
@@ -811,31 +908,35 @@ class _SearchPageState extends State<SearchPage> {
   Widget _buildLiveSuggestionsView(ProductsProvider provider) {
     final query = _currentQuery.trim();
 
-    // 1. Matching Restaurants / Stores
-    var matchingRestaurants = MockCatalogData.restaurants.where((r) {
-      final matchesCategories =
-          r.categories.any((c) => _matchesQuery(c, query));
-      return _matchesQuery(r.name, query) ||
-          _matchesQuery(r.cuisine, query) ||
-          _matchesQuery(r.categoryTag, query) ||
-          matchesCategories;
-    }).toList();
+    // 1. Matching Restaurants & Markets (live backend data via MarketsProvider)
+    var matchingRestaurants = <RestaurantStoreModel>[];
+    var matchingMarkets = <MarketStoreModel>[];
+    if (locator.isRegistered<MarketsProvider>()) {
+      final marketsProvider = locator<MarketsProvider>();
+      matchingRestaurants = marketsProvider.restaurants.where((r) {
+        return _matchesQuery(r.name, query) ||
+            _matchesQuery(r.cuisine, query) ||
+            _matchesQuery(r.categoryTag, query);
+      }).toList();
+      matchingMarkets = marketsProvider.markets.where((m) {
+        return _matchesQuery(m.name, query) ||
+            _matchesQuery(m.tagline ?? '', query);
+      }).toList();
+    }
+    final storeCount = matchingRestaurants.length + matchingMarkets.length;
 
-    // 2. Matching Food Dishes / Products
-    final allDishes = <MockMenuItemData>[];
-    for (final r in MockCatalogData.restaurants) {
-      allDishes.addAll(r.menuItems);
+    // 2. Matching Products (live backend search results via ProductsProvider)
+    final products = provider.dataList;
+
+    if (provider.isBusy && products.isEmpty && storeCount == 0) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 16),
+        child: RestaurantsListSkeleton(count: 3),
+      );
     }
 
-    var matchingDishes = allDishes.where((item) {
-      return _matchesQuery(item.title, query) ||
-          _matchesQuery(item.description, query) ||
-          _matchesQuery(item.restaurantName, query) ||
-          _matchesQuery(item.category, query);
-    }).toList();
-
     // Empty State
-    if (matchingRestaurants.isEmpty && matchingDishes.isEmpty) {
+    if (storeCount == 0 && products.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -913,9 +1014,9 @@ class _SearchPageState extends State<SearchPage> {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       children: [
         // 1. Matching Stores Section
-        if (matchingRestaurants.isNotEmpty) ...[
+        if (storeCount > 0) ...[
           Text(
-            'المتاجر والمطاعم (${matchingRestaurants.length})',
+            'المتاجر والمطاعم ($storeCount)',
             style: GoogleFonts.ibmPlexSansArabic(
               color: kCharcoalDark,
               fontSize: 15,
@@ -923,130 +1024,41 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ),
           const SizedBox(height: 10),
-          ...matchingRestaurants.map((restaurant) {
-            final nameLower = restaurant.name.toLowerCase();
-            final catLower = restaurant.categoryTag.toLowerCase();
-            final isMarket = restaurant.isMarket ||
-                catLower.contains('سوبرماركت') ||
-                catLower.contains('ماركت') ||
-                catLower.contains('market') ||
-                nameLower.contains('ماركت') ||
-                nameLower.contains('سوبرماركت') ||
-                nameLower.contains('سوبر ماركت') ||
-                nameLower.contains('مارت') ||
-                nameLower.contains('كلوفر') ||
-                nameLower.contains('clover') ||
-                nameLower.contains('مول') ||
-                nameLower.contains('mall') ||
-                nameLower.contains('market') ||
-                nameLower.contains('mart');
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+          ...matchingMarkets.map((market) {
+            final image = market.assetPath ?? market.logoUrl ?? '';
+            return _buildStoreResultCard(
+              name: market.name,
+              subtitle: market.tagline ?? 'سوبرماركت • ${market.eta}',
+              imageUrl: image,
+              isVerified: true,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MarketPage(
+                    marketId: market.id,
+                    marketName: market.name,
+                    coverUrl: image,
+                    logoUrl: image,
+                  ),
+                ),
               ),
-              child: ListTile(
-                onTap: () {
-                  if (isMarket) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MarketPage(
-                          marketId: restaurant.id,
-                          marketName: restaurant.name,
-                          coverUrl: restaurant.coverUrl,
-                          logoUrl: restaurant.logoUrl,
-                        ),
-                      ),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => RestaurantMenuPage(
-                          restaurantId: restaurant.id,
-                          restaurantName: restaurant.name,
-                          coverUrl: restaurant.coverUrl,
-                          logoUrl: restaurant.logoUrl,
-                        ),
-                      ),
-                    );
-                  }
-                },
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                leading: Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+            );
+          }),
+          ...matchingRestaurants.map((restaurant) {
+            return _buildStoreResultCard(
+              name: restaurant.name,
+              subtitle: '${restaurant.cuisine} • ${restaurant.eta}',
+              imageUrl: restaurant.logoUrl,
+              isVerified: restaurant.rating >= 4.5 || restaurant.isFast,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RestaurantMenuPage(
+                    restaurantId: restaurant.id,
+                    restaurantName: restaurant.name,
+                    coverUrl: restaurant.coverUrl,
+                    logoUrl: restaurant.logoUrl,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: restaurant.logoUrl.startsWith('assets')
-                        ? Image.asset(
-                            restaurant.logoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                                Icons.storefront,
-                                color: Color(0xFF94A3B8)),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: restaurant.logoUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => const Icon(
-                                Icons.storefront,
-                                color: Color(0xFF94A3B8)),
-                          ),
-                  ),
-                ),
-                title: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        restaurant.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          color: kCharcoalDark,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    if (restaurant.rating >= 4.5 || restaurant.isFast) ...[
-                      const SizedBox(width: 4),
-                      Transform.flip(
-                        flipX: true,
-                        child: const Icon(
-                          PhosphorIconsFill.sealCheck,
-                          color: kPrimaryOrange,
-                          size: 15,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                subtitle: Text(
-                  '${restaurant.cuisine} • ${restaurant.eta}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    color: const Color(0xFF64748B),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                trailing: const Icon(
-                  PhosphorIconsRegular.caretLeft,
-                  color: Color(0xFF94A3B8),
-                  size: 16,
-                  textDirection: TextDirection.ltr,
                 ),
               ),
             );
@@ -1054,115 +1066,111 @@ class _SearchPageState extends State<SearchPage> {
           const SizedBox(height: 14),
         ],
 
-        // 2. Matching Food Items & Products Section
-        if (matchingDishes.isNotEmpty) ...[
+        // 2. Matching Products Section (real backend search results)
+        if (products.isNotEmpty) ...[
           Text(
-            'الوجبات والأصناف المطابقة (${matchingDishes.length})',
+            'المنتجات (${products.length})',
             style: GoogleFonts.ibmPlexSansArabic(
               color: kCharcoalDark,
               fontSize: 15,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 10),
-          ...matchingDishes.map((dish) {
-            final parentRest =
-                MockCatalogData.getRestaurantById(dish.restaurantId);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-              ),
-              child: ListTile(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => RestaurantMenuPage(
-                        restaurantId: parentRest.id,
-                        restaurantName: parentRest.name,
-                        coverUrl: parentRest.coverUrl,
-                        logoUrl: parentRest.logoUrl,
-                      ),
-                    ),
-                  );
-                },
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                leading: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: dish.imageUrl.startsWith('assets')
-                        ? Image.asset(
-                            dish.imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                                Icons.fastfood,
-                                color: Color(0xFF94A3B8)),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: dish.imageUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => const Icon(
-                                Icons.fastfood,
-                                color: Color(0xFF94A3B8)),
-                          ),
-                  ),
-                ),
-                title: Text(
-                  dish.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    color: kCharcoalDark,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'من ${dish.restaurantName}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        color: const Color(0xFF64748B),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      dish.price,
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        color: kPrimaryOrange,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                trailing: const Icon(
-                  PhosphorIconsRegular.caretLeft,
-                  color: Color(0xFF94A3B8),
-                  size: 16,
-                  textDirection: TextDirection.ltr,
-                ),
-              ),
-            );
-          }),
+          const SizedBox(height: 8),
+          ...products.map((product) => ProductSingleItem(product)),
         ],
       ],
+    );
+  }
+
+  Widget _buildStoreResultCard({
+    required String name,
+    required String subtitle,
+    required String imageUrl,
+    required bool isVerified,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: imageUrl.startsWith('assets')
+                ? Image.asset(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                        Icons.storefront, color: Color(0xFF94A3B8)),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const Icon(
+                        Icons.storefront, color: Color(0xFF94A3B8)),
+                  ),
+          ),
+        ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.ibmPlexSansArabic(
+                  color: kCharcoalDark,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (isVerified) ...[
+              const SizedBox(width: 4),
+              Transform.flip(
+                flipX: true,
+                child: const Icon(
+                  PhosphorIconsFill.sealCheck,
+                  color: kPrimaryOrange,
+                  size: 15,
+                ),
+              ),
+            ],
+          ],
+        ),
+        subtitle: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.ibmPlexSansArabic(
+            color: const Color(0xFF64748B),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: const Icon(
+          PhosphorIconsRegular.caretLeft,
+          color: Color(0xFF94A3B8),
+          size: 16,
+          textDirection: TextDirection.ltr,
+        ),
+      ),
     );
   }
 }

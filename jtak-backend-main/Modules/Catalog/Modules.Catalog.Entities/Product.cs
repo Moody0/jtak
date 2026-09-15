@@ -16,11 +16,17 @@ namespace Modules.Catalog.Entities
         public int Id { get; set; }
 
         [Required]
-        [StringLength(128)]
+        [StringLength(256)]
         public string Title { get; set; }
 
-        [StringLength(128)]
+        [StringLength(256)]
         public string TitleEn { get; set; }
+
+        [StringLength(64)]
+        public string Barcode { get; set; }
+
+        [StringLength(128)]
+        public string Brand { get; set; }
 
         public string Description { get; set; }
 
@@ -59,6 +65,10 @@ namespace Modules.Catalog.Entities
 
         public string TitleEn { get; set; }
 
+        public string Barcode { get; set; }
+
+        public string Brand { get; set; }
+
         public string Description { get; set; }
 
         public string DescriptionEn { get; set; }
@@ -75,7 +85,7 @@ namespace Modules.Catalog.Entities
         public string Unit { get; set; }
         public decimal Price { get; set; }
         public decimal FinalPrice { get; set; }
-        public int MerchantId { get; set; }
+        public int? MerchantId { get; set; }
         public Currency Currency { get; set; }
         public string CurrencyString => Currency.ToLocalizedName();
         public bool Active { get; set; } = true;
@@ -123,6 +133,26 @@ namespace Modules.Catalog.Entities
         //public double Rate { get; set; }
         //public int RateCount { get; set; }
         public int MerchantId { get; set; }
+    }
+
+    public class PopularProductDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public int CategoryId { get; set; }
+        public string Category { get; set; }
+        public string Photos { get; set; }
+        public string Unit { get; set; }
+        public decimal Price { get; set; }
+        public decimal FinalPrice { get; set; }
+        public int MerchantId { get; set; }
+        public string MerchantTitle { get; set; }
+        public string MerchantLogo { get; set; }
+        public int MerchantKind { get; set; }
+        public string Eta { get; set; }
+        public string Distance { get; set; }
+        public int OrdersCount { get; set; }
     }
 
 }

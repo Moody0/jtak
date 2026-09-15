@@ -1,114 +1,348 @@
-<div class="card card-custom gutter-b">
-  <div class="card-header">
-    <div class="card-title">
-      <div><h3 class="card-label">Orders</h3><span class="card-subtitle">Track fulfillment, delivery assignments, and cancellations.</span></div>
+<div class="orders-page-container">
+  <!-- 1. Streamlined Operations Utility Bar -->
+  <div class="ops-utility-bar mb-3">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span class="fw-bold">{{ 'ORDERS_PAGE.LIVE_OPERATIONS' | translate }}</span>
+      </div>
+      <div class="ops-sync-meta">
+        <i class="fas fa-satellite text-primary me-1"></i>
+        <span>{{ 'ORDERS_PAGE.AUTO_REFRESH' | translate }}</span>
+        <span class="ops-sync-divider">•</span>
+        <span class="ops-sync-time">{{ lastUpdated | date:'shortTime' }}</span>
+      </div>
     </div>
-
+    <div class="ops-utility-right">
+      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="refreshOrders()" [disabled]="isLoading" [title]="'ORDERS_PAGE.REFRESH_ORDERS' | translate">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading" aria-hidden="true"></i>
+        <span>{{ 'ORDERS_PAGE.REFRESH_ORDERS' | translate }}</span>
+      </button>
+    </div>
   </div>
-  <div class="card-body">
-    <!-- begin: Filtration form -->
-    <div class="form form-label-right">
-      <div class="form-group row">
-        <div class="col-lg-2" [formGroup]="searchGroup">
-          <input type="text" class="form-control" name="searchText" placeholder="Search orders" formControlName="searchTerm" />
+
+  <ng-container *ngIf="ordersService.items$ | async as items">
+    <!-- 2. Operational KPI Counters Strip -->
+    <section class="ops-orders-kpi-bar mb-4" *ngIf="getCounts(items) as counts">
+      <div class="ops-kpi-chip" [class.active]="activeTab === 'ALL'" (click)="setActiveTab('ALL')">
+        <div class="ops-kpi-chip-icon ops-kpi-chip-icon--dark">
+          <i class="fas fa-boxes"></i>
+        </div>
+        <div class="ops-kpi-chip-info">
+          <strong class="ops-kpi-chip-count">{{ counts.total }}</strong>
+          <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_ALL' | translate }}</span>
         </div>
       </div>
-    </div>
-    <!-- end: Filtration form -->
-    <ng-container *ngIf="ordersService.items$ | async as items">
-      <div class="bulk-action-bar" *ngIf="selection.count > 0">
-        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-        <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'orders')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-danger" (click)="bulkCancel(items)"><i class="fas fa-ban"></i> Cancel orders</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
+
+      <div class="ops-kpi-chip" [class.active]="activeTab === 'PENDING'" (click)="setActiveTab('PENDING')">
+        <div class="ops-kpi-chip-icon ops-kpi-chip-icon--amber">
+          <i class="fas fa-hourglass-half"></i>
+        </div>
+        <div class="ops-kpi-chip-info">
+          <strong class="ops-kpi-chip-count text-warning">{{ counts.pending }}</strong>
+          <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_PENDING' | translate }}</span>
+        </div>
       </div>
-    </ng-container>
 
-    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="ordersService.items$ | async as items">
-      <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
-        <thead>
-          <tr class="fw-bolder text-muted">
-            <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all orders on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-            <th scope="col">
-              Id
-              <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"
-                (sort)="sort($event)"></app-sort-icon>
-            </th>
-            <th scope="col" style="width: 26%;">
-              Order
-              <app-sort-icon column="purchaseDate" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"
-                (sort)="sort($event)"></app-sort-icon>
-            </th>
-            <th scope="col">
-              Price
-            </th>
-            <th scope="col">
-              Order Details
-            </th>
-            <th scope="col">
-              Delivery User
-            </th>
-            <th scope="col">
-              Cancel
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
-            <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select order ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
-            <td>{{ i.id }}</td>
-            <td>
-              <div>{{ i.purchaseDate | date }}</div>
-              <div>{{ i.address }}</div>
-              <div>{{ i.phonenumber }}</div>
-              <div>
-                <a class="badge mb-2 p-1 badge-warning text-dark" target="_blank"
-                  href="https://www.google.com/maps/search/?api=1&query={{ i.lat }},{{ i.lng }}"><i
-                    class="fas fa-map-marker-alt" style="color: black;"></i> Map</a>
-              </div>
-              <div>{{ i.user }}</div>
-            <td>
-              <span class="fw-bolder">{{ i.price | number }}</span>
-              <span class="currency-badge">SYP</span>
-            </td>
-            <td>
-              <table>
-              <tr *ngFor="let detail of i.orderDetails">
-                <td class="p-1">{{detail.productTitle}} × {{detail.quantity}}</td>
-                <td class="p-1" style="direction: ltr;text-align: right;">
-                  <strong>{{detail.totalFinalPrice | number}}</strong>
-                  <span class="badge badge-light-primary ms-1">SYP</span>
-                </td>
-                <td class="p-1"><span class="badge mb-2 p-1" [ngClass]="{
-                    'badge-light-success': detail.orderDetailStatus === 3,
-                    'badge-warning': detail.orderDetailStatus !== 3
-                  }">{{detail.orderDetailStatusString}}</span></td>
-                </tr>
-            </table>
-            </td>
-            <td>{{ i.deliveryUser }}
-              <div>
-              <button *ngIf="canApprove(i)" type="button" class="btn btn-sm btn-primary me-2" (click)="approve(i)"><i class="fas fa-check"></i>Approve</button>
-              <app-table-actions *ngIf="isDeliveryEditable(i)" (editClicked)="edit(i)"
-                                    [showDeleteButton]="false">
-              </app-table-actions>
-            </div>
-            </td>
-            <td>
-            
-              <button class="btn text-danger p-2"
-              href="#"
-                (click)="confirmCancel(i.id)" aria-label="Cancel order"><i
-                  class="fas fa-times"></i><span class="ms-1">Cancel</span></button>
-               
-                </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="ops-kpi-chip" [class.active]="activeTab === 'UNASSIGNED'" (click)="setActiveTab('UNASSIGNED')">
+        <div class="ops-kpi-chip-icon ops-kpi-chip-icon--rose">
+          <i class="fas fa-user-clock"></i>
+        </div>
+        <div class="ops-kpi-chip-info">
+          <strong class="ops-kpi-chip-count text-danger">{{ counts.unassigned }}</strong>
+          <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_UNASSIGNED' | translate }}</span>
+        </div>
+      </div>
+
+      <div class="ops-kpi-chip" [class.active]="activeTab === 'READY'" (click)="setActiveTab('READY')">
+        <div class="ops-kpi-chip-icon ops-kpi-chip-icon--cyan">
+          <i class="fas fa-box-open"></i>
+        </div>
+        <div class="ops-kpi-chip-info">
+          <strong class="ops-kpi-chip-count text-info">{{ counts.ready }}</strong>
+          <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_READY' | translate }}</span>
+        </div>
+      </div>
+
+      <div class="ops-kpi-chip" [class.active]="activeTab === 'IN_TRANSIT'" (click)="setActiveTab('IN_TRANSIT')">
+        <div class="ops-kpi-chip-icon ops-kpi-chip-icon--blue">
+          <i class="fas fa-motorcycle"></i>
+        </div>
+        <div class="ops-kpi-chip-info">
+          <strong class="ops-kpi-chip-count text-primary">{{ counts.inTransit }}</strong>
+          <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_IN_TRANSIT' | translate }}</span>
+        </div>
+      </div>
+
+      <div class="ops-kpi-chip" [class.active]="activeTab === 'DELIVERED'" (click)="setActiveTab('DELIVERED')">
+        <div class="ops-kpi-chip-icon ops-kpi-chip-icon--green">
+          <i class="fas fa-check-double"></i>
+        </div>
+        <div class="ops-kpi-chip-info">
+          <strong class="ops-kpi-chip-count text-success">{{ counts.delivered }}</strong>
+          <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_DELIVERED' | translate }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Navigation Filter Tabs & Search Toolbar -->
+    <div class="ops-tabs-toolbar mb-4">
+      <nav class="ops-status-tabs" aria-label="Order Status Navigation">
+        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'ALL'" (click)="setActiveTab('ALL')">
+          <span>{{ 'ORDERS_PAGE.TAB_ALL' | translate }}</span>
+          <span class="ops-status-tab-count">{{ items.length }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'PENDING'" (click)="setActiveTab('PENDING')">
+          <span>{{ 'ORDERS_PAGE.TAB_PENDING' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--amber">{{ getCounts(items).pending }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'UNASSIGNED'" (click)="setActiveTab('UNASSIGNED')">
+          <span>{{ 'ORDERS_PAGE.TAB_UNASSIGNED' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--rose">{{ getCounts(items).unassigned }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'READY'" (click)="setActiveTab('READY')">
+          <span>{{ 'ORDERS_PAGE.TAB_READY' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--blue">{{ getCounts(items).ready }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'IN_TRANSIT'" (click)="setActiveTab('IN_TRANSIT')">
+          <span>{{ 'ORDERS_PAGE.TAB_IN_TRANSIT' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--blue">{{ getCounts(items).inTransit }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'DELIVERED'" (click)="setActiveTab('DELIVERED')">
+          <span>{{ 'ORDERS_PAGE.TAB_DELIVERED' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--green">{{ getCounts(items).delivered }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'CANCELED'" (click)="setActiveTab('CANCELED')">
+          <span>{{ 'ORDERS_PAGE.TAB_CANCELED' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--muted">{{ getCounts(items).canceled }}</span>
+        </button>
+      </nav>
+
+      <div class="ops-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search ops-search-icon"></i>
+        <input type="text" class="form-control ops-search-input" name="searchText"
+          [placeholder]="'ORDERS_PAGE.SEARCH_PLACEHOLDER' | translate" formControlName="searchTerm" />
+        <button type="button" class="btn ops-search-clear" *ngIf="searchGroup.get('searchTerm')?.value" (click)="clearSearch()" title="مسح البحث">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
     </div>
 
-    <app-paginator class="d-flex justify-content-between align-items-center flex-wrap" [paginator]="paginator"
-      [isLoading]="isLoading" (paginate)="paginate($event)"></app-paginator>
+    <!-- 4. Multi-Selection Bulk Action Bar -->
+    <div class="ops-bulk-bar mb-4" *ngIf="selection.count > 0">
+      <div class="ops-bulk-info">
+        <i class="fas fa-check-square me-2 fs-5"></i>
+        <span><strong>{{ selection.count }}</strong> {{ 'ORDERS_PAGE.SELECTED_ORDERS' | translate }}</span>
+      </div>
+      <div class="ops-bulk-actions">
+        <button type="button" class="btn btn-sm btn-light-primary me-2" (click)="selection.exportSelected(items, 'orders')">
+          <i class="fas fa-file-export me-1"></i> {{ 'COMMON.EXPORT' | translate }}
+        </button>
+        <button type="button" class="btn btn-sm btn-light-danger me-2" (click)="bulkCancel(items)">
+          <i class="fas fa-ban me-1"></i> {{ 'ORDERS_PAGE.CANCEL_SELECTED' | translate }}
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" (click)="selection.clear()">
+          <i class="fas fa-times me-1"></i> {{ 'COMMON.CLEAR' | translate }}
+        </button>
+      </div>
+    </div>
 
-    <!-- begin:Table -->
-  </div>
-  <!-- end: Table -->
+    <!-- Active Filter Reset Notice -->
+    <div class="d-flex align-items-center justify-content-between mb-3 px-1" *ngIf="hasActiveFilter()">
+      <div class="text-muted fs-8">
+        <i class="fas fa-filter text-primary me-1"></i>
+        <span>{{ 'ORDERS_PAGE.FILTER_NOTICE_PREFIX' | translate }} <strong>{{ getFilteredOrders(items).length }}</strong> {{ 'ORDERS_PAGE.FILTER_NOTICE_OF' | translate }} {{ items.length }})</span>
+      </div>
+      <button type="button" class="btn btn-link btn-sm text-primary p-0 fs-8 fw-bold" (click)="resetFilters()">
+        <i class="fas fa-undo me-1"></i>{{ 'ORDERS_PAGE.RESET_FILTERS' | translate }}
+      </button>
+    </div>
+
+    <!-- 5. Modern High-Density Orders Table Card -->
+    <div class="ops-orders-card">
+      <div class="table-responsive" *ngIf="getFilteredOrders(items) as filteredItems">
+        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0" *ngIf="filteredItems.length > 0; else noOrdersState">
+          <thead>
+            <tr class="ops-table-header text-muted fs-8">
+              <th scope="col" style="width: 40px;" class="text-center">
+                <input type="checkbox" class="form-check-input ops-checkbox" aria-label="Select all orders"
+                  [checked]="selection.allSelected(filteredItems)" [indeterminate]="selection.partiallySelected(filteredItems)"
+                  (change)="selection.toggleAll(filteredItems, $any($event.target).checked)" />
+              </th>
+              <th scope="col" style="width: 155px;">
+                <div class="d-flex align-items-center cursor-pointer" (click)="sort('id')">
+                  <span>{{ 'ORDERS_PAGE.COL_ORDER_NUM' | translate }}</span>
+                  <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
+                </div>
+              </th>
+              <th scope="col" style="min-width: 260px;">
+                <div class="d-flex align-items-center cursor-pointer" (click)="sort('purchaseDate')">
+                  <span>{{ 'ORDERS_PAGE.COL_CUSTOMER_DEST' | translate }}</span>
+                  <app-sort-icon column="purchaseDate" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
+                </div>
+              </th>
+              <th scope="col" style="min-width: 220px;">{{ 'ORDERS_PAGE.COL_ITEMS_STATUS' | translate }}</th>
+              <th scope="col" style="width: 120px;">{{ 'ORDERS_PAGE.COL_TOTAL_PRICE' | translate }}</th>
+              <th scope="col" style="width: 150px;">{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</th>
+              <th scope="col" style="width: 125px; text-align: center;">{{ 'ORDERS_PAGE.COL_ACTIONS' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let o of filteredItems" [class.ops-row-selected]="selection.isSelected(o)" class="ops-table-row">
+              <!-- Select Checkbox -->
+              <td class="text-center">
+                <input type="checkbox" class="form-check-input ops-checkbox" [checked]="selection.isSelected(o)"
+                  [attr.aria-label]="'Select order ' + o.id" (change)="selection.toggle(o, $any($event.target).checked)" />
+              </td>
+
+              <!-- 1. Order ID, Time & Overall Status -->
+              <td>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <span class="ops-order-id">#{{ o.id }}</span>
+                  <span class="ops-status-pill" [ngClass]="getOrderOverallStatus(o).badgeClass">
+                    <i class="fas me-1" [ngClass]="getOrderOverallStatus(o).icon"></i>{{ getOrderOverallStatus(o).label }}
+                  </span>
+                </div>
+                <div class="ops-order-meta">
+                  <span>{{ o.purchaseDate | date:'d MMM y' }}</span>
+                  <span class="ops-dot-sep">•</span>
+                  <span>{{ o.purchaseDate | date:'shortTime' }}</span>
+                </div>
+                <div *ngIf="o.adminFlowMessage" class="small mt-2"
+                  [ngClass]="o.requiresMerchantDecision ? 'text-warning fw-bold' : 'text-muted'">
+                  <i class="fas" [ngClass]="o.requiresMerchantDecision ? 'fa-store-alt' : 'fa-info-circle'"></i>
+                  {{ o.adminFlowMessage }}
+                </div>
+              </td>
+
+              <!-- 2. Customer & Destination -->
+              <td>
+                <div class="ops-customer-cell">
+                  <div class="ops-customer-primary">
+                    <strong class="ops-customer-name" [title]="o.user">{{ o.user || ('ORDERS_PAGE.CUSTOMER' | translate) }}</strong>
+                    <a *ngIf="o.phonenumber" [href]="'tel:' + o.phonenumber" class="ops-phone" dir="ltr" [title]="'ORDERS_PAGE.CALL_CUSTOMER' | translate">
+                      <i class="fas fa-phone-alt me-1 text-success"></i>{{ formatPhoneNumber(o.phonenumber) }}
+                    </a>
+                  </div>
+                  <div class="ops-customer-meta">
+                    <span class="ops-customer-addr" [title]="o.address">
+                      <i class="fas fa-map-marker-alt text-danger me-1"></i>{{ o.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}
+                    </span>
+                    <a *ngIf="o.lat && o.lng" class="ops-micro-link" target="_blank"
+                      [href]="'https://www.google.com/maps/search/?api=1&query=' + o.lat + ',' + o.lng" [title]="'ORDERS_PAGE.OPEN_MAP' | translate">
+                      <i class="fas fa-map-marked-alt text-primary"></i>
+                    </a>
+                    <span *ngIf="o.deliveryOtp" class="ops-pin-chip" title="Proof of Delivery PIN">
+                      PIN <strong dir="ltr">{{ o.deliveryOtp }}</strong>
+                    </span>
+                    <span *ngIf="o.deliveredAt" class="text-success fs-9 ms-1" [title]="o.deliveredAt | date:'short'">
+                      <i class="fas fa-check-circle"></i>
+                    </span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- 3. Items Manifest -->
+              <td>
+                <div class="ops-manifest-list" *ngIf="o.orderDetails?.length; else noDetails">
+                  <div class="ops-manifest-item" *ngFor="let detail of (isExpanded(o.id) ? o.orderDetails : o.orderDetails.slice(0, 2))">
+                    <span class="ops-manifest-qty">{{ detail.quantity }}×</span>
+                    <span class="ops-manifest-title" [title]="detail.productTitle">{{ detail.productTitle }}</span>
+                  </div>
+
+                  <!-- Expand / Collapse Toggle if more than 2 items -->
+                  <button type="button" class="btn btn-link btn-sm ops-manifest-toggle p-0" *ngIf="o.orderDetails.length > 2" (click)="toggleExpand(o.id)">
+                    <span *ngIf="!isExpanded(o.id)">
+                      <i class="fas fa-chevron-down me-1"></i>+{{ o.orderDetails.length - 2 }} {{ 'ORDERS_PAGE.MORE_ITEMS_SHOW' | translate }}
+                    </span>
+                    <span *ngIf="isExpanded(o.id)">
+                      <i class="fas fa-chevron-up me-1"></i>{{ 'ORDERS_PAGE.MORE_ITEMS_HIDE' | translate }}
+                    </span>
+                  </button>
+                </div>
+                <ng-template #noDetails>
+                  <span class="text-muted fs-8 fst-italic">{{ 'ORDERS_PAGE.NO_ITEMS_RECORDED' | translate }}</span>
+                </ng-template>
+              </td>
+
+              <!-- 4. Total Price & Payment Method -->
+              <td>
+                <div class="ops-price-amount">
+                  {{ o.price | number }} <span class="ops-price-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                </div>
+                <div class="ops-payment-meta">
+                  <span class="ops-cod-badge">
+                    <i class="fas fa-money-bill-wave me-1"></i>{{ 'ORDERS_PAGE.CASH_ON_DELIVERY' | translate }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- 5. Delivery Captain -->
+              <td>
+                <div class="ops-captain-cell">
+                  <ng-container *ngIf="hasAssignedDriver(o); else unassignedDriver">
+                    <div class="d-flex align-items-center gap-1 mb-1">
+                      <i class="fas fa-motorcycle text-primary fs-8"></i>
+                      <strong class="ops-driver-name text-truncate">{{ getCleanDriverName(o.deliveryUser) }}</strong>
+                    </div>
+                    <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
+                      <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
+                    </button>
+                  </ng-container>
+                  <ng-template #unassignedDriver>
+                    <div class="d-flex align-items-center gap-1 mb-1">
+                      <span class="ops-unassigned-tag">{{ 'ORDERS_PAGE.UNASSIGNED' | translate }}</span>
+                    </div>
+                    <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
+                      <i class="fas fa-user-plus me-1"></i>{{ 'ORDERS_PAGE.ASSIGN_CAPTAIN' | translate }}
+                    </button>
+                  </ng-template>
+                </div>
+              </td>
+
+              <!-- 6. Actions Cluster -->
+              <td>
+                <div class="ops-actions-cluster">
+                  <button *ngIf="canApprove(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve"
+                    (click)="approve(o)" [title]="'ORDERS_PAGE.APPROVE_TOOLTIP' | translate">
+                    <i class="fas fa-check me-1"></i><span>{{ 'ORDERS_PAGE.APPROVE' | translate }}</span>
+                  </button>
+                  <button *ngIf="canMarkReady(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve"
+                    (click)="markReady(o)" title="Mark ready for courier pickup">
+                    <i class="fas fa-box-check me-1"></i><span>{{ 'جاهز للاستلام' }}</span>
+                  </button>
+                  <button *ngIf="canLiveTrack(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--radar"
+                    (click)="openLiveTrack(o)" [title]="'ORDERS_PAGE.LIVE_RADAR_TOOLTIP' | translate">
+                    <i class="fas fa-satellite-dish me-1"></i><span>{{ 'ORDERS_PAGE.LIVE_RADAR' | translate }}</span>
+                  </button>
+                  <button *ngIf="canCancel(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--cancel"
+                    (click)="confirmCancel(o)" [title]="'ORDERS_PAGE.CANCEL_TOOLTIP' | translate">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Empty State inside table -->
+        <ng-template #noOrdersState>
+          <div class="ops-empty-state py-5">
+            <div class="ops-empty-icon">
+              <i class="fas fa-search"></i>
+            </div>
+            <strong class="fs-5">{{ 'ORDERS_PAGE.NO_MATCHING_ORDERS' | translate }}</strong>
+            <span class="text-muted fs-7 mt-1">{{ 'ORDERS_PAGE.NO_MATCHING_DESC' | translate }}</span>
+            <button type="button" class="btn btn-sm ops-btn-primary mt-3" (click)="resetFilters()">
+              <i class="fas fa-undo me-1"></i>{{ 'ORDERS_PAGE.RESET_FILTERS' | translate }}
+            </button>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- Pagination -->
+      <app-paginator class="ops-paginator px-4 py-3 d-flex justify-content-between align-items-center flex-wrap"
+        [paginator]="paginator" [isLoading]="isLoading" (paginate)="paginate($event)"></app-paginator>
+    </div>
+  </ng-container>
 </div>

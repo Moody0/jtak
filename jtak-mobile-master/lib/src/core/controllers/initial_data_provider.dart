@@ -6,6 +6,7 @@ import 'package:jtek_app/src/core/services/authentication_service.dart';
 import 'package:provider/provider.dart';
 
 import '../models/catalog/category_model.dart';
+import 'package:jtek_app/src/core/models/catalog/home_category_tile.dart';
 
 import '../services/locator.dart';
 import '../../utils/providers/sol_api.dart';
@@ -19,8 +20,8 @@ class InitialDataProvider extends BaseProvider {
     try {
       Map data = await _api.getRequest('/Home');
 
-      if (data.containsKey('user')) {
-        locator<AuthenticationService>().user = data['user'] != null ? UserModel.fromMap(data['user']) : null;
+      if (data.containsKey('user') && data['user'] != null) {
+        locator<AuthenticationService>().user = UserModel.fromMap(data['user']);
       }
 
       if (data.containsKey('banners') && data['banners'] != null) {
@@ -61,6 +62,22 @@ class InitialDataProvider extends BaseProvider {
           }
         }
       }
+      // The curated Home grid, where every tile carries its own destination.
+      // Older backends do not send this; the featured category list above then
+      // remains the fallback.
+      if (data.containsKey('homeCategories') && data['homeCategories'] != null) {
+        final tiles = <HomeCategoryTile>[];
+        for (final item in data['homeCategories']) {
+          tiles.add(HomeCategoryTile.fromMap(Map<String, dynamic>.from(item)));
+        }
+        if (locator.isRegistered<CategoriesProvider>()) {
+          locator<CategoriesProvider>().setHomeCategoryTiles(tiles);
+        } else if (context.mounted) {
+          Provider.of<CategoriesProvider>(context, listen: false)
+              .setHomeCategoryTiles(tiles);
+        }
+      }
+
       notifyListeners();
     } catch (error) {
       rethrow;
@@ -104,5 +121,41 @@ class InitialDataProvider extends BaseProvider {
     }).toList();
 
     return specific.isNotEmpty ? specific : bannerList;
+  }
+
+  /// Banners targeted for the "صفحة المطاعم" (Restaurants Page) promo ads section
+  List<BannerModel> get restaurantBanners {
+    if (bannerList.isEmpty) return [];
+
+    return bannerList.where((b) {
+      final url = (b.url ?? '').toLowerCase();
+      final desc = (b.description ?? '').toLowerCase();
+      final title = (b.title ?? '').toLowerCase();
+      return b.bannerLocation == 2 || // RestaurantsPage
+          b.bannerLocation == 4 || // All
+          url.contains('section:restaurant') ||
+          url.contains('section:food') ||
+          desc.contains('restaurants') ||
+          desc.contains('مطاعم') ||
+          title.contains('مطاعم');
+    }).toList();
+  }
+
+  /// Banners targeted for the "صفحة الماركت" (Market Page) promo ads section
+  List<BannerModel> get marketBanners {
+    if (bannerList.isEmpty) return [];
+
+    return bannerList.where((b) {
+      final url = (b.url ?? '').toLowerCase();
+      final desc = (b.description ?? '').toLowerCase();
+      final title = (b.title ?? '').toLowerCase();
+      return b.bannerLocation == 3 || // MarketPage
+          b.bannerLocation == 4 || // All
+          url.contains('section:market') ||
+          url.contains('section:grocery') ||
+          desc.contains('market') ||
+          desc.contains('ماركت') ||
+          title.contains('ماركت');
+    }).toList();
   }
 }

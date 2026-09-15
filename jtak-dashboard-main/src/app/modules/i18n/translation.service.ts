@@ -20,10 +20,10 @@ export class TranslationService {
 
   constructor(private translate: TranslateService) {
     // add new langIds to the list
-    this.translate.addLangs(['en']);
+    this.translate.addLangs(['ar', 'en']);
 
     // this language will be used as a fallback when a translation isn't found in the current language
-    this.translate.setDefaultLang('en');
+    this.translate.setDefaultLang('ar');
   }
 
   loadTranslations(...args: Locale[]): void {
@@ -38,7 +38,9 @@ export class TranslationService {
 
     // add new languages to the list
     this.translate.addLangs(this.langIds);
-    this.translate.use(this.getSelectedLanguage());
+    const selected = this.getSelectedLanguage();
+    this.translate.use(selected);
+    this.updateDirection(selected);
   }
 
   setLanguage(lang: string) {
@@ -46,6 +48,30 @@ export class TranslationService {
       this.translate.use(this.translate.getDefaultLang());
       this.translate.use(lang);
       localStorage.setItem(LOCALIZATION_LOCAL_STORAGE_KEY, lang);
+      this.updateDirection(lang);
+    }
+  }
+
+  updateDirection(lang: string) {
+    if (typeof document !== 'undefined') {
+      const isRtl = lang === 'ar';
+      const dirVal = isRtl ? 'rtl' : 'ltr';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = dirVal;
+      document.documentElement.setAttribute('dir', dirVal);
+      document.documentElement.style.direction = dirVal;
+      if (document.body) {
+        document.body.dir = dirVal;
+        document.body.setAttribute('dir', dirVal);
+        document.body.style.direction = dirVal;
+        if (isRtl) {
+          document.body.classList.add('rtl');
+          document.body.classList.remove('ltr');
+        } else {
+          document.body.classList.add('ltr');
+          document.body.classList.remove('rtl');
+        }
+      }
     }
   }
 
@@ -55,7 +81,7 @@ export class TranslationService {
   getSelectedLanguage(): any {
     return (
       localStorage.getItem(LOCALIZATION_LOCAL_STORAGE_KEY) ||
-      this.translate.getDefaultLang()
+      'ar'
     );
   }
 }

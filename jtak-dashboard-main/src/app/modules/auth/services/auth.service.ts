@@ -73,10 +73,12 @@ export class AuthService {
           }),
           catchError((err) => {
             console.error('err', err);
+            this.logout();
             return of(undefined);
           }),
           finalize(() => this.isLoadingSubject.next(false))
-        );
+        )
+        .subscribe();
     }
     var user = this.getUserFromLocalStorage();
     if (user !== undefined) {

@@ -1,71 +1,663 @@
-<app-edit-modal [item]="item" [itemName]="item.title" moduleName="Merchant" [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid" (cancelClicked)="modal.dismiss()" (saveClicked)="save()">
+<app-edit-modal
+  [item]="item"
+  [itemName]="item.title || ''"
+  moduleName="Merchant"
+  [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid"
+  (cancelClicked)="modal.dismiss()"
+  (saveClicked)="save()"
+>
   <ng-container *ngIf="item">
-    <form class="form jtak-edit-form" [formGroup]="formGroup">
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>01</span><div><h3>Business details</h3><p>Customer-facing identity and merchant ownership.</p></div></div>
-        <div class="row g-4">
-          <div class="col-md-6"><label for="title">Business name</label><app-input-container [control]="formGroup.controls.title"><input type="text" class="form-control" formControlName="title" id="title" placeholder="Enter the business name" /></app-input-container></div>
-          <div class="col-md-6"><label for="ownerId">Account owner</label><ng-select id="ownerId" formControlName="ownerId" placeholder="Choose an owner"><ng-option *ngFor="let user of merchantUsers" [value]="user.id">{{ user.fullName }}</ng-option></ng-select></div>
-          <div class="col-12">
-            <label class="d-block mb-2">Merchant type (نوع المتجر)</label>
-            <div class="d-flex flex-wrap gap-4">
-              <label class="d-flex align-items-center gap-2 cursor-pointer">
-                <input type="radio" formControlName="merchantKind" [value]="0" class="form-check-input mt-0" />
-                <span>🍽️ <strong>Restaurant (مطعم)</strong></span>
-              </label>
-              <label class="d-flex align-items-center gap-2 cursor-pointer">
-                <input type="radio" formControlName="merchantKind" [value]="1" class="form-check-input mt-0" />
-                <span>🛒 <strong>Supermarket / Market (سوبرماركت)</strong></span>
-              </label>
-              <label class="d-flex align-items-center gap-2 cursor-pointer">
-                <input type="radio" formControlName="merchantKind" [value]="2" class="form-check-input mt-0" />
-                <span>💊 <strong>Pharmacy (صيدلية)</strong></span>
-              </label>
-              <label class="d-flex align-items-center gap-2 cursor-pointer">
-                <input type="radio" formControlName="merchantKind" [value]="3" class="form-check-input mt-0" />
-                <span>🏬 <strong>Store (متجر)</strong></span>
-              </label>
+    <div class="merchant-editor-layout">
+
+      <!-- Form Column -->
+      <div class="merchant-form-column">
+        <form class="form jtak-edit-form" [formGroup]="formGroup">
+
+          <!-- Section 01: Store Identity & Activity -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>01</span>
+              <div>
+                <h3>بيانات المتجر والنشاط</h3>
+                <p>الهوية التجارية ومالك الحساب وتصنيف النشاط في التطبيق.</p>
+              </div>
             </div>
-            <small class="text-muted d-block mt-1">This controls exactly which featured category contains the merchant in the customer app.</small>
+
+            <div class="row g-4">
+              <!-- Title -->
+              <div class="col-12">
+                <label for="title" class="form-label fw-bold mb-2">
+                  {{ 'MERCHANTS_PAGE.COL_NAME_MARKET' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.title">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="title"
+                    id="title"
+                    placeholder="أدخل اسم المتجر بوضوح (مثال: جيتك ماركت - JTAK Market)"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Owner -->
+              <div class="col-12">
+                <label for="ownerId" class="form-label fw-bold mb-2 d-flex justify-content-between align-items-center">
+                  <span class="d-flex align-items-center gap-2">
+                    <i class="fas fa-user-shield text-primary fs-7"></i>
+                    <span>{{ 'MERCHANT_WORKSPACE.OWNER' | translate }} (مالك الحساب)</span>
+                  </span>
+                  <span class="badge bg-light-primary text-primary fs-8 py-1 px-2.5 rounded-pill" *ngIf="formGroup.get('ownerId')?.value && formGroup.get('ownerId')?.value !== '-'">
+                    <i class="fas fa-check-circle me-1 text-primary"></i> تم التعيين
+                  </span>
+                </label>
+                <ng-select
+                  id="ownerId"
+                  class="merchant-owner-select"
+                  formControlName="ownerId"
+                  [items]="merchantUsers"
+                  bindValue="id"
+                  bindLabel="fullName"
+                  [searchFn]="userSearchFn"
+                  [loading]="loadingUsers"
+                  loadingText="جاري تحميل المستخدمين..."
+                  placeholder="ابحث بالاسم أو برقم الهاتف (مثال: 0980906630)..."
+                  [clearable]="true"
+                >
+                  <!-- Selected Item Display -->
+                  <ng-template ng-label-tmp let-item="item">
+                    <div class="owner-selected-chip">
+                      <span class="owner-avatar">
+                        <i class="fas fa-user-check"></i>
+                      </span>
+                      <span class="owner-name text-truncate">{{ item.fullName || 'بدون اسم' }}</span>
+                      <span *ngIf="item.phoneNumber" class="owner-phone-badge" dir="ltr">
+                        <i class="fas fa-phone-alt me-1"></i>{{ item.phoneNumber }}
+                      </span>
+                    </div>
+                  </ng-template>
+
+                  <!-- Dropdown Option Display -->
+                  <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                    <div class="owner-option-item">
+                      <div class="owner-option-avatar">
+                        <i class="fas fa-user"></i>
+                      </div>
+                      <div class="owner-option-details">
+                        <div class="owner-option-name">{{ item.fullName || 'بدون اسم' }}</div>
+                        <div class="owner-option-phone font-monospace" *ngIf="item.phoneNumber" dir="ltr">
+                          <i class="fas fa-phone-alt me-1"></i>{{ item.phoneNumber }}
+                        </div>
+                      </div>
+                      <div class="owner-option-status" *ngIf="formGroup.get('ownerId')?.value === item.id">
+                        <i class="fas fa-check-circle text-primary"></i>
+                      </div>
+                    </div>
+                  </ng-template>
+
+                  <!-- Empty State / No Search Results -->
+                  <ng-template ng-notfound-tmp let-searchTerm="searchTerm">
+                    <div class="p-4 text-center">
+                      <div class="mb-2">
+                        <i class="fas fa-search text-muted opacity-50" style="font-size: 2rem;"></i>
+                      </div>
+                      <div class="fw-bold text-gray-700 fs-6" *ngIf="searchTerm">
+                        لا يوجد مستخدم مطابق لـ "{{ searchTerm }}"
+                      </div>
+                      <div class="fw-bold text-gray-700 fs-6" *ngIf="!searchTerm">
+                        لا يوجد مستخدمين مسجلين في النظام
+                      </div>
+                      <p class="text-muted fs-7 mt-1 mb-0">
+                        تأكد من كتابة الاسم أو رقم الهاتف بالصيغة الصحيحة (مثل 0980906630 أو +963...)
+                      </p>
+                    </div>
+                  </ng-template>
+                </ng-select>
+                <small class="text-muted d-block mt-1">
+                  <i class="fas fa-info-circle me-1 text-primary"></i>
+                  ابحث بالاسم أو رقم الهاتف لتعيين مالك المتجر ليتمكن من تسجيل الدخول بتطبيق التاجر.
+                </small>
+              </div>
+
+              <!-- Activity Kind Selector Cards -->
+              <div class="col-12">
+                <label class="form-label fw-bold mb-2">
+                  {{ 'MERCHANTS_PAGE.COL_TYPE' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <div class="activity-kind-grid">
+                  <div
+                    class="activity-kind-card"
+                    [class.active]="formGroup.get('merchantKind')?.value === 1"
+                    (click)="setMerchantKind(1)"
+                  >
+                    <span class="activity-icon">🛒</span>
+                    <span class="activity-title">سوبرماركت / بقالية</span>
+                  </div>
+
+                  <div
+                    class="activity-kind-card"
+                    [class.active]="formGroup.get('merchantKind')?.value === 0"
+                    (click)="setMerchantKind(0)"
+                  >
+                    <span class="activity-icon">🍽️</span>
+                    <span class="activity-title">مطعم</span>
+                  </div>
+                </div>
+                <small class="text-muted d-block mt-2">
+                  يحدد نوع النشاط طريقة تصنيف المتجر وإبرازه في الأقسام المخصصة بتطبيق العملاء.
+                </small>
+              </div>
+
+              <!-- Short Description -->
+              <div class="col-12">
+                <label for="shortDescription" class="form-label fw-bold mb-2">
+                  وصف مختصر (يظهر في بطاقة المتجر)
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.shortDescription">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="shortDescription"
+                    id="shortDescription"
+                    placeholder="مثال: سوبرماركت ومقاضي شاملة • 20-30 دقيقة"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Full Description -->
+              <div class="col-12">
+                <label for="description" class="form-label fw-bold mb-2">
+                  {{ 'COMMON.DESCRIPTION' | translate }}
+                </label>
+                <app-input-container [control]="formGroup.controls.description">
+                  <textarea
+                    class="form-control"
+                    rows="3"
+                    formControlName="description"
+                    id="description"
+                    placeholder="اكتب تفاصيل وافية عن المتجر والمنتجات والخدمات التي يوفرها..."
+                  ></textarea>
+                </app-input-container>
+              </div>
+
+              <!-- Active Status Switch Card -->
+              <div class="col-12">
+                <div
+                  class="custom-switch-card"
+                  (click)="formGroup.patchValue({ active: !formGroup.get('active')?.value })"
+                >
+                  <div class="switch-info">
+                    <span class="switch-title">
+                      {{ formGroup.get('active')?.value ? 'المتجر مفعّل ونشط للطلب' : 'المتجر معطل ومخفي عن العملاء' }}
+                    </span>
+                    <span class="switch-desc">
+                      {{ formGroup.get('active')?.value ? 'يظهر المتجر في نتائج البحث وقوائم التطبيق ويمكن للعملاء الطلب منه' : 'لن يتمكن العملاء من استكشاف المتجر أو إضافة منتجاته لسلة التسوق' }}
+                    </span>
+                  </div>
+                  <div class="form-check form-switch m-0">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      formControlName="active"
+                      (click)="$event.stopPropagation()"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 02: Contact & Delivery -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>02</span>
+              <div>
+                <h3>التواصل ونطاق التوصيل</h3>
+                <p>أرقام الاتصال بالمحل والعنوان الدقيق ونصف قطر التغطية.</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- Phone 1 -->
+              <div class="col-md-6">
+                <label for="phone1" class="form-label fw-bold mb-2">
+                  {{ 'MERCHANT_WORKSPACE.PRIMARY_PHONE' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.phone1">
+                  <input
+                    type="tel"
+                    class="form-control"
+                    formControlName="phone1"
+                    id="phone1"
+                    placeholder="مثال: 0912345678"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Phone 2 -->
+              <div class="col-md-6">
+                <label for="phone2" class="form-label fw-bold mb-2">
+                  {{ 'MERCHANT_WORKSPACE.SECONDARY_PHONE' | translate }}
+                  <span class="text-muted fs-8">(اختياري)</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.phone2">
+                  <input
+                    type="tel"
+                    class="form-control"
+                    formControlName="phone2"
+                    id="phone2"
+                    placeholder="رقم هاتف إضافي"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Address -->
+              <div class="col-md-7">
+                <label for="address" class="form-label fw-bold mb-2">
+                  {{ 'MERCHANT_WORKSPACE.ADDRESS' | translate }}
+                </label>
+                <app-input-container [control]="formGroup.controls.address">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="address"
+                    id="address"
+                    placeholder="المدينة، الحي، والشارع"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Shipping Coverage with Presets -->
+              <div class="col-md-5">
+                <label for="shippingCoverageInMeters" class="form-label fw-bold mb-2">
+                  {{ 'MERCHANT_WORKSPACE.COVERAGE_RADIUS' | translate }}
+                </label>
+                <div class="input-with-suffix">
+                  <input
+                    type="number"
+                    class="form-control"
+                    formControlName="shippingCoverageInMeters"
+                    id="shippingCoverageInMeters"
+                    min="0"
+                    placeholder="1000"
+                  />
+                  <span>متر</span>
+                </div>
+
+                <div class="presets-row">
+                  <button
+                    type="button"
+                    *ngFor="let cov of coveragePresets"
+                    class="preset-pill"
+                    [class.active]="formGroup.get('shippingCoverageInMeters')?.value === cov"
+                    (click)="setCoverage(cov)"
+                  >
+                    {{ cov >= 1000 ? (cov / 1000 + ' كم') : (cov + ' م') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 03: Delivery & Order Policy -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>03</span>
+              <div>
+                <h3>سياسات التوصيل وساعات العمل</h3>
+                <p>التحكم الكامل في مدة ورسوم التوصيل، الحد الأدنى للطلب، وساعات العمل في صفحة المتجر بالتطبيق.</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- Delivery Time / ETA -->
+              <div class="col-md-6">
+                <label for="deliveryTime" class="form-label fw-bold mb-2">
+                  مدة التوصيل المتوقعة
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.deliveryTime">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="deliveryTime"
+                    id="deliveryTime"
+                    placeholder="مثال: 20-30 دقيقة"
+                  />
+                </app-input-container>
+                <div class="presets-row mt-2">
+                  <button
+                    type="button"
+                    *ngFor="let t of deliveryTimePresets"
+                    class="preset-pill"
+                    [class.active]="formGroup.get('deliveryTime')?.value === t"
+                    (click)="setDeliveryTime(t)"
+                  >
+                    {{ t }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Working Hours / Open Until -->
+              <div class="col-md-6">
+                <label for="workingHours" class="form-label fw-bold mb-2">
+                  ساعات العمل / حالة الفتح (أعلى الغلاف)
+                </label>
+                <app-input-container [control]="formGroup.controls.workingHours">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="workingHours"
+                    id="workingHours"
+                    placeholder="مثال: حتى 3 ص"
+                  />
+                </app-input-container>
+                <div class="presets-row mt-2">
+                  <button
+                    type="button"
+                    *ngFor="let w of workingHoursPresets"
+                    class="preset-pill"
+                    [class.active]="formGroup.get('workingHours')?.value === w"
+                    (click)="setWorkingHours(w)"
+                  >
+                    {{ w }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Delivery Fee -->
+              <div class="col-md-6">
+                <label for="deliveryFee" class="form-label fw-bold mb-2">
+                  رسوم التوصيل
+                  <span class="text-danger">*</span>
+                </label>
+                <div class="input-with-suffix">
+                  <input
+                    type="number"
+                    class="form-control"
+                    formControlName="deliveryFee"
+                    id="deliveryFee"
+                    min="0"
+                    placeholder="5000"
+                  />
+                  <span>ل.س</span>
+                </div>
+                <div class="presets-row mt-2">
+                  <button
+                    type="button"
+                    *ngFor="let fee of deliveryFeePresets"
+                    class="preset-pill"
+                    [class.active]="formGroup.get('deliveryFee')?.value === fee"
+                    (click)="setDeliveryFee(fee)"
+                  >
+                    {{ fee === 0 ? 'مجاني' : (fee | number) + ' ل.س' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Min Order Amount -->
+              <div class="col-md-6">
+                <label for="minOrderAmount" class="form-label fw-bold mb-2">
+                  الحد الأدنى للطلب
+                  <span class="text-danger">*</span>
+                </label>
+                <div class="input-with-suffix">
+                  <input
+                    type="number"
+                    class="form-control"
+                    formControlName="minOrderAmount"
+                    id="minOrderAmount"
+                    min="0"
+                    placeholder="15000"
+                  />
+                  <span>ل.س</span>
+                </div>
+                <div class="presets-row mt-2">
+                  <button
+                    type="button"
+                    *ngFor="let m of minOrderPresets"
+                    class="preset-pill"
+                    [class.active]="formGroup.get('minOrderAmount')?.value === m"
+                    (click)="setMinOrder(m)"
+                  >
+                    {{ (m | number) }} ل.س
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 04: Financials & Commission -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>04</span>
+              <div>
+                <h3>الإعدادات المالية والعمولة</h3>
+                <p>الحساب البنكي للتسوية ونسبة عمولة منصة جتك من المبيعات.</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- IBAN Title -->
+              <div class="col-md-6">
+                <label for="ibaN1Title" class="form-label fw-bold mb-2">
+                  اسم صاحب الحساب البنكي
+                </label>
+                <app-input-container [control]="formGroup.controls.ibaN1Title">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="ibaN1Title"
+                    id="ibaN1Title"
+                    placeholder="الاسم المسجل على الحساب"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- IBAN -->
+              <div class="col-md-6">
+                <label for="ibaN1" class="form-label fw-bold mb-2">
+                  رقم الحساب / الآيبان (IBAN)
+                </label>
+                <app-input-container [control]="formGroup.controls.ibaN1">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="ibaN1"
+                    id="ibaN1"
+                    placeholder="أدخل رقم الحساب أو الآيبان"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Commission with Presets -->
+              <div class="col-12">
+                <label for="profitOutOfMerchantPricePercent" class="form-label fw-bold mb-2">
+                  {{ 'MERCHANTS_PAGE.COL_COMMISSION' | translate }}
+                </label>
+                <div class="input-with-suffix" style="max-width: 240px;">
+                  <input
+                    type="number"
+                    class="form-control"
+                    formControlName="profitOutOfMerchantPricePercent"
+                    id="profitOutOfMerchantPricePercent"
+                    min="0"
+                    max="100"
+                    placeholder="20"
+                  />
+                  <span>%</span>
+                </div>
+
+                <div class="presets-row">
+                  <button
+                    type="button"
+                    *ngFor="let comm of commissionPresets"
+                    class="preset-pill"
+                    [class.active]="formGroup.get('profitOutOfMerchantPricePercent')?.value === comm"
+                    (click)="setCommission(comm)"
+                  >
+                    {{ comm }}%
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 05: Store Media & Logo -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>05</span>
+              <div>
+                <h3>الهوية والشعار</h3>
+                <p>رفع شعار أو صورة واجهة المتجر التي ستظهر للعملاء في التطبيق.</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <div class="col-12">
+                <app-file-uploader
+                  uploaderTitle="اختر شعار أو صورة المتجر"
+                  (fileUploaded)="onFileUploaded($event, 'photo')"
+                ></app-file-uploader>
+
+                <div class="edit-image-grid mt-4" *ngIf="formGroup.get('photo')?.value">
+                  <app-uploaded-image
+                    [imageId]="formGroup.get('photo')?.value"
+                    [dimensions]="{ width: 320, height: 180 }"
+                    (imageDeleted)="onFileDelete('photo')"
+                  ></app-uploaded-image>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 06: Map Location -->
+          <section class="edit-section edit-section--last">
+            <div class="edit-section-heading">
+              <span>06</span>
+              <div>
+                <h3>الموقع الجغرافي على الخريطة</h3>
+                <p>اسحب المؤشر إلى نقطة استلام الطلبات الدقيقة الخاصة بالمتجر.</p>
+              </div>
+            </div>
+
+            <div class="merchant-map">
+              <google-map
+                height="320px"
+                width="100%"
+                [center]="center"
+                [options]="options"
+                [zoom]="zoom"
+              >
+                <map-marker
+                  [position]="marker.position"
+                  [options]="marker.options"
+                  (mapDragend)="onCursorChange($event)"
+                ></map-marker>
+              </google-map>
+            </div>
+          </section>
+
+        </form>
+      </div>
+
+      <!-- Preview Column: Live Mobile App Preview -->
+      <div class="merchant-preview-column">
+        <div class="preview-phone-card">
+          <!-- Top Phone Bar -->
+          <div class="preview-phone-header">
+            <div class="preview-notch-info">
+              <span class="preview-dot-pulse"></span>
+              <span>معاينة المتجر بالتطبيق</span>
+            </div>
+            <span class="preview-app-title">JTAK</span>
           </div>
-          <div class="col-12"><label for="shortDescription">Short description</label><app-input-container [control]="formGroup.controls.shortDescription"><input type="text" class="form-control" formControlName="shortDescription" id="shortDescription" placeholder="A short summary shown in listings" /></app-input-container></div>
-          <div class="col-12"><label for="description">Full description</label><app-input-container [control]="formGroup.controls.description"><textarea class="form-control" rows="4" formControlName="description" id="description" placeholder="Describe the business, cuisine, or service"></textarea></app-input-container></div>
-          <div class="col-12"><label class="setting-toggle"><input type="checkbox" formControlName="active" /><span><strong>Merchant is active</strong><small>Customers can discover and order from this merchant.</small></span></label></div>
+
+          <!-- Customer Store Card Mockup -->
+          <div class="preview-card-viewport">
+            <div class="customer-store-card">
+              <!-- Store Media -->
+              <div class="customer-store-media">
+                <img
+                  *ngIf="getStorePhoto()"
+                  [src]="filesService.getFile(getStorePhoto()!, 320, 160)"
+                  [alt]="formGroup.get('title')?.value"
+                  (error)="onImageError($event)"
+                />
+                <i
+                  *ngIf="!getStorePhoto()"
+                  [class]="getKindInfo().icon"
+                  class="media-fallback"
+                ></i>
+
+                <!-- Activity Kind Badge -->
+                <span class="kind-pill-overlay">
+                  {{ getKindInfo().emoji }} {{ getKindInfo().label }}
+                </span>
+
+                <!-- Active Status Overlay -->
+                <span
+                  class="status-pill-overlay"
+                  [class.active]="formGroup.get('active')?.value"
+                  [class.inactive]="!formGroup.get('active')?.value"
+                >
+                  {{ formGroup.get('active')?.value ? 'مفتوح للطلب' : 'مغلق حالياً' }}
+                </span>
+              </div>
+
+              <!-- Store Info -->
+              <div class="customer-store-info">
+                <h4 class="customer-store-title">
+                  {{ formGroup.get('title')?.value || 'اسم المتجر' }}
+                </h4>
+
+                <p class="customer-store-desc">
+                  {{ formGroup.get('shortDescription')?.value || 'وصف مختصر للمتجر والمنتجات المتوفرة' }}
+                </p>
+
+                <!-- Store Meta Chips -->
+                <div class="customer-store-chips">
+                  <span class="chip-meta">
+                    <i class="fas fa-clock text-primary"></i>
+                    <span>{{ formGroup.get('deliveryTime')?.value || '20-30 دقيقة' }}</span>
+                  </span>
+
+                  <span class="chip-meta">
+                    <i class="fas fa-motorcycle text-primary"></i>
+                    <span>{{ formGroup.get('deliveryFee')?.value ? (formGroup.get('deliveryFee')?.value | number) + ' ل.س' : 'توصيل مجاني' }}</span>
+                  </span>
+
+                  <span class="chip-meta">
+                    <i class="fas fa-shopping-basket text-primary"></i>
+                    <span>حد أدنى {{ (formGroup.get('minOrderAmount')?.value || 15000) | number }} ل.س</span>
+                  </span>
+
+                  <span class="chip-meta" *ngIf="formGroup.get('workingHours')?.value">
+                    <i class="fas fa-bolt text-warning"></i>
+                    <span>مفتوح {{ formGroup.get('workingHours')?.value }}</span>
+                  </span>
+
+                  <span class="chip-meta" *ngIf="formGroup.get('shippingCoverageInMeters')?.value">
+                    <i class="fas fa-map-marked-alt text-muted"></i>
+                    <span>تغطية {{ formGroup.get('shippingCoverageInMeters')?.value >= 1000 ? (formGroup.get('shippingCoverageInMeters')?.value / 1000 + ' كم') : (formGroup.get('shippingCoverageInMeters')?.value + ' م') }}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Meta Note -->
+          <div class="preview-card-meta">
+            هكذا تظهر بطاقة المتجر للعملاء في تطبيق الهواتف الذكية
+          </div>
         </div>
-      </section>
+      </div>
 
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>02</span><div><h3>Contact and delivery</h3><p>How the team reaches this merchant and where they deliver.</p></div></div>
-        <div class="row g-4">
-          <div class="col-md-6"><label for="phone1">Primary phone</label><app-input-container [control]="formGroup.controls.phone1"><input type="tel" class="form-control" formControlName="phone1" id="phone1" placeholder="Primary contact number" /></app-input-container></div>
-          <div class="col-md-6"><label for="phone2">Secondary phone <span class="optional-label">Optional</span></label><app-input-container [control]="formGroup.controls.phone2"><input type="tel" class="form-control" formControlName="phone2" id="phone2" placeholder="Backup contact number" /></app-input-container></div>
-          <div class="col-md-8"><label for="address">Address</label><app-input-container [control]="formGroup.controls.address"><input type="text" class="form-control" formControlName="address" id="address" placeholder="Street, district, and city" /></app-input-container></div>
-          <div class="col-md-4"><label for="shippingCoverageInMeters">Delivery radius</label><div class="input-with-suffix"><input type="number" class="form-control" formControlName="shippingCoverageInMeters" id="shippingCoverageInMeters" min="0" placeholder="0" /><span>meters</span></div></div>
-        </div>
-      </section>
-
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>03</span><div><h3>Commercial settings</h3><p>Settlement account and JTAK commission.</p></div></div>
-        <div class="row g-4">
-          <div class="col-md-6"><label for="ibaN1Title">Account holder</label><app-input-container [control]="formGroup.controls.ibaN1Title"><input type="text" class="form-control" formControlName="ibaN1Title" id="ibaN1Title" placeholder="Name on the account" /></app-input-container></div>
-          <div class="col-md-6"><label for="ibaN1">IBAN / account number</label><app-input-container [control]="formGroup.controls.ibaN1"><input type="text" class="form-control" formControlName="ibaN1" id="ibaN1" placeholder="Enter account details" /></app-input-container></div>
-          <div class="col-md-6"><label for="profitOutOfMerchantPricePercent">JTAK commission</label><div class="input-with-suffix"><input type="number" class="form-control" formControlName="profitOutOfMerchantPricePercent" id="profitOutOfMerchantPricePercent" min="0" max="100" placeholder="0" /><span>%</span></div></div>
-        </div>
-      </section>
-
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>04</span><div><h3>Branding</h3><p>Upload the logo customers will see throughout the app.</p></div></div>
-        <label for="photo">Logo URL <span class="optional-label">Optional</span></label>
-        <app-input-container [control]="formGroup.controls.photo"><input type="text" class="form-control mb-3" formControlName="photo" id="photo" placeholder="Asset path or image URL" /></app-input-container>
-        <app-file-uploader uploaderTitle="Choose merchant logo" (fileUploaded)="onFileUploaded($event, 'photo')"></app-file-uploader>
-        <app-uploaded-image *ngIf="formGroup.get('photo')?.value" [imageId]="formGroup.get('photo')?.value" [dimensions]="{ width: 320, height: 160 }" (imageDeleted)="onFileDelete('photo')"></app-uploaded-image>
-      </section>
-
-      <section class="edit-section edit-section--last">
-        <div class="edit-section-heading"><span>05</span><div><h3>Map location</h3><p>Drag the marker to the merchant’s exact pickup point.</p></div></div>
-        <div class="merchant-map"><google-map height="360px" width="100%" [center]="center" [options]="options" [zoom]="zoom"><map-marker [position]="marker.position" [options]="marker.options" (mapDragend)="onCursorChange($event)"></map-marker></google-map></div>
-      </section>
-    </form>
+    </div>
   </ng-container>
 </app-edit-modal>

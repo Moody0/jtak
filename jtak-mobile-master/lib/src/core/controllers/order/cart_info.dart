@@ -13,6 +13,9 @@ class CartInfo {
 
   Future initData() async {
     AuthenticationService authService = locator<AuthenticationService>();
+    if (authService.user == null) {
+      await authService.getAuthorizationData();
+    }
     AddressModel mainAddress =
         locator<AppParametersProvider>().mainAddressService.mainAddress;
 

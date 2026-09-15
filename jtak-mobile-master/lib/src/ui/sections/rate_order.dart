@@ -1,8 +1,7 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-
 import 'package:flutter/material.dart';
 import 'package:jtek_app/src/config/constants/constants.dart';
+import 'package:jtek_app/src/config/constants/app_constant.dart';
+import 'package:jtek_app/src/utils/utilities/lunch_url.dart';
 import 'package:jtek_app/src/config/themes/app_theme.dart';
 import 'package:jtek_app/src/config/themes/colors.dart';
 import 'package:jtek_app/src/core/controllers/order/order_provider.dart';
@@ -12,7 +11,6 @@ import 'package:jtek_app/src/utils/custom_widgets/messages.dart';
 import 'package:jtek_app/src/utils/custom_widgets/rating_bar.dart';
 import 'package:jtek_app/src/utils/utilities/global_var.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../main_imports.dart';
 
 class RateOrder extends StatelessWidget {
@@ -59,10 +57,13 @@ class RateOrder extends StatelessWidget {
                           try {
                             OrderProvider provider = Provider.of<OrderProvider>(context, listen: false);
                             await provider.rateOrder(item.id ?? 0, rating);
+                            if (!context.mounted) return;
                             Navigator.pop(context);
                             context.showSnakBar('تم ارسال التقييم');
                           } catch (err) {
-                            showDialog(context: context, builder: (context) => CustomDialog(message: err.toString()));
+                            if (context.mounted) {
+                              showDialog(context: context, builder: (context) => CustomDialog(message: err.toString()));
+                            }
                           }
                         },
                         itemSize: 30,
@@ -93,16 +94,14 @@ class RateOrder extends StatelessWidget {
   }
 
   void whatsappFun(BuildContext context) async {
-    var whatsappPhone = "+905300888301";
-    var whatsappURlAndroid = "whatsapp://send?phone=" + whatsappPhone + "&text=";
-    var whatappURLIOS = "https://wa.me/$whatsappPhone?text=${Uri.parse("")}";
-    var url = (!kIsWeb && Platform.isIOS) ? whatappURLIOS : whatsappURlAndroid;
-    try {
-      await launch(url);
-    } catch (e) {
-      GlobalVar.log(e.toString());
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لايوجد تطبيق واتس اب !')));
-    }
+    final orderNum = item.id != null ? '#${item.id}' : '';
+    final msg = orderNum.isNotEmpty
+        ? 'مرحباً جيتك، لدي ملاحظة حول تقييم طلبي رقم $orderNum'
+        : 'مرحباً جيتك، لدي ملاحظة حول تقييم الطلب';
+    await LunchUrl.openWhatsApp(
+      phone: kSupportWhatsAppNumber,
+      message: msg,
+      context: context,
+    );
   }
 }

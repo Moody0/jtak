@@ -1,0 +1,695 @@
+// Edit Merchant Modal Two-Column Studio Architecture & Mobile Live Preview
+
+.merchant-editor-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+
+  @media (max-width: 991px) {
+    flex-direction: column;
+  }
+}
+
+.merchant-form-column {
+  flex: 1 1 64%;
+  min-width: 0;
+}
+
+.merchant-preview-column {
+  flex: 0 0 320px;
+  position: sticky;
+  top: 16px;
+
+  @media (max-width: 991px) {
+    flex: 1 1 100%;
+    width: 100%;
+    position: static;
+  }
+}
+
+// Form Structure
+.jtak-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.edit-section {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+
+  .edit-section-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #fff7ed;
+      color: #ea580c;
+      font-size: 0.8rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    h3 {
+      font-size: 0.96rem;
+      font-weight: 750;
+      color: #0f172a;
+      margin: 0 0 3px;
+    }
+
+    p {
+      font-size: 0.77rem;
+      color: #64748b;
+      margin: 0;
+    }
+  }
+}
+
+// Quick Preset Pills
+.presets-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+
+  .preset-pill {
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.74rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #ffffff;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+
+    &.active {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #ea580c;
+      font-weight: 750;
+    }
+  }
+}
+
+// Input with Suffix
+.input-with-suffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .form-control {
+    padding-left: 42px;
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      padding-left: 12px;
+      padding-right: 42px;
+    }
+  }
+
+  span {
+    position: absolute;
+    left: 12px;
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 0.82rem;
+    pointer-events: none;
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      left: auto;
+      right: 12px;
+    }
+  }
+}
+
+// Activity Radio Cards
+.activity-kind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.activity-kind-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: #cbd5e1;
+    background: #ffffff;
+  }
+
+  &.active {
+    border-color: #f97316;
+    background: #fff7ed;
+    color: #c2410c;
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+  }
+
+  .activity-icon {
+    font-size: 1.1rem;
+  }
+
+  .activity-title {
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+}
+
+// Toggle Switch Card
+.custom-switch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+  }
+
+  .switch-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .switch-title {
+      font-size: 0.88rem;
+      font-weight: 750;
+      color: #0f172a;
+    }
+
+    .switch-desc {
+      font-size: 0.74rem;
+      color: #64748b;
+    }
+  }
+
+  .form-check-input {
+    width: 42px;
+    height: 22px;
+    cursor: pointer;
+
+    &:checked {
+      background-color: #10b981;
+      border-color: #10b981;
+    }
+  }
+}
+
+// Google Map Container
+.merchant-map {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+// Phone Mockup & Customer App Live Preview
+.preview-phone-card {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-phone-header {
+  background: #0f172a;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ffffff;
+
+  .preview-notch-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #e2e8f0;
+
+    .preview-dot-pulse {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+    }
+  }
+
+  .preview-app-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: #f97316;
+  }
+}
+
+.preview-card-viewport {
+  padding: 16px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+// Customer Store Card Mockup
+.customer-store-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+
+  .customer-store-media {
+    position: relative;
+    height: 120px;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .media-fallback {
+      font-size: 2.2rem;
+      color: #94a3b8;
+    }
+
+    .kind-pill-overlay {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 3px 9px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.85);
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 750;
+      backdrop-filter: blur(4px);
+
+      html[dir="ltr"] &,
+      body[dir="ltr"] & {
+        right: auto;
+        left: 10px;
+      }
+    }
+
+    .status-pill-overlay {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.68rem;
+      font-weight: 750;
+
+      html[dir="ltr"] &,
+      body[dir="ltr"] & {
+        right: auto;
+        left: 10px;
+      }
+
+      &.active {
+        background: #ecfdf5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+      }
+
+      &.inactive {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+      }
+    }
+  }
+
+  .customer-store-info {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .customer-store-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0;
+    }
+
+    .customer-store-desc {
+      font-size: 0.74rem;
+      color: #64748b;
+      margin: 0;
+      line-height: 1.35;
+    }
+
+    .customer-store-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+
+      .chip-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        font-weight: 650;
+        color: #475569;
+        background: #f1f5f9;
+        padding: 2px 7px;
+        border-radius: 6px;
+
+        i {
+          font-size: 0.68rem;
+          color: #f97316;
+        }
+      }
+    }
+  }
+}
+
+.preview-card-meta {
+  padding: 10px 16px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: center;
+  font-weight: 600;
+}
+
+// Owner Selector Styling (ng-select)
+::ng-deep .merchant-owner-select {
+  width: 100%;
+  display: block;
+
+  .ng-select-container {
+    min-height: 48px !important;
+    height: auto !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    padding: 4px 12px !important;
+    transition: all 0.2s ease;
+    display: flex !important;
+    align-items: center !important;
+
+    &:hover {
+      border-color: #cbd5e1 !important;
+    }
+  }
+
+  &.ng-select-focused:not(.ng-select-opened) > .ng-select-container {
+    border-color: #f97316 !important;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12) !important;
+    background: #ffffff !important;
+  }
+
+  &.ng-select-opened > .ng-select-container {
+    border-color: #f97316 !important;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12) !important;
+    background: #ffffff !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+
+  .ng-value-container {
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+
+    [dir="rtl"] & {
+      padding-left: 12px !important;
+      padding-right: 0 !important;
+    }
+
+    .ng-placeholder {
+      color: #94a3b8 !important;
+      font-size: 0.88rem !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
+    .ng-input {
+      top: 0 !important;
+      bottom: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+
+      > input {
+        font-size: 0.88rem !important;
+        color: #0f172a !important;
+      }
+
+      [dir="rtl"] & {
+        padding-right: 0 !important;
+        padding-left: 60px !important;
+      }
+    }
+
+    .ng-value {
+      max-width: 100% !important;
+      overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+    }
+  }
+
+  // Clear Button & Dropdown Arrow
+  .ng-clear-wrapper {
+    width: 26px !important;
+    height: 26px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    color: #94a3b8 !important;
+    margin: 0 4px !important;
+    transition: all 0.15s ease !important;
+
+    &:hover {
+      background: #fee2e2 !important;
+      color: #ef4444 !important;
+    }
+
+    .ng-clear {
+      font-size: 1.15rem !important;
+      line-height: 1 !important;
+    }
+  }
+
+  .ng-arrow-wrapper {
+    width: 24px !important;
+    height: 24px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+
+    .ng-arrow {
+      border-color: #64748b transparent transparent !important;
+      border-style: solid !important;
+      border-width: 5px 5px 2.5px !important;
+      transition: transform 0.2s ease;
+    }
+  }
+
+  &.ng-select-opened .ng-arrow-wrapper .ng-arrow {
+    border-color: transparent transparent #f97316 !important;
+    border-width: 0 5px 5px !important;
+  }
+
+  // Dropdown Panel
+  .ng-dropdown-panel {
+    border-radius: 0 0 12px 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-top: none !important;
+    box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+    background: #ffffff !important;
+    margin-top: 0 !important;
+    z-index: 1060 !important;
+
+    .ng-dropdown-panel-items {
+      .ng-option {
+        padding: 10px 14px !important;
+        border-bottom: 1px solid #f8fafc !important;
+        transition: background 0.15s ease;
+
+        &:last-child {
+          border-bottom: none !important;
+        }
+
+        &.ng-option-marked {
+          background-color: #fff7ed !important;
+        }
+
+        &.ng-option-selected {
+          background-color: #ffedd5 !important;
+          color: #c2410c !important;
+        }
+      }
+    }
+  }
+}
+
+// Selected Owner Chip inside ng-select
+.owner-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+
+  .owner-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #ffedd5;
+    color: #ea580c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .owner-name {
+    font-size: 0.88rem;
+    font-weight: 750;
+    color: #0f172a;
+    min-width: 0;
+  }
+
+  .owner-phone-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+    flex-shrink: 0;
+
+    i {
+      color: #10b981;
+      font-size: 0.7rem;
+    }
+  }
+}
+
+// Owner Option in Dropdown
+.owner-option-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+
+  .owner-option-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #ea580c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .owner-option-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+
+    .owner-option-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .owner-option-phone {
+      font-size: 0.75rem;
+      color: #64748b;
+      display: inline-flex;
+      align-items: center;
+
+      i {
+        color: #10b981;
+        font-size: 0.68rem;
+      }
+    }
+  }
+
+  .owner-option-status {
+    margin-inline-start: auto;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+}
+
+

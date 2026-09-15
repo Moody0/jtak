@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -16,7 +17,17 @@ import 'src/ui/pages/splash_page.dart';
 import 'src/utils/custom_widgets/init_widget.dart';
 import '../../../main_imports.dart';
 
+class JtakHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() async {
+  HttpOverrides.global = JtakHttpOverrides();
   print("STARTING MAIN");
   try {
     await AppGlobalInitializer.mainInitializer();

@@ -1,18 +1,25 @@
 <div class="modal-header">
   <div class="jtak-modal-heading">
     <span class="jtak-modal-icon jtak-modal-icon--danger"><i class="fas fa-exclamation-triangle"></i></span>
-    <div><span class="jtak-modal-kicker">Bulk action</span><h2 class="modal-title">{{ actionLabel }} {{ count }} {{ itemLabel }}</h2></div>
+    <div>
+      <span class="jtak-modal-kicker">{{ 'COMMON.BULK_ACTION' | translate }}</span>
+      <h2 class="modal-title">{{ actionLabel }} ({{ count }})</h2>
+    </div>
   </div>
   <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
 </div>
 <div class="modal-body bulk-confirm-body">
   <p>{{ description }}</p>
-  <div class="alert alert-danger" *ngIf="hasError" role="alert">The action couldn’t be completed. Nothing else was changed.</div>
+  <div class="alert alert-danger" *ngIf="hasError" role="alert">
+    تعذر إتمام الإجراء. لم يتم إجراء أي تغيير على السجلات.
+  </div>
 </div>
 <div class="modal-footer">
-  <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isLoading">Keep records</button>
+  <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isLoading">
+    {{ 'COMMON.KEEP_RECORDS' | translate }}
+  </button>
   <button type="button" class="btn btn-danger" (click)="confirm()" [disabled]="isLoading">
     <span *ngIf="isLoading" class="spinner-border spinner-border-sm"></span>
-    {{ isLoading ? 'Working…' : actionLabel + ' selected' }}
+    {{ isLoading ? ('COMMON.LOADING' | translate) : (actionLabel + ' ' + ('COMMON.SELECTED' | translate)) }}
   </button>
 </div>

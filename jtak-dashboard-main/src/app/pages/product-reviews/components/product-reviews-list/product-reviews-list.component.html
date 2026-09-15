@@ -1,76 +1,72 @@
 <div class="card card-custom gutter-b">
-    <div class="card-header">
-      <div class="card-title">
-        <div><h3 class="card-label">Product reviews</h3><span class="card-subtitle">Monitor customer feedback and product quality.</span></div>
-      </div>
-      <div class="card-toolbar">
+  <div class="card-header">
+    <div class="card-title">
+      <div>
+        <h3 class="card-label fw-bolder">{{ 'REVIEWS_PAGE.TITLE' | translate }}</h3>
+        <span class="card-subtitle text-muted">{{ 'REVIEWS_PAGE.SUBTITLE' | translate }}</span>
       </div>
     </div>
-    <div class="card-body">
-      <!-- begin: Filtration form -->
-      <div class="form form-label-right">
-        <div class="form-group row">
-          <div class="col-lg-2" [formGroup]="searchGroup">
-            <input
-              type="text"
-              class="form-control"
-              name="searchText"
-              placeholder="Search reviews"
-              formControlName="searchTerm"
-            />
-          </div>
-        </div>
-      </div>
-      <!-- end: Filtration form -->
-      <ng-container *ngIf="productReviewsService.items$ | async as items">
-        <div class="bulk-action-bar" *ngIf="selection.count > 0">
-          <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-          <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'reviews')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
-        </div>
-      </ng-container>
-  
-      <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="productReviewsService.items$ | async as items">
-        <table
-          class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
-        >
-          <thead>
-            <tr class="fw-bolder text-muted">
-              <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all reviews on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-              <th scope="col">
-                Id
-              </th>
-              <th scope="col">
-                Product
-              </th>
-              <th scope="col">
-                Date
-              </th>
-              <th scope="col">
-                Rate
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
-              <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select review ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
-              <td>#{{ i.id }}</td>
-              <td>{{ i.productTitle }}</td>
-              <td>{{ i.createdDate | date:'d/M/yy, h:mm a' }}</td>
-              <td>{{ i.rate }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-  
-      <app-paginator
-        class="d-flex justify-content-between align-items-center flex-wrap"
-        [paginator]="paginator"
-        [isLoading]="isLoading"
-        (paginate)="paginate($event)"
-      ></app-paginator>
-  
-      <!-- begin:Table -->
-    </div>
-    <!-- end: Table -->
   </div>
-  
+  <div class="card-body">
+    <!-- begin: Filtration form -->
+    <div class="form form-label-right">
+      <div class="form-group row">
+        <div class="col-lg-3" [formGroup]="searchGroup">
+          <input
+            type="text"
+            class="form-control"
+            name="searchText"
+            [placeholder]="'REVIEWS_PAGE.SEARCH_PLACEHOLDER' | translate"
+            formControlName="searchTerm"
+          />
+        </div>
+      </div>
+    </div>
+    <!-- end: Filtration form -->
+    <ng-container *ngIf="productReviewsService.items$ | async as items">
+      <div class="bulk-action-bar" *ngIf="selection.count > 0">
+        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}</div>
+        <div class="bulk-action-buttons">
+          <button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'reviews')"><i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}</button>
+          <button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">{{ 'COMMON.CLEAR' | translate }}</button>
+        </div>
+      </div>
+    </ng-container>
+
+    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="productReviewsService.items$ | async as items">
+      <table
+        class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
+      >
+        <thead>
+          <tr class="fw-bolder text-muted bg-light text-uppercase fs-7">
+            <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all reviews on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
+            <th scope="col">{{ 'REVIEWS_PAGE.COL_ID' | translate }}</th>
+            <th scope="col">{{ 'REVIEWS_PAGE.COL_PRODUCT' | translate }}</th>
+            <th scope="col">{{ 'REVIEWS_PAGE.COL_DATE' | translate }}</th>
+            <th scope="col">{{ 'REVIEWS_PAGE.COL_RATE' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
+            <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select review ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
+            <td><span class="badge badge-light-secondary font-monospace">#{{ i.id }}</span></td>
+            <td><span class="fw-bolder text-dark">{{ i.productTitle }}</span></td>
+            <td>{{ i.createdDate | date:'d/M/yy, h:mm a' }}</td>
+            <td>
+              <span class="badge badge-light-warning fw-bolder fs-7">
+                <i class="fas fa-star text-warning me-1"></i>{{ i.rate }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <app-paginator
+      class="d-flex justify-content-between align-items-center flex-wrap mt-4"
+      [paginator]="paginator"
+      [isLoading]="isLoading"
+      (paginate)="paginate($event)"
+    ></app-paginator>
+  </div>
+</div>

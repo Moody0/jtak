@@ -1,0 +1,25 @@
+:host {
+  display: block;
+}
+
+.transition-all {
+  transition: all 0.25s ease-in-out;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.card-dashed {
+  background: #ffffff;
+  border-style: dashed;
+}
+
+.card-dashed:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+.hover-elevate-up:hover {
+  background-color: #fafbfc;
+}

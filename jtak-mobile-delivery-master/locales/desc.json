@@ -215,6 +215,7 @@
     "smsCodeSend": "smsCodeSend",
     "locationServiceDisabled": "locationServiceDisabled",
     "locationPermissionsDenied": "Location permissions are denied, you must allow Location permission to continue",
-    "pleaseEnableLocationService": "pleaseEnableLocationService"
+    "pleaseEnableLocationService": "pleaseEnableLocationService",
+    "locationAlwaysUpgradeRequired": "locationAlwaysUpgradeRequired"
   }
 }

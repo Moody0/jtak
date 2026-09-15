@@ -8,8 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/providers/sol_api.dart';
 import '../../enums/viewstate.dart';
 import '../../models/order/order_model.dart';
+import '../../models/order/order_live_track_model.dart';
 import '../../services/locator.dart';
 import '../app/base_provider.dart';
+import 'cart_provider.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Dynamic Order Provider (Backend API + Instant Real-Time Order Sync)
@@ -26,6 +28,7 @@ class OrderProvider extends BaseProvider<OrderModel> {
   static OrderProvider? instance;
   final SolApi _api = locator<SolApi>();
   OrderModel? order;
+  OrderLiveTrackModel? liveTrack;
   final List<OrderModel> _localPlacedOrders = [];
 
   OrderProvider() {
@@ -37,6 +40,7 @@ class OrderProvider extends BaseProvider<OrderModel> {
     dataList.clear();
     _localPlacedOrders.clear();
     order = null;
+    liveTrack = null;
     notifyListeners();
   }
 
@@ -127,8 +131,9 @@ class OrderProvider extends BaseProvider<OrderModel> {
             // The API is authoritative. Local storage is only an offline cache.
             final List<OrderModel> merged = List<OrderModel>.from(remoteOrders);
             for (var cached in _localPlacedOrders) {
-              if (!merged.any((remote) => remote.id == cached.id))
+              if (!merged.any((remote) => remote.id == cached.id)) {
                 merged.add(cached);
+              }
             }
             _localPlacedOrders
               ..clear()
@@ -159,6 +164,12 @@ class OrderProvider extends BaseProvider<OrderModel> {
           if (data != null && data is Map) {
             order = OrderModel.fromMap(Map<String, dynamic>.from(data));
             _cacheServerOrder(order!);
+            final currentStatus = getOrderStatus(order!);
+            if (currentStatus == OrderDetailsStatus.merchantRejected ||
+                currentStatus == OrderDetailsStatus.customerCanceled ||
+                currentStatus == OrderDetailsStatus.deliveryCanceled) {
+              locator<CartProvider>().clearCart();
+            }
             notifyListeners();
             return;
           }
@@ -181,6 +192,40 @@ class OrderProvider extends BaseProvider<OrderModel> {
         notifyListeners();
       }
     }
+  }
+
+  /// Fetches ultra-lightweight real-time GPS telemetry, heading, and multi-stop progress (<1KB payload)
+  Future<OrderLiveTrackModel?> loadLiveTrack(int id) async {
+    try {
+      var data = await _api.getRequest('/Orders/$id/LiveTrack');
+      if (data != null && data is Map) {
+        liveTrack = OrderLiveTrackModel.fromMap(Map<String, dynamic>.from(data));
+
+        // Keep the main order model's delivery fields synchronized seamlessly
+        if (order != null && order!.id == id) {
+          if (liveTrack!.driverLat != null && liveTrack!.driverLng != null) {
+            order!.deliveryLat = liveTrack!.driverLat;
+            order!.deliveryLng = liveTrack!.driverLng;
+          }
+          if (liveTrack!.driverName != null && liveTrack!.driverName!.isNotEmpty) {
+            order!.deliveryUser = liveTrack!.driverName;
+          }
+          if (liveTrack!.driverPhoneNumber != null && liveTrack!.driverPhoneNumber!.isNotEmpty) {
+            order!.deliveryUserPhone = liveTrack!.driverPhoneNumber;
+          }
+          if (liveTrack!.locationUpdatedAt != null) {
+            order!.deliveryLocationUpdatedAt =
+                liveTrack!.locationUpdatedAt!.toIso8601String();
+          }
+        }
+
+        notifyListeners();
+        return liveTrack;
+      }
+    } catch (e) {
+      debugPrint('LiveTrack sync note for order #$id: $e');
+    }
+    return liveTrack;
   }
 
   /// Submits an order review to the backend
@@ -238,13 +283,52 @@ class OrderProvider extends BaseProvider<OrderModel> {
   OrderDetailsStatus getOrderStatus(OrderModel order) {
     OrderDetailsStatus status = OrderDetailsStatus.pending;
     if (GlobalVar.checkListNotEmpty(order.orderDetails)) {
-      status = order.orderDetails!.first.orderDetailStatus ??
-          OrderDetailsStatus.pending;
-      for (var element in order.orderDetails!) {
-        if ((element.orderDetailStatus?.index ?? 0) < status.index) {
-          status = element.orderDetailStatus ?? OrderDetailsStatus.pending;
-        }
+      final items = order.orderDetails!;
+
+      // 1. If all items were rejected by the merchant
+      if (items.every((e) => e.orderDetailStatus == OrderDetailsStatus.merchantRejected)) {
+        return OrderDetailsStatus.merchantRejected;
       }
+
+      // 2. If all items are in terminal canceled/rejected states
+      final allTerminal = items.every((e) =>
+          e.orderDetailStatus == OrderDetailsStatus.merchantRejected ||
+          e.orderDetailStatus == OrderDetailsStatus.customerCanceled ||
+          e.orderDetailStatus == OrderDetailsStatus.deliveryCanceled);
+      if (allTerminal) {
+        if (items.any((e) => e.orderDetailStatus == OrderDetailsStatus.merchantRejected)) {
+          return OrderDetailsStatus.merchantRejected;
+        }
+        if (items.any((e) => e.orderDetailStatus == OrderDetailsStatus.deliveryCanceled)) {
+          return OrderDetailsStatus.deliveryCanceled;
+        }
+        return OrderDetailsStatus.customerCanceled;
+      }
+
+      // Active (non-terminal) items for fulfillment evaluation
+      final activeItems = items.where((e) =>
+          e.orderDetailStatus != OrderDetailsStatus.merchantRejected &&
+          e.orderDetailStatus != OrderDetailsStatus.customerCanceled &&
+          e.orderDetailStatus != OrderDetailsStatus.deliveryCanceled).toList();
+
+      if (activeItems.isNotEmpty && activeItems.every((e) => e.orderDetailStatus == OrderDetailsStatus.delivered)) {
+        return OrderDetailsStatus.delivered;
+      }
+
+      // 3. Active fulfillment stages
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.shipping)) {
+        return OrderDetailsStatus.shipping;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.readyForPickup)) {
+        return OrderDetailsStatus.readyForPickup;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.merchantAccepted)) {
+        return OrderDetailsStatus.merchantAccepted;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.customerPending)) {
+        return OrderDetailsStatus.customerPending;
+      }
+      return OrderDetailsStatus.pending;
     }
     return status;
   }
@@ -277,10 +361,11 @@ class OrderProvider extends BaseProvider<OrderModel> {
   void _cacheServerOrder(OrderModel updated) {
     final localIndex =
         _localPlacedOrders.indexWhere((item) => item.id == updated.id);
-    if (localIndex >= 0)
+    if (localIndex >= 0) {
       _localPlacedOrders[localIndex] = updated;
-    else
+    } else {
       _localPlacedOrders.insert(0, updated);
+    }
 
     final listIndex = dataList.indexWhere((item) => item.id == updated.id);
     if (listIndex >= 0) dataList[listIndex] = updated;

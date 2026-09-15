@@ -16,6 +16,10 @@ export interface Merchant extends BaseModel {
   lat: number;
   active: boolean;
   merchantKind: number;
+  deliveryTime?: string;
+  deliveryFee?: number;
+  minOrderAmount?: number;
+  workingHours?: string;
   ownerId: string;
   owner: string;
   photo: string;

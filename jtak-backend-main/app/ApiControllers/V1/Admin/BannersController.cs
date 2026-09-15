@@ -1,4 +1,4 @@
-﻿using App.Extensions;
+using App.Extensions;
 using App.Shared.Services;
 using AutoMapper;
 using Microsoft.AspNetCore.Identity;
@@ -87,7 +87,7 @@ namespace App.ApiControllers.V1.Admin
             };
             _service.Insert(entity);
             await _uow.SaveChangesAsync();
-            _cache.Remove($"BannerCache_{BannerLocation.HomePage}");
+            InvalidateBannerCache();
             return entity.Id;
         }
 
@@ -115,7 +115,7 @@ namespace App.ApiControllers.V1.Admin
             entity.Active = model.Active;
 
             await _uow.SaveChangesAsync();
-            _cache.Remove($"BannerCache_{BannerLocation.HomePage}");
+            InvalidateBannerCache();
 
             return entity.Id;
         }
@@ -130,8 +130,18 @@ namespace App.ApiControllers.V1.Admin
         {
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();
-            _cache.Remove($"BannerCache_{BannerLocation.HomePage}");
+            InvalidateBannerCache();
             return true;
+        }
+
+        private void InvalidateBannerCache()
+        {
+            _cache.Remove($"BannerCache_{BannerLocation.HomePage}");
+            _cache.Remove($"BannerCache_{BannerLocation.DontMiss}");
+            _cache.Remove($"BannerCache_{BannerLocation.RestaurantsPage}");
+            _cache.Remove($"BannerCache_{BannerLocation.MarketPage}");
+            _cache.Remove($"BannerCache_{BannerLocation.All}");
+            _cache.Remove("BannerCache_AllActive");
         }
     }
 }

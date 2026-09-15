@@ -10,6 +10,8 @@ import { UsersService } from '../../services/users.service';
 import { AppUserRoleMap } from 'src/app/_metronic/config/settings';
 import * as moment from 'moment';
 
+import { FilesService } from 'src/app/modules/shared/services/files.service';
+
 const EMPTY_USER: User = {
   id: '',
   email: '',
@@ -17,17 +19,17 @@ const EMPTY_USER: User = {
   firstName: '',
   lastName: '',
   fullName: '',
-  isActive: false,
+  isActive: true,
   profilePhoto: '',
   role: 3,
   lang: 'ar',
-  countryPhoneCode: '',
+  countryPhoneCode: '+963',
 };
 
 @Component({
   selector: 'app-edit-user-modal',
   templateUrl: './edit-user-modal.component.html',
-  styles: [],
+  styleUrls: ['./edit-user-modal.component.scss'],
 })
 export class EditUserModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
@@ -40,8 +42,37 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
     private service: UsersService,
     private fb: FormBuilder,
     public modal: NgbActiveModal,
+    public filesService: FilesService,
     private toasterService: ToastrService
   ) {}
+
+  getUserAvatar(): string | null {
+    return this.formGroup?.get('profilePhoto')?.value || null;
+  }
+
+  getUserInitials(): string {
+    const first = (this.formGroup?.get('firstName')?.value || '').trim()[0] || '';
+    const last = (this.formGroup?.get('lastName')?.value || '').trim()[0] || '';
+    return (first + last).toUpperCase() || 'U';
+  }
+
+  getRoleBadgeInfo(): { label: string; icon: string; badgeClass: string } {
+    const role = Number(this.formGroup?.get('role')?.value ?? 1);
+    switch (role) {
+      case 0:
+        return { label: 'مدير النظام', icon: 'fas fa-user-shield', badgeClass: 'role-admin' };
+      case 2:
+        return { label: 'تاجر', icon: 'fas fa-store', badgeClass: 'role-merchant' };
+      case 3:
+        return { label: 'مندوب توصيل', icon: 'fas fa-motorcycle', badgeClass: 'role-delivery' };
+      default:
+        return { label: 'عميل', icon: 'fas fa-user', badgeClass: 'role-customer' };
+    }
+  }
+
+  onImageError(event: any): void {
+    event.target.style.display = 'none';
+  }
 
   ngOnInit(): void {
     this.isLoading$ = this.service.isLoading$;
@@ -62,13 +93,15 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
       lastName: [this.item.lastName, [Validators.required]],
       phoneNumber: [
         this.item.countryPhoneCode?this.item.phoneNumber.replace(this.item.countryPhoneCode,''):this.item.phoneNumber,
-        [Validators.required, Validators.minLength(8), Validators.maxLength(10)],
+        [Validators.required, Validators.minLength(8), Validators.maxLength(15)],
       ],
+      countryPhoneCode: [this.item.countryPhoneCode || '+963'],
       email: [this.item.email, [Validators.email]],
-      isActive: [this.item.isActive],
+      password: ['', this.item?.id ? [] : [Validators.required, Validators.minLength(6)]],
+      isActive: [this.item.isActive !== undefined ? this.item.isActive : true],
       profilePhoto: [this.item.profilePhoto],
-      role: [this.item.role],
-      lang: [this.item.lang]
+      role: [this.item.role !== undefined ? this.item.role : 3],
+      lang: [this.item.lang || 'ar']
     });
   }
 

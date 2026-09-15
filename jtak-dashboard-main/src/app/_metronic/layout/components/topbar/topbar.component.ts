@@ -19,4 +19,18 @@ export class TopbarComponent implements OnInit {
   ngOnInit(): void {
     this.headerLeft = this.layout.getProp('header.left') as string;
   }
+
+  toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  }
+
+  isFullscreen(): boolean {
+    return !!document.fullscreenElement;
+  }
 }

@@ -17,6 +17,7 @@ import { Category } from 'src/app/pages/categories/models/Category.model';
 import { CategoriesService } from 'src/app/pages/categories/services/categories.service';
 import { ProductsService } from 'src/app/pages/products/services/products.service';
 import { BulkConfirmModalComponent } from 'src/app/modules/shared/components/bulk-confirm-modal/bulk-confirm-modal.component';
+import { PaginatorState } from 'src/app/_metronic/shared/crud-table';
 
 interface MerchantCategorySummary {
   id: number;
@@ -37,6 +38,7 @@ interface MerchantCategorySummary {
 @Component({
   selector: 'app-merchant-workspace',
   templateUrl: './merchant-workspace.component.html',
+  styleUrls: ['./merchant-workspace.component.scss'],
 })
 export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   private readonly subs = new SubSink();
@@ -45,7 +47,9 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
 
   merchant: Merchant | null = null;
   products: ProductMerchant[] = [];
+  selectedProductIds = new Set<number>();
   catalogCategories: Category[] = [];
+  paginator: PaginatorState = new PaginatorState();
   activeTab = 'overview';
   searchTerm = '';
   categoryFilter = '';
@@ -102,6 +106,9 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.paginator.page = 0;
+    this.paginator.pageSize = 25;
+    this.paginator.pageSizes = [10, 25, 50, 100];
     this.subs.sink = this.route.paramMap.subscribe((params) => {
       const id = Number(params.get('id'));
       const tab = params.get('tab') || 'overview';
@@ -146,6 +153,31 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
       const haystack = `${item.product} ${item.productCat1 || ''} ${item.productCat2 || ''}`.toLocaleLowerCase();
       return matchesCategory && (!search || haystack.includes(search));
     });
+  }
+
+  get paginatedProducts(): ProductMerchant[] {
+    const list = this.visibleProducts;
+    this.paginator.total = list.length;
+    const maxPageIndex = Math.max(0, Math.ceil(list.length / this.paginator.pageSize) - 1);
+    if (this.paginator.page > maxPageIndex) {
+      this.paginator.page = maxPageIndex;
+    }
+    if (this.paginator.page < 0) {
+      this.paginator.page = 0;
+    }
+    const start = this.paginator.page * this.paginator.pageSize;
+    return list.slice(start, start + this.paginator.pageSize);
+  }
+
+  onProductFilterChange(): void {
+    this.paginator.page = 0;
+    this.cdr.detectChanges();
+  }
+
+  paginate(paginator: PaginatorState): void {
+    this.paginator.page = paginator.page ?? 0;
+    this.paginator.pageSize = paginator.pageSize || 25;
+    this.cdr.detectChanges();
   }
 
   get allCategorizedData(): {
@@ -563,17 +595,120 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     item.isSelected = selected;
   }
 
+  get selectedProductsCount(): number {
+    return this.selectedProductIds.size;
+  }
+
+  isProductRowSelected(item: ProductMerchant): boolean {
+    return this.selectedProductIds.has(item.productId);
+  }
+
+  toggleProductRowSelection(item: ProductMerchant, selected: boolean): void {
+    if (selected) {
+      this.selectedProductIds.add(item.productId);
+    } else {
+      this.selectedProductIds.delete(item.productId);
+    }
+  }
+
   toggleAllVisible(selected: boolean): void {
-    this.visibleProducts.forEach((item) => item.isSelected = selected);
+    if (selected) {
+      this.paginatedProducts.forEach((item) => this.selectedProductIds.add(item.productId));
+    } else {
+      this.paginatedProducts.forEach((item) => this.selectedProductIds.delete(item.productId));
+    }
+  }
+
+  toggleAllFiltered(selected: boolean): void {
+    if (selected) {
+      this.visibleProducts.forEach((item) => this.selectedProductIds.add(item.productId));
+    } else {
+      this.visibleProducts.forEach((item) => this.selectedProductIds.delete(item.productId));
+    }
+  }
+
+  clearProductSelection(): void {
+    this.selectedProductIds.clear();
   }
 
   allVisibleSelected(): boolean {
-    return this.visibleProducts.length > 0 && this.visibleProducts.every((item) => item.isSelected);
+    return (
+      this.paginatedProducts.length > 0 &&
+      this.paginatedProducts.every((item) => this.selectedProductIds.has(item.productId))
+    );
   }
 
   someVisibleSelected(): boolean {
-    const enabled = this.visibleProducts.filter((item) => item.isSelected).length;
-    return enabled > 0 && enabled < this.visibleProducts.length;
+    const selectedCount = this.paginatedProducts.filter((item) =>
+      this.selectedProductIds.has(item.productId)
+    ).length;
+    return selectedCount > 0 && selectedCount < this.paginatedProducts.length;
+  }
+
+  deleteSelectedProducts(): void {
+    const ids = Array.from(this.selectedProductIds);
+    if (!ids.length) return;
+    const modalRef = this.modalService.open(BulkConfirmModalComponent);
+    modalRef.componentInstance.count = ids.length;
+    modalRef.componentInstance.itemLabel = ids.length === 1 ? 'منتج' : 'منتجات';
+    modalRef.componentInstance.actionLabel = 'حذف المنتجات المحددة';
+    modalRef.componentInstance.description = `هل أنت متأكد من حذف ${ids.length} منتج من الكتالوج العام نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`;
+    modalRef.componentInstance.action = () => forkJoin(ids.map((id) => this.productsService.delete(id)));
+    modalRef.result.then(
+      () => {
+        const idSet = new Set(ids);
+        this.products = this.products.filter((product) => !idSet.has(product.productId));
+        this.originalProducts = this.originalProducts.filter((product) => !idSet.has(product.productId));
+        this.selectedProductIds.clear();
+        this.toaster.success(`تم حذف ${ids.length} منتج بنجاح`);
+        this.cdr.detectChanges();
+      },
+      () => {}
+    );
+  }
+
+  bulkEnableInMerchant(): void {
+    const ids = this.selectedProductIds;
+    if (!ids.size) return;
+    let modified = 0;
+    this.products.forEach((p) => {
+      if (ids.has(p.productId) && !p.isSelected) {
+        p.isSelected = true;
+        modified++;
+      }
+    });
+    this.selectedProductIds.clear();
+    this.toaster.success(`تم تفعيل ${modified} منتج في متجر التاجر`);
+    this.cdr.detectChanges();
+  }
+
+  bulkRemoveFromMerchant(): void {
+    const ids = this.selectedProductIds;
+    if (!ids.size) return;
+    let modified = 0;
+    this.products.forEach((p) => {
+      if (ids.has(p.productId) && p.isSelected) {
+        p.isSelected = false;
+        modified++;
+      }
+    });
+    this.selectedProductIds.clear();
+    this.toaster.info(`تم تعطيل ${modified} منتج من متجر التاجر`);
+    this.cdr.detectChanges();
+  }
+
+  bulkSetExtraProfit(percent: number): void {
+    const ids = this.selectedProductIds;
+    if (!ids.size) return;
+    let modified = 0;
+    this.products.forEach((p) => {
+      if (ids.has(p.productId)) {
+        p.additionalProfitPercent = percent;
+        modified++;
+      }
+    });
+    this.toaster.success(`تم تطبيق نسبة ربح ${percent}% على ${modified} منتج`);
+    this.cdr.detectChanges();
   }
 
   toggleCategory(category: MerchantCategorySummary, enabled: boolean): void {

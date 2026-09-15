@@ -14,7 +14,7 @@ import 'sol_api_response.dart';
 class SolApi {
   static const String baseURL = 'https://api.jtak.app';
   static const String imagePreviewUrl = baseURL + '/api/v1/services/previewimage/';
-  static const String downloadUrl = baseURL + '/api/services/Download/';
+  static const String downloadUrl = baseURL + '/api/v1/services/Download/';
   static const String apiVersionPrefex = '/api/v1';
   static const String apiModelPrefex = '/delivery';
   static const String apiPrefex = apiVersionPrefex + apiModelPrefex;
@@ -32,20 +32,21 @@ class SolApi {
     getHeaders();
   }
 
-  Map<String, String> getHeaders({String? contentType}) {
+  Map<String, String> getHeaders({String? contentType, bool includeAuth = true}) {
     apiHeaders = {};
     apiHeaders['Content-Type'] = contentType ?? this.contentType;
     apiHeaders['Accept-Language'] = locator<AppStateManager>().appLanguage;
-    if (accessToken != null) apiHeaders['authorization'] = 'Bearer $accessToken';
+    if (includeAuth && accessToken != null) apiHeaders['authorization'] = 'Bearer $accessToken';
 
     return apiHeaders;
   }
 
   Future<dynamic> getRequest(String subUrl, {Map<String, String>? headers, String? apiPrefex}) async {
-    if (subUrl != '/connect/token') await locator<AuthenticationService>().checkAuthorizationToken();
+    final bool isConnectToken = subUrl.contains('/connect/token');
+    if (!isConnectToken) await locator<AuthenticationService>().checkAuthorizationToken();
     String url = getFullUrl(subUrl, prefex: apiPrefex);
     try {
-      final httpResponse = await internetProvider.getRequest(Uri.parse(url), headers: headers ?? getHeaders());
+      final httpResponse = await internetProvider.getRequest(Uri.parse(url), headers: headers ?? getHeaders(includeAuth: !isConnectToken));
       return _responseHandel(httpResponse, url: url);
     } catch (err) {
       rethrow;
@@ -53,10 +54,11 @@ class SolApi {
   }
 
   Future<dynamic> postRequest(String subUrl, dynamic body, {Map<String, String>? headers, String? apiPrefex}) async {
-    if (subUrl != '/connect/token') await locator<AuthenticationService>().checkAuthorizationToken();
+    final bool isConnectToken = subUrl.contains('/connect/token');
+    if (!isConnectToken) await locator<AuthenticationService>().checkAuthorizationToken();
     String url = getFullUrl(subUrl, prefex: apiPrefex);
     try {
-      Map<String, String>? header = headers ?? getHeaders();
+      Map<String, String>? header = headers ?? getHeaders(includeAuth: !isConnectToken);
       Object newBody = _parseBody(body, header);
 
       final httpResponse = await internetProvider.postRequest(Uri.parse(url), newBody, headers: header);
@@ -67,10 +69,11 @@ class SolApi {
   }
 
   Future<dynamic> putRequest(String subUrl, dynamic body, {Map<String, String>? headers, String? apiPrefex}) async {
-    if (subUrl != '/connect/token') await locator<AuthenticationService>().checkAuthorizationToken();
+    final bool isConnectToken = subUrl.contains('/connect/token');
+    if (!isConnectToken) await locator<AuthenticationService>().checkAuthorizationToken();
     String url = getFullUrl(subUrl, prefex: apiPrefex);
     try {
-      Map<String, String> header = headers ?? getHeaders();
+      Map<String, String> header = headers ?? getHeaders(includeAuth: !isConnectToken);
       Object newBody = _parseBody(body, header);
 
       final httpResponse = await internetProvider.putRequest(Uri.parse(url), newBody, headers: header);
@@ -81,9 +84,11 @@ class SolApi {
   }
 
   Future<dynamic> deleteRequest(String subUrl, {Map<String, String>? headers, String? apiPrefex}) async {
+    final bool isConnectToken = subUrl.contains('/connect/token');
+    if (!isConnectToken) await locator<AuthenticationService>().checkAuthorizationToken();
     String url = getFullUrl(subUrl, prefex: apiPrefex);
     try {
-      Map<String, String> header = headers ?? getHeaders();
+      Map<String, String> header = headers ?? getHeaders(includeAuth: !isConnectToken);
       final httpResponse = await internetProvider.deleteRequest(Uri.parse(url), headers: header);
       return _responseHandel(httpResponse, url: url);
     } catch (err) {
@@ -106,22 +111,36 @@ class SolApi {
 
   dynamic _responseHandel(http.Response response, {String url = ''}) {
     try {
-      if (response.statusCode >= 200 && response.statusCode < 300) return json.decode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.body.isEmpty) return <String, dynamic>{};
+        return json.decode(response.body);
+      }
 
-      SolApiErrorResponse apiResponse = SolApiErrorResponse();
-      GlobalVar.log('$url status code ${response.statusCode} : ${json.decode(response.body)}');
+      GlobalVar.log('$url status code ${response.statusCode} : ${response.body}');
 
-      if (response.statusCode == 404) throw NotFoundException('${str.msg.errConnectionServer} \n ${apiResponse.getErrorsString()}');
+      if (response.statusCode == 401) throw FetchDataException('يرجى تسجيل الدخول مجدداً');
+      if (response.statusCode == 403) throw FetchDataException('هذا الحساب ليس لديه صلاحيات مندوب توصيل');
+      if (response.statusCode == 404) throw NotFoundException('المورد المطلوب غير موجود');
+      if (response.statusCode >= 500) throw FetchDataException(str.msg.errConnectionServer);
 
-      if (response.statusCode == 500) throw FetchDataException('${str.msg.errConnectionServer} \n ${apiResponse.getErrorsString()}');
+      if (response.body.isNotEmpty) {
+        try {
+          final decoded = json.decode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            SolApiErrorResponse apiResponse = SolApiErrorResponse();
+            apiResponse.fromJson(decoded);
+            final errStr = apiResponse.getErrorsString();
+            if (errStr.trim().isNotEmpty) {
+              throw FetchDataException(errStr.trim());
+            }
+          }
+        } catch (_) {}
+      }
 
-      apiResponse.fromJson(json.decode(response.body) as Map<String, dynamic>);
-      if (kDebugMode) debugPrint('///////////////// apiResponse.getErrorsString :' + apiResponse.getErrorsString());
-      throw FetchDataException(apiResponse.getErrorsString());
+      throw FetchDataException(response.body.isNotEmpty ? response.body : str.msg.errConnectionServer);
     } on FormatException catch (e) {
-      // if faild to parse error json object
-      debugPrint(e.toString());
-      throw FetchDataException(response.body);
+      debugPrint('SolApi FormatException: $e');
+      throw FetchDataException(str.msg.errConnectionServer);
     } catch (err) {
       debugPrint(err.toString());
       rethrow;

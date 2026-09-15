@@ -1,29 +1,32 @@
 <div class="card card-custom gutter-b">
   <div class="card-header d-flex justify-content-between align-items-center">
     <div class="card-title">
-      <h3 class="card-label">Set Products For Merchant</h3>
+      <h3 class="card-label fw-bolder">تعيين منتجات المتجر</h3>
     </div>
     <div>
-      <button class="btn btn-success" (click)="save()">Save</button>
+      <button class="btn btn-success" (click)="save()">{{ 'COMMON.SAVE' | translate }}</button>
     </div>
   </div>
   <div class="card-body" style="max-height: 90vh; overflow-y: scroll">
     <table class="table">
       <tr>
         <td>
-          <input
-            type="checkbox"
-            (change)="toggleAllChanged($event)"
-            [checked]="toggleAll"
-          />
-          <span>Toggle All</span>
+          <label class="d-flex align-items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              class="form-check-input mt-0"
+              (change)="toggleAllChanged($event)"
+              [checked]="toggleAll"
+            />
+            <span class="fw-bold">تحديد الكل</span>
+          </label>
         </td>
         <td>
           <input
             type="text"
             class="form-control"
             name="searchText"
-            placeholder="Search"
+            [placeholder]="'COMMON.SEARCH' | translate"
             [(ngModel)]="search"
             (ngModelChange)="onSearchChange($event)"
           />
@@ -33,11 +36,11 @@
 
     <table class="table table-sm mt-3">
       <thead>
-        <tr>
-          <td>Enabled</td>
-          <td>Product</td>
-          <td>Merchant Price</td>
-          <td>Additional %</td>
+        <tr class="fw-bolder text-muted bg-light fs-7">
+          <td>{{ 'COMMON.ENABLED' | translate }}</td>
+          <td>{{ 'MERCHANT_WORKSPACE.COL_PRODUCT' | translate }}</td>
+          <td>{{ 'MERCHANT_WORKSPACE.COL_CUSTOMER_PRICE' | translate }}</td>
+          <td>{{ 'MERCHANT_WORKSPACE.COL_ADDITIONAL_PROFIT' | translate }} %</td>
         </tr>
       </thead>
       <tbody>
@@ -53,6 +56,7 @@
           <td style="width: 50px">
             <input
               type="checkbox"
+              class="form-check-input"
               name="checkbox"
               [checked]="i.isSelected"
               (change)="changeIsSelected(i.productId)"
@@ -73,16 +77,16 @@
                 <span class="badge badge-light-success"
                   >{{ i.productCat1 }}
                 </span>
-                <i class="fas fa-chevron-left m-1"></i>
+                <i class="fas fa-chevron-left rtl-flip m-1"></i>
                 <span class="badge badge-success"> {{ i.productCat2 }}</span>
               </div>
             </div>
           </td>
           <td>
-            <span *ngIf="i.price === i.finalPrice">{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">SYP</span></span>
+            <span *ngIf="i.price === i.finalPrice">{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span></span>
             <span *ngIf="i.price !== i.finalPrice">
               <span style="text-decoration: line-through" class="text-muted me-1">{{ i.price | number }}</span>
-              <span>{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">SYP</span></span>
+              <span>{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span></span>
             </span>
           </td>
           <td>

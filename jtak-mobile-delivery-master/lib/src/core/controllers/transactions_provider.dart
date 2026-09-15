@@ -13,4 +13,16 @@ class TransactionsProvider extends BaseProvider {
       balances = BalancesModel.fromMap(res);
     });
   }
+
+  Future<bool> requestSettlement() async {
+    final res = await _api.postRequest('/Balances/RequestSettlement', {
+      'method': 'cash_to_admin',
+      'notes': 'طلب تسوية كامل العهدة النقدية',
+    });
+    if (res != null) {
+      await loadBalances();
+      return true;
+    }
+    return false;
+  }
 }

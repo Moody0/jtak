@@ -15,28 +15,49 @@ class LocationService {
 
   /// Determine the current position of the device.
   ///
-  /// When the location services are not enabled or permissions
-  /// are denied the `Future` will return an error.
+  /// Fast path checks last known cached position (<50ms).
+  /// Falls back to fresh GPS fix with reasonable timeout.
   Future<LatLng?> getCurrentLocation() async {
     if (kIsWeb) {
       return const LatLng(33.5138, 36.2765);
     }
-    ////////////////{ check Permission } ////////////////
-    await checkPermission();
 
-    // When we reach here, permissions are granted and we can
-    // continue accessing the position of the device.
+    ////////////////{ check Permission } ////////////////
+    bool hasPermission = false;
+    try {
+      hasPermission = await checkPermission();
+    } catch (e) {
+      if (isMandatory) rethrow;
+      return null;
+    }
+
+    if (!hasPermission) {
+      return null;
+    }
+
+    // 1. FAST PATH (<50ms): Last known location cached by Google Play Services / OS
+    try {
+      Position? lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        return LatLng(lastKnown.latitude, lastKnown.longitude);
+      }
+    } catch (e) {
+      debugPrint('LocationService: getLastKnownPosition error: $e');
+    }
+
+    // 2. FRESH GPS FIX: Medium accuracy resolves within 1-2s
     try {
       Position currentPosition = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 8),
         ),
       );
       return LatLng(currentPosition.latitude, currentPosition.longitude);
     } catch (e) {
+      debugPrint('LocationService: getCurrentPosition error: $e');
       if (isMandatory) {
-        if (e is LocationServiceDisabledException && isMandatory) {
+        if (e is LocationServiceDisabledException) {
           throw str.msg.locationServiceDisabled;
         }
         rethrow;
@@ -229,43 +250,46 @@ class LocationService {
   }
 
   Future<bool> checkLocationService() async {
-    bool serviceEnabled;
-
-    // Test if location services are enabled.
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // Location services are not enabled don't continue
-      // accessing the position and request users of the
-      // App to enable the location services.
-      return Future.error('Location services are disabled.');
+      if (isMandatory) {
+        return Future.error(str.msg.locationServiceDisabled);
+      }
+      return false;
     }
-    return serviceEnabled;
+    return true;
   }
 
   Future<bool> checkPermission() async {
-    LocationPermission permission;
-    permission = await Geolocator.checkPermission();
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (isMandatory) {
+        return Future.error(str.msg.locationServiceDisabled);
+      }
+      return false;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        // Permissions are denied, next time you could try
-        // requesting permissions again (this is also where
-        // Android's shouldShowRequestPermissionRationale
-        // returned true. According to Android guidelines
-        // your App should show an explanatory UI now.
-        return Future.error(str.msg.locationPermissionsDenied);
+        if (isMandatory) {
+          return Future.error(str.msg.locationPermissionsDenied);
+        }
+        return false;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever, handle appropriately.
-
-      if (!kIsWeb && Platform.isIOS) {
-        return Future.error(str.msg.pleaseEnableLocationService);
-      } else {
-        await Geolocator.openLocationSettings();
-        return Future.error(str.msg.locationPermissionsDenied);
+      if (isMandatory) {
+        if (!kIsWeb && Platform.isIOS) {
+          return Future.error(str.msg.pleaseEnableLocationService);
+        } else {
+          await Geolocator.openLocationSettings();
+          return Future.error(str.msg.locationPermissionsDenied);
+        }
       }
+      return false;
     }
 
     return true;

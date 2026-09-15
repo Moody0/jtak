@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,10 @@ import 'package:provider/provider.dart';
 
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/catalog/favorite_product_provider.dart';
+import '../../../core/controllers/order/cart_provider.dart';
+import '../../../core/services/locator.dart';
 import '../../pages/catalog/market_page.dart';
+import '../clean_shimmer_skeletons.dart';
 
 /// ---------------------------------------------------------------------------
 /// Shared Market Product Card Component
@@ -18,54 +22,148 @@ import '../../pages/catalog/market_page.dart';
 /// - Smooth animated morphing Quick-Add (+) / Stepper button at bottom-right
 /// - Clean title (max 2 lines) and bold orange price underneath
 /// - Supports both fixed width (horizontal carousels) and flexible width (2-col grid)
+/// - Self-contained reactive counter that updates instantly without reloading the parent page!
 /// ---------------------------------------------------------------------------
-class MarketProductCard extends StatelessWidget {
+class MarketProductCard extends StatefulWidget {
   final MarketProductItem product;
-  final int quantityInCart;
-  final bool isExpanded;
+  final int? quantityInCart;
+  final bool? isExpanded;
   final VoidCallback onProductTap;
-  final VoidCallback onPlusTap;
-  final VoidCallback onMinusTap;
-  final VoidCallback onCollapsedBadgeTap;
+  final VoidCallback? onPlusTap;
+  final VoidCallback? onMinusTap;
+  final VoidCallback? onCollapsedBadgeTap;
   final double? width;
+  final int? marketId;
 
   const MarketProductCard({
     super.key,
     required this.product,
-    required this.quantityInCart,
-    required this.isExpanded,
+    this.quantityInCart,
+    this.isExpanded,
     required this.onProductTap,
-    required this.onPlusTap,
-    required this.onMinusTap,
-    required this.onCollapsedBadgeTap,
+    this.onPlusTap,
+    this.onMinusTap,
+    this.onCollapsedBadgeTap,
     this.width,
+    this.marketId,
   });
 
   @override
+  State<MarketProductCard> createState() => _MarketProductCardState();
+}
+
+class _MarketProductCardState extends State<MarketProductCard> {
+  bool _localExpanded = false;
+  Timer? _collapseTimer;
+
+  void _resetCollapseTimer() {
+    _collapseTimer?.cancel();
+    _collapseTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _localExpanded = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handlePlus() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _localExpanded = true;
+    });
+    _resetCollapseTimer();
+    if (widget.onPlusTap != null) {
+      widget.onPlusTap!();
+    } else {
+      final cart = locator<CartProvider>();
+      final newQty = cart.getProductQuantity(widget.product.id) + 1;
+      cart.setToCart(
+        widget.product.id,
+        widget.marketId ?? 0,
+        widget.product.priceValue.toDouble(),
+        newQty,
+        title: widget.product.title,
+        imageUrl: widget.product.imageUrl,
+      );
+    }
+  }
+
+  void _handleMinus() {
+    HapticFeedback.selectionClick();
+    _resetCollapseTimer();
+    if (widget.onMinusTap != null) {
+      widget.onMinusTap!();
+    } else {
+      final cart = locator<CartProvider>();
+      final current = cart.getProductQuantity(widget.product.id);
+      if (current <= 1) {
+        cart.removeFromCart(widget.product.id, widget.marketId ?? 0);
+        setState(() {
+          _localExpanded = false;
+        });
+      } else {
+        cart.setToCart(
+          widget.product.id,
+          widget.marketId ?? 0,
+          widget.product.priceValue.toDouble(),
+          current - 1,
+          title: widget.product.title,
+          imageUrl: widget.product.imageUrl,
+        );
+      }
+    }
+  }
+
+  void _handleCollapsedBadgeTap() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _localExpanded = true;
+    });
+    _resetCollapseTimer();
+    if (widget.onCollapsedBadgeTap != null) {
+      widget.onCollapsedBadgeTap!();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final bool expanded = isExpanded && quantityInCart > 0;
+    return Selector<CartProvider, int>(
+      selector: (_, cart) => cart.getProductQuantity(widget.product.id),
+      builder: (context, cartQty, _) {
+        final product = widget.product;
+        final width = widget.width;
+        final onProductTap = widget.onProductTap;
+        final quantityInCart = widget.quantityInCart ?? cartQty;
+        final bool expanded = (widget.isExpanded ?? _localExpanded) && quantityInCart > 0;
 
-    final double btnWidth = expanded ? 112 : 34;
-    final double btnHeight = expanded ? 36 : 34;
-    final double btnRight = expanded ? 6 : 8;
-    final double btnBottom = expanded ? 6 : 8;
+        final double btnWidth = expanded ? 112 : 34;
+        final double btnHeight = expanded ? 36 : 34;
+        final double btnRight = expanded ? 6 : 8;
+        final double btnBottom = expanded ? 6 : 8;
 
-    final BoxDecoration btnDecoration = expanded
-        ? BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-          )
-        : (quantityInCart > 0
+        final BoxDecoration btnDecoration = expanded
             ? BoxDecoration(
-                color: kPrimaryOrange,
-                borderRadius: BorderRadius.circular(17),
-              )
-            : BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(17),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-              ));
+              )
+            : (quantityInCart > 0
+                ? BoxDecoration(
+                    color: kPrimaryOrange,
+                    borderRadius: BorderRadius.circular(17),
+                  )
+                : BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(17),
+                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                  ));
 
     Widget imageBox = Container(
       width: width,
@@ -78,33 +176,53 @@ class MarketProductCard extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Product Image (Takes full area with contain fit)
+          // Product Image (Fills container completely with cover fit)
           Positioned.fill(
             child: GestureDetector(
               onTap: onProductTap,
               behavior: HitTestBehavior.opaque,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(17),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: product.imageUrl.startsWith('assets')
-                      ? Image.asset(
-                          product.imageUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.fastfood_rounded,
-                                color: Color(0xFFCBD5E1), size: 36),
-                          ),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: product.imageUrl,
-                          fit: BoxFit.contain,
-                          errorWidget: (_, __, ___) => const Center(
-                            child: Icon(Icons.fastfood_rounded,
-                                color: Color(0xFFCBD5E1), size: 36),
+                child: product.imageUrl.startsWith('assets')
+                    ? Image.asset(
+                        product.imageUrl,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFF8FAFC),
+                          child: const Center(
+                            child: Icon(
+                              Icons.shopping_basket_rounded,
+                              color: Color(0xFFCBD5E1),
+                              size: 36,
+                            ),
                           ),
                         ),
-                ),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: product.imageUrl,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        fadeInDuration: const Duration(milliseconds: 200),
+                        fadeOutDuration: const Duration(milliseconds: 150),
+                        placeholder: (_, __) => const CleanShimmer(
+                          child: SizedBox.expand(
+                            child: ColoredBox(color: Colors.white),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: const Color(0xFFF8FAFC),
+                          child: const Center(
+                            child: Icon(
+                              Icons.shopping_basket_rounded,
+                              color: Color(0xFFCBD5E1),
+                              size: 36,
+                            ),
+                          ),
+                        ),
+                      ),
               ),
             ),
           ),
@@ -119,7 +237,7 @@ class MarketProductCard extends StatelessWidget {
                 return GestureDetector(
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    favProvider.toggleMealFavorite(product.id);
+                    favProvider.toggleMealFavorite(product.id, product);
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
@@ -181,82 +299,82 @@ class MarketProductCard extends StatelessWidget {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  // Minus Button (Left)
-                                  GestureDetector(
-                                    onTap: onMinusTap,
-                                    behavior: HitTestBehavior.opaque,
-                                    child: const SizedBox(
-                                      width: 32,
-                                      height: 36,
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.remove_rounded,
-                                          color: kPrimaryOrange,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                   // Minus Button (Left)
+                                   GestureDetector(
+                                     onTap: _handleMinus,
+                                     behavior: HitTestBehavior.opaque,
+                                     child: const SizedBox(
+                                       width: 32,
+                                       height: 36,
+                                       child: Center(
+                                         child: Icon(
+                                           Icons.remove_rounded,
+                                           color: kPrimaryOrange,
+                                           size: 20,
+                                         ),
+                                       ),
+                                     ),
+                                   ),
 
-                                  // Animated Sliding Number (Center)
-                                  AnimatedCounterText(
-                                    count: quantityInCart,
-                                    style: GoogleFonts.ibmPlexSansArabic(
-                                      color: kCharcoalDark,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
+                                   // Animated Sliding Number (Center)
+                                   AnimatedCounterText(
+                                     count: quantityInCart,
+                                     style: GoogleFonts.ibmPlexSansArabic(
+                                       color: kCharcoalDark,
+                                       fontSize: 15,
+                                       fontWeight: FontWeight.w900,
+                                     ),
+                                   ),
 
-                                  // Plus Button (Right)
-                                  GestureDetector(
-                                    onTap: onPlusTap,
-                                    behavior: HitTestBehavior.opaque,
-                                    child: const SizedBox(
-                                      width: 32,
-                                      height: 36,
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.add_rounded,
-                                          color: kPrimaryOrange,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        )
-                      : (quantityInCart > 0
-                          ? GestureDetector(
-                              key: const ValueKey('collapsed_badge'),
-                              onTap: onCollapsedBadgeTap,
-                              behavior: HitTestBehavior.opaque,
-                              child: Center(
-                                child: AnimatedCounterText(
-                                  count: quantityInCart,
-                                  style: GoogleFonts.ibmPlexSansArabic(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : GestureDetector(
-                              key: const ValueKey('default_add_btn'),
-                              onTap: onPlusTap,
-                              behavior: HitTestBehavior.opaque,
-                              child: const Center(
-                                child: Icon(
-                                  Icons.add_rounded,
-                                  color: kPrimaryOrange,
-                                  size: 20,
-                                ),
-                              ),
-                            )),
+                                   // Plus Button (Right)
+                                   GestureDetector(
+                                     onTap: _handlePlus,
+                                     behavior: HitTestBehavior.opaque,
+                                     child: const SizedBox(
+                                       width: 32,
+                                       height: 36,
+                                       child: Center(
+                                         child: Icon(
+                                           Icons.add_rounded,
+                                           color: kPrimaryOrange,
+                                           size: 20,
+                                         ),
+                                       ),
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                             ),
+                           ),
+                         )
+                       : (quantityInCart > 0
+                           ? GestureDetector(
+                               key: const ValueKey('collapsed_badge'),
+                               onTap: _handleCollapsedBadgeTap,
+                               behavior: HitTestBehavior.opaque,
+                               child: Center(
+                                 child: AnimatedCounterText(
+                                   count: quantityInCart,
+                                   style: GoogleFonts.ibmPlexSansArabic(
+                                     color: Colors.white,
+                                     fontSize: 15,
+                                     fontWeight: FontWeight.w900,
+                                   ),
+                                 ),
+                               ),
+                             )
+                           : GestureDetector(
+                               key: const ValueKey('default_add_btn'),
+                               onTap: _handlePlus,
+                               behavior: HitTestBehavior.opaque,
+                               child: const Center(
+                                 child: Icon(
+                                   Icons.add_rounded,
+                                   color: kPrimaryOrange,
+                                   size: 20,
+                                 ),
+                               ),
+                             )),
                 ),
               ),
             ),
@@ -329,6 +447,8 @@ class MarketProductCard extends StatelessWidget {
     }
 
     return cardContent;
+      },
+    );
   }
 }
 

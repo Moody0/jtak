@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using OpenIddict.Validation.AspNetCore;
@@ -53,16 +53,25 @@ namespace App.ApiControllers.V1.Admin
                                                     .Select(x => new TopProduct
                                                     {
                                                         ProductId = x.Key,
-                                                        //ProductName = x.FirstOrDefault(p => p.ProductTitle != null).ProductTitle,
                                                         Count = x.Sum(x => x.Quantity)
                                                     })
                                                     .OrderByDescending(x => x.Count)
                                                     .Take(30)
                                                     .ToArrayAsync();
+
+            // Resolve the titles in one round trip instead of a lookup per row.
+            // A best seller that has since been deactivated or deleted has no
+            // title to show, but it must not take the whole dashboard down.
+            var topProdIds = topProds.Select(x => x.ProductId).ToArray();
+            var titles = await _service.Queryable().AsNoTracking()
+                                       .Where(x => topProdIds.Contains(x.Id))
+                                       .Select(x => new { x.Id, x.Title })
+                                       .ToDictionaryAsync(x => x.Id, x => x.Title);
             foreach (var prod in topProds)
             {
-                prod.ProductName = (await _service.GetProduct(prod.ProductId)).Title;
+                prod.ProductName = titles.TryGetValue(prod.ProductId, out var title) ? title : string.Empty;
             }
+
             return new DashboardVm
             {
                 ProductsCount = await _service.Queryable().AsNoTracking()
@@ -70,13 +79,26 @@ namespace App.ApiControllers.V1.Admin
                 UsersCount = await _userManager.Users.AsNoTracking().CountAsync(x => x.IsActive),
                 OrdersCount = await _orderService.Queryable().AsNoTracking().CountAsync(x => x.OrderStatus == OrderStatus.Success),
                 BillsCount = await _billService.Queryable().AsNoTracking().CountAsync(),
-                TotalOrdersValue = (int)await _billService.Queryable().AsNoTracking().SumAsync(x => x.TotalAmount),
-                JTakOrdersValue = (int)await _billService.Queryable().AsNoTracking().SumAsync(x => x.JTakAmount),
-                JTakAdditionalOrdersValue = (int)await _billService.Queryable().AsNoTracking().SumAsync(x => x.JTakAdditionalAmount),
-                MerchantOrdersValue = (int)await _billService.Queryable().AsNoTracking().SumAsync(x => x.MerchantAmount),
+                TotalOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.TotalAmount)),
+                JTakOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.JTakAmount)),
+                JTakAdditionalOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.JTakAdditionalAmount)),
+                MerchantOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.MerchantAmount)),
                 TopProducts = topProds
 
             };
+        }
+
+        /// <summary>
+        /// Narrows a summed money column down to the whole number the dashboard
+        /// displays. Clamping keeps one corrupt row from turning the request
+        /// into an OverflowException.
+        /// </summary>
+        private static long ToAmount(decimal? value)
+        {
+            var amount = value ?? 0m;
+            if (amount >= long.MaxValue) return long.MaxValue;
+            if (amount <= long.MinValue) return long.MinValue;
+            return (long)amount;
         }
     }
 }

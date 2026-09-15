@@ -8,7 +8,9 @@ import 'package:app_jtak_warehouse/src/core/services/authentication_service.dart
 import 'package:app_jtak_warehouse/src/core/services/locator.dart';
 import 'package:provider/provider.dart';
 
+import '../merchant_profile_provider.dart';
 import 'app_state_manager.dart';
+import 'merchant_state_provider.dart';
 
 class RootProvider extends StatelessWidget {
   final Widget child;
@@ -18,6 +20,8 @@ class RootProvider extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (ctx) => locator<AppStateManager>()),
+        ChangeNotifierProvider(create: (ctx) => locator<MerchantStateProvider>()),
+        ChangeNotifierProvider(create: (ctx) => locator<MerchantProfileProvider>()),
         ChangeNotifierProvider(create: (ctx) => locator<AuthenticationService>()),
         ChangeNotifierProvider(create: (ctx) => locator<AppParametersProvider>()),
         ChangeNotifierProvider(create: (ctx) => InitialDataProvider()),

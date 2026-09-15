@@ -1,0 +1,296 @@
+// Edit User Modal Two-Column Architecture & Live ID Profile Preview
+
+.user-editor-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+
+  @media (max-width: 991px) {
+    flex-direction: column;
+  }
+}
+
+.user-form-column {
+  flex: 1 1 64%;
+  min-width: 0;
+}
+
+.user-preview-column {
+  flex: 0 0 320px;
+  position: sticky;
+  top: 16px;
+
+  @media (max-width: 991px) {
+    flex: 1 1 100%;
+    width: 100%;
+    position: static;
+  }
+}
+
+// Form Structure
+.jtak-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.edit-section {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+
+  .edit-section-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #fff7ed;
+      color: #ea580c;
+      font-size: 0.8rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    h3 {
+      font-size: 0.96rem;
+      font-weight: 750;
+      color: #0f172a;
+      margin: 0 0 3px;
+    }
+
+    p {
+      font-size: 0.77rem;
+      color: #64748b;
+      margin: 0;
+    }
+  }
+}
+
+// Custom Switch Card
+.custom-switch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+  }
+
+  .switch-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .switch-title {
+      font-size: 0.88rem;
+      font-weight: 750;
+      color: #0f172a;
+    }
+
+    .switch-desc {
+      font-size: 0.74rem;
+      color: #64748b;
+    }
+  }
+
+  .form-check-input {
+    width: 42px;
+    height: 22px;
+    cursor: pointer;
+
+    &:checked {
+      background-color: #10b981;
+      border-color: #10b981;
+    }
+  }
+}
+
+// User Profile ID Card Preview
+.preview-phone-card {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-phone-header {
+  background: #0f172a;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ffffff;
+
+  .preview-notch-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #e2e8f0;
+
+    .preview-dot-pulse {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+    }
+  }
+
+  .preview-app-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: #f97316;
+  }
+}
+
+.preview-card-viewport {
+  padding: 20px 16px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+// Profile Badge Card
+.customer-profile-card {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+  .profile-user-name {
+    font-size: 1.12rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 8px 0 12px;
+  }
+
+  .profile-role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.74rem;
+    font-weight: 750;
+    margin-bottom: 12px;
+
+    &.role-admin {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+    }
+
+    &.role-customer {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      color: #0284c7;
+    }
+
+    &.role-merchant {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #059669;
+    }
+
+    &.role-delivery {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #ea580c;
+    }
+  }
+
+  .profile-contact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    margin-top: 6px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+
+    .contact-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.74rem;
+      color: #475569;
+      background: #f8fafc;
+      padding: 6px 10px;
+      border-radius: 8px;
+
+      i {
+        font-size: 0.76rem;
+        color: #f97316;
+      }
+
+      span {
+        direction: ltr;
+        unicode-bidi: embed;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .profile-status-badge {
+    margin-top: 12px;
+    font-size: 0.74rem;
+    font-weight: 750;
+    padding: 3px 10px;
+    border-radius: 20px;
+
+    &.active {
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+    }
+
+    &.inactive {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+  }
+}
+
+.preview-card-meta {
+  padding: 10px 16px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: center;
+  font-weight: 600;
+}

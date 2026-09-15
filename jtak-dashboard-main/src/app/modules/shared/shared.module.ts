@@ -14,6 +14,7 @@ import { NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import { EditModalComponent } from './components/edit-modal/edit-modal.component';
 import { StarRatingComponent } from './components/star-rating/star-rating.component';
 import { BulkConfirmModalComponent } from './components/bulk-confirm-modal/bulk-confirm-modal.component';
+import { TranslationModule } from '../i18n/translation.module';
 
 @NgModule({
   declarations: [
@@ -29,7 +30,7 @@ import { BulkConfirmModalComponent } from './components/bulk-confirm-modal/bulk-
     StarRatingComponent,
     BulkConfirmModalComponent,
   ],
-  imports: [CommonModule, InlineSVGModule, MaterialModule, NgbModalModule],
+  imports: [CommonModule, InlineSVGModule, MaterialModule, NgbModalModule, TranslationModule],
   exports: [
     SubmitButtonComponent,
     InputContainerComponent,
@@ -42,6 +43,7 @@ import { BulkConfirmModalComponent } from './components/bulk-confirm-modal/bulk-
     DeleteModalComponent,
     StarRatingComponent,
     BulkConfirmModalComponent,
+    TranslationModule,
   ],
 })
 export class SharedModule {}

@@ -17,6 +17,7 @@ import '../../../utils/custom_widgets/messages.dart';
 import '../../../utils/utilities/validation.dart';
 import 'choose_location_map_page.dart';
 import 'search_address_page.dart';
+import '../account/login_page.dart';
 import '../../widgets/header_circle_button.dart';
 
 class AddAddressPage extends StatefulWidget {
@@ -53,6 +54,11 @@ class _AddAddressPageState extends State<AddAddressPage> {
   @override
   Widget build(BuildContext context) {
     provider = Provider.of<AddressProvider>(context);
+    final isLogin = locator<AuthenticationService>().isLogin();
+
+    if (!isLogin) {
+      return _buildGuestGate(context);
+    }
 
     return PopScope(
       canPop: provider.stage == 0,
@@ -79,6 +85,124 @@ class _AddAddressPageState extends State<AddAddressPage> {
                 Align(
                   alignment: Alignment.bottomCenter,
                   child: _buildBottomSection(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildGuestAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      centerTitle: true,
+      leading: Center(
+        child: HeaderCircleButton.back(
+          onTap: () => Navigator.pop(context),
+        ),
+      ),
+      title: Text(
+        'إضافة عنوان جديد',
+        style: GoogleFonts.ibmPlexSansArabic(
+          fontSize: 18.5,
+          fontWeight: FontWeight.w800,
+          color: kCharcoalDark,
+        ),
+      ),
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(1),
+        child: Divider(height: 1, color: Color(0xFFF1F5F9), thickness: 1),
+      ),
+    );
+  }
+
+  Widget _buildGuestGate(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: _buildGuestAppBar(context),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF0E8),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      PhosphorIconsFill.mapPinPlus,
+                      color: kPrimaryOrange,
+                      size: 40,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'تسجيل الدخول لإضافة عنوان',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 19.5,
+                    fontWeight: FontWeight.w800,
+                    color: kCharcoalDark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'يتطلب حفظ وإضافة عنوان جديد إلى حسابك تسجيل الدخول أولاً لتتمكن من استخدامه في جميع طلباتك.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF64748B),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 26),
+                GestureDetector(
+                  onTap: () async {
+                    HapticFeedback.mediumImpact();
+                    final res = await Navigator.pushNamed(context, LoginPage.routeName);
+                    if (res is bool && res && mounted) {
+                      setState(() {});
+                    }
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: kPrimaryOrange,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0x40FF5400),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        'تسجيل الدخول / إنشاء حساب',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

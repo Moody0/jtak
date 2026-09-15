@@ -5,6 +5,7 @@ import { DashboardComponent } from './dashboard.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { CRUDTableModule } from 'src/app/_metronic/shared/crud-table';
+import { TranslationModule } from 'src/app/modules/i18n/translation.module';
 
 @NgModule({
   declarations: [DashboardComponent],
@@ -14,6 +15,7 @@ import { CRUDTableModule } from 'src/app/_metronic/shared/crud-table';
     NgSelectModule,
     ReactiveFormsModule,
     CRUDTableModule,
+    TranslationModule,
     RouterModule.forChild([
       {
         path: '',

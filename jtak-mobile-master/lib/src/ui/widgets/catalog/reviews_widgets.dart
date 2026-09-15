@@ -52,7 +52,7 @@ class ProductReviewSingleItem extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => Provider.of<ProductReviewProvider>(context, listen: false).delete(item.productId!),
+                  onPressed: () => Provider.of<ProductReviewProvider>(context, listen: false).delete(item.id!),
                   icon: const Icon(Icons.close),
                 )
               ],

@@ -1,108 +1,436 @@
-<div class="card card-custom gutter-b">
-    <div class="card-header">
-      <div class="card-title">
-        <div><h3 class="card-label">Banners</h3><span class="card-subtitle">Control campaign artwork and in-app promotions.</span></div>
+<div class="ops-banners-container">
+
+  <!-- 1. Operations Utility Bar -->
+  <div class="ops-utility-bar">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span>{{ 'BANNERS_PAGE.LIVE_OPERATIONS' | translate }}</span>
       </div>
-      <div class="card-toolbar">
-        <button type="button" class="btn btn-primary" (click)="create()">
-          <i class="fas fa-plus"></i> Add banner
+      <span class="ops-sync-meta">
+        <i class="fas fa-image text-muted me-1"></i>
+        <span>{{ 'BANNERS_PAGE.TOTAL_RECORDS' | translate }}:</span>
+        <strong>{{ totalRecords | number }}</strong>
+      </span>
+    </div>
+    <div class="ops-utility-right">
+      <button type="button" class="ops-btn-refresh" (click)="refresh()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>{{ 'BANNERS_PAGE.REFRESH' | translate }}</span>
+      </button>
+      <button type="button" class="ops-btn-primary" (click)="create()">
+        <i class="fas fa-plus"></i>
+        <span>{{ 'BANNERS_PAGE.ADD_BANNER' | translate }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. Real Operational KPI Cards -->
+  <div class="row g-3">
+    <!-- Total Banners -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-total">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BANNERS_PAGE.KPI_TOTAL' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-bullhorn"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value">{{ kpiTotal | number }}</span>
+          <span class="ops-kpi-unit">{{ 'BANNERS_PAGE.KPI_TOTAL_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Banners -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-active">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BANNERS_PAGE.KPI_ACTIVE' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-check-circle"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-success">{{ kpiActive | number }}</span>
+          <span class="ops-kpi-unit">{{ 'BANNERS_PAGE.KPI_ACTIVE_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Offers Section -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-daily">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BANNERS_PAGE.KPI_DAILY' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-star"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-primary">{{ kpiDaily | number }}</span>
+          <span class="ops-kpi-unit">{{ 'BANNERS_PAGE.KPI_DAILY_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Don't Miss Section -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-dontmiss">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BANNERS_PAGE.KPI_DONT_MISS' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-fire"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-warning">{{ kpiDontMiss | number }}</span>
+          <span class="ops-kpi-unit">{{ 'BANNERS_PAGE.KPI_DONT_MISS_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Consolidated Search & Filter Panel -->
+  <div class="ops-filter-panel">
+    <div class="ops-filter-row">
+      <!-- Search Input -->
+      <div class="ops-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search ops-search-icon"></i>
+        <input
+          type="text"
+          class="ops-search-input"
+          [placeholder]="'BANNERS_PAGE.SEARCH_PLACEHOLDER' | translate"
+          formControlName="searchTerm"
+        />
+      </div>
+
+      <!-- Placement Filter Dropdown -->
+      <div class="ops-filter-dropdown">
+        <select
+          [ngModel]="selectedSection"
+          (ngModelChange)="filterBySection($event)"
+          aria-label="Filter by Placement"
+        >
+          <option value="all">{{ 'BANNERS_PAGE.ALL_SECTIONS' | translate }}</option>
+          <option value="daily">⭐ {{ 'BANNERS_PAGE.SECTION_DAILY_OFFERS' | translate }}</option>
+          <option value="dont_miss">🔥 {{ 'BANNERS_PAGE.SECTION_DONT_MISS' | translate }}</option>
+          <option value="both">✨ {{ 'BANNERS_PAGE.SECTION_BOTH' | translate }}</option>
+        </select>
+      </div>
+
+      <!-- Status Filter Tabs -->
+      <div class="ops-status-tabs" role="tablist">
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'all'"
+          (click)="filterByStatus('all')"
+        >
+          {{ 'BANNERS_PAGE.ALL_STATUS' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'active'"
+          (click)="filterByStatus('active')"
+        >
+          <i class="fas fa-check-circle text-success me-1"></i>
+          {{ 'BANNERS_PAGE.STATUS_ACTIVE' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'disabled'"
+          (click)="filterByStatus('disabled')"
+        >
+          <i class="fas fa-ban text-danger me-1"></i>
+          {{ 'BANNERS_PAGE.STATUS_DISABLED' | translate }}
         </button>
       </div>
     </div>
-    <div class="card-body">
-      <!-- begin: Filtration form -->
-      <div class="form form-label-right">
-        <div class="form-group row">
-          <div class="col-lg-2" [formGroup]="searchGroup">
-            <input
-              type="text"
-              class="form-control"
-              name="searchText"
-              placeholder="Search banners"
-              formControlName="searchTerm"
-            />
-          </div>
+  </div>
+
+  <!-- 4. Banners Table Card -->
+  <div class="ops-table-card" *ngIf="bannersService.items$ | async as rawItems">
+    <!-- Filtered visible items -->
+    <ng-container *ngIf="getDisplayedItems(rawItems) as items">
+
+      <!-- Bulk Action Bar -->
+      <div class="ops-bulk-bar" *ngIf="selection.count > 0">
+        <div class="ops-bulk-count">
+          <strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}
+        </div>
+        <div class="ops-bulk-actions">
+          <button
+            type="button"
+            class="btn btn-sm btn-light-primary"
+            (click)="selection.exportSelected(items, 'banners')"
+          >
+            <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-light-success"
+            (click)="bulkSetStatus(items, true)"
+          >
+            <i class="fas fa-check-circle me-1"></i> {{ 'PRODUCTS_PAGE.ENABLE' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-light-warning"
+            (click)="bulkSetStatus(items, false)"
+          >
+            <i class="fas fa-ban me-1"></i> {{ 'PRODUCTS_PAGE.DISABLE' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-light-danger"
+            (click)="bulkDelete(items)"
+          >
+            <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-link text-muted"
+            (click)="selection.clear()"
+          >
+            {{ 'COMMON.CLEAR' | translate }}
+          </button>
         </div>
       </div>
-      <!-- end: Filtration form -->
-      <ng-container *ngIf="bannersService.items$ | async as items">
-        <div class="bulk-action-bar" *ngIf="selection.count > 0">
-          <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-          <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'banners')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-danger" (click)="bulkDelete(items)"><i class="fas fa-trash"></i> Delete</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
-        </div>
-      </ng-container>
-  
-      <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="bannersService.items$ | async as items">
-        <table
-          class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
-        >
+
+      <!-- High-Density Responsive Table -->
+      <div class="table-responsive">
+        <table class="ops-table">
           <thead>
-            <tr class="fw-bolder text-muted">
-              <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all banners on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-              <th scope="col">
-                Title
-                <app-sort-icon
-                  column="title"
-                  [activeColumn]="sorting.column"
-                  [activeDirection]="sorting.direction"
-                  (sort)="sort($event)"
-                ></app-sort-icon>
+            <tr>
+              <th scope="col" class="table-select-cell" style="width: 44px;">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  aria-label="Select all banners on this page"
+                  [checked]="selection.allSelected(items)"
+                  [indeterminate]="selection.partiallySelected(items)"
+                  (change)="selection.toggleAll(items, $any($event.target).checked)"
+                />
+              </th>
+              <th scope="col" style="width: 140px;">
+                {{ 'BANNERS_PAGE.COL_IMAGE' | translate }}
               </th>
               <th scope="col">
-                Description
+                <span role="button" (click)="sort('title')">
+                  {{ 'BANNERS_PAGE.COL_TITLE' | translate }}
+                  <app-sort-icon column="title" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <th scope="col">
-                Section / القسم
+              <th scope="col" style="width: 170px;">
+                {{ 'BANNERS_PAGE.COL_SECTION' | translate }}
               </th>
-              <th scope="col">
-                Active
+              <th scope="col" style="width: 100px; text-align: center;">
+                <span role="button" (click)="sort('order')">
+                  {{ 'BANNERS_PAGE.ORDER_LABEL' | translate }}
+                  <app-sort-icon column="order" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <th scope="col">
-                Created Date
+              <th scope="col" style="width: 110px; text-align: center;">
+                {{ 'BANNERS_PAGE.COL_ACTIVE' | translate }}
               </th>
-              <th scope="col">Actions</th>
+              <th scope="col" style="width: 130px;">
+                {{ 'BANNERS_PAGE.COL_CREATED_DATE' | translate }}
+              </th>
+              <th scope="col" style="width: 130px; text-align: center;">
+                {{ 'BANNERS_PAGE.COL_ACTIONS' | translate }}
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
-              <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select ' + i.title" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
-              <td>{{ i.title }}</td>
-              <td>{{ i.description }}</td>
-              <td>
-                <span class="badge badge-light-warning" *ngIf="isDontMiss(i)">لا تفوتها</span>
-                <span class="badge badge-light-success" *ngIf="isAllSections(i)">كلاهما</span>
-                <span class="badge badge-light-primary" *ngIf="isDailyOffers(i)">العروض اليومية</span>
+            <tr
+              *ngFor="let banner of items"
+              [class.table-row-selected]="selection.isSelected(banner)"
+            >
+              <!-- Select Checkbox -->
+              <td class="table-select-cell">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="selection.isSelected(banner)"
+                  [attr.aria-label]="'Select ' + banner.title"
+                  (change)="selection.toggle(banner, $any($event.target).checked)"
+                />
               </td>
+
+              <!-- Banner Thumbnail Preview -->
               <td>
-                <span
-                  class="badge"
-                  [ngClass]="{'badge-light-success': i.active,'badge-warning': !i.active}"
-                >
-                  {{ i.active ? "Active" : "Disabled" }}
+                <div class="ops-banner-thumb">
+                  <img
+                    *ngIf="banner.featuredImage"
+                    [src]="filesService.getFile(banner.featuredImage, 180, 100)"
+                    [alt]="banner.title"
+                    (error)="onImageError($event)"
+                  />
+                  <div class="thumb-fallback" *ngIf="!banner.featuredImage">
+                    <i class="fas fa-image"></i>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Title & Description / Navigation Target -->
+              <td>
+                <div class="ops-banner-info">
+                  <span class="ops-banner-title" [title]="banner.title">
+                    {{ banner.title }}
+                  </span>
+                  <span class="ops-banner-desc text-muted" *ngIf="banner.description">
+                    {{ banner.description }}
+                  </span>
+                  <!-- In-App Destination / Target Badge -->
+                  <div class="ops-target-container" *ngIf="getTargetInfo(banner) as target">
+                    <span class="ops-target-pill pill-none" *ngIf="target.type === 'none'">
+                      <i [class]="target.icon + ' me-1'"></i>
+                      <span>{{ target.label }}</span>
+                    </span>
+                    <span class="ops-target-pill pill-restaurant" *ngIf="target.type === 'restaurant'">
+                      <i [class]="target.icon + ' me-1'"></i>
+                      <span>{{ target.label }}</span>
+                    </span>
+                    <span class="ops-target-pill pill-market" *ngIf="target.type === 'market'">
+                      <i [class]="target.icon + ' me-1'"></i>
+                      <span>{{ target.label }}</span>
+                    </span>
+                    <span class="ops-target-pill pill-offers" *ngIf="target.type === 'offers'">
+                      <i [class]="target.icon + ' me-1'"></i>
+                      <span>{{ target.label }}</span>
+                    </span>
+                    <a
+                      *ngIf="target.type === 'external' && target.url"
+                      [href]="target.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="ops-target-pill pill-external"
+                      [title]="target.url"
+                    >
+                      <i [class]="target.icon + ' me-1'"></i>
+                      <span>{{ target.label }}</span>
+                    </a>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Section Placement -->
+              <td>
+                <span class="ops-section-pill pill-restaurants" *ngIf="isRestaurants(banner)">
+                  <i class="fas fa-utensils me-1"></i>
+                  {{ 'BANNERS_PAGE.SECTION_RESTAURANTS' | translate }}
+                </span>
+                <span class="ops-section-pill pill-market" *ngIf="isMarket(banner)">
+                  <i class="fas fa-shopping-basket me-1"></i>
+                  {{ 'BANNERS_PAGE.SECTION_MARKET' | translate }}
+                </span>
+                <span class="ops-section-pill pill-dontmiss" *ngIf="isDontMiss(banner)">
+                  <i class="fas fa-fire me-1"></i>
+                  {{ 'BANNERS_PAGE.SECTION_DONT_MISS' | translate }}
+                </span>
+                <span class="ops-section-pill pill-both" *ngIf="isAllSections(banner)">
+                  <i class="fas fa-layer-group me-1"></i>
+                  {{ 'BANNERS_PAGE.SECTION_BOTH' | translate }}
+                </span>
+                <span class="ops-section-pill pill-daily" *ngIf="isDailyOffers(banner)">
+                  <i class="fas fa-star me-1"></i>
+                  {{ 'BANNERS_PAGE.SECTION_DAILY_OFFERS' | translate }}
                 </span>
               </td>
-              <td>{{ i.createdDate | date }}</td>
-              <td>
-                <app-table-actions
-                  (editClicked)="edit(i)"
-                  (deleteClicked)="delete(i.id)"
+
+              <!-- Order Badge -->
+              <td style="text-align: center;">
+                <span class="ops-order-badge">
+                  #{{ banner.order || 0 }}
+                </span>
+              </td>
+
+              <!-- Status -->
+              <td style="text-align: center;">
+                <span
+                  class="ops-status-pill"
+                  [class.status-active]="banner.active"
+                  [class.status-disabled]="!banner.active"
                 >
-                </app-table-actions>
+                  <span class="status-dot"></span>
+                  <span>
+                    {{ (banner.active ? 'BANNERS_PAGE.STATUS_ACTIVE' : 'BANNERS_PAGE.STATUS_DISABLED') | translate }}
+                  </span>
+                </span>
+              </td>
+
+              <!-- Created Date -->
+              <td>
+                <span class="ops-date-cell">
+                  {{ banner.createdDate | date:'yyyy/MM/dd' }}
+                </span>
+              </td>
+
+              <!-- Actions Group -->
+              <td style="text-align: center;">
+                <div class="ops-actions-group">
+                  <!-- Toggle Status Button -->
+                  <button
+                    type="button"
+                    class="ops-btn-action"
+                    [class.btn-toggle-disable]="banner.active"
+                    [class.btn-toggle-active]="!banner.active"
+                    (click)="toggleBannerStatus(banner)"
+                    [title]="banner.active ? ('PRODUCTS_PAGE.DISABLE' | translate) : ('PRODUCTS_PAGE.ENABLE' | translate)"
+                  >
+                    <i [class]="banner.active ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
+                  </button>
+
+                  <!-- Edit Button -->
+                  <button
+                    type="button"
+                    class="ops-btn-action btn-edit"
+                    (click)="edit(banner)"
+                    title="تعديل الإعلان"
+                  >
+                    <i class="fas fa-pen"></i>
+                  </button>
+
+                  <!-- Delete Button -->
+                  <button
+                    type="button"
+                    class="ops-btn-action btn-delete"
+                    (click)="delete(banner.id)"
+                    title="حذف الإعلان"
+                  >
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Empty State -->
+            <tr *ngIf="items.length === 0">
+              <td colspan="8" class="text-center py-10">
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                  <div style="width: 60px; height: 60px; border-radius: 50%; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #94a3b8; font-size: 24px;">
+                    <i class="fas fa-bullhorn"></i>
+                  </div>
+                  <h5 class="text-dark fw-bold mb-1">{{ 'BANNERS_PAGE.EMPTY_TITLE' | translate }}</h5>
+                  <p class="text-muted fs-7 mb-3">{{ 'BANNERS_PAGE.EMPTY_DESC' | translate }}</p>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light-primary"
+                    (click)="searchGroup.get('searchTerm')?.setValue(''); selectedSection = 'all'; selectedStatus = 'all'; filterBySection('all');"
+                  >
+                    <i class="fas fa-redo me-1"></i> {{ 'BANNERS_PAGE.RESET_FILTERS' | translate }}
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-  
+
+    </ng-container>
+
+    <!-- Table Footer with Paginator -->
+    <div class="ops-table-footer">
       <app-paginator
         class="d-flex justify-content-between align-items-center flex-wrap"
         [paginator]="paginator"
         [isLoading]="isLoading"
         (paginate)="paginate($event)"
       ></app-paginator>
-  
-      <!-- begin:Table -->
     </div>
-    <!-- end: Table -->
   </div>
-  
+
+</div>

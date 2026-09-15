@@ -25,6 +25,7 @@ class UserProvider extends BaseProvider {
   AuthenticationService authService = locator<AuthenticationService>();
   String? fullName, email, oldPassword, newPassword;
   PhoneNumberModel? phoneNumber;
+  String? lastVerificationCode;
 
   void loadUserDataProfile() {
     fullName = authService.user?.fullName;
@@ -49,11 +50,10 @@ class UserProvider extends BaseProvider {
       loadBody: () async {
         await authService.loginByPhone(phoneNumber, code);
         try {
-          AddressProvider addressProvider = locator<AddressProvider>();
-          addressProvider.address = locator<AppParametersProvider>().mainAddressService.mainAddress;
-          await addressProvider.saveFun();
+          // Refresh user's saved addresses without creating any new or duplicate entries
+          await locator<AddressProvider>().loadData();
         } catch (e) {
-          debugPrint('Address sync after login: $e');
+          debugPrint('Address load after login: $e');
         }
       },
     );
@@ -65,6 +65,9 @@ class UserProvider extends BaseProvider {
         Map<String, String> body = {"phoneNumber": phoneNumber};
         var res = await _api.postRequest('/Account/RegisterOrSignInByPhoneNumber', body, apiPrefex: apiPrefex);
         log('registerOrSignInByPhoneNumber : $res');
+        if (res != null) {
+          lastVerificationCode = res.toString().replaceAll('"', '').trim();
+        }
       },
     );
   }
@@ -81,12 +84,22 @@ class UserProvider extends BaseProvider {
   Future<void> update() async {
     await loadBaseData(
       loadBody: () async {
+        final phone = (phoneNumber?.phoneNumber != null && phoneNumber!.phoneNumber!.isNotEmpty)
+            ? phoneNumber!.phoneNumber!
+            : (authService.user?.phoneNumber ?? '');
+        final dial = (phoneNumber?.dialCode != null && phoneNumber!.dialCode!.isNotEmpty)
+            ? phoneNumber!.dialCode!
+            : (authService.user?.countryPhoneCode ?? '+963');
+        final cleanEmail = (email != null && email!.isNotEmpty)
+            ? email!
+            : (authService.user?.email ?? 'user@jtak.app');
+
         try {
           Map body = {
-            "fullName": fullName,
-            "email": email,
-            "phoneNumber": phoneNumber?.phoneNumber ?? '',
-            "countryPhoneCode": phoneNumber?.dialCode ?? '+963',
+            "fullName": fullName ?? '',
+            "email": cleanEmail,
+            "phoneNumber": phone,
+            "countryPhoneCode": dial,
           };
           await _api.postRequest('/Account/UpdateUser', body, apiPrefex: apiPrefex);
         } catch (e) {
@@ -96,9 +109,18 @@ class UserProvider extends BaseProvider {
         if (authService.user != null) {
           UserModel user = authService.user!;
           user.fullName = fullName;
-          user.email = email;
+          user.email = cleanEmail;
+          if (phone.isNotEmpty) user.phoneNumber = phone;
           authService.user = user;
+        } else {
+          authService.user = UserModel(
+            fullName: fullName,
+            email: cleanEmail,
+            phoneNumber: phone,
+            countryPhoneCode: dial,
+          );
         }
+        await authService.saveUserData(authService.user);
       },
     );
   }

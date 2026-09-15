@@ -1,6 +1,16 @@
 import 'package:app_jtak_delivery/src/utils/utilities/global_var.dart';
 
-enum OrderDetailsStatus { pending, merchantAccepted, shipping, delivered, merchantRejected, customerPending, customerCanceled }
+enum OrderDetailsStatus {
+  pending,
+  merchantAccepted,
+  shipping,
+  delivered,
+  merchantRejected,
+  customerPending,
+  customerCanceled,
+  deliveryCanceled,
+  readyForPickup,
+}
 
 extension StringValueExtention on OrderDetailsStatus {
   String get value {
@@ -25,6 +35,11 @@ extension StringValueExtention on OrderDetailsStatus {
 
       case OrderDetailsStatus.customerCanceled:
         return str.app.orderDetailsStatusCustomerCanceled;
+
+      case OrderDetailsStatus.deliveryCanceled:
+        return 'تم الإلغاء من قبل التوصيل';
+      case OrderDetailsStatus.readyForPickup:
+        return 'جاهز للاستلام';
     }
   }
 }
@@ -46,8 +61,15 @@ extension ParseEnumExtention on int {
         return OrderDetailsStatus.customerPending;
       case 6:
         return OrderDetailsStatus.customerCanceled;
+      case 7:
+        return OrderDetailsStatus.deliveryCanceled;
+      case 8:
+        return OrderDetailsStatus.readyForPickup;
       default:
-        throw Exception('order details status not recognized');
+        // An unrecognized backend status code must never be silently
+        // treated as a terminal cancellation; fall back to the safe,
+        // still-active default like OrderStatus.parseOrderStatus does.
+        return OrderDetailsStatus.pending;
     }
   }
 }

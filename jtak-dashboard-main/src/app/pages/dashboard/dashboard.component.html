@@ -1,229 +1,412 @@
 <main class="ops-dashboard">
+  <!-- 1. Executive Operations Hero -->
   <header class="ops-hero">
-    <div>
-      <div class="ops-eyebrow"><span></span> Live operations overview</div>
-      <h2>Good to see you. Here’s what’s happening today.</h2>
-      <p>Monitor orders, catalog health, merchant balances, and the exchange rate from one place.</p>
+    <div class="ops-hero-content">
+      <div class="ops-eyebrow">
+        <span class="ops-eyebrow-dot"></span>
+        {{ 'DASHBOARD.LIVE_OPERATIONS_OVERVIEW' | translate }}
+      </div>
+      <h1 class="ops-hero-title">{{ 'DASHBOARD.GREETING' | translate }}</h1>
+      <p class="ops-hero-subtitle">{{ 'DASHBOARD.SUBTITLE' | translate }}</p>
     </div>
     <div class="ops-hero-actions">
-      <span class="ops-updated">Updated {{ lastUpdated | date:'shortTime' }}</span>
-      <button type="button" class="btn btn-light ops-refresh" (click)="refreshDashboard()" [disabled]="dashboardLoading">
-        <i class="fas fa-redo-alt" [class.fa-spin]="dashboardLoading" aria-hidden="true"></i>
-        Refresh
+      <div class="ops-updated-badge">
+        <i class="fas fa-clock text-muted me-1"></i>
+        <span>{{ 'DASHBOARD.UPDATED' | translate }} {{ lastUpdated | date:'shortTime' }}</span>
+      </div>
+      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="refreshDashboard()" [disabled]="dashboardLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="dashboardLoading" aria-hidden="true"></i>
+        <span>{{ 'DASHBOARD.REFRESH' | translate }}</span>
       </button>
-      <a routerLink="/orders" class="btn btn-primary">
-        View orders <i class="fas fa-arrow-right" aria-hidden="true"></i>
+      <a routerLink="/orders" class="btn btn-sm ops-btn-primary">
+        <i class="fas fa-shopping-bag me-1" aria-hidden="true"></i>
+        <span>{{ 'DASHBOARD.VIEW_ORDERS' | translate }}</span>
+        <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i>
       </a>
     </div>
   </header>
 
-  <section class="ops-rate-panel" aria-labelledby="rate-heading">
-    <div class="ops-rate-heading">
-      <div class="ops-icon ops-icon--amber"><i class="fas fa-exchange-alt" aria-hidden="true"></i></div>
+  <!-- 2. Compact Exchange Rate Micro-Bar -->
+  <section class="ops-rate-bar" aria-labelledby="rate-heading">
+    <div class="ops-rate-info">
+      <div class="ops-rate-icon">
+        <i class="fas fa-exchange-alt" aria-hidden="true"></i>
+      </div>
       <div>
-        <span class="ops-section-kicker">Store configuration</span>
-        <h3 id="rate-heading">USD to SYP exchange rate</h3>
-        <p>Used to convert product prices across Best Market and Clover Mall.</p>
+        <h4 id="rate-heading" class="ops-rate-title">{{ 'DASHBOARD.EXCHANGE_RATE_TITLE' | translate }}</h4>
+        <span class="ops-rate-desc">{{ 'DASHBOARD.EXCHANGE_RATE_DESC' | translate }}</span>
       </div>
     </div>
-    <div class="ops-rate-control">
-      <label for="exchange-rate">1 USD equals</label>
-      <div class="ops-rate-input">
-        <input id="exchange-rate" type="number" [(ngModel)]="exchangeRate" min="1" step="100"
-          [disabled]="isSavingRate" aria-describedby="rate-feedback" />
-        <span>SYP</span>
+    <div class="ops-rate-actions">
+      <div class="ops-rate-pill">
+        <span class="ops-rate-usd">
+          <i class="fas fa-dollar-sign text-success me-1"></i>1 USD
+        </span>
+        <span class="ops-rate-equals">=</span>
+        <div class="ops-rate-input-box">
+          <input id="exchange-rate" type="number" [(ngModel)]="exchangeRate" min="1" step="100"
+            [disabled]="isSavingRate" placeholder="15000" />
+          <span class="ops-rate-curr">{{ 'DASHBOARD.SYP' | translate }}</span>
+        </div>
       </div>
-      <button type="button" class="btn btn-dark" (click)="saveExchangeRate()"
+      <button type="button" class="btn btn-sm ops-btn-save-rate" (click)="saveExchangeRate()"
         [disabled]="isSavingRate || !exchangeRate || exchangeRate <= 0">
-        <span *ngIf="isSavingRate" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-        <i *ngIf="!isSavingRate" class="fas fa-check" aria-hidden="true"></i>
-        {{ isSavingRate ? 'Saving' : 'Save rate' }}
+        <span *ngIf="isSavingRate" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+        <i *ngIf="!isSavingRate" class="fas fa-check me-1" aria-hidden="true"></i>
+        <span>{{ isSavingRate ? ('DASHBOARD.SAVING' | translate) : ('DASHBOARD.SAVE_RATE' | translate) }}</span>
       </button>
     </div>
     <div id="rate-feedback" class="ops-feedback ops-feedback--success" *ngIf="rateSaveSuccess" role="status">
-      <i class="fas fa-check-circle" aria-hidden="true"></i> Exchange rate saved
+      <i class="fas fa-check-circle" aria-hidden="true"></i> {{ 'DASHBOARD.RATE_SAVED' | translate }}
     </div>
     <div id="rate-feedback" class="ops-feedback ops-feedback--error" *ngIf="rateSaveError" role="alert">
-      <i class="fas fa-exclamation-circle" aria-hidden="true"></i> Couldn’t save. Please try again.
+      <i class="fas fa-exclamation-circle" aria-hidden="true"></i> {{ 'DASHBOARD.RATE_SAVE_ERROR' | translate }}
     </div>
   </section>
 
-  <section class="ops-featured-panel" aria-labelledby="featured-categories-heading">
-    <div class="ops-featured-heading">
-      <div>
-        <span class="ops-section-kicker">Customer app navigation</span>
-        <h3 id="featured-categories-heading">Featured categories on Home</h3>
-        <p>Choose up to 8 top-level categories, then set the exact order customers see. Category name, image and active status are managed in Categories.</p>
+  <!-- 3. Unified Modern 4 KPI Cards Grid -->
+  <section class="ops-stat-grid" aria-label="Platform totals">
+    <!-- Orders Card -->
+    <a routerLink="/orders" class="ops-stat-card">
+      <div class="ops-stat-top">
+        <span class="ops-stat-label">{{ 'DASHBOARD.ORDERS_CARD' | translate }}</span>
+        <div class="ops-stat-icon-wrapper ops-stat-icon--blue">
+          <i class="fas fa-shopping-bag" aria-hidden="true"></i>
+        </div>
       </div>
-      <a routerLink="/categories" class="btn btn-light">
-        <i class="fas fa-tags" aria-hidden="true"></i> Manage categories
+      <strong class="ops-stat-value">{{ data.ordersCount | number }}</strong>
+      <div class="ops-stat-link">
+        <span>{{ 'DASHBOARD.MANAGE_ORDERS' | translate }}</span>
+        <i class="fas fa-arrow-right rtl-flip" aria-hidden="true"></i>
+      </div>
+    </a>
+
+    <!-- Revenue Card -->
+    <div class="ops-stat-card">
+      <div class="ops-stat-top">
+        <span class="ops-stat-label">{{ 'DASHBOARD.TOTAL_ORDER_VALUE' | translate }}</span>
+        <div class="ops-stat-icon-wrapper ops-stat-icon--green">
+          <i class="fas fa-hand-holding-usd" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="d-flex align-items-baseline gap-2 mt-2">
+        <strong class="ops-stat-value text-success">{{ data.totalOrdersValue | number }}</strong>
+        <span class="ops-currency-badge">{{ 'DASHBOARD.SYP' | translate }}</span>
+      </div>
+      <div class="ops-stat-link text-muted">
+        <span>{{ 'DASHBOARD.COMPLETED_ORDERS_NOTE' | translate }}</span>
+      </div>
+    </div>
+
+    <!-- Products Card -->
+    <a routerLink="/products" class="ops-stat-card">
+      <div class="ops-stat-top">
+        <span class="ops-stat-label">{{ 'DASHBOARD.PRODUCTS_CARD' | translate }}</span>
+        <div class="ops-stat-icon-wrapper ops-stat-icon--violet">
+          <i class="fas fa-box-open" aria-hidden="true"></i>
+        </div>
+      </div>
+      <strong class="ops-stat-value">{{ data.productsCount | number }}</strong>
+      <div class="ops-stat-link">
+        <span>{{ 'DASHBOARD.OPEN_CATALOG' | translate }}</span>
+        <i class="fas fa-arrow-right rtl-flip" aria-hidden="true"></i>
+      </div>
+    </a>
+
+    <!-- Customers Card -->
+    <a routerLink="/users" class="ops-stat-card">
+      <div class="ops-stat-top">
+        <span class="ops-stat-label">{{ 'DASHBOARD.CUSTOMERS_CARD' | translate }}</span>
+        <div class="ops-stat-icon-wrapper ops-stat-icon--amber">
+          <i class="fas fa-users" aria-hidden="true"></i>
+        </div>
+      </div>
+      <strong class="ops-stat-value">{{ data.usersCount | number }}</strong>
+      <div class="ops-stat-link">
+        <span>{{ 'DASHBOARD.VIEW_CUSTOMERS' | translate }}</span>
+        <i class="fas fa-arrow-right rtl-flip" aria-hidden="true"></i>
+      </div>
+    </a>
+  </section>
+
+  <!-- 4. Financial Snapshot & Revenue Split Card -->
+  <section class="ops-card ops-finance-card" aria-labelledby="finance-heading">
+    <div class="ops-card-header">
+      <div class="d-flex align-items-center gap-3">
+        <div class="ops-header-icon ops-header-icon--green">
+          <i class="fas fa-chart-pie" aria-hidden="true"></i>
+        </div>
+        <div>
+          <span class="ops-section-kicker">{{ 'DASHBOARD.FINANCIAL_SNAPSHOT' | translate }}</span>
+          <h3 id="finance-heading" class="ops-card-title">{{ 'DASHBOARD.ORDER_VALUE_BREAKDOWN' | translate }}</h3>
+        </div>
+      </div>
+      <span class="ops-unit-badge">
+        <i class="fas fa-receipt me-1"></i>{{ 'DASHBOARD.ALL_VALUES_IN_SYP' | translate }}
+      </span>
+    </div>
+
+    <div class="ops-finance-body">
+      <!-- Visual Split Progress Bar -->
+      <!-- Visual Split Progress Bar -->
+      <div class="ops-split-progress-container mb-4" *ngIf="data.totalOrdersValue > 0">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fs-8 fw-bold text-muted">{{ 'DASHBOARD.SALES_SPLIT_LABEL' | translate }}</span>
+          <div class="d-flex gap-3 fs-8 fw-bold">
+            <span class="text-primary"><i class="fas fa-circle fs-9 me-1"></i>{{ 'DASHBOARD.JTAK_SHARE' | translate }}: {{ getJTakSharePercent() }}%</span>
+            <span class="text-warning"><i class="fas fa-circle fs-9 me-1"></i>{{ 'DASHBOARD.MERCHANT_SHARE' | translate }}: {{ getMerchantSharePercent() }}%</span>
+          </div>
+        </div>
+        <div class="ops-split-progress-track">
+          <div class="ops-split-progress-bar ops-split-progress-bar--jTak" [style.width.%]="getJTakSharePercent()"></div>
+          <div class="ops-split-progress-bar ops-split-progress-bar--merchant" [style.width.%]="getMerchantSharePercent()"></div>
+        </div>
+      </div>
+
+      <!-- Financial Metric Columns -->
+      <div class="ops-finance-columns">
+        <div class="ops-finance-col ops-finance-col--primary">
+          <span class="ops-finance-col-label text-warning">{{ 'DASHBOARD.TOTAL_ORDER_VALUE' | translate }}</span>
+          <div class="d-flex align-items-baseline gap-2 mt-2">
+            <strong class="ops-finance-main-number">{{ data.totalOrdersValue | number }}</strong>
+            <small class="ops-currency-text">{{ 'DASHBOARD.SYP' | translate }}</small>
+          </div>
+          <span class="ops-finance-col-desc">{{ 'DASHBOARD.COMPLETED_ORDERS_NOTE' | translate }}</span>
+        </div>
+
+        <div class="ops-finance-col">
+          <span class="ops-finance-col-label">
+            <span class="ops-bullet ops-bullet--blue"></span>
+            {{ 'DASHBOARD.JTAK_ORDERS' | translate }}
+          </span>
+          <div class="d-flex align-items-baseline gap-2 mt-2">
+            <strong class="ops-finance-sub-number text-dark">{{ data.jTakOrdersValue | number }}</strong>
+            <small class="text-muted">{{ 'DASHBOARD.SYP' | translate }}</small>
+          </div>
+          <span class="badge badge-light-primary fs-9 mt-1 py-1 px-2">{{ getJTakSharePercent() }}% {{ 'DASHBOARD.OF_TOTAL' | translate }}</span>
+        </div>
+
+        <div class="ops-finance-col">
+          <span class="ops-finance-col-label">
+            <span class="ops-bullet ops-bullet--orange"></span>
+            {{ 'DASHBOARD.MERCHANT_ORDERS' | translate }}
+          </span>
+          <div class="d-flex align-items-baseline gap-2 mt-2">
+            <strong class="ops-finance-sub-number text-dark">{{ data.merchantOrdersValue | number }}</strong>
+            <small class="text-muted">{{ 'DASHBOARD.SYP' | translate }}</small>
+          </div>
+          <span class="badge badge-light-warning text-warning fs-9 mt-1 py-1 px-2">{{ getMerchantSharePercent() }}% {{ 'DASHBOARD.OF_TOTAL' | translate }}</span>
+        </div>
+
+        <div class="ops-finance-col">
+          <span class="ops-finance-col-label">
+            <span class="ops-bullet ops-bullet--gray"></span>
+            {{ 'DASHBOARD.ADDITIONAL_ORDERS' | translate }}
+          </span>
+          <div class="d-flex align-items-baseline gap-2 mt-2">
+            <strong class="ops-finance-sub-number text-dark">{{ data.jTakAdditionalOrdersValue | number }}</strong>
+            <small class="text-muted">{{ 'DASHBOARD.SYP' | translate }}</small>
+          </div>
+          <span class="badge badge-light-secondary text-muted fs-9 mt-1 py-1 px-2">{{ 'DASHBOARD.ADDITIONAL_FEES' | translate }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Live Operations Radar: Recent Orders Feed -->
+  <section class="ops-card ops-orders-radar" aria-labelledby="radar-heading">
+    <div class="ops-card-header">
+      <div class="d-flex align-items-center gap-3">
+        <div class="ops-header-icon ops-header-icon--blue">
+          <i class="fas fa-satellite-dish" aria-hidden="true"></i>
+        </div>
+        <div>
+          <span class="ops-section-kicker">{{ 'DASHBOARD.LOGISTICS_RADAR_KICKER' | translate }}</span>
+          <h3 id="radar-heading" class="ops-card-title">{{ 'DASHBOARD.LIVE_RADAR_TITLE' | translate }}</h3>
+        </div>
+      </div>
+      <a routerLink="/orders" class="ops-header-link">
+        <span>{{ 'DASHBOARD.VIEW_ALL_ORDERS' | translate }}</span>
+        <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i>
       </a>
     </div>
 
-    <div class="ops-featured-add">
-      <ng-select
-        [(ngModel)]="featuredCategoryToAdd"
-        [items]="availableFeaturedCategories"
-        bindLabel="title"
-        bindValue="id"
-        [clearable]="true"
-        [searchable]="true"
-        [disabled]="featuredCategoriesLoading || featuredCategories.length >= 8"
-        placeholder="Select a category to feature"
-        aria-label="Category to add to Home"
-      ></ng-select>
-      <button type="button" class="btn btn-primary" (click)="addFeaturedCategory()"
-        [disabled]="!featuredCategoryToAdd || featuredCategories.length >= 8">
-        <i class="fas fa-plus" aria-hidden="true"></i> Add category
-      </button>
-    </div>
-
-    <div *ngIf="featuredCategoriesLoading" class="ops-featured-empty">Loading categories…</div>
-    <div *ngIf="!featuredCategoriesLoading && !featuredCategories.length" class="ops-featured-empty">
-      No categories are selected. Choose the categories that should appear in the customer app’s Home grid.
-    </div>
-    <ol *ngIf="featuredCategories.length" class="ops-featured-list">
-      <li *ngFor="let category of featuredCategories; let index = index">
-        <span class="ops-featured-order">{{ index + 1 }}</span>
-        <span class="ops-featured-name">{{ category.title }}</span>
-        <span class="ops-featured-meta">{{ category.icon ? 'Image set' : 'No image' }}</span>
-        <div class="ops-featured-actions">
-          <button type="button" class="btn btn-sm btn-light" (click)="moveFeaturedCategory(index, -1)"
-            [disabled]="index === 0" [attr.aria-label]="'Move ' + category.title + ' up'">
-            <i class="fas fa-arrow-up" aria-hidden="true"></i>
-          </button>
-          <button type="button" class="btn btn-sm btn-light" (click)="moveFeaturedCategory(index, 1)"
-            [disabled]="index === featuredCategories.length - 1" [attr.aria-label]="'Move ' + category.title + ' down'">
-            <i class="fas fa-arrow-down" aria-hidden="true"></i>
-          </button>
-          <button type="button" class="btn btn-sm btn-light-danger" (click)="removeFeaturedCategory(category)"
-            [attr.aria-label]="'Remove ' + category.title">
-            <i class="fas fa-times" aria-hidden="true"></i>
-          </button>
-        </div>
-      </li>
-    </ol>
-
-    <div class="ops-featured-footer">
-      <span>{{ featuredCategories.length }} / 8 categories selected</span>
-      <button type="button" class="btn btn-dark" (click)="saveFeaturedCategories()"
-        [disabled]="isSavingFeaturedCategories || featuredCategoriesLoading">
-        <span *ngIf="isSavingFeaturedCategories" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-        <i *ngIf="!isSavingFeaturedCategories" class="fas fa-save" aria-hidden="true"></i>
-        {{ isSavingFeaturedCategories ? 'Saving' : 'Save Home categories' }}
-      </button>
-    </div>
-    <div *ngIf="featuredCategoriesSaveSuccess" class="ops-feedback ops-feedback--success" role="status">
-      <i class="fas fa-check-circle" aria-hidden="true"></i> Home featured categories saved
-    </div>
-    <div *ngIf="featuredCategoriesSaveError" class="ops-feedback ops-feedback--error" role="alert">
-      <i class="fas fa-exclamation-circle" aria-hidden="true"></i> Couldn’t save. Please try again.
-    </div>
-  </section>
-
-  <section class="ops-stat-grid" aria-label="Platform totals">
-    <a routerLink="/orders" class="ops-stat-card ops-stat-card--featured">
-      <div class="ops-stat-top"><span>Orders</span><i class="fas fa-shopping-bag" aria-hidden="true"></i></div>
-      <strong>{{ data.ordersCount | number }}</strong>
-      <span class="ops-stat-link">Manage orders <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
-    </a>
-    <a routerLink="/products" class="ops-stat-card">
-      <div class="ops-stat-top"><span>Products</span><i class="fas fa-box-open" aria-hidden="true"></i></div>
-      <strong>{{ data.productsCount | number }}</strong>
-      <span class="ops-stat-link">Open catalog <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
-    </a>
-    <a routerLink="/users" class="ops-stat-card">
-      <div class="ops-stat-top"><span>Customers</span><i class="fas fa-users" aria-hidden="true"></i></div>
-      <strong>{{ data.usersCount | number }}</strong>
-      <span class="ops-stat-link">View customers <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
-    </a>
-    <a routerLink="/bills" class="ops-stat-card">
-      <div class="ops-stat-top"><span>Bills</span><i class="fas fa-file-invoice" aria-hidden="true"></i></div>
-      <strong>{{ data.billsCount | number }}</strong>
-      <span class="ops-stat-link">Review billing <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
-    </a>
-  </section>
-
-  <section class="ops-finance" aria-labelledby="finance-heading">
-    <div class="ops-section-heading">
-      <div>
-        <span class="ops-section-kicker">Financial snapshot</span>
-        <h3 id="finance-heading">Order value breakdown</h3>
-      </div>
-      <span class="ops-unit">All values in SYP</span>
-    </div>
-    <div class="ops-finance-grid">
-      <div class="ops-finance-primary">
-        <span>Total order value</span>
-        <strong>{{ data.totalOrdersValue | number }}</strong>
-        <small>SYP across all completed orders</small>
-      </div>
-      <div class="ops-finance-item">
-        <span>JTAK orders</span><strong>{{ data.jTakOrdersValue | number }}</strong><small>SYP</small>
-      </div>
-      <div class="ops-finance-item">
-        <span>Merchant orders</span><strong>{{ data.merchantOrdersValue | number }}</strong><small>SYP</small>
-      </div>
-      <div class="ops-finance-item">
-        <span>Additional orders</span><strong>{{ data.jTakAdditionalOrdersValue | number }}</strong><small>SYP</small>
-      </div>
-    </div>
-  </section>
-
-  <div class="ops-content-grid">
-    <section class="ops-panel" aria-labelledby="balances-heading">
-      <div class="ops-panel-header">
-        <div>
-          <span class="ops-section-kicker">Settlements</span>
-          <h3 id="balances-heading">Merchant balances</h3>
-          <p>Current dues and payable amounts.</p>
-        </div>
-        <a routerLink="/payments" class="ops-text-link">Payments <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
-      </div>
-      <ng-container *ngIf="service.items$ | async as merchants">
-        <div class="table-responsive">
-          <table class="table ops-table">
-            <thead><tr><th scope="col">Merchant</th><th scope="col" class="text-end">Balance</th></tr></thead>
+    <div class="ops-card-body p-0">
+      <ng-container *ngIf="ordersService.items$ | async as orders">
+        <div class="table-responsive" *ngIf="orders.length > 0; else noRecentOrders">
+          <table class="table ops-table align-middle gs-4 gy-3 mb-0">
+            <thead>
+              <tr class="fw-bolder text-muted fs-8 bg-light">
+                <th style="min-width: 110px;">{{ 'DASHBOARD.ORDER_NUMBER' | translate }}</th>
+                <th style="min-width: 180px;">{{ 'DASHBOARD.CUSTOMER_AND_ADDRESS' | translate }}</th>
+                <th style="min-width: 140px;">{{ 'DASHBOARD.TOTAL_PRICE' | translate }}</th>
+                <th style="min-width: 150px;">{{ 'DASHBOARD.ORDER_STATUS' | translate }}</th>
+                <th style="min-width: 150px;">{{ 'DASHBOARD.DELIVERY_CAPTAIN' | translate }}</th>
+                <th style="width: 100px; text-align: center;">{{ 'DASHBOARD.ACTION' | translate }}</th>
+              </tr>
+            </thead>
             <tbody>
-              <tr *ngFor="let merchant of merchants">
+              <tr *ngFor="let o of orders.slice(0, 5)">
                 <td>
-                  <div class="ops-merchant">
-                    <span class="ops-avatar">{{ merchant.name ? merchant.name.charAt(0) : 'M' }}</span>
-                    <span><strong>{{ merchant.name }}</strong><small>Merchant account</small></span>
+                  <span class="fw-bolder fs-6 text-dark">#{{ o.id }}</span>
+                  <div class="text-muted fs-9">{{ o.purchaseDate | date:'shortTime' }}</div>
+                </td>
+                <td>
+                  <div class="fw-bold text-dark fs-7">{{ o.user || ('USERS.USER' | translate) }}</div>
+                  <div class="text-muted fs-9 text-truncate" style="max-width: 220px;" [title]="o.address">
+                    <i class="fas fa-map-marker-alt text-danger me-1"></i>{{ o.address || '-' }}
                   </div>
                 </td>
-                <td class="text-end"><strong class="ops-amount">{{ merchant.amount | number }}</strong><small class="ops-currency">SYP</small></td>
+                <td>
+                  <strong class="text-dark fs-6">{{ o.price | number }}</strong>
+                  <span class="text-muted fs-8 ms-1">{{ 'DASHBOARD.SYP' | translate }}</span>
+                </td>
+                <td>
+                  <span class="badge py-1 px-2 fs-8 fw-bold" [ngClass]="getOrderStatus(o).badgeClass">
+                    <i class="fas me-1" [ngClass]="getOrderStatus(o).icon"></i>{{ getOrderStatus(o).label }}
+                  </span>
+                </td>
+                <td>
+                  <div *ngIf="o.deliveryUser" class="d-flex align-items-center">
+                    <i class="fas fa-motorcycle text-primary me-2 fs-7"></i>
+                    <span class="fw-bold text-dark fs-8">{{ o.deliveryUser }}</span>
+                  </div>
+                  <span *ngIf="!o.deliveryUser" class="badge badge-light-secondary text-muted fs-9">{{ 'DASHBOARD.UNASSIGNED' | translate }}</span>
+                </td>
+                <td class="text-center">
+                  <a routerLink="/orders" class="btn btn-icon btn-sm btn-light-primary" [title]="'DASHBOARD.VIEW_ORDER_DETAILS' | translate">
+                    <i class="fas fa-external-link-alt fs-8"></i>
+                  </a>
+                </td>
               </tr>
-              <tr *ngIf="!merchants.length"><td colspan="2"><div class="ops-empty"><i class="fas fa-wallet"></i><strong>No balances yet</strong><span>Merchant balances will appear here.</span></div></td></tr>
             </tbody>
           </table>
         </div>
       </ng-container>
-      <app-paginator class="ops-paginator d-flex justify-content-between align-items-center flex-wrap"
-        [paginator]="paginator" [isLoading]="isLoading" (paginate)="paginate($event)"></app-paginator>
+      <ng-template #noRecentOrders>
+        <div class="ops-empty-state py-5">
+          <div class="ops-empty-icon">
+            <i class="fas fa-shopping-bag"></i>
+          </div>
+          <strong>{{ 'DASHBOARD.NO_ORDERS_YET' | translate }}</strong>
+          <span>{{ 'DASHBOARD.NO_ORDERS_DESC' | translate }}</span>
+        </div>
+      </ng-template>
+    </div>
+  </section>
+
+
+  <!-- 6. Bottom Balanced Grid: Merchant Balances & Top Demanded Products -->
+  <div class="ops-content-grid">
+    <!-- Merchant Balances Card -->
+    <section class="ops-card" aria-labelledby="balances-heading">
+      <div class="ops-card-header">
+        <div class="d-flex align-items-center gap-3">
+          <div class="ops-header-icon ops-header-icon--blue">
+            <i class="fas fa-wallet" aria-hidden="true"></i>
+          </div>
+          <div>
+            <span class="ops-section-kicker">{{ 'DASHBOARD.SETTLEMENTS' | translate }}</span>
+            <h3 id="balances-heading" class="ops-card-title">{{ 'DASHBOARD.MERCHANT_BALANCES' | translate }}</h3>
+          </div>
+        </div>
+        <a routerLink="/payments" class="ops-header-link">
+          <span>{{ 'DASHBOARD.PAYMENTS' | translate }}</span>
+          <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i>
+        </a>
+      </div>
+      <div class="ops-card-body p-0">
+        <ng-container *ngIf="service.items$ | async as merchants">
+          <div class="table-responsive">
+            <table class="table ops-table align-middle mb-0">
+              <thead>
+                <tr class="fw-bolder text-muted fs-8 bg-light">
+                  <th scope="col">{{ 'DASHBOARD.MERCHANT' | translate }}</th>
+                  <th scope="col" class="text-end">{{ 'DASHBOARD.BALANCE' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let merchant of merchants">
+                  <td>
+                    <div class="ops-merchant">
+                      <span class="ops-merchant-avatar">{{ merchant.name ? merchant.name.charAt(0) : 'M' }}</span>
+                      <div>
+                        <strong class="d-block text-dark fs-7">{{ merchant.name }}</strong>
+                        <small class="text-muted fs-9">{{ 'DASHBOARD.MERCHANT_ACCOUNT' | translate }}</small>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-end">
+                    <strong class="ops-merchant-amount">{{ merchant.amount | number }}</strong>
+                    <span class="ops-currency-badge ms-1">{{ 'DASHBOARD.SYP' | translate }}</span>
+                  </td>
+                </tr>
+                <tr *ngIf="!merchants.length">
+                  <td colspan="2">
+                    <div class="ops-empty-state py-4">
+                      <div class="ops-empty-icon">
+                        <i class="fas fa-wallet"></i>
+                      </div>
+                      <strong>{{ 'DASHBOARD.NO_BALANCES_YET' | translate }}</strong>
+                      <span>{{ 'DASHBOARD.NO_BALANCES_DESC' | translate }}</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+        <app-paginator class="ops-paginator px-4 py-3 d-flex justify-content-between align-items-center flex-wrap"
+          [paginator]="paginator" [isLoading]="isLoading" (paginate)="paginate($event)"></app-paginator>
+      </div>
     </section>
 
-    <section class="ops-panel" aria-labelledby="products-heading">
-      <div class="ops-panel-header">
-        <div>
-          <span class="ops-section-kicker">Demand</span>
-          <h3 id="products-heading">Top products</h3>
-          <p>Most ordered items right now.</p>
-        </div>
-        <a routerLink="/products" class="ops-text-link">Catalog <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
-      </div>
-      <ol class="ops-ranking" *ngIf="data.topProducts?.length; else noProducts">
-        <li *ngFor="let item of data.topProducts; let idx = index; trackBy: trackByProductId">
-          <span class="ops-rank">{{ idx + 1 }}</span>
-          <div class="ops-product-info">
-            <div><strong>{{ item.productName }}</strong><span>{{ item.count | number }} orders</span></div>
-            <div class="ops-progress" aria-hidden="true"><span [style.width.%]="getTopProductShare(item.count)"></span></div>
+    <!-- Top Products Card -->
+    <section class="ops-card" aria-labelledby="products-heading">
+      <div class="ops-card-header">
+        <div class="d-flex align-items-center gap-3">
+          <div class="ops-header-icon ops-header-icon--green">
+            <i class="fas fa-trophy" aria-hidden="true"></i>
           </div>
-        </li>
-      </ol>
-      <ng-template #noProducts>
-        <div class="ops-empty"><i class="fas fa-chart-bar"></i><strong>No ranking data yet</strong><span>Top products will appear after orders arrive.</span></div>
-      </ng-template>
+          <div>
+            <span class="ops-section-kicker">{{ 'DASHBOARD.DEMAND' | translate }}</span>
+            <h3 id="products-heading" class="ops-card-title">{{ 'DASHBOARD.TOP_PRODUCTS' | translate }}</h3>
+          </div>
+        </div>
+        <a routerLink="/products" class="ops-header-link">
+          <span>{{ 'DASHBOARD.CATALOG' | translate }}</span>
+          <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i>
+        </a>
+      </div>
+      <div class="ops-card-body p-0">
+        <ol class="ops-ranking-list mb-0" *ngIf="data.topProducts?.length; else noProducts">
+          <li *ngFor="let item of data.topProducts; let idx = index; trackBy: trackByProductId" class="ops-ranking-row">
+            <span class="ops-ranking-badge" [ngClass]="{'ops-rank-1': idx === 0, 'ops-rank-2': idx === 1, 'ops-rank-3': idx === 2}">
+              {{ idx + 1 }}
+            </span>
+            <div class="ops-ranking-details">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong class="ops-ranking-name">{{ item.productName }}</strong>
+                <span class="badge badge-light-primary text-primary fs-8 fw-bold">
+                  {{ item.count | number }} {{ 'DASHBOARD.ORDERS_COUNT_LABEL' | translate }}
+                </span>
+              </div>
+              <div class="ops-ranking-progress-track">
+                <div class="ops-ranking-progress-fill" [style.width.%]="getTopProductShare(item.count)"></div>
+              </div>
+            </div>
+          </li>
+        </ol>
+        <ng-template #noProducts>
+          <div class="ops-empty-state py-5">
+            <div class="ops-empty-icon">
+              <i class="fas fa-chart-bar"></i>
+            </div>
+            <strong>{{ 'DASHBOARD.NO_RANKING_YET' | translate }}</strong>
+            <span>{{ 'DASHBOARD.NO_RANKING_DESC' | translate }}</span>
+          </div>
+        </ng-template>
+      </div>
     </section>
   </div>
 </main>

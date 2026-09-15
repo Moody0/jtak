@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -34,7 +34,9 @@ namespace App.ApiControllers.V1.Authorization
         [IgnoreAntiforgeryToken, Produces("application/json")]
         public async Task<IActionResult> Userinfo()
         {
-            var user = await _userManager.GetUserAsync(User);
+            var user = await _userManager.GetUserAsync(User)
+                ?? (User.GetUserId() != null ? await _userManager.FindByIdAsync(User.GetUserId().ToString()) : null);
+
             if (user is null)
             {
                 return Challenge(
@@ -63,7 +65,7 @@ namespace App.ApiControllers.V1.Authorization
 
             if (User.HasScope(Scopes.Phone))
             {
-                claims[Claims.PhoneNumber] = await _userManager.GetPhoneNumberAsync(user);
+                claims[Claims.PhoneNumber] = await _userManager.GetPhoneNumberAsync(user) ?? user.PhoneNumber ?? user.UserName;
                 claims[Claims.PhoneNumberVerified] = await _userManager.IsPhoneNumberConfirmedAsync(user);
             }
 
@@ -76,7 +78,9 @@ namespace App.ApiControllers.V1.Authorization
             {
                 claims["firstName"] = user.FirstName;
                 claims["lastName"] = user.LastName;
-                claims["fullName"] = user.FullName;
+                claims["fullName"] = !string.IsNullOrWhiteSpace(user.FullName)
+                    ? user.FullName
+                    : (!string.IsNullOrWhiteSpace(user.FirstName) ? $"{user.FirstName} {user.LastName}".Trim() : null);
                 claims["birthday"] = user.Birthday?.ToString("O");
                 claims[Claims.Picture] = Url.ImgHref(user.ProfilePhoto);
                 claims["UserTopicId"] = _notifService.GetUserTopic(user.Id);

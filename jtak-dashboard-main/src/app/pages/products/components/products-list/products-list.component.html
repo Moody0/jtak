@@ -1,102 +1,430 @@
-<div class="card card-custom gutter-b">
-  <div class="card-header">
-    <div class="card-title">
-      <div><h3 class="card-label">Products</h3><span class="card-subtitle">Maintain product information, categories, and availability.</span></div>
+<div class="ops-products-container">
+
+  <!-- 1. Operations Utility Bar -->
+  <div class="ops-utility-bar">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span>{{ 'PRODUCTS_PAGE.LIVE_OPERATIONS' | translate }}</span>
+      </div>
+      <span class="ops-sync-meta">
+        <i class="fas fa-database text-muted me-1"></i>
+        <span>{{ 'PRODUCTS_PAGE.TOTAL_RECORDS' | translate }}:</span>
+        <strong>{{ totalRecords | number }}</strong>
+      </span>
     </div>
-    <div class="card-toolbar">
-      <button type="button" class="btn btn-primary" (click)="create()">
-        <i class="fas fa-plus"></i> Add product
+    <div class="ops-utility-right">
+      <button type="button" class="ops-btn-refresh" (click)="refresh()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>{{ 'PRODUCTS_PAGE.REFRESH' | translate }}</span>
+      </button>
+      <button type="button" class="ops-btn-primary" (click)="create()">
+        <i class="fas fa-plus"></i>
+        <span>{{ 'PRODUCTS_PAGE.ADD_PRODUCT' | translate }}</span>
       </button>
     </div>
   </div>
-  <div class="card-body">
-    <!-- begin: Filtration form -->
-    <div class="form form-label-right">
-      <div class="form-group row">
-        <div class="col-lg-2" [formGroup]="searchGroup">
-          <input type="text" class="form-control" name="searchText" placeholder="Search products" formControlName="searchTerm" />
+
+  <!-- 2. Real System Operational KPI Cards -->
+  <div class="row g-3">
+    <!-- Total Catalog Products -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-total">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_TOTAL' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-boxes"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value">{{ totalRecords | number }}</span>
+          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_TOTAL_SUB' | translate }}</span>
         </div>
       </div>
     </div>
-    <!-- end: Filtration form -->
 
-    <ng-container *ngIf="service.items$ | async as items">
-      <div class="bulk-action-bar" *ngIf="selection.count > 0" role="region" aria-label="Bulk actions">
-        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-        <div class="bulk-action-buttons">
-          <button type="button" class="btn btn-sm btn-light" (click)="bulkSetStatus(items, true)"><i class="fas fa-check-circle"></i> Enable</button>
-          <button type="button" class="btn btn-sm btn-light" (click)="bulkSetStatus(items, false)"><i class="fas fa-ban"></i> Disable</button>
-          <button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'products')"><i class="fas fa-download"></i> Export</button>
-          <button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button>
+    <!-- Sourcing Stores & Merchants -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-merchants">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_MERCHANTS' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-store"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-success">{{ kpiMerchantsCount | number }}</span>
+          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_MERCHANTS_SUB' | translate }}</span>
         </div>
       </div>
-    </ng-container>
+    </div>
 
-    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="service.items$ | async as items">
-      <table
-        class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
-      >
-      <thead>
-        <tr>
-        <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input"
-          aria-label="Select all products on this page" [checked]="selection.allSelected(items)"
-          [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-        <th scope="col">Id
-          <app-sort-icon
-            column="id"
-            [activeColumn]="sorting.column"
-            [activeDirection]="sorting.direction"
-            (sort)="sort($event)"
-          ></app-sort-icon></th>
-        <th scope="col">Title
-          <app-sort-icon
-            column="title"
-            [activeColumn]="sorting.column"
-            [activeDirection]="sorting.direction"
-            (sort)="sort($event)"
-          ></app-sort-icon></th>
-        <th scope="col">Product Category
-          <app-sort-icon
-            column="productCategory"
-            [activeColumn]="sorting.column"
-            [activeDirection]="sorting.direction"
-            (sort)="sort($event)"
-          ></app-sort-icon></th>
-        <th scope="col" style="width: 120px;">ACTIONS</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let product of items" [class.table-row-selected]="selection.isSelected(product)">
-          <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(product)"
-            [attr.aria-label]="'Select ' + product.title" (change)="selection.toggle(product, $any($event.target).checked)" /></td>
-          <td>{{ product.id }}</td>
-          <td>{{ product.title }}</td>
-          <td>{{ product.productCategory }}</td>
-          <td>
-            <app-table-actions (editClicked)="edit(product)"
-            [showDeleteButton]="false">
-              
-              <button
-              title="Enable / Disable"
-              class="btn btn-icon btn-light btn-hover-danger btn-sm"
-              (click)="changeStatus(product.active, product.id)"
-            >
-              <span
-                class="fas"
-                [ngClass]="{
-                  'fa-ban': product.active,
-                  'fa-check': !product.active
-                }"
-              ></span>
-            </button>
-            </app-table-actions>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Catalog Departments & Subcategories -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-categories">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_CATEGORIES' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-sitemap"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-primary">{{ kpiCategoriesCount | number }}</span>
+          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_CATEGORIES_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Catalog Health & Readiness -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-status">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_STATUS' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-shield-alt"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-warning">{{ kpiCatalogHealth }}</span>
+          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_STATUS_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
   </div>
-  <!-- end: Table -->
 
-  <app-paginator class="d-flex justify-content-between align-items-center flex-wrap" [paginator]="paginator"
-    [isLoading]="isLoading" (paginate)="paginate($event)"></app-paginator>
+  <!-- 3. Consolidated Search & Filter Panel -->
+  <div class="ops-filter-panel">
+    <div class="ops-filter-row">
+      <!-- Search Input -->
+      <div class="ops-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search ops-search-icon"></i>
+        <input
+          type="text"
+          class="ops-search-input"
+          [placeholder]="'PRODUCTS_PAGE.SEARCH_PLACEHOLDER' | translate"
+          formControlName="searchTerm"
+        />
+      </div>
+
+      <!-- Category Filter Dropdown -->
+      <div class="ops-filter-dropdown">
+        <select
+          [ngModel]="selectedCategoryId"
+          (ngModelChange)="filterByCategory($event)"
+          aria-label="Filter by Category"
+        >
+          <option [ngValue]="null">{{ 'PRODUCTS_PAGE.ALL_CATEGORIES' | translate }}</option>
+          <option *ngFor="let cat of categoriesList" [ngValue]="cat.id">
+            {{ cat.fullPath }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Status Filter Tabs -->
+      <div class="ops-status-tabs" role="tablist">
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'all'"
+          (click)="filterByStatus('all')"
+        >
+          {{ 'PRODUCTS_PAGE.ALL_STATUS' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'active'"
+          (click)="filterByStatus('active')"
+        >
+          <i class="fas fa-check-circle text-success me-1"></i>
+          {{ 'PRODUCTS_PAGE.STATUS_ACTIVE' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedStatus === 'disabled'"
+          (click)="filterByStatus('disabled')"
+        >
+          <i class="fas fa-ban text-danger me-1"></i>
+          {{ 'PRODUCTS_PAGE.STATUS_DISABLED' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Products Table Card -->
+  <div class="ops-table-card">
+    <ng-container *ngIf="service.items$ | async as rawItems">
+      <!-- Bulk Selection Bar -->
+      <div class="ops-bulk-bar" *ngIf="selection.count > 0" role="region" aria-label="Bulk actions">
+        <div class="ops-bulk-count">
+          <span>تم تحديد <strong>{{ selection.count }}</strong> منتج</span>
+        </div>
+        <div class="ops-bulk-actions">
+          <button type="button" class="btn btn-sm btn-light-success" (click)="bulkSetStatus(rawItems, true)">
+            <i class="fas fa-check-circle me-1"></i> {{ 'PRODUCTS_PAGE.ENABLE' | translate }}
+          </button>
+          <button type="button" class="btn btn-sm btn-light-danger" (click)="bulkSetStatus(rawItems, false)">
+            <i class="fas fa-ban me-1"></i> {{ 'PRODUCTS_PAGE.DISABLE' | translate }}
+          </button>
+          <button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(rawItems, 'products')">
+            <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
+          </button>
+          <button type="button" class="btn btn-sm btn-link text-muted" (click)="selection.clear()">
+            {{ 'COMMON.CLEAR' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Table Body -->
+      <div class="table-responsive">
+        <table class="table ops-table align-middle">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 44px;">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  aria-label="Select all products"
+                  [checked]="selection.allSelected(getDisplayedItems(rawItems))"
+                  [indeterminate]="selection.partiallySelected(getDisplayedItems(rawItems))"
+                  (change)="selection.toggleAll(getDisplayedItems(rawItems), $any($event.target).checked)"
+                />
+              </th>
+              <th scope="col" style="width: 90px;">
+                {{ 'PRODUCTS_PAGE.COL_ID' | translate }}
+                <app-sort-icon
+                  column="id"
+                  [activeColumn]="sorting.column"
+                  [activeDirection]="sorting.direction"
+                  (sort)="sort($event)"
+                ></app-sort-icon>
+              </th>
+              <th scope="col">
+                {{ 'PRODUCTS_PAGE.COL_PRODUCT' | translate }}
+                <app-sort-icon
+                  column="title"
+                  [activeColumn]="sorting.column"
+                  [activeDirection]="sorting.direction"
+                  (sort)="sort($event)"
+                ></app-sort-icon>
+              </th>
+              <th scope="col">
+                {{ 'PRODUCTS_PAGE.COL_CATEGORY' | translate }}
+                <app-sort-icon
+                  column="productCategory"
+                  [activeColumn]="sorting.column"
+                  [activeDirection]="sorting.direction"
+                  (sort)="sort($event)"
+                ></app-sort-icon>
+              </th>
+              <th scope="col">
+                {{ 'PRODUCTS_PAGE.COL_RELATION' | translate }}
+              </th>
+              <th scope="col" style="width: 110px;">
+                {{ 'PRODUCTS_PAGE.COL_STATUS' | translate }}
+              </th>
+              <th scope="col" style="width: 120px; text-align: center;">
+                {{ 'PRODUCTS_PAGE.COL_ACTIONS' | translate }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let product of getDisplayedItems(rawItems)"
+              [class.table-row-selected]="selection.isSelected(product)"
+            >
+              <!-- Select Checkbox -->
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="selection.isSelected(product)"
+                  [attr.aria-label]="'Select ' + product.title"
+                  (change)="selection.toggle(product, $any($event.target).checked)"
+                />
+              </td>
+
+              <!-- ID -->
+              <td>
+                <span class="badge badge-light fw-bold fs-8 text-muted">#{{ product.id }}</span>
+              </td>
+
+              <!-- Product Thumbnail & Details (Clean Unobstructed Photography) -->
+              <td>
+                <div class="ops-product-cell">
+                  <div class="ops-product-thumb">
+                    <img
+                      *ngIf="product.photos"
+                      [src]="filesService.getFile(product.photos, 64, 64)"
+                      [alt]="product.title"
+                      loading="lazy"
+                      (error)="onImageError($event)"
+                    />
+                    <div *ngIf="!product.photos" class="ops-thumb-fallback">
+                      <i class="fas fa-box-open"></i>
+                    </div>
+                  </div>
+                  <div class="ops-product-meta">
+                    <span class="ops-product-title">
+                      {{ product.title }}
+                      <i
+                        *ngIf="product.isFeatured"
+                        class="fas fa-star text-warning fs-9 ms-1"
+                        title="منتج مميز وموصى به بالتطبيق"
+                      ></i>
+                    </span>
+                    <div class="ops-product-sub">
+                      <span class="ops-unit-badge" *ngIf="product.unit">
+                        <i class="fas fa-balance-scale me-1 fs-9"></i> {{ product.unit }}
+                      </span>
+                      <span class="ops-desc-snippet" *ngIf="product.description" [title]="product.description">
+                        {{ product.description }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Category & Hierarchy with Smart Subcategory Resolution -->
+              <td>
+                <div class="ops-cat-cell" *ngIf="getCategoryBadge(product) as catBadge">
+                  <!-- Root Category Department -->
+                  <span class="ops-cat-root-badge">
+                    <i class="fas fa-folder me-1"></i> {{ catBadge.parent }}
+                  </span>
+
+                  <!-- Explicit Subcategory -->
+                  <span class="ops-cat-sub-badge" *ngIf="!catBadge.isRootOnly">
+                    <i class="fas fa-angle-left rtl-flip me-1"></i>
+                    <strong>{{ catBadge.sub }}</strong>
+                  </span>
+
+                  <!-- Inferred Smart Suggestion (1-Click Apply) -->
+                  <div
+                    class="ops-suggested-chip"
+                    *ngIf="catBadge.isRootOnly && catBadge.isSuggested"
+                    (click)="applySuggestedSubcategory(product, catBadge.sub, $event)"
+                    title="اقتراح ذكي بناءً على بيانات الصنف - انقر للاعتماد الفوري"
+                  >
+                    <i class="fas fa-lightbulb text-warning me-1"></i>
+                    <span>{{ catBadge.sub }}</span>
+                    <span class="ops-apply-btn"><i class="fas fa-check"></i></span>
+                  </div>
+
+                  <!-- Needs Subcategory Warning -->
+                  <span
+                    class="ops-cat-warn-chip"
+                    *ngIf="catBadge.isRootOnly && !catBadge.isSuggested"
+                    (click)="edit(product)"
+                    title="يرجى فتح المنتج وإسناده لتصنيف فرعي دقيق"
+                  >
+                    <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                    <span>{{ 'PRODUCTS_PAGE.NEEDS_SUBCATEGORY' | translate }}</span>
+                  </span>
+                </div>
+              </td>
+
+              <!-- Sourcing & Store Linkage (Realistic Branding & Links) -->
+              <td>
+                <div class="ops-merchant-cell" *ngIf="getMerchantInfo(product) as mInfo">
+                  <!-- Linked Store / Brand -->
+                  <ng-container *ngIf="mInfo.isAssigned">
+                    <span class="ops-merchant-tag">
+                      <i class="fas fa-store-alt text-primary"></i>
+                      <span>{{ mInfo.name }}</span>
+                    </span>
+                    <a
+                      [routerLink]="['/inventory-batches']"
+                      [queryParams]="{ productId: product.id }"
+                      class="ops-batch-link"
+                      title="استعراض دفعات المخزون وتواريخ الصلاحية لهذا المنتج"
+                    >
+                      <i class="fas fa-layer-group"></i>
+                      <span>{{ 'PRODUCTS_PAGE.VIEW_BATCHES' | translate }}</span>
+                    </a>
+                  </ng-container>
+
+                  <!-- Unassigned Store / Global Catalog -->
+                  <ng-container *ngIf="!mInfo.isAssigned">
+                    <span class="ops-unassigned-tag">
+                      <i class="fas fa-store-slash text-muted"></i>
+                      <span>{{ mInfo.name }}</span>
+                    </span>
+                    <button
+                      type="button"
+                      class="ops-assign-btn"
+                      (click)="edit(product)"
+                      title="فتح لتحديد المتجر وسعر البيع"
+                    >
+                      <i class="fas fa-link me-1"></i>
+                      <span>{{ 'PRODUCTS_PAGE.ASSIGN_MERCHANT' | translate }}</span>
+                    </button>
+                  </ng-container>
+                </div>
+              </td>
+
+              <!-- Status -->
+              <td>
+                <span
+                  class="ops-status-pill"
+                  [ngClass]="product.active ? 'status-active' : 'status-disabled'"
+                >
+                  <span class="status-dot"></span>
+                  <span>{{ (product.active ? 'PRODUCTS_PAGE.STATUS_ACTIVE' : 'PRODUCTS_PAGE.STATUS_DISABLED') | translate }}</span>
+                </span>
+              </td>
+
+              <!-- Actions Cluster -->
+              <td>
+                <div class="ops-actions-group justify-content-center">
+                  <!-- Edit Modal Trigger -->
+                  <button
+                    type="button"
+                    class="ops-btn-action btn-edit"
+                    (click)="edit(product)"
+                    title="تعديل تفاصيل الصنف والهيكل والوسائط"
+                  >
+                    <i class="fas fa-pen"></i>
+                  </button>
+
+                  <!-- Toggle Popular Quick Action -->
+                  <button
+                    type="button"
+                    class="ops-btn-action"
+                    style="color: #ea580c; background: #fff7ed; border-color: #fed7aa;"
+                    (click)="togglePopular(product)"
+                    title="تبديل التواجد في قسم الأكثر طلباً بالصفحة الرئيسية"
+                  >
+                    <i class="fas fa-fire-alt"></i>
+                  </button>
+
+                  <!-- Toggle Active / Disabled -->
+                  <button
+                    type="button"
+                    class="ops-btn-action"
+                    [ngClass]="product.active ? 'btn-toggle-disable' : 'btn-toggle-active'"
+                    (click)="changeStatus(product.active, product.id)"
+                    [title]="(product.active ? 'PRODUCTS_PAGE.DISABLE' : 'PRODUCTS_PAGE.ENABLE') | translate"
+                  >
+                    <i class="fas" [ngClass]="product.active ? 'fa-ban' : 'fa-check'"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Empty State -->
+            <tr *ngIf="getDisplayedItems(rawItems).length === 0">
+              <td colspan="7" class="text-center py-10">
+                <div class="text-muted">
+                  <i class="fas fa-box-open fs-1 mb-3 text-muted"></i>
+                  <p class="fs-6 fw-bold mb-1">لا توجد منتجات مطابقة لخيارات البحث أو التصفية الحالية</p>
+                  <small>جرب تغيير معايير البحث أو تصفية التصنيفات أو إعادة تعيين الفلاتر.</small>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginator Footer -->
+      <div class="ops-table-footer">
+        <app-paginator
+          class="d-flex justify-content-between align-items-center flex-wrap"
+          [paginator]="paginator"
+          [isLoading]="isLoading"
+          (paginate)="paginate($event)"
+        ></app-paginator>
+      </div>
+    </ng-container>
+  </div>
 </div>

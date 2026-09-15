@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,8 +13,7 @@ import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/init_widget.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/custom_widgets/messages.dart';
-import '../../../utils/utilities/global_var.dart';
-import 'phone_code_page.dart';
+import '../../../utils/custom_widgets/syrian_flag.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -26,32 +24,28 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
   late UserProvider userProvider;
-
-  @override
-  void initState() {
-    super.initState();
-    if (kDebugMode) {
-      _phoneController.text = '0955555553';
-    }
-  }
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   String _formatPhoneNumber(String raw) {
     String clean = raw.replaceAll(RegExp(r'\s+'), '');
-    if (clean.startsWith('0')) {
+    if (clean.startsWith('+963')) {
+      clean = clean.substring(4);
+    } else if (clean.startsWith('963')) {
+      clean = clean.substring(3);
+    } else if (clean.startsWith('0')) {
       clean = clean.substring(1);
     }
-    if (!clean.startsWith('+963')) {
-      clean = '+963$clean';
-    }
-    return clean;
+    return '+963$clean';
   }
 
   @override
@@ -81,7 +75,7 @@ class _LoginPageState extends State<LoginPage> {
                           decoration: BoxDecoration(
                             color: kSurfaceWarm,
                             shape: BoxShape.circle,
-                            border: Border.all(color: kPrimaryOrange.withOpacity(0.35), width: 2),
+                            border: Border.all(color: kPrimaryOrange.withValues(alpha: 0.35), width: 2),
                           ),
                           child: const Center(
                             child: AppIcon(
@@ -104,7 +98,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'أدخل رقم هاتفك لتسجيل الدخول ومتابعة توصيل الطلبات',
+                        'أدخل رقم هاتفك وكلمة المرور المسجلة لمتابعة توصيل الطلبات',
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 13.5,
                           color: kCharcoalMuted,
@@ -157,8 +151,8 @@ class _LoginPageState extends State<LoginPage> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Text('🇸🇾', style: TextStyle(fontSize: 18)),
-                                          const SizedBox(width: 6),
+                                          const SyrianFlag(width: 26, height: 17),
+                                          const SizedBox(width: 7),
                                           Text(
                                             '+963',
                                             style: GoogleFonts.ibmPlexSansArabic(
@@ -214,67 +208,131 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
 
-                              const SizedBox(height: 22),
+                                const SizedBox(height: 18),
 
-                              // Primary CTA: Log In / Continue
-                              GestureDetector(
-                                onTap: _onContinue,
-                                behavior: HitTestBehavior.opaque,
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: kPrimaryOrange,
-                                    borderRadius: BorderRadius.circular(14),
+                                Text(
+                                  'كلمة المرور',
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: kCharcoalDark,
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      'تسجيل الدخول',
-                                      style: GoogleFonts.ibmPlexSansArabic(
-                                        fontSize: 15.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Password Field
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+                                  ),
+                                  child: TextFormField(
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
+                                    style: GoogleFonts.ibmPlexSansArabic(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: kCharcoalDark,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: '••••••••',
+                                      hintStyle: GoogleFonts.ibmPlexSansArabic(
+                                        color: const Color(0xFF94A3B8),
+                                        fontSize: 14,
+                                      ),
+                                      prefixIcon: const Icon(PhosphorIcons.lockKeyBold, size: 20, color: Color(0xFF94A3B8)),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscurePassword ? PhosphorIcons.eyeClosedBold : PhosphorIcons.eyeBold,
+                                          size: 20,
+                                          color: const Color(0xFF94A3B8),
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _obscurePassword = !_obscurePassword;
+                                          });
+                                        },
+                                      ),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      filled: false,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.trim().isEmpty) {
+                                        return 'يرجى إدخال كلمة المرور';
+                                      }
+                                      if (value.trim().length < 4) {
+                                        return 'كلمة المرور قصيرة جداً';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                // Primary CTA: Log In
+                                GestureDetector(
+                                  onTap: _onContinue,
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryOrange,
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'تسجيل الدخول',
+                                        style: GoogleFonts.ibmPlexSansArabic(
+                                          fontSize: 15.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 28),
-
-                      // 3. Security Trust Footer
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const AppIcon(
-                            PhosphorIcons.shieldCheckBold,
-                            size: 16,
-                            color: kCharcoalLight,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'تطبيق معتمد لكباتن توصيل جتك',
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 12,
-                              color: kCharcoalMuted,
-                              fontWeight: FontWeight.w500,
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        // 3. Security Trust Footer
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const AppIcon(
+                              PhosphorIcons.shieldCheckBold,
+                              size: 16,
+                              color: kCharcoalLight,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'حسابات السائقين معتمدة ومفعلة من قبل الإدارة',
+                              style: GoogleFonts.ibmPlexSansArabic(
+                                fontSize: 12,
+                                color: kCharcoalMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
-    );
+      );
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -302,29 +360,35 @@ class _LoginPageState extends State<LoginPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final formattedPhone = _formatPhoneNumber(_phoneController.text.trim());
+    final password = _passwordController.text;
 
     try {
-      await userProvider.registerOrSignInByPhoneNumber(formattedPhone);
-      context.showSnakBar(str.msg.smsCodeSend);
-      var res = await context.navigateName(
-        PhoneCodePage.routeName,
-        data: {
-          'phone': formattedPhone,
-          'code': userProvider.lastSmsCode,
-        },
-      );
+      await userProvider.login(formattedPhone, password);
 
-      if (res is bool && res) {
-        AuthenticationService authenticationService = locator<AuthenticationService>();
-        if (authenticationService.user!.role == null || authenticationService.user!.role != kDeliveryRole) {
-          showDialog(context: context, builder: (context) => CustomDialog(message: 'يرجى تسجيل الدخول بحساب سائق'));
-          authenticationService.logOut();
-        } else {
-          InitWidget.restartApp(context);
+      final authService = locator<AuthenticationService>();
+      if (authService.user == null || authService.user!.role != kDeliveryRole) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => const CustomDialog(message: 'يرجى تسجيل الدخول بحساب سائق معتمد'),
+          );
         }
+        authService.logOut();
+        return;
+      }
+
+      if (mounted) {
+        InitWidget.restartApp(context);
       }
     } catch (err) {
-      showDialog(context: context, builder: (context) => CustomDialog(message: err.toString()));
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => const CustomDialog(
+            message: 'تعذر تسجيل الدخول. يرجى التحقق من رقم الهاتف وكلمة المرور وصلاحيات حسابك.',
+          ),
+        );
+      }
     }
   }
 }

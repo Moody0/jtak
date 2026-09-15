@@ -129,31 +129,47 @@ namespace App.ApiControllers.V1.Admin
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         public async Task<ActionResult<Guid>> Create(UserDto item)
         {
+            var countryCode = !string.IsNullOrWhiteSpace(item.CountryPhoneCode) ? item.CountryPhoneCode.Trim() : "+963";
+            if (!countryCode.StartsWith("+")) countryCode = "+" + countryCode;
+
+            var rawPhone = item.PhoneNumber?.Trim() ?? "";
+            if (rawPhone.StartsWith(countryCode))
+            {
+                rawPhone = rawPhone.Substring(countryCode.Length);
+            }
+            else if (rawPhone.StartsWith(countryCode.TrimStart('+')))
+            {
+                rawPhone = rawPhone.Substring(countryCode.TrimStart('+').Length);
+            }
+            rawPhone = rawPhone.TrimStart('0');
+
+            var fullPhone = countryCode + rawPhone;
+            var email = !string.IsNullOrWhiteSpace(item.Email) ? item.Email.Trim() : $"{rawPhone}@jtak.app";
+
             var entity = new AppUser
             {
-                FirstName = item.FirstName.Trim(),
-                LastName = item.LastName.Trim(),
+                FirstName = item.FirstName?.Trim() ?? "",
+                LastName = item.LastName?.Trim() ?? "",
                 FullName = $"{item.FirstName} {item.LastName}".Trim(),
                 Gender = item.Gender,
                 IsActive = item.IsActive,
                 ProfilePhoto = item.ProfilePhoto,
                 Birthday = item.Birthday,
-                PhoneNumber = item.CountryPhoneCode + item.PhoneNumber,
-                CountryPhoneCode = item.CountryPhoneCode,
-                Email = item.Email,
-                UserName = item.PhoneNumber,
+                PhoneNumber = fullPhone,
+                CountryPhoneCode = countryCode,
+                Email = email,
+                UserName = fullPhone,
                 EmailConfirmed = true
             };
-            var result = await _userManager.CreateAsync(entity);
+
+            var password = !string.IsNullOrWhiteSpace(item.Password) ? item.Password.Trim() : "123456";
+            var result = await _userManager.CreateAsync(entity, password);
             if (!result.Succeeded)
                 return BadRequest(result);
-            //item.Role = item.Role != AppRoleName.Merchant 
+
             var role = item.Role.ToString();
             await _userManager.AddToRoleAsync(entity, role);
-            //not working
-            //_service.Insert(entity);
-            //await _uow.SaveChangesAsync();
-            _logger.LogInformation("Created New {0}", entity.GetType().Name);
+            _logger.LogInformation("Created New {0} with role {1}", entity.GetType().Name, role);
             return entity.Id;
         }
 
@@ -167,29 +183,58 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<Guid>> Edit(Guid id, UserDto item)
         {
             var entity = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
+            if (entity == null) return NotFound();
 
-            item.PhoneNumber = item.PhoneNumber.Replace("+90", "");
-            item.CountryPhoneCode = "+90";
+            var countryCode = !string.IsNullOrWhiteSpace(item.CountryPhoneCode)
+                ? item.CountryPhoneCode.Trim()
+                : (!string.IsNullOrWhiteSpace(entity.CountryPhoneCode) ? entity.CountryPhoneCode : "+963");
+            if (!countryCode.StartsWith("+")) countryCode = "+" + countryCode;
 
-            entity.FirstName = item.FirstName;
-            entity.LastName = item.LastName;
-            entity.FullName = $"{item.FirstName} {item.LastName}";
+            var rawPhone = item.PhoneNumber?.Trim() ?? "";
+            if (rawPhone.StartsWith(countryCode))
+            {
+                rawPhone = rawPhone.Substring(countryCode.Length);
+            }
+            else if (rawPhone.StartsWith(countryCode.TrimStart('+')))
+            {
+                rawPhone = rawPhone.Substring(countryCode.TrimStart('+').Length);
+            }
+            rawPhone = rawPhone.TrimStart('0');
+
+            var fullPhone = countryCode + rawPhone;
+
+            entity.FirstName = item.FirstName?.Trim() ?? entity.FirstName;
+            entity.LastName = item.LastName?.Trim() ?? entity.LastName;
+            entity.FullName = $"{item.FirstName} {item.LastName}".Trim();
             entity.Gender = item.Gender;
             entity.IsActive = item.IsActive;
             entity.ProfilePhoto = item.ProfilePhoto;
             entity.Birthday = item.Birthday;
-            entity.PhoneNumber = item.CountryPhoneCode + item.PhoneNumber;
-            entity.CountryPhoneCode = item.CountryPhoneCode;
-            entity.Email = item.Email;
-            entity.UserName = item.PhoneNumber;
+            entity.PhoneNumber = fullPhone;
+            entity.CountryPhoneCode = countryCode;
+            if (!string.IsNullOrWhiteSpace(item.Email))
+            {
+                entity.Email = item.Email.Trim();
+            }
+            entity.UserName = fullPhone;
             entity.EmailConfirmed = true;
             entity.DefaultLat = item.DefaultLat;
             entity.DefaultLng = item.DefaultLng;
 
-           var res =  await _userManager.UpdateAsync(entity);
+            var res = await _userManager.UpdateAsync(entity);
             if (!res.Succeeded)
             {
                 return BadRequest(res);
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.Password))
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(entity);
+                var passResult = await _userManager.ResetPasswordAsync(entity, token, item.Password.Trim());
+                if (!passResult.Succeeded)
+                {
+                    return BadRequest(passResult);
+                }
             }
 
             var currentRoles = await _userManager.GetRolesAsync(entity);
@@ -206,8 +251,6 @@ namespace App.ApiControllers.V1.Admin
             {
                 return BadRequest(res);
             }
-
-            //await _uow.SaveChangesAsync();
 
             return entity.Id;
         }

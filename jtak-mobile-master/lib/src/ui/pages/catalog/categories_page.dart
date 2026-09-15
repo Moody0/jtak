@@ -16,7 +16,17 @@ class CategoriesPage extends StatefulWidget {
   final int initCategoryIndex;
   final String? categoryTitle;
 
-  const CategoriesPage(this.initCategoryIndex, {super.key, this.categoryTitle});
+  /// Backend category id. When supplied it decides the category outright;
+  /// the positional index is only a legacy fallback for callers that still
+  /// identify a category by its position in a list.
+  final int? categoryId;
+
+  const CategoriesPage(
+    this.initCategoryIndex, {
+    super.key,
+    this.categoryTitle,
+    this.categoryId,
+  });
 
   @override
   State<CategoriesPage> createState() => _CategoriesPageState();
@@ -36,11 +46,22 @@ class _CategoriesPageState extends State<CategoriesPage> {
   ];
 
   CategoryModel _resolveCategory(CategoriesProvider categoriesProvider) {
+    // An explicit id is unambiguous, so it wins over every other hint.
+    if (widget.categoryId != null) {
+      for (final c in categoriesProvider.dataList) {
+        if (c.id == widget.categoryId) return c;
+      }
+      return CategoryModel(
+          id: widget.categoryId, title: widget.categoryTitle ?? '');
+    }
+
     if (widget.categoryTitle != null && widget.categoryTitle!.isNotEmpty) {
+      // Deriving an id from a list position produced a real category id
+      // belonging to something unrelated, which is how a cleaning-products
+      // tile ended up showing restaurants. Without a match, carry no id at all.
       final found = categoriesProvider.dataList.firstWhere(
         (c) => c.title == widget.categoryTitle,
-        orElse: () => CategoryModel(
-            id: widget.initCategoryIndex + 1, title: widget.categoryTitle),
+        orElse: () => CategoryModel(title: widget.categoryTitle),
       );
       return found;
     }

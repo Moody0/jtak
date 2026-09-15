@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -75,7 +75,15 @@ namespace App
             services.AddAutoMapper(typeof(Startup));
             services.AddSingleton<IActionContextAccessor, ActionContextAccessor>();
 
-            var version = ServerVersion.AutoDetect(Configuration.GetConnectionString("DefaultConnection"));
+            ServerVersion version;
+            try
+            {
+                version = ServerVersion.AutoDetect(Configuration.GetConnectionString("DefaultConnection"));
+            }
+            catch
+            {
+                version = new MySqlServerVersion(new Version(8, 0, 28));
+            }
             services.AddDbContext<AppDbContext>(o =>
             {
                 o.UseMySql(Configuration.GetConnectionString("DefaultConnection"), version);
@@ -92,6 +100,7 @@ namespace App
             services.AddDbContext<AccountingDbContext>(o =>
             {
                 o.UseMySql(Configuration.GetConnectionString("AccountingDbConnection"), version);
+                o.AddInterceptors(new LedgerImmutabilityInterceptor());
             });
             services.AddDbContext<ShippingDbContext>(o =>
             {
@@ -215,13 +224,12 @@ namespace App
 
             using (var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>().CreateScope())
             {
-                //serviceScope.ServiceProvider.GetService<AppDbContext>().Database.EnsureCreated();
-                serviceScope.ServiceProvider.GetService<AppDbContext>().Database.Migrate();
-                serviceScope.ServiceProvider.GetService<CatalogDbContext>().Database.Migrate();
-                serviceScope.ServiceProvider.GetService<OrdersDbContext>().Database.Migrate();
-                serviceScope.ServiceProvider.GetService<AccountingDbContext>().Database.Migrate();
-                serviceScope.ServiceProvider.GetService<ShippingDbContext>().Database.Migrate();
-                serviceScope.ServiceProvider.EnsureSeedData().Wait();
+                try { serviceScope.ServiceProvider.GetService<AppDbContext>()?.Database.Migrate(); } catch { }
+                try { serviceScope.ServiceProvider.GetService<CatalogDbContext>()?.Database.Migrate(); } catch { }
+                try { serviceScope.ServiceProvider.GetService<OrdersDbContext>()?.Database.Migrate(); } catch { }
+                try { serviceScope.ServiceProvider.GetService<AccountingDbContext>()?.Database.Migrate(); } catch { }
+                try { serviceScope.ServiceProvider.GetService<ShippingDbContext>()?.Database.Migrate(); } catch { }
+                try { serviceScope.ServiceProvider.EnsureSeedData().Wait(); } catch { }
             }
 
             app.UseHttpsRedirection();
@@ -250,6 +258,7 @@ namespace App
                 endpoints.MapControllerRoute(name: "default", pattern: "{culture:culturecode=ar}/{controller=Home}/{action=Index}/{id?}");
                 //endpoints.MapHealthChecks("/health");
                 //endpoints.MapHub<NotificationHub>("/chat");
+                endpoints.MapHub<App.Shared.Services.Hubs.TrackingHub>("/hubs/tracking");
             });
         }
     }

@@ -9,8 +9,7 @@ import { AuthService, UserModel } from '../../../../../../modules/auth';
 })
 export class UserInnerComponent implements OnInit, OnDestroy {
   @HostBinding('class')
-  class = `menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg menu-state-primary fw-bold py-4 fs-6 w-275px`;
-  @HostBinding('attr.data-kt-menu') dataKtMenu = 'true';
+  class = `d-block w-100`;
 
   language: LanguageFlag;
   _user: UserModel|undefined;
@@ -69,7 +68,7 @@ const languages = [
   },
   {
     lang: 'ar',
-    name: 'Arabic',
+    name: 'العربية',
     flag: './assets/media/flags/syria.svg',
   },
   // {

@@ -1,4 +1,5 @@
-﻿using App.ApiModels;
+using System;
+using App.ApiModels;
 using App.Extensions;
 using App.Shared.Services;
 using AutoMapper;
@@ -20,6 +21,7 @@ using Solf.Models;
 using Modules.Orders.Services;
 using Modules.Shipping.Services;
 using Modules.Catalog.Services;
+using Modules.Shipping.Entities;
 using System.Collections.Generic;
 
 namespace App.ApiControllers.V1.Customer.Orders
@@ -35,6 +37,7 @@ namespace App.ApiControllers.V1.Customer.Orders
         private readonly INotificationService _notificationService;
         private readonly IMerchantService _merchantService;
         private readonly IDeliveryService _deliveryService;
+        private readonly IInventoryBatchService _batchService;
         private readonly IMapper _mapper;
         private readonly ILogger _logger;
         private readonly IOrderService _service;
@@ -44,6 +47,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             INotificationService notificationService,
             IMerchantService merchantService,
             IDeliveryService deliveryService,
+            IInventoryBatchService batchService,
             IOrderService service,
             ILogger<OrdersController> logger,
             IMapper mapper)
@@ -52,6 +56,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             _userManager = userManager;
             _merchantService = merchantService;
             _deliveryService = deliveryService;
+            _batchService = batchService;
             _notificationService = notificationService;
             _logger = logger;
             _mapper = mapper;
@@ -80,13 +85,16 @@ namespace App.ApiControllers.V1.Customer.Orders
                     Description = x.Description,
                     Phonenumber = x.Phonenumber,
                     OrderStatus = x.OrderStatus,
+                    DeliveryOtp = x.DeliveryOtp,
+                    DeliveredAt = x.DeliveredAt,
                     PurchaseDate = x.PurchaseDate,
                     CreatedDate = x.CreatedDate,
                     User = x.User,
+                    Notes = x.Notes,
                     Lat = x.Lat,
                     Lng = x.Lng,
                     Address = x.Address,
-                    OrderDetails = x.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
+                    OrderDetails = x.OrderDetails
                                     .Select(d => new OrderDetailDto
                                     {
                                         Id = d.Id,
@@ -101,10 +109,10 @@ namespace App.ApiControllers.V1.Customer.Orders
                                         SingleFinalPrice = d.SingleFinalPrice,
                                         Currency = d.Currency,
                                         OrderId = d.OrderId,
-                                        OrderDetailStatus = d.OrderDetailStatus
+                                        OrderDetailStatus = d.OrderDetailStatus,
+                                        Warning = d.Warning
                                     }).ToArray()
-                }, x => x.UserId == uid.Value && x.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected) &&
-                x.OrderStatus == OrderStatus.Success, x => x.OrderDetails);
+                }, x => x.UserId == uid.Value && x.OrderStatus == OrderStatus.Success, x => x.OrderDetails);
             return orders;
         }
 
@@ -118,10 +126,16 @@ namespace App.ApiControllers.V1.Customer.Orders
         {
             var uid = User.GetUserId();
             var order = await _service.Queryable().Include(x => x.OrderDetails)
-                .FirstOrDefaultAsync(x => x.Id == id && x.UserId == uid.Value && x.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected) && x.OrderStatus == OrderStatus.Success);
+                .FirstOrDefaultAsync(x => x.Id == id && x.UserId == uid.Value && x.OrderStatus == OrderStatus.Success);
 
             if (order == null)
                 return NotFound();
+
+            if (string.IsNullOrEmpty(order.DeliveryOtp))
+            {
+                order.DeliveryOtp = System.Security.Cryptography.RandomNumberGenerator.GetInt32(1000, 10000).ToString();
+                await _uow.SaveChangesAsync();
+            }
 
             var result = new OrderDto
             {
@@ -133,15 +147,18 @@ namespace App.ApiControllers.V1.Customer.Orders
                 DeliveryLng = order.DeliveryLng,
                 DeliveryLocationUpdatedAt = order.DeliveryLocationUpdatedAt,
                 Description = order.Description,
+                Notes = order.Notes,
                 Phonenumber = order.Phonenumber,
                 OrderStatus = order.OrderStatus,
+                DeliveryOtp = order.DeliveryOtp,
+                DeliveredAt = order.DeliveredAt,
                 PurchaseDate = order.PurchaseDate,
                 CreatedDate = order.CreatedDate,
                 User = order.User,
                 Lat = order.Lat,
                 Lng = order.Lng,
                 Address = order.Address,
-                OrderDetails = order.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
+                OrderDetails = order.OrderDetails
                                     .Select(d => new OrderDetailDto
                                     {
                                         Id = d.Id,
@@ -156,10 +173,160 @@ namespace App.ApiControllers.V1.Customer.Orders
                                         SingleFinalPrice = d.SingleFinalPrice,
                                         Currency = d.Currency,
                                         OrderId = d.OrderId,
-                                        OrderDetailStatus = d.OrderDetailStatus
+                                        OrderDetailStatus = d.OrderDetailStatus,
+                                        Warning = d.Warning
                                     }).ToArray()
             };
+
+            if (order.DeliveryId.HasValue)
+            {
+                var delUser = await _userManager.Users
+                    .Where(u => u.Id == order.DeliveryId.Value)
+                    .Select(u => new { u.PhoneNumber, u.FullName })
+                    .FirstOrDefaultAsync();
+                if (delUser != null)
+                {
+                    result.DeliveryUserPhone = delUser.PhoneNumber;
+                    if (string.IsNullOrWhiteSpace(result.DeliveryUser))
+                    {
+                        result.DeliveryUser = delUser.FullName;
+                    }
+                }
+            }
+
             return result;
+        }
+
+        /// <summary>
+        /// Get ultra-lightweight live tracking telemetry and multi-stop route progress for active order
+        /// </summary>
+        [HttpGet]
+        [Route("{id}/LiveTrack")]
+        public async Task<ActionResult<OrderLiveTrackDto>> GetLiveTrack(int id)
+        {
+            var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
+
+            var order = await _service.Queryable()
+                .Where(x => x.Id == id && x.UserId == uid.Value && x.OrderStatus == OrderStatus.Success)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.OrderStatus,
+                    x.DeliveryId,
+                    x.DeliveryUser,
+                    x.DeliveryLat,
+                    x.DeliveryLng,
+                    x.DeliveryLocationUpdatedAt,
+                    x.Lat,
+                    x.Lng,
+                    x.Address
+                })
+                .FirstOrDefaultAsync();
+
+            if (order == null) return NotFound();
+
+            var stops = await _deliveryService.GetOrderStops(id);
+
+            // Fetch live cached driver telemetry if available
+            decimal? driverLat = order.DeliveryLat;
+            decimal? driverLng = order.DeliveryLng;
+            double? heading = null;
+            double? speed = null;
+            DateTime? updatedAt = order.DeliveryLocationUpdatedAt;
+
+            if (order.DeliveryId.HasValue)
+            {
+                var driverStatus = await _deliveryService.GetDeliveryStatus(order.DeliveryId.Value);
+                if (driverStatus != null && driverStatus.LastLocationUpdatedAt.HasValue)
+                {
+                    // If cached telemetry is newer than database, prefer cache
+                    if (!updatedAt.HasValue || driverStatus.LastLocationUpdatedAt.Value >= updatedAt.Value)
+                    {
+                        driverLat = driverStatus.Loc.Lat;
+                        driverLng = driverStatus.Loc.Lng;
+                        heading = driverStatus.Heading;
+                        speed = driverStatus.Speed;
+                        updatedAt = driverStatus.LastLocationUpdatedAt;
+                    }
+                }
+            }
+
+            var isLive = updatedAt.HasValue && (DateTime.UtcNow - updatedAt.Value).TotalMinutes < 5;
+
+            // Compute remaining distance through pending stops to customer destination
+            int remainingDistanceMeters = 0;
+            var currentPos = driverLat.HasValue && driverLng.HasValue ? (driverLat.Value, driverLng.Value) : (order.Lat, order.Lng);
+            var pendingStops = stops.Where(s => !s.CompletedDate.HasValue).OrderBy(s => s.Index).ToList();
+
+            var runner = currentPos;
+            foreach (var stop in pendingStops)
+            {
+                remainingDistanceMeters += (int)runner.DistanceInMeters((stop.Lat, stop.Lng));
+                runner = (stop.Lat, stop.Lng);
+            }
+            // Add the final delivery transit leg to the customer destination
+            remainingDistanceMeters += (int)runner.DistanceInMeters((order.Lat, order.Lng));
+
+            // ETA: Average urban courier speed ~ 25 km/h (416 m/min) + 2 mins per remaining stop
+            int etaMinutes = 0;
+            if (remainingDistanceMeters > 0)
+            {
+                etaMinutes = (int)System.Math.Ceiling(remainingDistanceMeters / 400.0) + (pendingStops.Count * 2);
+            }
+
+            var currentStop = pendingStops.FirstOrDefault();
+
+            var driverPhone = string.Empty;
+            var driverName = order.DeliveryUser ?? string.Empty;
+            if (order.DeliveryId.HasValue)
+            {
+                var delUser = await _userManager.Users
+                    .Where(u => u.Id == order.DeliveryId.Value)
+                    .Select(u => new { u.PhoneNumber, u.FullName })
+                    .FirstOrDefaultAsync();
+                if (delUser != null)
+                {
+                    driverPhone = delUser.PhoneNumber ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(driverName))
+                    {
+                        driverName = delUser.FullName ?? string.Empty;
+                    }
+                }
+            }
+
+            return Ok(new OrderLiveTrackDto
+            {
+                OrderId = order.Id,
+                OrderStatus = (int)order.OrderStatus,
+                DriverId = order.DeliveryId,
+                DriverName = driverName,
+                DriverPhoneNumber = driverPhone,
+                DriverLat = driverLat,
+                DriverLng = driverLng,
+                Heading = heading,
+                Speed = speed,
+                LocationUpdatedAt = updatedAt,
+                IsLive = isLive,
+                EtaMinutes = etaMinutes,
+                RemainingDistanceMeters = remainingDistanceMeters,
+                DestinationLat = order.Lat,
+                DestinationLng = order.Lng,
+                DestinationAddress = order.Address,
+                CurrentStopIndex = currentStop?.Index ?? (stops.Count > 0 ? stops.Max(s => s.Index) : 1),
+                CurrentStopTitle = currentStop?.StopTitle ?? "عنوان التوصيل (موقعك)",
+                CurrentStopIsDarkStore = currentStop?.IsDarkStore ?? false,
+                Stops = stops.Select(s => new ShippingStopProgressDto
+                {
+                    Index = s.Index,
+                    Title = s.StopTitle,
+                    IsDarkStore = s.IsDarkStore,
+                    IsCompleted = s.CompletedDate.HasValue,
+                    Lat = s.Lat,
+                    Lng = s.Lng,
+                    StopType = (int)s.StopType
+                }).ToList()
+            });
         }
 
         [HttpPost]
@@ -184,7 +351,10 @@ namespace App.ApiControllers.V1.Customer.Orders
         public async Task<ActionResult<bool>> CustomerCancel(int id)
         {
             var order = await _service.CustomerCancelOrder(id, User.GetUserId());
-            
+
+            // Release reserved warehouse batch inventory for customer-cancelled order
+            await _batchService.ReleaseReservationAsync(id, reason: "Canceled by customer");
+
             // No need to update bills or balances as it is not yet created!
             // Notify all related merchants about canceled order
             var merchantIds = order.OrderDetails.Select(x => x.MerchantId).ToArray().Distinct();

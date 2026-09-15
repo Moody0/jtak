@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:jtek_app/src/core/controllers/app/app_state_manager.dart';
 import 'package:jtek_app/src/core/controllers/app_parameters_provider.dart';
+import 'package:jtek_app/src/core/controllers/order/cart_provider.dart';
+import 'package:jtek_app/src/core/controllers/order/order_provider.dart';
 import 'package:jtek_app/src/core/models/notifications_payload_model.dart';
 import 'package:jtek_app/src/core/services/authentication_service.dart';
 import 'package:jtek_app/src/core/services/locator.dart';
@@ -38,9 +40,19 @@ class FireBaseNotificationServices {
     });
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      // app is in foregrounde
+      // app is in foreground
       GlobalVar.log("🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔 Firebase Messaging recieved");
-      locator<AppParametersProvider>().localNotificationService.showNotifications(getPayloadModel(message.data));
+      final payload = getPayloadModel(message.data);
+      locator<AppParametersProvider>().localNotificationService.showNotifications(payload);
+      if (payload.url != null && (payload.url!.contains('/Rejected/') || payload.url!.contains('/Cancel/'))) {
+        locator<CartProvider>().clearCart();
+        if (locator.isRegistered<OrderProvider>()) {
+          final prov = locator<OrderProvider>();
+          if (prov.order?.id != null) {
+            prov.loadOrder(prov.order!.id!, silent: true);
+          }
+        }
+      }
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {

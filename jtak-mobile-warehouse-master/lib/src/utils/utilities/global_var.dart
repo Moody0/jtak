@@ -12,8 +12,20 @@ class GlobalVar {
 
   static String getAssetsImage(String imageName) => "assets/images/$imageName";
 
-  static String getImageUrl(String imageName, {int width = 300, int height = 200, bool crop = true}) =>
-      SolApi.imagePreviewUrl + getString(imageName) + '?w=$width&h=$height&crop=$crop';
+  static String getImageUrl(String imageName, {int width = 300, int height = 200, bool crop = true}) {
+    final raw = getString(imageName).trim();
+    if (raw.isEmpty) return '';
+    final clean = raw.split(',').first.trim();
+    if (clean.isEmpty || clean == 'null') return '';
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('assets/')) {
+      return clean;
+    }
+    final lower = clean.toLowerCase();
+    if (lower.endsWith('.webp') || lower.endsWith('.svg') || lower.endsWith('.gif') || lower.endsWith('.avif')) {
+      return '${SolApi.downloadUrl}$clean';
+    }
+    return '${SolApi.imagePreviewUrl}$clean?w=$width&h=$height&crop=$crop';
+  }
 
   static String getDownloadUrl(String subUrl) => SolApi.downloadUrl + GlobalVar.getString(subUrl);
 

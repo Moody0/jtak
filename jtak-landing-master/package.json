@@ -10,7 +10,7 @@
         "parcel:serve": "parcel src/index.html",
         "parcel:watch": "parcel watch src/index.html",
         "parcel:build": "parcel build src/index.html --public-url ./",
-        "clean": "del -rf dist .cache",
+        "clean": "rimraf dist .cache",
         "build": "npm-run-all -s clean postcss:build parcel:build",
         "start": "npm-run-all -s clean -p postcss:watch parcel:serve"
     },

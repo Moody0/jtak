@@ -3,40 +3,56 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../config/themes/colors.dart';
+import '../../core/models/catalog/restaurant_category_model.dart';
+import '../../core/services/locator.dart';
+import '../../utils/providers/sol_api.dart';
 
 /// ---------------------------------------------------------------------------
-/// JTAK Various Cuisines / Categories Section (مطابخ متنوعة)
+/// JTAK "browse by kind" strip on Home.
 ///
-/// Section 6 on Home Page:
-/// - Header: "مطابخ متنوعة"
-/// - Horizontal scroll of compact 18px rounded category cards (80x74 image box + bold label)
-/// - High-resolution studio food photography matching reference style
-/// - Real-time scroll progress fill bar anchored right, expanding left as you scroll
+/// Entirely driven by the restaurant categories the administrator maintains in
+/// the dashboard: the heading, the entries, their order and their artwork all
+/// come from the backend. Entries with no merchant behind them are left out by
+/// the backend, so the strip never offers a category that opens an empty list,
+/// and the whole section hides itself when nothing is left to show.
 /// ---------------------------------------------------------------------------
 
 class CuisineCategoryItem {
   final int id;
   final String title;
   final String imageUrl;
-  final String? assetPath;
+  final int? productCategoryId;
+  final String filterTag;
   final IconData fallbackIcon;
 
   const CuisineCategoryItem({
     required this.id,
     required this.title,
     required this.imageUrl,
-    this.assetPath,
+    this.productCategoryId,
+    this.filterTag = '',
     this.fallbackIcon = Icons.restaurant_rounded,
   });
+
+  factory CuisineCategoryItem.fromCategory(RestaurantCategoryModel category) {
+    return CuisineCategoryItem(
+      id: category.id,
+      title: category.title,
+      imageUrl: category.image,
+      productCategoryId: category.productCategoryId,
+      filterTag: category.filterTag,
+    );
+  }
 }
 
 class JtakVariousCuisinesSection extends StatefulWidget {
-  final String title;
+  /// Optional override. Left null, the heading comes from the dashboard.
+  final String? title;
   final ValueChanged<CuisineCategoryItem>? onCategoryTap;
 
   const JtakVariousCuisinesSection({
     super.key,
-    this.title = 'مطابخ متنوعة',
+    this.title,
     this.onCategoryTap,
   });
 
@@ -46,9 +62,48 @@ class JtakVariousCuisinesSection extends StatefulWidget {
 
 class _JtakVariousCuisinesSectionState extends State<JtakVariousCuisinesSection> {
   double _scrollProgress = 0.0;
+  List<CuisineCategoryItem> _items = const [];
+  String _title = '';
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await locator<SolApi>().getRequest('/RestaurantCategories');
+      if (res is Map) {
+        final config =
+            RestaurantCategoriesConfigModel.fromMap(Map<String, dynamic>.from(res));
+        if (!mounted) return;
+        setState(() {
+          _title = config.homeSectionTitle;
+          _items = config.showOnHome && config.enabled
+              ? config.homeItems.map(CuisineCategoryItem.fromCategory).toList()
+              : const [];
+          _loaded = true;
+        });
+        return;
+      }
+    } catch (_) {
+      // Fall through: showing nothing is better than showing categories that
+      // are not known to lead anywhere.
+    }
+    if (!mounted) return;
+    setState(() => _loaded = true);
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Nothing to browse means no section at all, rather than a heading over an
+    // empty strip.
+    if (!_loaded || _items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -56,7 +111,7 @@ class _JtakVariousCuisinesSectionState extends State<JtakVariousCuisinesSection>
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
           child: Text(
-            widget.title,
+            widget.title ?? _title,
             style: GoogleFonts.ibmPlexSansArabic(
               color: kCharcoalDark,
               fontSize: 21,
@@ -87,10 +142,10 @@ class _JtakVariousCuisinesSectionState extends State<JtakVariousCuisinesSection>
                 physics: const ClampingScrollPhysics(),
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _sampleCuisines.length,
+                itemCount: _items.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
-                  final item = _sampleCuisines[index];
+                  final item = _items[index];
                   return _buildCuisineCard(item);
                 },
               ),
@@ -101,7 +156,7 @@ class _JtakVariousCuisinesSectionState extends State<JtakVariousCuisinesSection>
         const SizedBox(height: 10),
 
         // 3. Expanding Fill Progress Bar (Anchored Right, expands Left)
-        if (_sampleCuisines.length > 4) _buildExpandingFillProgressBar(_sampleCuisines.length),
+        if (_items.length > 4) _buildExpandingFillProgressBar(_items.length),
 
         const SizedBox(height: 8),
       ],
@@ -133,23 +188,25 @@ class _JtakVariousCuisinesSectionState extends State<JtakVariousCuisinesSection>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(17.2),
-                child: item.assetPath != null && item.assetPath!.isNotEmpty
-                    ? Image.asset(
-                        item.assetPath!,
-                        width: 80,
-                        height: 74,
-                        fit: BoxFit.fill,
-                        errorBuilder: (_, __, ___) => Icon(item.fallbackIcon, color: kPrimaryOrange, size: 34),
-                      )
-                    : (item.imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
+                // The dashboard may hold either a bundled asset path or a
+                // uploaded image URL, so both are supported.
+                child: item.imageUrl.isEmpty
+                    ? Icon(item.fallbackIcon, color: kPrimaryOrange, size: 34)
+                    : item.imageUrl.startsWith('assets')
+                        ? Image.asset(
+                            item.imageUrl,
+                            width: 80,
+                            height: 74,
+                            fit: BoxFit.fill,
+                            errorBuilder: (_, __, ___) => Icon(item.fallbackIcon, color: kPrimaryOrange, size: 34),
+                          )
+                        : CachedNetworkImage(
                             imageUrl: item.imageUrl,
                             width: 80,
                             height: 74,
                             fit: BoxFit.fill,
                             errorWidget: (_, __, ___) => Icon(item.fallbackIcon, color: kPrimaryOrange, size: 34),
-                          )
-                        : Icon(item.fallbackIcon, color: kPrimaryOrange, size: 34)),
+                          ),
               ),
             ),
 
@@ -205,76 +262,18 @@ class _JtakVariousCuisinesSectionState extends State<JtakVariousCuisinesSection>
     );
   }
 
-  static const List<CuisineCategoryItem> _sampleCuisines = [
-    CuisineCategoryItem(
-      id: 1,
-      title: 'فطور',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/breakfast.webp',
-      fallbackIcon: Icons.breakfast_dining_rounded,
-    ),
-    CuisineCategoryItem(
-      id: 2,
-      title: 'مخبوزات',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/bakery.webp',
-      fallbackIcon: Icons.bakery_dining_rounded,
-    ),
-    CuisineCategoryItem(
-      id: 3,
-      title: 'بيتزا',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/pizza.webp',
-      fallbackIcon: Icons.local_pizza_rounded,
-    ),
-    CuisineCategoryItem(
-      id: 4,
-      title: 'برجر',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/burger.webp',
-      fallbackIcon: Icons.lunch_dining_rounded,
-    ),
-    CuisineCategoryItem(
-      id: 5,
-      title: 'شاورما',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/shawarma.webp',
-      fallbackIcon: Icons.kebab_dining_rounded,
-    ),
-    CuisineCategoryItem(
-      id: 6,
-      title: 'مشاوي',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/grills.webp',
-      fallbackIcon: Icons.outdoor_grill_rounded,
-    ),
-    CuisineCategoryItem(
-      id: 7,
-      title: 'حلويات',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/sweets.webp',
-      fallbackIcon: Icons.cake_rounded,
-    ),
-    CuisineCategoryItem(
-      id: 8,
-      title: 'مشروبات',
-      imageUrl: '',
-      assetPath: 'assets/images/cuisines/drinks.webp',
-      fallbackIcon: Icons.local_cafe_rounded,
-    ),
-  ];
 }
 
 /// ---------------------------------------------------------------------------
 /// Sliver wrapper for smooth use in CustomScrollView
 /// ---------------------------------------------------------------------------
 class SliverJtakVariousCuisinesSection extends StatelessWidget {
-  final String title;
+  final String? title;
   final ValueChanged<CuisineCategoryItem>? onCategoryTap;
 
   const SliverJtakVariousCuisinesSection({
     super.key,
-    this.title = 'مطابخ متنوعة',
+    this.title,
     this.onCategoryTap,
   });
 

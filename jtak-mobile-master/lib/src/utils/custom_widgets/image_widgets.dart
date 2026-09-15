@@ -148,6 +148,9 @@ class ImageView extends StatelessWidget {
       if (image is File) {
         return FileImage(image);
       } else if (image is String && image.isNotEmpty) {
+        if (image.startsWith('assets')) {
+          return AssetImage(image);
+        }
         return NetworkImage(
           image.startsWith('http') ? image : GlobalVar.getImageUrl(image, width: imageWidth.toInt(), height: imageHeight.toInt()),
         );

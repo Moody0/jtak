@@ -2,7 +2,7 @@ import { Injectable, Inject, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
 import { TableService } from 'src/app/_metronic/shared/crud-table';
-import { Order } from '../models/orders.model';
+import { Order, OrderLiveTrack } from '../models/orders.model';
 import { finalize, Observable } from 'rxjs';
 
 
@@ -26,15 +26,22 @@ export class OrdersService extends TableService<Order> implements OnDestroy {
     super(http);
   }
 
-  cancel(orderId: number): Observable<boolean> {
-    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Cancel/${orderId}`, {});
+  cancel(orderId: number, reason?: string): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Cancel/${orderId}`, { reason: reason || '' });
   }
   approve(orderId: number): Observable<boolean> {
     return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Approve/${orderId}`, {});
   }
+  ready(orderId: number): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Ready/${orderId}`, {});
+  }
   setDelievry(id:number,uid :string):Observable<boolean>
   {
     return this.http.put<boolean>(`${this.BASE_URL}/Admin/Orders/SetDelivery/${id}/${uid}`,{});
+  }
+
+  getLiveTrack(id: number): Observable<OrderLiveTrack> {
+    return this.http.get<OrderLiveTrack>(`${this.BASE_URL}/Admin/Orders/${id}/LiveTrack`);
   }
 
   ngOnDestroy() {

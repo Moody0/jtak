@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/catalog/favorite_product_provider.dart';
 import '../../../utils/custom_widgets/messages.dart';
-import '../../../utils/custom_widgets/shimmer.dart';
+import '../clean_shimmer_skeletons.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Restaurant Card Component (Exact Match to Reference Mockup with PhosphorIcons)
@@ -291,13 +291,9 @@ class JtakRestaurantCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         fadeInDuration: const Duration(milliseconds: 220),
                         fadeOutDuration: const Duration(milliseconds: 150),
-                        placeholder: (_, __) => Shimmer.fromColors(
-                          baseColor: const Color(0xFFF1F5F9),
-                          highlightColor: const Color(0xFFF8FAFC),
-                          child: Container(
-                            width: double.infinity,
-                            height: 135,
-                            color: const Color(0xFFF1F5F9),
+                        placeholder: (_, __) => const CleanShimmer(
+                          child: SizedBox.expand(
+                            child: ColoredBox(color: Colors.white),
                           ),
                         ),
                         errorWidget: (_, __, ___) => _buildFallbackCover(),
@@ -345,13 +341,9 @@ class JtakRestaurantCard extends StatelessWidget {
                               fit: BoxFit.cover,
                               fadeInDuration: const Duration(milliseconds: 220),
                               fadeOutDuration: const Duration(milliseconds: 150),
-                              placeholder: (_, __) => Shimmer.fromColors(
-                                baseColor: const Color(0xFFF1F5F9),
-                                highlightColor: const Color(0xFFF8FAFC),
-                                child: Container(
-                                  width: 72,
-                                  height: 72,
-                                  color: const Color(0xFFF1F5F9),
+                              placeholder: (_, __) => const CleanShimmer(
+                                child: SizedBox.expand(
+                                  child: ColoredBox(color: Colors.white),
                                 ),
                               ),
                               errorWidget: (_, __, ___) => _buildFallbackLogo(),
@@ -372,7 +364,7 @@ class JtakRestaurantCard extends StatelessWidget {
                 return GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    favProvider.toggleRestaurantFavorite(data.id);
+                    favProvider.toggleRestaurantFavorite(data.id, data);
                     SnackBarWidget.showCustomSnackBar(
                       context,
                       isFav
@@ -649,13 +641,9 @@ class JtakHomeRestaurantCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         fadeInDuration: const Duration(milliseconds: 220),
                         fadeOutDuration: const Duration(milliseconds: 150),
-                        placeholder: (_, __) => Shimmer.fromColors(
-                          baseColor: const Color(0xFFF1F5F9),
-                          highlightColor: const Color(0xFFF8FAFC),
-                          child: Container(
-                            width: double.infinity,
-                            height: 130,
-                            color: const Color(0xFFF1F5F9),
+                        placeholder: (_, __) => const CleanShimmer(
+                          child: SizedBox.expand(
+                            child: ColoredBox(color: Colors.white),
                           ),
                         ),
                         errorWidget: (_, __, ___) => _buildFallbackCover(),
@@ -703,13 +691,9 @@ class JtakHomeRestaurantCard extends StatelessWidget {
                               fit: BoxFit.cover,
                               fadeInDuration: const Duration(milliseconds: 220),
                               fadeOutDuration: const Duration(milliseconds: 150),
-                              placeholder: (_, __) => Shimmer.fromColors(
-                                baseColor: const Color(0xFFF1F5F9),
-                                highlightColor: const Color(0xFFF8FAFC),
-                                child: Container(
-                                  width: 52,
-                                  height: 52,
-                                  color: const Color(0xFFF1F5F9),
+                              placeholder: (_, __) => const CleanShimmer(
+                                child: SizedBox.expand(
+                                  child: ColoredBox(color: Colors.white),
                                 ),
                               ),
                               errorWidget: (_, __, ___) => _buildFallbackLogo(),

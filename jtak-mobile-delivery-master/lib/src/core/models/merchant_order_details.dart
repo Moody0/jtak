@@ -12,6 +12,10 @@ class MerchentOrderDetailsModel {
   String? merchantTitle;
   double? lat;
   double? lng;
+  String? merchantAddress;
+  String? merchantPhone;
+  String? merchantLogo;
+  bool isDarkStore;
   List<OrderDetailsModel>? orderDetails;
   MerchentOrderDetailsModel({
     this.orderDetailStatus,
@@ -20,6 +24,10 @@ class MerchentOrderDetailsModel {
     this.merchantTitle,
     this.lat,
     this.lng,
+    this.merchantAddress,
+    this.merchantPhone,
+    this.merchantLogo,
+    this.isDarkStore = false,
     this.orderDetails,
   });
 
@@ -30,6 +38,10 @@ class MerchentOrderDetailsModel {
     String? merchantTitle,
     double? lat,
     double? lng,
+    String? merchantAddress,
+    String? merchantPhone,
+    String? merchantLogo,
+    bool? isDarkStore,
     List<OrderDetailsModel>? orderDetails,
   }) {
     return MerchentOrderDetailsModel(
@@ -40,6 +52,10 @@ class MerchentOrderDetailsModel {
       merchantTitle: merchantTitle ?? this.merchantTitle,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
+      merchantAddress: merchantAddress ?? this.merchantAddress,
+      merchantPhone: merchantPhone ?? this.merchantPhone,
+      merchantLogo: merchantLogo ?? this.merchantLogo,
+      isDarkStore: isDarkStore ?? this.isDarkStore,
       orderDetails: orderDetails ?? this.orderDetails,
     );
   }
@@ -52,22 +68,53 @@ class MerchentOrderDetailsModel {
       'merchantTitle': merchantTitle,
       'lat': lat,
       'lng': lng,
+      'merchantAddress': merchantAddress,
+      'merchantPhone': merchantPhone,
+      'merchantLogo': merchantLogo,
+      'isDarkStore': isDarkStore,
       'orderDetails': orderDetails?.map((x) => x.toMap()).toList(),
     };
   }
 
   factory MerchentOrderDetailsModel.fromMap(Map<String, dynamic> map) {
+    final statusRaw = map['orderDetailStatus'] ?? map['OrderDetailStatus'];
     return MerchentOrderDetailsModel(
-      orderDetailStatus:
-          (map['orderDetailStatus'] as int).parseOrderDetailsStatus,
-      orderDetailStatusString: map['orderDetailStatusString'],
-      merchantId: map['merchantId']?.toInt(),
-      merchantTitle: map['merchantTitle'],
-      lat: map['lat']?.toDouble(),
-      lng: map['lng']?.toDouble(),
-      orderDetails: map['orderDetails'] != null
+      orderDetailStatus: statusRaw != null
+          ? (statusRaw is int
+              ? statusRaw.parseOrderDetailsStatus
+              : int.tryParse(statusRaw.toString())?.parseOrderDetailsStatus)
+          : null,
+      orderDetailStatusString:
+          map['orderDetailStatusString'] ?? map['OrderDetailStatusString'],
+      merchantId: (map['merchantId'] ?? map['MerchantId']) != null
+          ? int.tryParse((map['merchantId'] ?? map['MerchantId']).toString())
+          : null,
+      merchantTitle: map['merchantTitle'] ?? map['MerchantTitle'],
+      lat: (map['lat'] ?? map['Lat']) != null
+          ? double.tryParse((map['lat'] ?? map['Lat']).toString())
+          : null,
+      lng: (map['lng'] ?? map['Lng']) != null
+          ? double.tryParse((map['lng'] ?? map['Lng']).toString())
+          : null,
+      merchantAddress: map['merchantAddress'] ??
+          map['MerchantAddress'] ??
+          map['address'] ??
+          map['Address'],
+      merchantPhone: map['merchantPhone'] ??
+          map['MerchantPhone'] ??
+          map['phone'] ??
+          map['Phone'],
+      merchantLogo: map['merchantLogo'] ??
+          map['MerchantLogo'] ??
+          map['photo'] ??
+          map['Photo'] ??
+          map['logo'] ??
+          map['Logo'],
+      isDarkStore: (map['isDarkStore'] ?? map['IsDarkStore']) == true,
+      orderDetails: (map['orderDetails'] ?? map['OrderDetails']) != null
           ? List<OrderDetailsModel>.from(
-              map['orderDetails']?.map((x) => OrderDetailsModel.fromMap(x)))
+              (map['orderDetails'] ?? map['OrderDetails'])
+                  ?.map((x) => OrderDetailsModel.fromMap(x)))
           : null,
     );
   }

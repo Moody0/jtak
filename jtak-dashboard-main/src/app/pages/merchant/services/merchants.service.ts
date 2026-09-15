@@ -1,8 +1,10 @@
 import { Injectable, Inject, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
-import { TableService } from 'src/app/_metronic/shared/crud-table';
+import { TableService, TableResponseModel } from 'src/app/_metronic/shared/crud-table';
 import { Merchant } from '../models/merchant.model';
+import { Observable, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root',
@@ -26,6 +28,25 @@ export class MerchantsService extends TableService<Merchant> implements OnDestro
     super(http);
   }
 
+  getAllMerchants(): Observable<Merchant[]> {
+    return this.http
+      .post<any>(
+        `${this.BASE_URL}/${this.GET_ALL_URL}`,
+        { pageNumber: 1, pageSize: 500, filter: {} }
+      )
+      .pipe(
+        map((res: any) => (Array.isArray(res) ? res : (res?.items || res?.data || []))),
+        catchError(() => {
+          return this.http
+            .get<any>(`${this.BASE_URL}/Admin/Merchants`)
+            .pipe(
+              map((res: any) => (Array.isArray(res) ? res : (res?.items || res?.data || []))),
+              catchError(() => of([]))
+            );
+        })
+      );
+  }
+
   rememberWorkspaceMerchant(merchant: Merchant): void {
     if (!merchant?.id) return;
     try {
@@ -41,7 +62,7 @@ export class MerchantsService extends TableService<Merchant> implements OnDestro
   getWorkspaceMerchant(id: number): Merchant | null {
     try {
       const value = sessionStorage.getItem(`${this.workspaceStoragePrefix}${id}`);
-      return value ? JSON.parse(value) as Merchant : null;
+      return value ? (JSON.parse(value) as Merchant) : null;
     } catch {
       return null;
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -161,5 +161,6 @@ namespace App.Shared.Data.App
         public DbSet<Address> Addresses { get; set; }
         public DbSet<FavoriteProduct> FavoriteProducts { get; set; }
         public DbSet<ProductReview> ProductReviews { get; set; }
+        public DbSet<SupportMessage> SupportMessages { get; set; }
     }
 }

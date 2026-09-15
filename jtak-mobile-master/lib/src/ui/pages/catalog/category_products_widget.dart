@@ -86,10 +86,6 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
   Widget build(BuildContext context) {
     final provider = Provider.of<CategoryProductsProvider>(context);
 
-    if (provider.isBusy) {
-      return const CategoryProductsSkeleton();
-    }
-
     final merchants = provider.matchedMerchants;
 
     return ScrollConfiguration(
@@ -104,7 +100,13 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
             _buildCategoryHeroBanner(widget.categoryTitle),
 
             // 2. Dedicated Merchants & Category Content Feed with Filter Chips
-            _buildDedicatedMerchantsView(context, merchants),
+            if (provider.isBusy && merchants.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 20),
+                child: RestaurantsListSkeleton(count: 3),
+              )
+            else
+              _buildDedicatedMerchantsView(context, merchants),
 
             const SizedBox(height: BottomNavigation.height + 24),
           ],

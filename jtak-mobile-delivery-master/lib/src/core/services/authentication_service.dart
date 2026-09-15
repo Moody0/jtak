@@ -67,6 +67,7 @@ class AuthenticationService extends BaseProvider {
       _authorizationModel = AuthorizationModel.fromJson(data);
       saveAuthorizationData();
       _api.accessToken = _authorizationModel?.accessToken;
+      await loadUserData();
     } catch (err) {
       rethrow;
     }
@@ -100,12 +101,18 @@ class AuthenticationService extends BaseProvider {
   }
 
   Future<void> checkAuthorizationToken() async {
-    // log('/////////////////////////////////////////////////////////////// check Authorization ');
     await getAuthorizationData();
     try {
-      if (_authorizationModel != null && _authorizationModel!.accessToken!.isNotEmpty) {
-        Duration diff = DateTime.parse(_authorizationModel!.expiresIn!).difference(DateTime.now());
+      if (_authorizationModel != null && GlobalVar.checkString(_authorizationModel!.accessToken)) {
+        DateTime? expiry;
+        if (GlobalVar.checkString(_authorizationModel!.expiresIn)) {
+          expiry = DateTime.tryParse(_authorizationModel!.expiresIn!);
+        }
+        Duration diff = expiry != null ? expiry.difference(DateTime.now()) : const Duration(days: 1);
         if (diff.isNegative || diff.inMinutes < 10) {
+          if (!GlobalVar.checkString(_authorizationModel!.refreshToken)) {
+            return;
+          }
           if (kDebugMode) {
             debugPrint('/////////////////////////////////////////////////////////////// Request refresh_token :$diff ');
           }
@@ -114,18 +121,25 @@ class AuthenticationService extends BaseProvider {
             "refresh_token": _authorizationModel!.refreshToken!,
             "scope": "offline_access profile roles phone email",
           };
-          Map<String, String> headers = _api.getHeaders(contentType: 'application/x-www-form-urlencoded');
+          Map<String, String> headers = _api.getHeaders(contentType: 'application/x-www-form-urlencoded', includeAuth: false);
 
+          final oldRefreshToken = _authorizationModel?.refreshToken;
           var data = await _api.postRequest('/connect/token', body, headers: headers, apiPrefex: '');
-          //Request refresh_token response comes without refreshToken
           _authorizationModel = AuthorizationModel.fromJson(data);
-          _api.accessToken = _authorizationModel?.accessToken!;
+          if (!GlobalVar.checkString(_authorizationModel?.refreshToken) && GlobalVar.checkString(oldRefreshToken)) {
+            _authorizationModel?.refreshToken = oldRefreshToken;
+          }
+          _api.accessToken = _authorizationModel?.accessToken;
           saveAuthorizationData();
         }
       }
     } catch (error) {
-      logOut();
-      debugPrint(error.toString());
+      debugPrint('Token renewal error: $error');
+      // Only log out on authentication refusal, not transient connection hiccups
+      final errStr = error.toString().toLowerCase();
+      if (errStr.contains('invalid_grant') || errStr.contains('invalid_token') || errStr.contains('401')) {
+        logOut();
+      }
     }
   }
 
@@ -140,4 +154,6 @@ class AuthenticationService extends BaseProvider {
     _api.accessToken = null;
     notifyListeners();
   }
+
+  Future signOut() => logOut();
 }

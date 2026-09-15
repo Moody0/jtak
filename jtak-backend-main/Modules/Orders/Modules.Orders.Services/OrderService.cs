@@ -1,4 +1,4 @@
-﻿using App.Orders.Data;
+using App.Orders.Data;
 using App.Shared.Data.MultiContext;
 using App.Shared.Entities;
 using App.Shared.Entities.Enums;
@@ -34,13 +34,14 @@ namespace Modules.Orders.Services
         /// <param name="ProductId"></param>
         /// <returns></returns>
         Task<Order> MerchantAccept(int orderId, params int[] merchantIds);
+        Task<Order> MerchantMarkReady(int orderId, params int[] merchantIds);
         Task<Order> CustomerAcceptOrderChange(int orderId, Guid? uid = null);
         Task<Order> CustomerCancelOrder(int orderId, Guid? uid = null);
         Task<Order> DeliveryCancelOrder(int orderId, Guid? uid = null);
         Task<Order> StartShippingOrder(int orderId, int merchantId, Guid derliveryId);
         Task<bool> CanDeliverOrder(int orderId, Guid derliveryId);
         Task<bool> CanStartShippingOrder(int orderId, int merchantId, Guid derliveryId);
-        Task<Order> DeliverOrder(int orderId, Guid derliveryId);
+        Task<Order> DeliverOrder(int orderId, Guid derliveryId, string photoUrl = null, string signature = null, string notes = null);
         Task<Order> UpdateDeliveryLocation(int orderId, Guid deliveryId, decimal lat, decimal lng);
         void Log(int OrderId,
                      OrderDetailStatus orderDetailsStatus,
@@ -249,6 +250,12 @@ namespace Modules.Orders.Services
                 throw new Exception("You Cannot Cancel this order!");
 
             var orderDetails = order.OrderDetails.ToArray();
+            // Cancellation is intentionally idempotent. If the order state was
+            // saved but the separate catalog reservation-release operation
+            // failed, a client retry must be allowed to finish the cleanup.
+            if (orderDetails.Length > 0 && orderDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.CustomerCanceled))
+                return order;
+
             var allPending = orderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
                                          .All(x => x.OrderDetailStatus == OrderDetailStatus.CustomerPending || x.OrderDetailStatus == OrderDetailStatus.Pending);
 
@@ -270,6 +277,9 @@ namespace Modules.Orders.Services
 
             if (order == null || (uid.HasValue && order.DeliveryId != uid))
                 throw new Exception("You Cannot Cancel this order!");
+
+            if (order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered))
+                throw new Exception("لا يمكن إلغاء طلب تم تسليمه بالفعل.");
 
             var orderDetails = order.OrderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected && x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled).ToArray();
             //var allShipping = orderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
@@ -297,18 +307,44 @@ namespace Modules.Orders.Services
                 throw new Exception("Order not found.");
 
             var merchantOrderdetails = order.OrderDetails.Where(x => merchantIds.Contains(x.MerchantId)).ToArray();
-            var actionable = merchantOrderdetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected).ToArray();
+            var actionable = merchantOrderdetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                                                            x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                            x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).ToArray();
             var allPendingOrAccepted = actionable.All(x => x.OrderDetailStatus == OrderDetailStatus.Pending ||
                                                            x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted);
 
-            if (!allPendingOrAccepted || !actionable.Any(x => x.OrderDetailStatus == OrderDetailStatus.Pending))
+            if (!allPendingOrAccepted)
                 throw new Exception("Can't Accept this order!");
 
-            foreach (var merchantOrderdetail in merchantOrderdetails.Where(x => x.OrderDetailStatus == OrderDetailStatus.Pending))
+            var pendingDetails = merchantOrderdetails.Where(x => x.OrderDetailStatus == OrderDetailStatus.Pending).ToArray();
+            if (pendingDetails.Length > 0)
             {
-                merchantOrderdetail.OrderDetailStatus = OrderDetailStatus.MerchantAccepted;
+                foreach (var merchantOrderdetail in pendingDetails)
+                {
+                    merchantOrderdetail.OrderDetailStatus = OrderDetailStatus.MerchantAccepted;
+                }
+                Log(orderId, OrderDetailStatus.MerchantAccepted, pendingDetails);
+                await _uow.SaveChangesAsync();
             }
-            Log(orderId, OrderDetailStatus.MerchantAccepted, merchantOrderdetails);
+            return order;
+        }
+
+        public async Task<Order> MerchantMarkReady(int orderId, params int[] merchantIds)
+        {
+            var order = await FindAsync(orderId);
+            if (order == null)
+                throw new Exception("Order not found.");
+
+            var acceptedDetails = order.OrderDetails
+                .Where(x => merchantIds.Contains(x.MerchantId) && x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted)
+                .ToArray();
+            if (acceptedDetails.Length == 0)
+                throw new Exception("يجب قبول الطلب قبل تحديده كجاهز للاستلام.");
+
+            foreach (var detail in acceptedDetails)
+                detail.OrderDetailStatus = OrderDetailStatus.ReadyForPickup;
+
+            Log(orderId, OrderDetailStatus.ReadyForPickup, acceptedDetails);
             await _uow.SaveChangesAsync();
             return order;
         }
@@ -324,37 +360,39 @@ namespace Modules.Orders.Services
             if (!isDelivery)
                 throw new Exception("You Cannot Start Shipping this order!");
 
-            var merchantOrderdetails = order.OrderDetails.Where(x => x.MerchantId == merchantId && x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted)
+            var merchantOrderdetails = order.OrderDetails.Where(x => x.MerchantId == merchantId && x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup)
                                                          .ToArray();
-            //var allMerchantAccepted = merchantOrderdetails.All(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted);
-            //
-            //if (!allMerchantAccepted)
-            //    throw new Exception("Can't start shiping this order! not all items are merchant accepted!");
 
-            foreach (var merchantOrderdetail in merchantOrderdetails)
+            if (merchantOrderdetails.Length > 0)
             {
-                merchantOrderdetail.OrderDetailStatus = OrderDetailStatus.ShippingStarted;
+                foreach (var merchantOrderdetail in merchantOrderdetails)
+                {
+                    merchantOrderdetail.OrderDetailStatus = OrderDetailStatus.ShippingStarted;
+                }
+                Log(orderId, OrderDetailStatus.ShippingStarted, merchantOrderdetails);
+                await _uow.SaveChangesAsync();
             }
-            Log(orderId, OrderDetailStatus.ShippingStarted, merchantOrderdetails);
-            await _uow.SaveChangesAsync();
             return order;
         }
 
         public async Task<bool> CanDeliverOrder(int orderId, Guid deliveryId) =>
             await Queryable().AnyAsync(o => o.Id == orderId &&
                                            o.DeliveryId == deliveryId &&
-                                           o.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted) &&
+                                           (o.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted) ||
+                                            o.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered)) &&
                                            o.OrderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
                                                                     x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
                                                                     x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
-                                                         .All(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted));
+                                                         .All(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted ||
+                                                                   x.OrderDetailStatus == OrderDetailStatus.Delivered));
 
         public async Task<bool> CanStartShippingOrder(int orderId, int merchantId, Guid deliveryId) =>
-            await Queryable().AnyAsync(o => o.DeliveryId == deliveryId && 
-                                            o.OrderDetails.Any(x => x.OrderId == orderId && x.MerchantId == merchantId && x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted));
+            await Queryable().AnyAsync(o => o.DeliveryId == deliveryId &&
+                                            o.OrderDetails.Any(x => x.OrderId == orderId && x.MerchantId == merchantId &&
+                                                (x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup || x.OrderDetailStatus == OrderDetailStatus.ShippingStarted)));
 
 
-        public async Task<Order> DeliverOrder(int orderId, Guid deliveryId)
+        public async Task<Order> DeliverOrder(int orderId, Guid deliveryId, string photoUrl = null, string signature = null, string notes = null)
         {
             var order = await FindAsync(orderId);
             if (order == null || order.DeliveryId != deliveryId)
@@ -364,13 +402,21 @@ namespace Modules.Orders.Services
                                                                x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
                                                                x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
                                                   .ToArray();
-            if (activeDetails.Length == 0 || activeDetails.Any(x => x.OrderDetailStatus != OrderDetailStatus.ShippingStarted))
+            if (activeDetails.Length == 0 || activeDetails.Any(x => x.OrderDetailStatus != OrderDetailStatus.ShippingStarted && x.OrderDetailStatus != OrderDetailStatus.Delivered))
                 throw new Exception("Every active merchant pickup must be in transit before the order can be delivered.");
 
             foreach (var orderdetail in activeDetails)
             {
                 orderdetail.OrderDetailStatus = OrderDetailStatus.Delivered;
             }
+            order.DeliveredAt ??= DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(photoUrl))
+                order.ProofOfDeliveryPhotoUrl = photoUrl;
+            if (!string.IsNullOrEmpty(signature))
+                order.ProofOfDeliverySignature = signature;
+            if (!string.IsNullOrEmpty(notes))
+                order.DeliveryNotes = notes;
+
             order.DeliveryLat = null;
             order.DeliveryLng = null;
             order.DeliveryLocationUpdatedAt = null;

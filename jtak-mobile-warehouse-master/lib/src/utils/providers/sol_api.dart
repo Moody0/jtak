@@ -13,8 +13,8 @@ import 'sol_api_response.dart';
 
 class SolApi {
   static const String baseURL = 'https://api.jtak.app';
-  static const String imagePreviewUrl = baseURL + '/api/v1/services/previewimage/';
-  static const String downloadUrl = baseURL + '/api/services/Download/';
+  static const String imagePreviewUrl = '$baseURL/api/v1/services/previewimage/';
+  static const String downloadUrl = '$baseURL/api/v1/services/Download/';
   static const String apiVersionPrefex = '/api/v1';
   static const String apiModelPrefex = '/Warehouse';
   static const String apiPrefex = apiVersionPrefex + apiModelPrefex;
@@ -106,13 +106,37 @@ class SolApi {
 
   dynamic _responseHandel(http.Response response, {String url = ''}) {
     try {
-      if (response.statusCode >= 200 && response.statusCode < 300) return json.decode(response.body);
+      final rawBody = response.body.trim();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (rawBody.isEmpty) return null;
+        return json.decode(rawBody);
+      }
+
       if (kDebugMode) {
-        debugPrint('$url status code ${response.statusCode} : ${json.decode(response.body)}');
+        debugPrint('$url status code ${response.statusCode} : ${rawBody.isEmpty ? "EMPTY BODY" : rawBody}');
+      }
+
+      if (response.statusCode == 401) {
+        locator<AuthenticationService>().logOut();
+      }
+
+      if (rawBody.isEmpty) {
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          throw UnauthorisedException(str.msg.errConnectionServer, response.statusCode);
+        }
+        if (response.statusCode == 404) {
+          throw NotFoundException(str.msg.errConnectionServer, response.statusCode);
+        }
+        throw FetchDataException(str.msg.errConnectionServer, response.statusCode);
       }
 
       SolApiErrorResponse apiResponse = SolApiErrorResponse();
-      apiResponse.fromJson(json.decode(response.body) as Map<String, dynamic>);
+      apiResponse.fromJson(json.decode(rawBody) as Map<String, dynamic>);
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw UnauthorisedException(apiResponse.getErrorsString(), response.statusCode);
+      }
 
       if (response.statusCode == 404) throw NotFoundException('${str.msg.errConnectionServer} \n ${apiResponse.getErrorsString()}');
 

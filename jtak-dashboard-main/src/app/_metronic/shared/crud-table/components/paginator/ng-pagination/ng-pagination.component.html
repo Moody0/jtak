@@ -29,7 +29,7 @@
 <ng-template #ellipsis>...</ng-template>
 <ng-template #defaultNumber let-page let-currentPage="currentPage">
   {{ page }}
-  <span *ngIf="page === currentPage" class="sr-only">(current)</span>
+  <span *ngIf="page === currentPage + 1" class="sr-only">(current)</span>
 </ng-template>
 <a
   *ngIf="boundaryLinks"
@@ -72,9 +72,9 @@
     class="btn btn-icon btn-sm border-0 btn-light btn-hover-primary m-1"
     tabindex="-1"
     aria-disabled="true"
-    [class.active]="pageNumber === page"
+    [class.active]="pageNumber === page + 1"
     [class.disabled]="isEllipsis(pageNumber) || disabled"
-    [attr.aria-current]="pageNumber === page ? 'page' : null"
+    [attr.aria-current]="pageNumber === page + 1 ? 'page' : null"
   >
     <ng-template
       [ngTemplateOutlet]="tplEllipsis?.templateRef || ellipsis"
@@ -87,9 +87,9 @@
     (click)="selectPage(pageNumber - 1); $event.preventDefault()"
     [attr.tabindex]="disabled ? '-1' : null"
     [attr.aria-disabled]="disabled ? 'true' : null"
-    [class.active]="pageNumber === page"
+    [class.active]="pageNumber === page + 1"
     [class.disabled]="isEllipsis(pageNumber) || disabled"
-    [attr.aria-current]="pageNumber === page ? 'page' : null"
+    [attr.aria-current]="pageNumber === page + 1 ? 'page' : null"
   >
     <ng-template
       [ngTemplateOutlet]="tplNumber?.templateRef || defaultNumber"

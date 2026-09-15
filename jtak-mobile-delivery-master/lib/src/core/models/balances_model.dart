@@ -4,11 +4,17 @@ class BalancesModel {
   String? id;
   double? amount;
   double? pendingAmount;
+  double? maxCashFloat;
+  double? availableAmount;
+  bool hasPendingSettlement;
   String? createdDate;
   BalancesModel({
     this.id,
     this.amount,
     this.pendingAmount,
+    this.maxCashFloat = 5000.0,
+    this.availableAmount,
+    this.hasPendingSettlement = false,
     this.createdDate,
   });
 
@@ -16,12 +22,18 @@ class BalancesModel {
     String? id,
     double? amount,
     double? pendingAmount,
+    double? maxCashFloat,
+    double? availableAmount,
+    bool? hasPendingSettlement,
     String? createdDate,
   }) {
     return BalancesModel(
       id: id ?? this.id,
       amount: amount ?? this.amount,
       pendingAmount: pendingAmount ?? this.pendingAmount,
+      maxCashFloat: maxCashFloat ?? this.maxCashFloat,
+      availableAmount: availableAmount ?? this.availableAmount,
+      hasPendingSettlement: hasPendingSettlement ?? this.hasPendingSettlement,
       createdDate: createdDate ?? this.createdDate,
     );
   }
@@ -31,16 +43,22 @@ class BalancesModel {
       'id': id,
       'amount': amount,
       'pendingAmount': pendingAmount,
+      'maxCashFloat': maxCashFloat,
+      'availableAmount': availableAmount,
+      'hasPendingSettlement': hasPendingSettlement,
       'createdDate': createdDate,
     };
   }
 
   factory BalancesModel.fromMap(Map<String, dynamic> map) {
     return BalancesModel(
-      id: map['id'],
-      amount: map['amount']?.toDouble(),
-      pendingAmount: map['pendingAmount']?.toDouble(),
-      createdDate: map['createdDate'],
+      id: map['id']?.toString(),
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      pendingAmount: (map['pendingAmount'] as num?)?.toDouble() ?? 0.0,
+      maxCashFloat: (map['maxCashFloat'] ?? map['maxCashLimit'] as num?)?.toDouble() ?? 5000.0,
+      availableAmount: (map['availableAmount'] as num?)?.toDouble(),
+      hasPendingSettlement: map['hasPendingSettlement'] == true || ((map['pendingAmount'] as num?)?.toDouble() ?? 0) > 0,
+      createdDate: map['createdDate']?.toString(),
     );
   }
 

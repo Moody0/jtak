@@ -47,331 +47,315 @@ class BigStoreData {
   }
 }
 
-class JtakBigStoresSection extends StatefulWidget {
+/// ---------------------------------------------------------------------------
+/// Flagship JTAK Market Hero Spotlight Section (سوبرماركت ومقاضي جيتك الحصري)
+///
+/// Tailored for the single-market architecture:
+/// - Replaces multi-store carousel with a unified flagship dark-store spotlight
+/// - Highlights combined Best Market + Clover Mall inventory
+/// - Immediate 1-tap navigation into MarketPage (id: 12)
+/// ---------------------------------------------------------------------------
+class JtakBigStoresSection extends StatelessWidget {
   final String title;
   final ValueChanged<BigStoreData>? onStoreTap;
 
   const JtakBigStoresSection({
     super.key,
-    this.title = 'المتاجر الكبرى بالقرب منك',
+    this.title = 'جيتك ماركت',
     this.onStoreTap,
   });
 
-  @override
-  State<JtakBigStoresSection> createState() => _JtakBigStoresSectionState();
-}
-
-class _JtakBigStoresSectionState extends State<JtakBigStoresSection> {
-  late final PageController _pageController = PageController(viewportFraction: 0.85);
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+  void _navigateToMarket(BuildContext context, BigStoreData store) {
+    if (onStoreTap != null) {
+      onStoreTap!(store);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MarketPage(
+            marketId: store.id,
+            marketName: store.name,
+            logoUrl: store.assetPath ?? store.logoUrl,
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<MarketsProvider>(
       builder: (context, marketsProvider, child) {
-        final stores = marketsProvider.markets.map((m) => BigStoreData.fromModel(m)).toList();
-        final int pageCount = (stores.length / 2).ceil();
+        final List<BigStoreData> stores = marketsProvider.markets
+            .map((m) => BigStoreData.fromModel(m))
+            .toList();
+
+        final BigStoreData flagshipStore = stores.isNotEmpty
+            ? stores.first
+            : BigStoreData.fromModel(MarketsProvider.jtakMarketModel);
 
         if (marketsProvider.isLoading && stores.isEmpty) {
           return _buildLoadingSkeleton();
         }
 
-        if (pageCount == 0) {
-          return const SizedBox.shrink();
-        }
-
-        const double cardHeight = 112.0;
-        const double cardGap = 12.0;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.title,
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      color: kCharcoalDark,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Header (Title only)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+                child: Text(
+                  title,
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    color: kCharcoalDark,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
                   ),
-                ],
+                ),
               ),
-            ),
-            SizedBox(
-              height: (cardHeight * 2) + cardGap,
-              child: PageView.builder(
-                controller: _pageController,
-                physics: const ClampingScrollPhysics(),
-                padEnds: false,
-                clipBehavior: Clip.none,
-                itemCount: pageCount,
-                itemBuilder: (context, pageIndex) {
-                  final int firstIndex = pageIndex * 2;
-                  final BigStoreData topStore = stores[firstIndex];
-                  final BigStoreData? bottomStore =
-                      firstIndex + 1 < stores.length ? stores[firstIndex + 1] : null;
 
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 16, left: 4),
-                    child: Column(
-                      children: [
-                        _buildStoreCard(topStore, cardHeight),
-                        const SizedBox(height: cardGap),
-                        if (bottomStore != null) _buildStoreCard(bottomStore, cardHeight),
+              // 2. Hero Spotlight Card
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GestureDetector(
+                  onTap: () => _navigateToMarket(context, flagshipStore),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFEBEBEF),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
                       ],
                     ),
-                  );
-                },
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Logo Box
+                        _buildEmblem(flagshipStore),
+
+                        const SizedBox(width: 12),
+
+                        // Store Meta & Badges
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      'جيتك ماركت',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.ibmPlexSansArabic(
+                                        color: kCharcoalDark,
+                                        fontSize: 16.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Transform.flip(
+                                    flipX: true,
+                                    child: const Icon(
+                                      PhosphorIconsFill.sealCheck,
+                                      color: kPrimaryOrange,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'آلاف المنتجات • خضار، ألبان، مونة ومنظفات',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  color: const Color(0xFF4B5563),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              // ETA Pill
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF3EB),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Transform.flip(
+                                      flipX: true,
+                                      child: const Icon(
+                                        PhosphorIconsFill.lightning,
+                                        color: kPrimaryOrange,
+                                        size: 11,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      flagshipStore.eta,
+                                      style: GoogleFonts.ibmPlexSansArabic(
+                                        color: kPrimaryOrange,
+                                        fontSize: 11.0,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // Shop Now Pill Button with opposite-facing arrow
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: kPrimaryOrange,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'تسوق',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  color: Colors.white,
+                                  fontSize: 12.0,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(
+                                PhosphorIconsBold.caretRight,
+                                color: Colors.white,
+                                size: 11,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-          ],
+
+              const SizedBox(height: 8),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildLoadingSkeleton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 180,
-            height: 22,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            height: 112,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFEBEBEF)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStoreCard(BigStoreData store, double height) {
-    return GestureDetector(
-      onTap: () {
-        if (widget.onStoreTap != null) {
-          widget.onStoreTap!(store);
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MarketPage(
-                marketId: store.id,
-                marketName: store.name,
-                logoUrl: store.assetPath ?? store.logoUrl,
-              ),
-            ),
-          );
-        }
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFEBEBEF), width: 1.0),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(17),
-          child: Row(
-            children: [
-              _buildLogoBlock(store),
-              Expanded(child: _buildStoreInfo(store)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLogoBlock(BigStoreData store) {
-    const Color defaultGrey = Color(0xFFEEEEEE);
-
-    Widget content;
-    final bool hasAsset = store.assetPath != null && store.assetPath!.isNotEmpty;
+  Widget _buildEmblem(BigStoreData store) {
+    const double size = 62.0;
+    final bool hasAsset =
+        store.assetPath != null && store.assetPath!.isNotEmpty;
     final bool hasUrl = store.logoUrl != null && store.logoUrl!.isNotEmpty;
 
-    if (hasUrl) {
-      content = CachedNetworkImage(
-        imageUrl: store.logoUrl!,
-        width: 104,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => hasAsset
-            ? Image.asset(
-                store.assetPath!,
-                width: 104,
-                height: double.infinity,
-                fit: BoxFit.cover,
-              )
-            : const CleanShimmer(
-                child: SkeletonBox(
-                  width: 104,
-                  height: double.infinity,
-                  borderRadius: 12,
-                ),
-              ),
-        errorWidget: (_, __, ___) => hasAsset
-            ? Image.asset(
-                store.assetPath!,
-                width: 104,
-                height: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildTextLogoFallback(store),
-              )
-            : _buildTextLogoFallback(store),
-      );
-    } else if (hasAsset) {
-      content = Image.asset(
+    Widget imageContent;
+    if (hasAsset) {
+      imageContent = Image.asset(
         store.assetPath!,
-        width: 104,
-        height: double.infinity,
+        width: size,
+        height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildTextLogoFallback(store),
+        errorBuilder: (_, __, ___) => _buildFallbackLogo(store, size),
+      );
+    } else if (hasUrl) {
+      imageContent = CachedNetworkImage(
+        imageUrl: store.logoUrl!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: const Color(0xFFF3F4F6)),
+        errorWidget: (_, __, ___) => _buildFallbackLogo(store, size),
       );
     } else {
-      content = _buildTextLogoFallback(store);
+      imageContent = _buildFallbackLogo(store, size);
     }
 
     return Container(
-      width: 104,
-      height: double.infinity,
-      color: defaultGrey,
-      alignment: Alignment.center,
-      child: content,
-    );
-  }
-
-  Widget _buildTextLogoFallback(BigStoreData store) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            store.logoText,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.ibmPlexSansArabic(
-              color: const Color(0xFF1F2937),
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              height: 1.2,
-            ),
-          ),
-          if (store.logoBoxedText != null) ...[
-            const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(color: const Color(0xFFD1D5DB), width: 1.2),
-              ),
-              child: Text(
-                store.logoBoxedText!,
-                style: GoogleFonts.ibmPlexSansArabic(
-                  color: const Color(0xFF374151),
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  height: 1.2,
-                ),
-              ),
-            ),
-          ],
-        ],
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF3F4F6), width: 1.0),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: imageContent,
       ),
     );
   }
 
-  Widget _buildStoreInfo(BigStoreData store) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (store.tagline != null && store.tagline!.isNotEmpty) ...[
-            Row(
-              children: [
-                const Icon(
-                  PhosphorIconsFill.shoppingBag,
-                  color: kPrimaryOrange,
-                  size: 14,
-                ),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    store.tagline!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      color: const Color(0xFF4B5563),
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+  Widget _buildFallbackLogo(BigStoreData store, double size) {
+    return Container(
+      width: size,
+      height: size,
+      color: const Color(0xFFFF5C00),
+      alignment: Alignment.center,
+      child: Text(
+        'جيتك',
+        style: GoogleFonts.ibmPlexSansArabic(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingSkeleton() {
+    return CleanShimmer(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 140,
+              height: 22,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 12),
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFEBEBEF)),
+              ),
+            ),
           ],
-          Text(
-            store.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.ibmPlexSansArabic(
-              color: kCharcoalDark,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              const Icon(
-                PhosphorIconsRegular.clock,
-                color: kCharcoalMedium,
-                size: 14,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                store.eta,
-                style: GoogleFonts.ibmPlexSansArabic(
-                  color: kCharcoalMedium,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -383,7 +367,7 @@ class SliverJtakBigStoresSection extends StatelessWidget {
 
   const SliverJtakBigStoresSection({
     super.key,
-    this.title = 'المتاجر الكبرى بالقرب منك',
+    this.title = 'جيتك ماركت',
     this.onStoreTap,
   });
 

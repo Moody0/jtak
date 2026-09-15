@@ -4,13 +4,13 @@ import 'package:flutter/services.dart';
 import 'colors.dart';
 
 class AppTheme {
-  static const String fontFamily = 'Tajawal';
+  static const String fontFamily = 'IBMPlexSansArabic';
 
   static const standardPadding = EdgeInsets.all(16);
 
-  static const boxShadow = [BoxShadow(blurRadius: 22, color: Colors.black12, offset: Offset(0, 6))];
+  static const boxShadow = [BoxShadow(blurRadius: 10, color: Color(0x0A000000), offset: Offset(0, 2))];
 
-  static const double borderRadiusValue = 5.0;
+  static const double borderRadiusValue = 14.0;
   static const BorderRadius borderRadius = BorderRadius.all(Radius.circular(borderRadiusValue));
 
   static InputDecoration getBorderdTextFieldDecoration({String? lable, String? hint, EdgeInsets? contentPadding}) {
@@ -19,9 +19,9 @@ class AppTheme {
       hintText: hint,
       labelStyle: const TextStyle(fontSize: 12),
       isDense: true,
-      contentPadding: contentPadding ?? const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-      border: const OutlineInputBorder(borderSide: BorderSide(color: kPrimaryColor)),
-      focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: kAccentColor)),
+      contentPadding: contentPadding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kCardBorderColor)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kPrimaryOrange, width: 1.5)),
     );
   }
 

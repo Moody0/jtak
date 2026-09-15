@@ -97,29 +97,31 @@ class OrderModel {
   }
 
   factory OrderModel.fromMap(Map<String, dynamic> map) {
+    final pmRaw = map['paymentMethod'] ?? map['PaymentMethod'];
+    final osRaw = map['orderStatus'] ?? map['OrderStatus'];
     return OrderModel(
-      id: map['id']?.toInt(),
-      user: map['user'],
-      userId: map['userId'],
-      purchaseDate: map['purchaseDate'],
-      description: map['description'],
-      phonenumber: map['phonenumber'],
-      lat: map['lat']?.toDouble(),
-      lng: map['lng']?.toDouble(),
-      address: map['address'],
-      paymentMethod: map['paymentMethod'] != null
-          ? (map['paymentMethod'] as int).parsePaymentMethod
+      id: (map['id'] ?? map['Id']) != null ? int.tryParse((map['id'] ?? map['Id']).toString()) : null,
+      user: map['user'] ?? map['User'],
+      userId: map['userId'] ?? map['UserId'],
+      purchaseDate: map['purchaseDate'] ?? map['PurchaseDate'],
+      description: map['description'] ?? map['Description'],
+      phonenumber: map['phonenumber'] ?? map['Phonenumber'] ?? map['phoneNumber'] ?? map['PhoneNumber'],
+      lat: (map['lat'] ?? map['Lat']) != null ? double.tryParse((map['lat'] ?? map['Lat']).toString()) : null,
+      lng: (map['lng'] ?? map['Lng']) != null ? double.tryParse((map['lng'] ?? map['Lng']).toString()) : null,
+      address: map['address'] ?? map['Address'],
+      paymentMethod: pmRaw != null
+          ? (pmRaw is int ? pmRaw.parsePaymentMethod : int.tryParse(pmRaw.toString())?.parsePaymentMethod)
           : null,
-      orderStatus: map['orderStatus'] != null
-          ? (map['orderStatus'] as int).parseOrderStatus
+      orderStatus: osRaw != null
+          ? (osRaw is int ? osRaw.parseOrderStatus : int.tryParse(osRaw.toString())?.parseOrderStatus)
           : null,
-      orderDetails: map['orderDetails'] != null
-          ? List<MerchentOrderDetailsModel>.from(map['orderDetails']
+      orderDetails: (map['orderDetails'] ?? map['OrderDetails']) != null
+          ? List<MerchentOrderDetailsModel>.from((map['orderDetails'] ?? map['OrderDetails'])
               ?.map((x) => MerchentOrderDetailsModel.fromMap(x)))
           : null,
-      price: map['price']?.toDouble(),
-      createdDate: map['createdDate'],
-      mapsUrl: map['mapsUrl'],
+      price: (map['price'] ?? map['Price']) != null ? double.tryParse((map['price'] ?? map['Price']).toString()) : null,
+      createdDate: map['createdDate'] ?? map['CreatedDate'],
+      mapsUrl: map['mapsUrl'] ?? map['MapsUrl'],
     );
   }
 

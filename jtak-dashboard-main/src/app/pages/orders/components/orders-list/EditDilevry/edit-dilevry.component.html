@@ -1,21 +1,77 @@
 <app-edit-modal
   [item]="item"
-  [itemName]="item.deliveryUser"
-  moduleName="deliveryUser"
+  [itemName]="item.deliveryUser ? (('ORDERS_PAGE.COL_ORDER_NUM' | translate) + ' #' + item.id + ' - ' + item.deliveryUser) : (('ORDERS_PAGE.COL_ORDER_NUM' | translate) + ' #' + item.id)"
+  [moduleName]="'ORDERS_PAGE.MODAL_CAPTAIN_TITLE' | translate"
   [isLoading]="isLoading$ | async"
   [saveDisabled]="formGroup.invalid"
   (cancelClicked)="modal.dismiss()"
   (saveClicked)="saved()"
 >
-  <form class="form form-label-right" [formGroup]="formGroup">
-    <ng-container  >
-      <ng-select  formControlName="uid"
-      [items]="deliviries"
-      [(ngModel)]="item.deliveryId"
-      bindLabel="fullName"
-      bindValue="id"
+  <form class="form form-label-right p-3" [formGroup]="formGroup">
+    <!-- Order Summary Card -->
+    <div class="card bg-light-primary border-0 p-3 mb-4 rounded-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-bolder fs-6 text-dark">
+          <i class="fas fa-file-invoice text-primary me-2"></i>{{ 'ORDERS_PAGE.MODAL_ORDER_INFO' | translate }} #{{ item.id }}
+        </span>
+        <span class="badge badge-light-success text-success fw-bolder fs-7">
+          {{ item.price | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+        </span>
+      </div>
+      <div class="d-flex flex-column gap-1 fs-8 text-muted">
+        <div><i class="fas fa-user text-muted me-1"></i><strong>{{ item.user }}</strong> ({{ item.phonenumber }})</div>
+        <div class="text-truncate" [title]="item.address">
+          <i class="fas fa-map-marker-alt text-danger me-1"></i>{{ item.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}
+        </div>
+      </div>
+      <div class="mt-2 pt-2 border-top border-primary-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="fs-8">
+          <span class="text-muted">{{ 'ORDERS_PAGE.MODAL_CURRENT_CAPTAIN' | translate }}</span>
+          <strong class="text-dark ms-1">{{ item.deliveryUser || ('ORDERS_PAGE.UNASSIGNED' | translate) }}</strong>
+        </div>
+        <button *ngIf="item.deliveryId && item.deliveryId !== '00000000-0000-0000-0000-000000000000'"
+          type="button" class="btn btn-sm btn-light-danger py-1 px-2 fs-8" (click)="unassign()">
+          <i class="fas fa-user-minus me-1"></i>{{ 'ORDERS_PAGE.MODAL_UNASSIGN_BTN' | translate }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Select Delivery Driver -->
+    <div class="form-group mb-3">
+      <label class="form-label fw-bolder fs-6 mb-2">
+        <i class="fas fa-motorcycle text-primary me-1"></i>{{ 'ORDERS_PAGE.SELECT_CAPTAIN_LABEL' | translate }}
+      </label>
+      <ng-select
+        formControlName="uid"
+        [items]="deliviries"
+        [(ngModel)]="item.deliveryId"
+        bindValue="id"
+        [searchable]="true"
+        [clearable]="true"
+        [placeholder]="'ORDERS_PAGE.SELECT_CAPTAIN_PLACEHOLDER' | translate"
       >
+        <ng-template ng-label-tmp let-selected="item">
+          <div class="d-flex align-items-center">
+            <i class="fas fa-motorcycle text-primary me-2"></i>
+            <span class="fw-bold text-dark">{{ getDriverDisplay(selected) }}</span>
+          </div>
+        </ng-template>
+        <ng-template ng-option-tmp let-option="item">
+          <div class="d-flex align-items-center justify-content-between py-1">
+            <div>
+              <i class="fas fa-user-circle text-primary me-2"></i>
+              <strong class="text-dark">{{ getDriverDisplay(option) }}</strong>
+            </div>
+            <span *ngIf="option.phoneNumber" class="badge badge-light-primary text-primary fs-8 ms-2">
+              {{ option.phoneNumber }}
+            </span>
+          </div>
+        </ng-template>
       </ng-select>
-    </ng-container>
+      <span class="text-muted fs-8 mt-2 d-block">
+        <i class="fas fa-info-circle me-1 text-info"></i>
+        {{ 'ORDERS_PAGE.CAPTAIN_DISPATCH_NOTE' | translate }}
+      </span>
+    </div>
   </form>
 </app-edit-modal>

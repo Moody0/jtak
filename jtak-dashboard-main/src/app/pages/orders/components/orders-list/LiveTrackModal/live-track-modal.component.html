@@ -1,0 +1,193 @@
+<div class="modal-header bg-light py-3 px-4 live-track-header">
+  <div class="d-flex align-items-center">
+    <div class="symbol symbol-40 symbol-light-primary me-3">
+      <span class="symbol-label">
+        <i class="fas fa-satellite-dish text-primary fs-3"></i>
+      </span>
+    </div>
+    <div>
+      <h4 class="modal-title fw-bolder text-dark mb-0 fs-5">
+        {{ 'LIVE_TRACK_MODAL.TITLE' | translate }} #{{ order?.id }}
+      </h4>
+      <span class="text-muted fs-8">
+        {{ 'LIVE_TRACK_MODAL.SUBTITLE' | translate }} <strong>{{ order?.user }}</strong>
+      </span>
+    </div>
+  </div>
+  <div class="d-flex align-items-center">
+    <div class="radar-live-pill me-3" [ngClass]="liveTrack?.isLive ? 'live' : 'offline'">
+      <span class="pulse-dot"></span>
+      <span>{{ (liveTrack?.isLive ? 'LIVE_TRACK_MODAL.STATUS_LIVE' : 'LIVE_TRACK_MODAL.STATUS_OFFLINE') | translate }}</span>
+    </div>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+</div>
+
+<div class="modal-body p-4">
+  <!-- Telemetry Metrics Cards -->
+  <div class="row g-3 mb-4">
+    <!-- Courier Card -->
+    <div class="col-md-4">
+      <div class="telemetry-card telemetry-card--primary h-100">
+        <div class="d-flex align-items-center mb-2">
+          <i class="fas fa-motorcycle text-primary fs-5 me-2"></i>
+          <span class="fw-bolder text-dark fs-7">{{ 'LIVE_TRACK_MODAL.COURIER_CARD' | translate }}</span>
+        </div>
+        <div class="fw-bolder text-dark fs-6">
+          {{ liveTrack?.driverName || order?.deliveryUser || ('ORDERS_PAGE.UNASSIGNED' | translate) }}
+        </div>
+        <div class="mt-1" *ngIf="liveTrack?.driverPhoneNumber">
+          <a [href]="'tel:' + liveTrack?.driverPhoneNumber" class="text-primary fw-bold fs-7">
+            <i class="fas fa-phone-alt fs-9 me-1"></i>{{ liveTrack?.driverPhoneNumber }}
+          </a>
+        </div>
+        <div class="text-muted fs-8 mt-2" *ngIf="liveTrack?.speed !== undefined && liveTrack?.speed !== null">
+          {{ 'LIVE_TRACK_MODAL.SPEED' | translate }} <strong class="text-dark">{{ liveTrack?.speed | number:'1.0-0' }} km/h</strong> •
+          {{ 'LIVE_TRACK_MODAL.HEADING' | translate }} <strong class="text-dark">{{ liveTrack?.heading | number:'1.0-0' }}°</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETA & Distance Card -->
+    <div class="col-md-4">
+      <div class="telemetry-card telemetry-card--warning h-100">
+        <div class="d-flex align-items-center mb-2">
+          <i class="fas fa-clock text-warning fs-5 me-2"></i>
+          <span class="fw-bolder text-dark fs-7">{{ 'LIVE_TRACK_MODAL.ETA_CARD' | translate }}</span>
+        </div>
+        <div class="d-flex align-items-baseline">
+          <span class="fs-2 fw-bolder text-warning me-2">
+            {{ (liveTrack?.etaMinutes || 0) > 0 ? liveTrack?.etaMinutes : '—' }}
+          </span>
+          <span class="text-muted fs-8 fw-bold">{{ 'LIVE_TRACK_MODAL.MINUTES' | translate }}</span>
+        </div>
+        <div class="text-muted fs-8 mt-2">
+          {{ 'LIVE_TRACK_MODAL.REMAINING_DISTANCE' | translate }}
+          <strong class="text-dark">
+            {{ ((liveTrack?.remainingDistanceMeters || 0) / 1000) | number:'1.1-1' }} km
+          </strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Stop Card -->
+    <div class="col-md-4">
+      <div class="telemetry-card telemetry-card--info h-100">
+        <div class="d-flex align-items-center mb-2">
+          <i class="fas fa-map-pin text-success fs-5 me-2"></i>
+          <span class="fw-bolder text-dark fs-7">{{ 'LIVE_TRACK_MODAL.CURRENT_STOP' | translate }}</span>
+        </div>
+        <div class="fw-bolder text-dark fs-7">
+          {{ liveTrack?.currentStopTitle || ('LIVE_TRACK_MODAL.FINAL_DESTINATION' | translate) }}
+        </div>
+        <div class="mt-2">
+          <span *ngIf="liveTrack?.currentStopIsDarkStore" class="badge badge-light-danger fw-bold fs-8">
+            <i class="fas fa-warehouse me-1"></i>{{ 'LIVE_TRACK_MODAL.DARK_STORE_PICKUP' | translate }}
+          </span>
+          <span *ngIf="!liveTrack?.currentStopIsDarkStore && liveTrack?.currentStopTitle" class="badge badge-light-primary fw-bold fs-8">
+            <i class="fas fa-store me-1"></i>{{ 'LIVE_TRACK_MODAL.MERCHANT_PICKUP' | translate }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multi-Stop Sequence Ribbon -->
+  <div class="route-ribbon mb-4" *ngIf="liveTrack?.stops && (liveTrack?.stops?.length || 0) > 0">
+    <div class="fw-bolder text-dark fs-8 w-100 mb-1">
+      <i class="fas fa-route text-primary me-1"></i>
+      {{ 'LIVE_TRACK_MODAL.ROUTE_SEQUENCE' | translate }}
+    </div>
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <ng-container *ngFor="let stop of liveTrack?.stops; let last = last">
+        <div class="route-stop-chip"
+             [ngClass]="stop.isCompleted ? 'route-stop-chip--completed' : (stop.isDarkStore ? 'route-stop-chip--darkstore' : 'route-stop-chip--merchant')">
+          <i class="fas me-2"
+             [ngClass]="stop.isCompleted ? 'fa-check-circle text-success' : (stop.isDarkStore ? 'fa-warehouse' : 'fa-store')"></i>
+          <div>
+            <div>#{{ stop.index + 1 }}: {{ stop.title || 'Stop' }}</div>
+            <div class="font-size-xxs opacity-75">
+              {{ stop.isCompleted ? '✓ مكتمل' : (stop.isDarkStore ? ('LIVE_TRACK_MODAL.DARK_STORE_PICKUP' | translate) : ('LIVE_TRACK_MODAL.MERCHANT_PICKUP' | translate)) }}
+            </div>
+          </div>
+        </div>
+        <i class="fas fa-arrow-right rtl-flip text-muted mx-1" *ngIf="!last"></i>
+      </ng-container>
+      <i class="fas fa-arrow-right rtl-flip text-muted mx-1"></i>
+      <div class="route-stop-chip route-stop-chip--destination">
+        <i class="fas fa-user-check text-warning me-2"></i>
+        <div>
+          <div>{{ 'LIVE_TRACK_MODAL.FINAL_DESTINATION' | translate }}</div>
+          <div class="font-size-xxs text-muted">{{ order?.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Map Canvas -->
+  <div class="rounded-3 border overflow-hidden position-relative shadow-sm" style="height: 380px;">
+    <google-map
+      height="100%"
+      width="100%"
+      [center]="mapCenter"
+      [zoom]="mapZoom"
+      [options]="mapOptions">
+      
+      <!-- Driver Marker -->
+      <map-marker
+        *ngIf="getDriverMarker()"
+        [position]="getDriverMarker()!"
+        [title]="liveTrack?.driverName || 'Driver'"
+        [options]="{
+          icon: {
+            url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png'
+          }
+        }">
+      </map-marker>
+
+      <!-- Customer Destination Marker -->
+      <map-marker
+        *ngIf="getDestinationMarker()"
+        [position]="getDestinationMarker()!"
+        [title]="'LIVE_TRACK_MODAL.FINAL_DESTINATION' | translate"
+        [options]="{
+          icon: {
+            url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+          }
+        }">
+      </map-marker>
+
+      <!-- Stops Markers -->
+      <ng-container *ngIf="liveTrack?.stops">
+        <map-marker
+          *ngFor="let s of liveTrack?.stops"
+          [position]="{ lat: s.lat, lng: s.lng }"
+          [title]="s.title"
+          [options]="{
+            icon: {
+              url: s.isCompleted 
+                ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' 
+                : (s.isDarkStore ? 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png')
+            }
+          }">
+        </map-marker>
+      </ng-container>
+    </google-map>
+  </div>
+</div>
+
+<div class="modal-footer bg-light py-3 px-4 d-flex justify-content-between">
+  <div>
+    <a [href]="getGoogleMapsUrl()" target="_blank" class="btn btn-sm btn-outline-secondary fw-bold">
+      <i class="fas fa-external-link-alt me-1"></i>Google Maps
+    </a>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-sm btn-light-primary" (click)="fetchTelemetry()">
+      <i class="fas fa-sync-alt me-1" [class.fa-spin]="isLoading"></i>{{ 'COMMON.REFRESH' | translate }}
+    </button>
+    <button type="button" class="btn btn-sm btn-secondary" (click)="modal.close()">
+      {{ 'COMMON.CLOSE' | translate }}
+    </button>
+  </div>
+</div>

@@ -17,7 +17,9 @@ import '../../widgets/clean_shimmer_skeletons.dart';
 import '../../../utils/custom_widgets/badge.dart';
 import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/dotted_separater.dart';
-import '../../../utils/custom_widgets/image_slider_page.dart';
+import '../../../utils/custom_widgets/image_view_page.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../../../utils/custom_widgets/image_widgets.dart';
 import '../../../utils/custom_widgets/messages.dart';
 import '../../../utils/utilities/global_var.dart';
@@ -213,23 +215,83 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     double imageWidth = 800, width = context.width;
     double imageHeight = imageWidth * kAppAspectRatio, height = width * kAppAspectRatio;
     if (GlobalVar.checkListNotEmpty(provider.product.photos)) {
-      return CarouselSlider(
-        options: CarouselOptions(
-          autoPlay: true,
-          viewportFraction: 0.7,
-          aspectRatio: 4 / 3,
-        ),
-        items: provider.product.photos!.map((e) {
-          return ImageView(
-            e,
-            height: height,
-            width: width,
-            imageHeight: imageHeight,
-            imageWidth: imageWidth,
-            tapped: true,
-            onTap: () => context.navigateName(ImageSliderPage.routeName, data: [provider.product.photos, e]),
-          );
-        }).toList(),
+      final photos = provider.product.photos!;
+      return Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          CarouselSlider(
+            options: CarouselOptions(
+              autoPlay: true,
+              viewportFraction: 0.75,
+              aspectRatio: 4 / 3,
+            ),
+            items: photos.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final e = entry.value;
+              return ImageView(
+                e,
+                height: height,
+                width: width,
+                imageHeight: imageHeight,
+                imageWidth: imageWidth,
+                tapped: true,
+                heroTag: 'catalog_product_${provider.product.id}_$idx',
+                onTap: () {
+                  ImageViewPage.openGallery(
+                    context,
+                    images: photos,
+                    initialIndex: idx,
+                    title: provider.product.title,
+                    heroTag: 'catalog_product_${provider.product.id}_$idx',
+                  );
+                },
+              );
+            }).toList(),
+          ),
+          Positioned(
+            bottom: 8,
+            child: GestureDetector(
+              onTap: () {
+                ImageViewPage.openGallery(
+                  context,
+                  images: photos,
+                  initialIndex: 0,
+                  title: provider.product.title,
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.62),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      PhosphorIconsBold.arrowsOut,
+                      color: Colors.white,
+                      size: 13,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'تكبير الصور',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
     return Image.asset(kNoImage, height: 200);

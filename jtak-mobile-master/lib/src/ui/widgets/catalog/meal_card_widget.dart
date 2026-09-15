@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/catalog/favorite_product_provider.dart';
-import '../../../utils/custom_widgets/shimmer.dart';
+import '../clean_shimmer_skeletons.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -31,6 +31,9 @@ class MealItemData {
   final String merchantName;
   final String eta;
   final String distance;
+  final int merchantId;
+  final double numericPrice;
+  final bool isMarket;
 
   const MealItemData({
     required this.id,
@@ -41,6 +44,9 @@ class MealItemData {
     required this.merchantName,
     required this.eta,
     required this.distance,
+    this.merchantId = 0,
+    this.numericPrice = 0.0,
+    this.isMarket = false,
   });
 }
 
@@ -198,38 +204,102 @@ class JTAKMealCard extends StatelessWidget {
     );
   }
 
+  String _resolveProductCover() {
+    if (data.coverUrl.isNotEmpty && !data.coverUrl.contains('_logo.')) {
+      return data.coverUrl;
+    }
+    final title = data.title.toLowerCase();
+    final name = data.merchantName.toLowerCase();
+    if (title.contains('شاورما') || name.contains('أنس')) {
+      return 'assets/images/restaurants/anas_dish.webp';
+    } else if (title.contains('كباب') ||
+        title.contains('مشاوي') ||
+        name.contains('بوابة دمشق')) {
+      return 'assets/images/restaurants/damascus_dish.webp';
+    } else if (title.contains('فتة') ||
+        title.contains('فول') ||
+        name.contains('بوز الجدي')) {
+      return 'assets/images/restaurants/bouz_dish.webp';
+    } else if (title.contains('بوظة') || name.contains('بكداش')) {
+      return 'assets/images/restaurants/bakdash_dish.webp';
+    } else if (title.contains('سحلب') || name.contains('النوفرة')) {
+      return 'assets/images/restaurants/noufara_dish.webp';
+    } else if (title.contains('برغر') || name.contains('برغر')) {
+      return 'assets/images/restaurants/burger_dish.webp';
+    } else if (title.contains('مبرومة') ||
+        title.contains('حلويات') ||
+        name.contains('داوود')) {
+      return 'assets/images/restaurants/dawood_dish.webp';
+    } else if (title.contains('لاتيه') ||
+        title.contains('قهوة') ||
+        name.contains('أرت')) {
+      return 'assets/images/restaurants/art_dish.webp';
+    }
+    return data.coverUrl;
+  }
+
+  String _resolveMerchantLogo() {
+    if (data.merchantLogoUrl.isNotEmpty &&
+        data.merchantLogoUrl != data.coverUrl &&
+        !data.merchantLogoUrl.contains('_dish.')) {
+      return data.merchantLogoUrl;
+    }
+    final name = data.merchantName.toLowerCase();
+    if (name.contains('أنس') || name.contains('شاورما')) {
+      return 'assets/images/restaurants/anas_logo.webp';
+    } else if (name.contains('مشاوي') ||
+        name.contains('كباب') ||
+        name.contains('بوابة دمشق')) {
+      return 'assets/images/restaurants/damascus_logo.webp';
+    } else if (name.contains('بوز الجدي') ||
+        name.contains('فول') ||
+        name.contains('فتات')) {
+      return 'assets/images/restaurants/bouz_logo.webp';
+    } else if (name.contains('بكداش') || name.contains('بوظة')) {
+      return 'assets/images/restaurants/bakdash_logo.webp';
+    } else if (name.contains('النوفرة') || name.contains('نوفرة')) {
+      return 'assets/images/restaurants/noufara_logo.webp';
+    } else if (name.contains('برغر') || name.contains('burger')) {
+      return 'assets/images/restaurants/burger_logo.webp';
+    } else if (name.contains('داوود') || name.contains('مهنا')) {
+      return 'assets/images/restaurants/dawood_logo.webp';
+    } else if (name.contains('أرت') || name.contains('art')) {
+      return 'assets/images/restaurants/art_logo.webp';
+    }
+    return data.merchantLogoUrl;
+  }
+
   Widget _buildCoverWithBadges(BuildContext context) {
+    final productCover = _resolveProductCover();
+    final restaurantLogo = _resolveMerchantLogo();
+
     return SizedBox(
       height: 115,
       width: double.infinity,
       child: Stack(
         children: [
-          // 1. Food Cover Image with 17px Rounded Corners
+          // 1. Food Cover Image with 17px Rounded Corners (Product Banner)
           ClipRRect(
             borderRadius: BorderRadius.circular(17),
-            child: data.coverUrl.isNotEmpty
-                ? (data.coverUrl.startsWith('assets')
+            child: productCover.isNotEmpty
+                ? (productCover.startsWith('assets')
                     ? Image.asset(
-                        data.coverUrl,
+                        productCover,
                         width: double.infinity,
                         height: 115,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => _buildFallbackCover(),
                       )
                     : CachedNetworkImage(
-                        imageUrl: data.coverUrl,
+                        imageUrl: productCover,
                         width: double.infinity,
                         height: 115,
                         fit: BoxFit.cover,
                         fadeInDuration: const Duration(milliseconds: 220),
                         fadeOutDuration: const Duration(milliseconds: 150),
-                        placeholder: (_, __) => Shimmer.fromColors(
-                          baseColor: const Color(0xFFF1F5F9),
-                          highlightColor: const Color(0xFFF8FAFC),
-                          child: Container(
-                            width: double.infinity,
-                            height: 115,
-                            color: const Color(0xFFF1F5F9),
+                        placeholder: (_, __) => const CleanShimmer(
+                          child: SizedBox.expand(
+                            child: ColoredBox(color: Colors.white),
                           ),
                         ),
                         errorWidget: (_, __, ___) => _buildFallbackCover(),
@@ -247,7 +317,7 @@ class JTAKMealCard extends StatelessWidget {
                 return GestureDetector(
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    favProvider.toggleMealFavorite(data.id);
+                    favProvider.toggleMealFavorite(data.id, data);
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
@@ -271,7 +341,7 @@ class JTAKMealCard extends StatelessWidget {
             ),
           ),
 
-          // 3. Floating Merchant Logo (Bottom-Right in RTL - 42x42)
+          // 3. Floating Restaurant Logo (Small Square at Bottom-Right in RTL - 42x42)
           if (showMerchantLogo)
             Positioned(
               bottom: 8,
@@ -293,17 +363,17 @@ class JTAKMealCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(11.0),
-                  child: data.merchantLogoUrl.isNotEmpty
-                      ? (data.merchantLogoUrl.startsWith('assets')
+                  child: restaurantLogo.isNotEmpty
+                      ? (restaurantLogo.startsWith('assets')
                           ? Image.asset(
-                              data.merchantLogoUrl,
+                              restaurantLogo,
                               width: double.infinity,
                               height: double.infinity,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => _buildFallbackLogo(),
                             )
                           : CachedNetworkImage(
-                              imageUrl: data.merchantLogoUrl,
+                              imageUrl: restaurantLogo,
                               width: double.infinity,
                               height: double.infinity,
                               fit: BoxFit.cover,

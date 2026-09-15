@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using App.Shared.Entities.Enums;
 using Solf.Base;
@@ -60,9 +60,10 @@ namespace App.Shared.Entities
         [Display(Name = "Id", ResourceType = typeof(_AppUser))]
         public Guid Id { get; set; }
 
-        [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]
         [Display(Name = "Email", ResourceType = typeof(_AppUser))]
-        public string Email { get; set; }
+        public string? Email { get; set; }
+
+        public string? Password { get; set; }
 
         public bool EmailConfirmed { get; set; }
 

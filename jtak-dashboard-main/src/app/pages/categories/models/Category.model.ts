@@ -7,4 +7,7 @@ export interface Category extends BaseModel {
   icon?: string;
   parent?: string;
   order?: number;
+  parentTitle?: string;
+  subCategoriesCount?: number;
+  fullPath?: string;
 }

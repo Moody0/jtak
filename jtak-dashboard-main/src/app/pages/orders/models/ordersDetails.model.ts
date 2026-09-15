@@ -6,4 +6,6 @@ export interface OrdersDetails extends BaseModel {
     orderDetailStatus: number;
     orderDetailStatusString: string;
     productTitle: string;
+    merchantId: number;
+    merchantTitle?: string;
 }

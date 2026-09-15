@@ -1,6 +1,9 @@
-﻿using App.Shared.Data.App;
+using App.Shared.Data.App;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using System;
+using System.IO;
+using System.Security.Cryptography;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace App.Helpers.StartUp
@@ -58,11 +61,7 @@ namespace App.Helpers.StartUp
                     //    options.AddEncryptionCertificate(cert);
                     //    options.AddSigningCertificate(cert);
                     //}
-                    //else
-                    //{
-                    options.AddEphemeralEncryptionKey();
-                    options.AddEphemeralSigningKey();
-                    //}
+                    ConfigureSigningAndEncryptionKeys(options);
 
                     //options.AddDevelopmentEncryptionCertificate().AddDevelopmentSigningCertificate();
 
@@ -136,12 +135,7 @@ namespace App.Helpers.StartUp
                     //    options.AddEncryptionCertificate(cert);
                     //    options.AddSigningCertificate(cert);
                     //}
-                    //else
-                    //{
-                    options.AddEphemeralEncryptionKey();
-                    options.AddEphemeralSigningKey();
-                    //}
-
+                    ConfigureSigningAndEncryptionKeys(options);
                     //options.AddDevelopmentEncryptionCertificate().AddDevelopmentSigningCertificate();
 
                     //options.AddEncryptionKey().AddEncryptionCertificate();
@@ -168,6 +162,38 @@ namespace App.Helpers.StartUp
                 });
 
             return services;
+        }
+
+        private static void ConfigureSigningAndEncryptionKeys(OpenIddictServerBuilder options)
+        {
+            try
+            {
+                var keysFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "keys");
+                if (!Directory.Exists(keysFolder))
+                {
+                    Directory.CreateDirectory(keysFolder);
+                }
+                var keyPath = Path.Combine(keysFolder, "openiddict-key.xml");
+                RSA rsa;
+                if (File.Exists(keyPath))
+                {
+                    rsa = RSA.Create();
+                    rsa.FromXmlString(File.ReadAllText(keyPath));
+                }
+                else
+                {
+                    rsa = RSA.Create(2048);
+                    File.WriteAllText(keyPath, rsa.ToXmlString(true));
+                }
+                var key = new RsaSecurityKey(rsa);
+                options.AddSigningKey(key);
+                options.AddEncryptionKey(key);
+            }
+            catch
+            {
+                options.AddEphemeralEncryptionKey();
+                options.AddEphemeralSigningKey();
+            }
         }
     }
 }

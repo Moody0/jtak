@@ -13,81 +13,52 @@
 
         <div class="col-md-4">
           <div class="mb-8">
-            <label for="byUser">By Delivery</label>
-            <ng-select placeholder="Select Deliveries" formControlName="byUser"
+            <label for="byUser" class="form-label fw-bold mb-2">{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</label>
+            <ng-select placeholder="اختر مندوب التوصيل" formControlName="byUser"
             (change)="changedDelivery($event)">
               <ng-option [value]="i" *ngFor="let i of deliveries">
                 {{ i.fullName }}
               </ng-option>
             </ng-select>
-            <span *ngIf="deliveryBalance !== 0">Balance: {{deliveryBalance}}</span>
+            <span *ngIf="deliveryBalance !== 0" class="badge badge-light-primary mt-1">الرصيد: {{ deliveryBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
         </div>
         <div class="col-md-4">
           <div class="mb-8">
-            <label for="toUser">To Merchant</label>
-            <ng-select placeholder="Select Merchant" formControlName="toUser"
+            <label for="toUser" class="form-label fw-bold mb-2">{{ 'MERCHANTS_PAGE.TITLE' | translate }}</label>
+            <ng-select placeholder="اختر المتجر" formControlName="toUser"
             (change)="changedMerchant($event)">
               <ng-option [value]="i" *ngFor="let i of merchants">
                 {{ i.fullName }}
               </ng-option>
             </ng-select>
-            <span *ngIf="merchantBalance !== 0">Balance: {{merchantBalance}}</span>
+            <span *ngIf="merchantBalance !== 0" class="badge badge-light-warning mt-1">الرصيد: {{ merchantBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
         </div>
 
         <div class="col-md-4">
           <div class="mb-8">
-            <label for="amount">Amount</label>
+            <label for="amount" class="form-label fw-bold mb-2">{{ 'PAYMENTS_PAGE.COL_AMOUNT' | translate }}</label>
             <app-input-container [control]="formGroup.controls.amount">
               <input
                 type="number"
                 class="form-control form-control-solid"
                 formControlName="amount"
                 id="amount"
-                placeholder="Enter amount"
+                [placeholder]="'PAYMENTS_PAGE.COL_AMOUNT' | translate"
                 #input
               />
             </app-input-container>
           </div>
         </div>
-        <div>
-          <span class="badge badge-warning">
-            عند إضافة دفعة أنت تقر باستلامك لكامل الرصيد من السائق، وتسليمه المبلغ المكتوب كعهده ليسلمها إلى التاجر.
-          </span>
-        </div>
-<!-- 
-        <div class="col-md-4">
-            <div class="mb-8">
-              <label for="newBalance">New Balance</label>
-              <app-input-container [control]="formGroup.controls.newBalance">
-                <input
-                  type="number"
-                  class="form-control form-control-solid"
-                  formControlName="newBalance"
-                  id="newBalance"
-                  placeholder="Enter new balance"
-                  #input
-                />
-              </app-input-container>
-            </div>
+        <div class="col-12 mt-2">
+          <div class="alert alert-light-warning d-flex align-items-center p-3 mb-0">
+            <i class="fas fa-info-circle text-warning fs-4 me-2"></i>
+            <span class="fs-7 text-dark">
+              عند إضافة دفعة، أنت تقر باستلام كامل الرصيد من السائق، وتسليمه المبلغ المسجل كعهدة ليسلمها إلى التاجر.
+            </span>
           </div>
-          <div class="col-md-4">
-            <div class="mb-8">
-              <label for="handoverDate">Hand over date</label>
-              <app-input-container [control]="formGroup.controls.handoverDate">
-                <input
-                  type="date"
-                  class="form-control form-control-solid"
-                  formControlName="handoverDate"
-                  id="handoverDate"
-                  placeholder="Enter hand over date"
-                  #input
-                />
-              </app-input-container>
-            </div>
-          </div> -->
-
+        </div>
       </div>
     </form>
   </ng-container>

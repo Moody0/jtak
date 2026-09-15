@@ -3,27 +3,27 @@
     <div class="jtak-modal-heading" *ngIf="item">
       <span class="jtak-modal-icon"><i class="fas" [ngClass]="item.id !== undefined ? 'fa-pen' : 'fa-plus'"></i></span>
       <div>
-        <span class="jtak-modal-kicker">{{ item.id !== undefined ? 'Edit record' : 'New record' }}</span>
-        <h2 class="modal-title">{{ item.id !== undefined ? 'Edit' : 'Create' }} {{ moduleName | lowercase }}</h2>
-        <p>{{ item.id !== undefined ? 'Update the details below, then save your changes.' : 'Add the information required to create this ' + (moduleName | lowercase) + '.' }}</p>
+        <span class="jtak-modal-kicker">{{ (item.id !== undefined ? 'COMMON.EDIT_RECORD' : 'COMMON.NEW_RECORD') | translate }}</span>
+        <h2 class="modal-title">{{ (item.id !== undefined ? 'COMMON.EDIT' : 'COMMON.CREATE') | translate }} {{ getLocalizedModuleName() }}</h2>
+        <p>{{ (item.id !== undefined ? 'COMMON.UPDATE_DETAILS_HINT' : 'COMMON.CREATE_DETAILS_HINT') | translate }}</p>
       </div>
     </div>
     <button type="button" class="btn-close" aria-label="Close" (click)="onCancelClicked()"></button>
   </div>
   <div class="overlay overlay-block cursor-default modal-body">
     <div class="modal-loading" *ngIf="isLoading" role="status">
-      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Saving changes…
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> {{ 'COMMON.SAVING' | translate }}
     </div>
     <ng-content></ng-content>
   </div>
   <div class="modal-footer">
-    <span class="jtak-modal-hint"><i class="fas fa-info-circle"></i> Required fields must be completed.</span>
+    <span class="jtak-modal-hint"><i class="fas fa-info-circle"></i> {{ 'COMMON.REQUIRED_HINT' | translate }}</span>
     <div class="d-flex gap-2">
-      <button type="button" class="btn btn-light" (click)="onCancelClicked()">Cancel</button>
+      <button type="button" class="btn btn-light" (click)="onCancelClicked()">{{ 'COMMON.CANCEL' | translate }}</button>
       <button *ngIf="item" type="submit" class="btn btn-primary" (click)="onSaveClicked()" [disabled]="saveDisabled || isLoading">
         <span *ngIf="isLoading" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
         <i *ngIf="!isLoading" class="fas fa-check" aria-hidden="true"></i>
-        {{ item.id !== undefined ? 'Save changes' : 'Create ' + (moduleName | lowercase) }}
+        {{ (item.id !== undefined ? 'COMMON.SAVE_CHANGES' : 'COMMON.CREATE') | translate }}
       </button>
     </div>
   </div>

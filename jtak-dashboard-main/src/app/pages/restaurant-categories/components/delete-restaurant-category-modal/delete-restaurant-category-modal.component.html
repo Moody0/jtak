@@ -1,0 +1,41 @@
+<div class="modal-header border-0 pb-0">
+  <h5 class="modal-title fw-bolder fs-5 text-danger">
+    <i class="fas fa-trash-alt me-2"></i>
+    حذف تصنيف المطاعم
+  </h5>
+  <button type="button" class="btn btn-sm btn-icon btn-active-light-primary" (click)="modal.dismiss()">
+    <i class="fas fa-times"></i>
+  </button>
+</div>
+
+<div class="modal-body py-4">
+  <div class="d-flex align-items-center mb-4">
+    <div class="symbol symbol-50px me-3">
+      <img
+        [src]="item?.image && item?.image?.startsWith('assets') ? item?.image : './assets/media/svg/files/blank-image.svg'"
+        alt=""
+        class="rounded-circle border"
+        style="width: 50px; height: 50px; object-fit: cover;"
+      />
+    </div>
+    <div>
+      <h6 class="fw-bolder mb-1">{{ item?.title }}</h6>
+      <span class="text-muted fs-8">الترتيب: #{{ item?.order }}</span>
+    </div>
+  </div>
+
+  <p class="text-muted mb-0">
+    هل أنت متأكد من رغبتك في حذف هذا التصنيف نهائياً من قسم المطاعم؟ لن يتم عرضه لزبائن التطبيق بعد ذلك.
+  </p>
+</div>
+
+<div class="modal-footer border-0 pt-0">
+  <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isDeleting">
+    إلغاء
+  </button>
+  <button type="button" class="btn btn-danger" (click)="confirm()" [disabled]="isDeleting">
+    <i class="fas fa-spinner fa-spin me-1" *ngIf="isDeleting"></i>
+    <i class="fas fa-trash me-1" *ngIf="!isDeleting"></i>
+    تأكيد الحذف
+  </button>
+</div>

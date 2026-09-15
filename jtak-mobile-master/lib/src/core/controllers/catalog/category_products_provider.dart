@@ -55,6 +55,7 @@ class CategoryProductsProvider extends BaseProvider<ShopModel> {
         dataList.add(ShopModel(category: category, products: products));
       }
 
+      await loadMerchants();
       setState(ViewState.idle);
     } catch (error) {
       debugPrint('CategoryProductsProvider setCategory error: $error');
@@ -62,92 +63,51 @@ class CategoryProductsProvider extends BaseProvider<ShopModel> {
     }
   }
 
-  List<MockRestaurantData> get matchedMerchants {
-    List<MockRestaurantData> allMerchants = [];
-    if (locator.isRegistered<MarketsProvider>()) {
-      final prov = locator<MarketsProvider>();
-      final rList = prov.restaurants.isNotEmpty
-          ? prov.restaurants
-          : MarketsProvider.defaultLiveSeededRestaurants;
-      final mList = prov.markets.isNotEmpty
-          ? prov.markets
-          : MarketsProvider.defaultLiveSeededMarkets;
+  /// Merchants that genuinely carry something in this category, as reported
+  /// by the backend.
+  ///
+  /// This used to be decided in the app by comparing the category title
+  /// against merchant names, cuisines and a list of hardcoded restaurants. Any
+  /// category that matched none of them fell through to returning every
+  /// merchant, which is why a cleaning-products category listed restaurants.
+  List<MockRestaurantData> matchedMerchants = [];
 
-      allMerchants.addAll(rList.map((r) => r.toRestaurantData()));
-      allMerchants.addAll(mList.map((m) => m.toRestaurantData()));
-    } else {
-      allMerchants.addAll(MockCatalogData.restaurants);
+  Future<void> loadMerchants() async {
+    final categoryId = category.id;
+    if (categoryId == null) {
+      matchedMerchants = [];
+      notifyListeners();
+      return;
     }
 
-    final catTitle = (category.title ?? '').trim().toLowerCase();
-    if (catTitle.isEmpty || catTitle == 'الأقسام' || catTitle == 'الكل') {
-      return allMerchants;
-    }
+    try {
+      final latLng = getLatLng();
+      final query = latLng == null
+          ? ''
+          : '?lat=${latLng.latitude}&lng=${latLng.longitude}';
+      final res =
+          await _api.getRequest('/Products/MerchantsByCategory/$categoryId$query');
 
-    // 1. Markets / Supermarkets filter
-    if (catTitle.contains('ماركت') ||
-        catTitle.contains('سوبرماركت') ||
-        catTitle.contains('بقالة') ||
-        catTitle.contains('market')) {
-      final markets = allMerchants.where((m) => m.isMarket).toList();
-      return markets.isNotEmpty ? markets : allMerchants;
-    }
-
-    // 2. Filter by category keyword match on restaurants / markets
-    final matches = allMerchants.where((m) {
-      if (m.cuisine.toLowerCase().contains(catTitle) ||
-          m.categoryTag.toLowerCase().contains(catTitle) ||
-          m.name.toLowerCase().contains(catTitle)) {
-        return true;
+      final merchants = <MockRestaurantData>[];
+      if (res is List) {
+        for (final item in res) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final kind = (map['merchantKind'] as num?)?.toInt() ?? 0;
+          merchants.add(
+            kind == 0
+                ? RestaurantStoreModel.fromJson(map).toRestaurantData()
+                : MarketStoreModel.fromJson(map).toRestaurantData(),
+          );
+        }
       }
-      return m.categories.any((c) =>
-          c.toLowerCase().contains(catTitle) || catTitle.contains(c.toLowerCase()));
-    }).toList();
-
-    if (matches.isNotEmpty) {
-      return matches;
+      matchedMerchants = merchants;
+    } catch (error) {
+      // An empty list is the honest answer here. Falling back to every
+      // merchant is exactly the behaviour this replaced.
+      debugPrint('CategoryProductsProvider loadMerchants error: $error');
+      matchedMerchants = [];
     }
-
-    // 3. Category specific keywords matching
-    if (catTitle.contains('فطور') || catTitle.contains('breakfast')) {
-      return allMerchants.where((m) =>
-          m.name.contains('فلافل') ||
-          m.name.contains('بوز الجدي') ||
-          m.name.contains('فول') ||
-          m.categoryTag.contains('فطور') ||
-          m.isMarket).toList();
-    }
-    if (catTitle.contains('حلويات') || catTitle.contains('كيك') || catTitle.contains('sweet')) {
-      return allMerchants.where((m) =>
-          m.name.contains('بكداش') ||
-          m.name.contains('داوود') ||
-          m.name.contains('مهنا') ||
-          m.cuisine.contains('حلويات') ||
-          m.categoryTag.contains('حلويات')).toList();
-    }
-    if (catTitle.contains('قهوة') || catTitle.contains('مشروبات') || catTitle.contains('cafe')) {
-      return allMerchants.where((m) =>
-          m.name.contains('النوفرة') ||
-          m.name.contains('نوفرة') ||
-          m.name.contains('أرت') ||
-          m.cuisine.contains('مشروبات') ||
-          m.cuisine.contains('كافيه') ||
-          m.categoryTag.contains('كافيه')).toList();
-    }
-    if (catTitle.contains('برغر') || catTitle.contains('burger')) {
-      return allMerchants.where((m) =>
-          m.name.contains('برغر') || m.cuisine.contains('برغر') || m.categoryTag.contains('برجر') || m.categoryTag.contains('البرجر')).toList();
-    }
-    if (catTitle.contains('شاورما') || catTitle.contains('shawarma')) {
-      return allMerchants.where((m) =>
-          m.name.contains('شاورما') || m.name.contains('أنس') || m.cuisine.contains('شاورما')).toList();
-    }
-    if (catTitle.contains('مشاوي') || catTitle.contains('grill')) {
-      return allMerchants.where((m) =>
-          m.name.contains('مشاوي') || m.name.contains('بوابة دمشق') || m.cuisine.contains('مشاوي') || m.categoryTag.contains('مشاوي')).toList();
-    }
-
-    return allMerchants;
+    notifyListeners();
   }
 
   void setSelectedCategoryIndex(int index) {

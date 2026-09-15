@@ -1,28 +1,362 @@
-<app-edit-modal [item]="item" [itemName]="item.title" moduleName="Product" [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid" (cancelClicked)="modal.dismiss()" (saveClicked)="save()">
+<app-edit-modal
+  [item]="item"
+  [itemName]="item.title || ''"
+  moduleName="Product"
+  [isLoading]="isLoading$ | async"
+  [saveDisabled]="formGroup.invalid"
+  (cancelClicked)="modal.dismiss()"
+  (saveClicked)="save()"
+>
   <ng-container *ngIf="item">
-    <form class="form jtak-edit-form" [formGroup]="formGroup">
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>01</span><div><h3>Product details</h3><p>The information customers use to identify this item.</p></div></div>
-        <div class="row g-4">
-          <div class="col-md-8"><label for="title">Product title</label><app-input-container [control]="formGroup.controls.title"><input type="text" class="form-control" formControlName="title" id="title" placeholder="Enter a clear product name" /></app-input-container></div>
-          <div class="col-md-4"><label for="unit">Unit</label><app-input-container [control]="formGroup.controls.unit"><input type="text" class="form-control" formControlName="unit" id="unit" placeholder="Piece, kg, box…" /></app-input-container></div>
-          <div class="col-12"><label for="description">Description</label><app-input-container [control]="formGroup.controls.description"><textarea rows="4" class="form-control" formControlName="description" id="description" placeholder="Describe the product and important details"></textarea></app-input-container></div>
-          <div class="col-12"><label for="productCategoryId">Category</label><ng-select id="productCategoryId" formControlName="productCategoryId" placeholder="Choose a category"><ng-option *ngFor="let cat of productCategories" [value]="cat.id">{{ cat.title }}</ng-option></ng-select></div>
+    <div class="product-editor-layout">
+      <!-- Left Column: Structured Form Sections -->
+      <div class="product-form-column">
+        <form class="form jtak-edit-form" [formGroup]="formGroup">
+
+          <!-- Section 01: Basic Details -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>01</span>
+              <div>
+                <h3>{{ 'PRODUCTS_PAGE.SEC_BASIC_TITLE' | translate }}</h3>
+                <p>{{ 'PRODUCTS_PAGE.SEC_BASIC_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- Title -->
+              <div class="col-md-8">
+                <label for="title" class="form-label fw-bold mb-2">
+                  {{ 'PRODUCTS_PAGE.TITLE_LABEL' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.title">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="title"
+                    id="title"
+                    [placeholder]="'PRODUCTS_PAGE.TITLE_PLACEHOLDER' | translate"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Unit with quick presets -->
+              <div class="col-md-4">
+                <label for="unit" class="form-label fw-bold mb-2">
+                  {{ 'PRODUCTS_PAGE.UNIT_LABEL' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.unit">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="unit"
+                    id="unit"
+                    [placeholder]="'PRODUCTS_PAGE.UNIT_PLACEHOLDER' | translate"
+                  />
+                </app-input-container>
+
+                <!-- Quick Unit Presets -->
+                <div class="unit-presets-row">
+                  <button
+                    type="button"
+                    *ngFor="let preset of unitPresets"
+                    class="unit-preset-pill"
+                    [class.active]="formGroup.get('unit')?.value === preset"
+                    (click)="setUnit(preset)"
+                  >
+                    {{ preset }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div class="col-12">
+                <label for="description" class="form-label fw-bold mb-2">
+                  {{ 'PRODUCTS_PAGE.DESC_LABEL' | translate }}
+                </label>
+                <app-input-container [control]="formGroup.controls.description">
+                  <textarea
+                    rows="3"
+                    class="form-control"
+                    formControlName="description"
+                    id="description"
+                    [placeholder]="'PRODUCTS_PAGE.DESC_PLACEHOLDER' | translate"
+                  ></textarea>
+                </app-input-container>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 02: Category & Classification Hierarchy -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>02</span>
+              <div>
+                <h3>{{ 'PRODUCTS_PAGE.SEC_CAT_TITLE' | translate }}</h3>
+                <p>{{ 'PRODUCTS_PAGE.SEC_CAT_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <div class="col-12">
+                <label for="productCategoryId" class="form-label fw-bold mb-2">
+                  {{ 'PRODUCTS_PAGE.CAT_LABEL' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <ng-select
+                  id="productCategoryId"
+                  formControlName="productCategoryId"
+                  [placeholder]="'PRODUCTS_PAGE.CAT_PLACEHOLDER' | translate"
+                  [items]="categoriesList"
+                  bindValue="id"
+                  bindLabel="fullPath"
+                  [clearable]="false"
+                >
+                </ng-select>
+
+                <!-- Visual Category Hierarchy Breadcrumb -->
+                <div class="category-hierarchy-box" *ngIf="getSelectedCategoryInfo() as catInfo">
+                  <span class="cat-hierarchy-label">{{ 'PRODUCTS_PAGE.COL_CATEGORY' | translate }}:</span>
+                  <div class="cat-hierarchy-path">
+                    <span class="cat-parent" *ngIf="catInfo.parentTitle">
+                      <i class="fas fa-folder me-1"></i> {{ catInfo.parentTitle }}
+                    </span>
+                    <span class="cat-arrow" *ngIf="catInfo.parentTitle">
+                      <i class="fas fa-angle-left rtl-flip"></i>
+                    </span>
+                    <span class="cat-sub">
+                      <i class="fas fa-tag me-1 text-muted"></i> {{ catInfo.title }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Root-Only Warning and Smart Suggestion Button -->
+                <div
+                  class="alert alert-custom alert-light-warning p-3 mt-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+                  *ngIf="getSelectedCategoryInfo()?.isRoot"
+                >
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-exclamation-circle text-warning fs-4"></i>
+                    <div>
+                      <strong class="d-block text-dark fs-8">الصنف مسند لتصنيف رئيسي فقط</strong>
+                      <span class="text-muted fs-9">يُفضل إسناده لتصنيف فرعي دقيق لتحسين تجربة عملاء التطبيق.</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning"
+                    *ngIf="getSuggestedSubcategory() as sug"
+                    (click)="applySuggestion(sug)"
+                  >
+                    <i class="fas fa-magic me-1"></i> اعتماد: {{ sug.title }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 03: Store & Merchant Linkage -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>03</span>
+              <div>
+                <h3>{{ 'PRODUCTS_PAGE.SEC_STORE_TITLE' | translate }}</h3>
+                <p>{{ 'PRODUCTS_PAGE.SEC_STORE_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <div class="col-12">
+                <label for="merchantId" class="form-label fw-bold mb-2">
+                  {{ 'PRODUCTS_PAGE.MERCHANT_LABEL' | translate }}
+                </label>
+                <ng-select
+                  id="merchantId"
+                  formControlName="merchantId"
+                  [placeholder]="'PRODUCTS_PAGE.MERCHANT_PLACEHOLDER' | translate"
+                  [items]="merchantsList"
+                  bindValue="id"
+                  bindLabel="title"
+                  [clearable]="true"
+                >
+                </ng-select>
+
+                <div class="merchant-linkage-note">
+                  <i class="fas fa-info-circle"></i>
+                  <div>
+                    <strong>{{ 'PRODUCTS_PAGE.MERCHANT_HINT' | translate }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 04: Visibility & Status -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>04</span>
+              <div>
+                <h3>{{ 'PRODUCTS_PAGE.SEC_VISIBILITY_TITLE' | translate }}</h3>
+                <p>{{ 'PRODUCTS_PAGE.SEC_VISIBILITY_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <label class="setting-toggle">
+                <input type="checkbox" formControlName="active" />
+                <span>
+                  <strong>{{ 'PRODUCTS_PAGE.ACTIVE_LABEL' | translate }}</strong>
+                  <small>{{ 'PRODUCTS_PAGE.ACTIVE_HINT' | translate }}</small>
+                </span>
+              </label>
+
+              <label class="setting-toggle">
+                <input type="checkbox" formControlName="isFeatured" />
+                <span>
+                  <strong>{{ 'PRODUCTS_PAGE.FEATURED_LABEL' | translate }}</strong>
+                  <small>{{ 'PRODUCTS_PAGE.FEATURED_HINT' | translate }}</small>
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <!-- Section 05: Product Photos -->
+          <section class="edit-section edit-section--last">
+            <div class="edit-section-heading">
+              <span>05</span>
+              <div>
+                <h3>{{ 'PRODUCTS_PAGE.SEC_PHOTOS_TITLE' | translate }}</h3>
+                <p>{{ 'PRODUCTS_PAGE.SEC_PHOTOS_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <app-file-uploader
+              uploaderTitle="رفع صور المنتج"
+              (fileUploaded)="onFileUploaded($event, 'photos')"
+              [multiple]="true"
+            ></app-file-uploader>
+
+            <!-- Photo Gallery Grid with Primary Photo indicator -->
+            <div class="photo-items-grid" *ngIf="formGroup.get('photos')?.value as photos">
+              <div
+                class="photo-item-card"
+                *ngFor="let photo of photos; let i = index"
+                [class.is-primary]="i === 0"
+              >
+                <img
+                  [src]="filesService.getFile(photo, 160, 160)"
+                  alt="Product Image"
+                  loading="lazy"
+                />
+                <span class="photo-primary-badge" *ngIf="i === 0">
+                  الصورة الرئيسية
+                </span>
+                <button
+                  type="button"
+                  class="photo-set-primary-btn"
+                  *ngIf="i > 0"
+                  (click)="setAsPrimaryPhoto(photo)"
+                  title="تعيين كصورة رئيسية"
+                >
+                  تعيين رئيسية
+                </button>
+                <button
+                  type="button"
+                  class="photo-delete-btn"
+                  (click)="onFileDelete('photos', photo)"
+                  title="حذف الصورة"
+                >
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </section>
+        </form>
+      </div>
+
+      <!-- Right Column: Real-Time Mobile Customer App Preview Card -->
+      <div class="product-preview-column">
+        <div class="preview-phone-card">
+          <!-- Top Phone Bar -->
+          <div class="preview-phone-header">
+            <div class="preview-notch-info">
+              <span class="preview-dot-pulse"></span>
+              <span>{{ 'PRODUCTS_PAGE.PREVIEW_HEADING' | translate }}</span>
+            </div>
+            <span class="preview-app-title">JTAK</span>
+          </div>
+
+          <!-- Customer Card Mockup -->
+          <div class="preview-card-viewport">
+            <div class="customer-app-card">
+              <!-- Card Media -->
+              <div class="customer-card-media">
+                <img
+                  *ngIf="getPrimaryPhoto()"
+                  [src]="filesService.getFile(getPrimaryPhoto(), 340, 220)"
+                  [alt]="formGroup.get('title')?.value"
+                />
+                <div *ngIf="!getPrimaryPhoto()" class="customer-media-fallback">
+                  <i class="fas fa-box-open"></i>
+                </div>
+
+                <!-- Featured Ribbon -->
+                <span class="customer-featured-ribbon" *ngIf="formGroup.get('isFeatured')?.value">
+                  <i class="fas fa-star me-1"></i> {{ 'PRODUCTS_PAGE.FEATURED_BADGE' | translate }}
+                </span>
+
+                <!-- Status Pill -->
+                <span
+                  class="customer-status-pill"
+                  [class.inactive]="!formGroup.get('active')?.value"
+                >
+                  {{ formGroup.get('active')?.value ? ('PRODUCTS_PAGE.STATUS_ACTIVE' | translate) : ('PRODUCTS_PAGE.STATUS_DISABLED' | translate) }}
+                </span>
+              </div>
+
+              <!-- Card Content -->
+              <div class="customer-card-content">
+                <!-- Category Tag -->
+                <div class="customer-cat-tag">
+                  <i class="fas fa-folder-open"></i>
+                  <span>
+                    {{ getSelectedCategoryInfo()?.fullPath || ('PRODUCTS_PAGE.SELECT_CATEGORY_HINT' | translate) }}
+                  </span>
+                </div>
+
+                <!-- Title -->
+                <h4 class="customer-product-title">
+                  {{ formGroup.get('title')?.value || ('PRODUCTS_PAGE.TITLE_PLACEHOLDER' | translate) }}
+                </h4>
+
+                <!-- Description -->
+                <p class="customer-product-desc" *ngIf="formGroup.get('description')?.value">
+                  {{ formGroup.get('description')?.value }}
+                </p>
+
+                <!-- Bottom Unit and Add Button -->
+                <div class="customer-card-bottom">
+                  <span class="customer-unit-pill">
+                    <i class="fas fa-balance-scale me-1"></i>
+                    {{ formGroup.get('unit')?.value || 'قطعة' }}
+                  </span>
+                  <div class="customer-btn-cart">
+                    <i class="fas fa-cart-plus"></i>
+                    <span>{{ 'PRODUCTS_PAGE.PREVIEW_ADD_CART' | translate }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Meta Note -->
+          <div class="preview-card-meta">
+            <span>{{ 'PRODUCTS_PAGE.PREVIEW_SUB' | translate }}</span>
+          </div>
         </div>
-      </section>
-      <section class="edit-section">
-        <div class="edit-section-heading"><span>02</span><div><h3>Visibility</h3><p>Control how this product appears in the customer app.</p></div></div>
-        <div class="settings-grid">
-          <label class="setting-toggle"><input type="checkbox" formControlName="active" /><span><strong>Product is active</strong><small>Customers can find and order this product.</small></span></label>
-          <label class="setting-toggle"><input type="checkbox" formControlName="isFeatured" /><span><strong>Feature this product</strong><small>Give the item additional visibility in discovery.</small></span></label>
-        </div>
-      </section>
-      <section class="edit-section edit-section--last">
-        <div class="edit-section-heading"><span>03</span><div><h3>Product images</h3><p>Use clear, consistent photography. Multiple images are supported.</p></div></div>
-        <app-file-uploader uploaderTitle="Choose product images" (fileUploaded)="onFileUploaded($event, 'photos')" [multiple]="true"></app-file-uploader>
-        <div class="edit-image-grid"><app-uploaded-image *ngFor="let photo of formGroup.get('photos')?.value" [imageId]="photo" [dimensions]="{ width: 600, height: 300 }" (imageDeleted)="onFileDelete('photos', photo)"></app-uploaded-image></div>
-      </section>
-    </form>
+      </div>
+    </div>
   </ng-container>
 </app-edit-modal>

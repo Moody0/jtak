@@ -1,0 +1,157 @@
+<div class="modal-header border-0 pb-0 pt-6 px-7">
+  <div class="d-flex align-items-center gap-3">
+    <div class="symbol symbol-45px symbol-circle bg-light-primary">
+      <span class="symbol-label text-primary">
+        <i class="fas fa-headset fs-3"></i>
+      </span>
+    </div>
+    <div>
+      <h3 class="modal-title fw-bolder text-dark mb-1">
+        {{ message?.title || 'رسالة إلى الدعم الفني' }}
+      </h3>
+      <span class="text-muted fs-7">
+        تاريخ الإرسال: {{ message?.createdDate | date: 'yyyy/MM/dd - hh:mm a' }}
+      </span>
+    </div>
+  </div>
+  <button type="button" class="btn btn-sm btn-icon btn-active-color-primary" (click)="modal.dismiss()">
+    <i class="fas fa-times fs-4"></i>
+  </button>
+</div>
+
+<div class="modal-body py-5 px-7">
+  <!-- Sender Overview Card -->
+  <div class="card bg-light-dark border-0 rounded-3 mb-6">
+    <div class="card-body p-5">
+      <div class="row g-4 align-items-center">
+        <!-- Sender Name -->
+        <div class="col-sm-4">
+          <div class="d-flex align-items-center gap-3">
+            <div class="symbol symbol-40px symbol-circle bg-white border border-gray-300">
+              <span class="symbol-label text-gray-800 fw-bolder fs-6">
+                {{ (message?.senderName?.charAt(0) || 'ع') }}
+              </span>
+            </div>
+            <div>
+              <div class="text-muted fs-8 fw-semibold">المرسل</div>
+              <div class="text-gray-900 fw-bolder fs-6">{{ message?.senderName }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sender Phone -->
+        <div class="col-sm-4">
+          <div class="text-muted fs-8 fw-semibold mb-1">رقم الهاتف</div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-gray-900 fw-bold fs-6 dir-ltr" style="direction: ltr;">
+              {{ message?.senderPhone || 'غير محدد' }}
+            </span>
+            <div *ngIf="message?.senderPhone" class="d-flex gap-1">
+              <button
+                type="button"
+                class="btn btn-icon btn-sm btn-light-success w-30px h-30px"
+                title="مراسلة عبر واتساب"
+                (click)="openWhatsApp()"
+              >
+                <i class="fab fa-whatsapp fs-5 text-success"></i>
+              </button>
+              <button
+                type="button"
+                class="btn btn-icon btn-sm btn-light-primary w-30px h-30px"
+                title="اتصال هاتفي"
+                (click)="callPhone()"
+              >
+                <i class="fas fa-phone-alt fs-6 text-primary"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sender Email -->
+        <div class="col-sm-4">
+          <div class="text-muted fs-8 fw-semibold mb-1">البريد الإلكتروني</div>
+          <div class="text-gray-900 fw-semibold fs-7 text-truncate">
+            {{ message?.senderEmail || 'غير متوفر' }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inquiry Message Content Card -->
+  <div class="mb-6">
+    <label class="form-label fw-bolder text-gray-800 fs-6 mb-2">
+      <i class="fas fa-comment-alt text-primary me-2 ms-1"></i> نص الرسالة والاستفسار
+    </label>
+    <div class="p-5 bg-light-primary rounded-3 border border-primary border-opacity-25">
+      <p class="text-gray-800 fs-6 mb-0 lh-lg" style="white-space: pre-wrap;">
+        {{ message?.message }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Status Changer Segment -->
+  <div class="mb-6">
+    <label class="form-label fw-bolder text-gray-800 fs-6 mb-3">حالة متابعة الاستفسار</label>
+    <div class="d-flex gap-3 flex-wrap">
+      <button
+        type="button"
+        class="btn btn-sm d-flex align-items-center gap-2 px-4 py-3"
+        [ngClass]="selectedStatus === SupportMessageStatus.New ? 'btn-warning' : 'btn-light-warning'"
+        (click)="setStatus(SupportMessageStatus.New)"
+      >
+        <i class="fas fa-exclamation-circle"></i>
+        <span>جديدة (بحاجة متابعة)</span>
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-sm d-flex align-items-center gap-2 px-4 py-3"
+        [ngClass]="selectedStatus === SupportMessageStatus.Read ? 'btn-primary' : 'btn-light-primary'"
+        (click)="setStatus(SupportMessageStatus.Read)"
+      >
+        <i class="fas fa-envelope-open-text"></i>
+        <span>قيد المتابعة</span>
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-sm d-flex align-items-center gap-2 px-4 py-3"
+        [ngClass]="selectedStatus === SupportMessageStatus.Resolved ? 'btn-success' : 'btn-light-success'"
+        (click)="setStatus(SupportMessageStatus.Resolved)"
+      >
+        <i class="fas fa-check-circle"></i>
+        <span>تمت المعالجة بنجاح</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Admin Resolution Notes -->
+  <div class="mb-2">
+    <label class="form-label fw-bolder text-gray-800 fs-6 mb-2">
+      <i class="fas fa-sticky-note text-warning me-2 ms-1"></i> ملاحظات الإدارة وسجل المتابعة
+    </label>
+    <textarea
+      class="form-control form-control-solid fs-6"
+      rows="3"
+      [(ngModel)]="adminNotes"
+      placeholder="اكتب ملاحظات حول التواصل مع العميل أو كيفية معالجة المشكلة..."
+    ></textarea>
+  </div>
+</div>
+
+<div class="modal-footer border-0 pt-0 pb-6 px-7 d-flex justify-content-between">
+  <button type="button" class="btn btn-light" (click)="modal.dismiss()">
+    إغلاق
+  </button>
+  <button
+    type="button"
+    class="btn btn-primary d-flex align-items-center gap-2 px-6"
+    [disabled]="isSaving"
+    (click)="saveChanges()"
+  >
+    <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-2"></span>
+    <i *ngIf="!isSaving" class="fas fa-save"></i>
+    <span>حفظ التعديلات</span>
+  </button>
+</div>

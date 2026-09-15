@@ -1,0 +1,48 @@
+:host {
+  display: block;
+}
+
+.card {
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ng-select.ng-select-single .ng-select-container {
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #cbd5e1;
+  }
+}
+
+.ng-select.ng-select-opened > .ng-select-container {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  background-color: #ffffff;
+}
+
+.ng-dropdown-panel {
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+
+  .ng-dropdown-panel-items .ng-option {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s ease;
+
+    &.ng-option-marked {
+      background-color: #eff6ff;
+    }
+
+    &.ng-option-selected {
+      background-color: #dbeafe;
+      font-weight: 700;
+    }
+  }
+}

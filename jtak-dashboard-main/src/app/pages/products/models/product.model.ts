@@ -9,4 +9,11 @@ export interface Product extends BaseModel {
   isFeatured: boolean;
   productCategoryId: number;
   productCategory: string;
+  parentCategoryId?: number | null;
+  parentCategoryTitle?: string;
+  categoryHierarchy?: string;
+  merchantId?: number;
+  merchantTitle?: string;
+  price?: number;
+  currency?: number;
 }

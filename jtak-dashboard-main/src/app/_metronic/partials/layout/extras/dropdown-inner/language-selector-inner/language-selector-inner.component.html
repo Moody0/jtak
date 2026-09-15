@@ -1,21 +1,23 @@
 <div ngbDropdown 
-class="d-flex align-items-center"
- [autoClose]="true" 
-[ngClass]="toolbarButtonMarginClass"
-style="position: initial !important;">
-  <div ngbDropdownToggle class="btn btn-icon btn-active-light-primary position-relative w-30px h-30px w-md-40px h-md-40px" data-toggle="dropdown">
-      <span [inlineSVG]="language.flag" [ngClass]="toolbarButtonIconSizeClass" class="svg-icon"></span>
-  </div>
-  <div ngbDropdownMenu class="dropdown-menu p-0 m-0 dropdown-menu-anim-up dropdown-menu-sm dropdown-menu-right">
-    <ul class="navi navi-hover p-4" style="list-style-type: none;">
-      <ng-container *ngFor="let language of languages">
-        <li class="navi-item" [ngClass]="{ active: language.active }">
-          <a href="javascript:;" (click)="setLanguageWithRefresh(language.lang)" [ngClass]="{ active: language.active }"
-            class="navi-link">
-            <span class="symbol symbol-20 mr-3">
-              <img src="{{ language.flag }}" class="svg-icon w-30px h-30px m-2"/>
+  class="d-flex align-items-center"
+  [autoClose]="true" 
+  style="position: initial !important;">
+  <button ngbDropdownToggle type="button" class="btn btn-sm btn-light d-flex align-items-center gap-2 py-2 px-3 border border-gray-200 jtak-lang-pill" data-toggle="dropdown" [title]="language?.name">
+    <img *ngIf="language?.flag" [src]="language.flag" class="w-22px h-15px rounded-1 shadow-xs" [alt]="language.name" style="object-fit: cover; border: 1px solid rgba(0,0,0,0.12); display: block;" />
+    <span class="fw-bold fs-7 text-gray-800">{{ language?.name }}</span>
+    <i class="fas fa-chevron-down text-muted" style="font-size: 0.65rem;"></i>
+  </button>
+  <div ngbDropdownMenu class="dropdown-menu p-2 shadow-lg border-0 rounded-3 dropdown-menu-anim-up dropdown-menu-sm">
+    <ul class="navi navi-hover p-0 mb-0" style="list-style-type: none;">
+      <ng-container *ngFor="let item of languages">
+        <li class="navi-item" [ngClass]="{ active: item.active }">
+          <a href="javascript:;" (click)="setLanguageWithRefresh(item.lang)" [ngClass]="{ active: item.active }"
+            class="navi-link d-flex align-items-center justify-content-between py-2 px-3 rounded-2">
+            <span class="d-flex align-items-center">
+              <img [src]="item.flag" class="w-24px h-16px rounded-1 me-2" [alt]="item.name" style="object-fit: cover; border: 1px solid rgba(0,0,0,0.12); display: block;" />
+              <span class="navi-text fw-bold ms-2">{{ item.name }}</span>
             </span>
-            <span class="navi-text">{{ language.name }}</span>
+            <i *ngIf="item.active" class="fas fa-check text-primary fs-7"></i>
           </a>
         </li>
       </ng-container>

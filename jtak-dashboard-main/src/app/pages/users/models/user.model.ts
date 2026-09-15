@@ -8,10 +8,11 @@ export interface User extends BaseModel {
   lastName: string;
   fullName: string;
   isActive: boolean;
-  profilePhoto: string;
+  profilePhoto?: string;
   role: AppRoleName;
   lang: string;
   countryPhoneCode: string;
+  password?: string;
 }
 export interface Balance extends BaseModel {
   name: string;

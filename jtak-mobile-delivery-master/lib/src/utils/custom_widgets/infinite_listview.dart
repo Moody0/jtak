@@ -13,12 +13,14 @@ class InfiniteListview<T> extends StatelessWidget {
   final Future Function() loadDataFun;
   final Function(dynamic item) listItemWidget;
   final EdgeInsets padding;
+  final Widget? emptyWidget;
   const InfiniteListview({
     Key? key,
     required this.modelProvider,
     required this.loadDataFun,
     required this.listItemWidget,
     this.padding = const EdgeInsets.all(4),
+    this.emptyWidget,
   }) : super(key: key);
   @override
   Widget build(BuildContext context) {
@@ -40,7 +42,7 @@ class InfiniteListview<T> extends StatelessWidget {
             if (modelProvider.state == ViewState.busy) {
               return const LoadingWidget();
             } else if (modelProvider.dataList.isEmpty) {
-              return const NoDataAvailableWidget();
+              return emptyWidget ?? const NoDataAvailableWidget();
             } else {
               return const SizedBox();
             }

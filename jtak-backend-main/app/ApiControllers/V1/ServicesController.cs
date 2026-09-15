@@ -1,4 +1,4 @@
-﻿
+
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -114,35 +114,52 @@ namespace App.ApiControllers.V1
         [HttpGet]
         public IActionResult PreviewImageApi(string id = "", int w = 150, int h = 150, bool crop = true)
         {
-            var physicalPath = FileHelper.GetPhysicalPath(_env, id);
-            var ext = Path.GetExtension(id)?.ToLower() ?? "";
-            if (!System.IO.File.Exists(physicalPath))
+            try
             {
-                physicalPath = _env.WebRootPath + "\\images\\default-image.jpg";
-                ext = ".jpg";
+                if (string.IsNullOrWhiteSpace(id)) return NotFound();
+
+                var cleanId = id.Split(',')[0].Trim();
+                var physicalPath = FileHelper.GetPhysicalPath(_env, cleanId);
+                var ext = Path.GetExtension(cleanId)?.ToLower() ?? "";
+
+                if (!System.IO.File.Exists(physicalPath))
+                {
+                    physicalPath = Path.Combine(_env.WebRootPath, "images", "default-image.jpg");
+                    ext = ".jpg";
+                    if (!System.IO.File.Exists(physicalPath))
+                    {
+                        return NotFound();
+                    }
+                }
+
+                if (ext == ".svg" || ext == ".webp" || ext == ".gif" || ext == ".avif")
+                {
+                    return new PhysicalFileResult(physicalPath, MimeTypeMap.GetMimeType(ext));
+                }
+
+                var cleanNameWithoutExt = Path.GetFileNameWithoutExtension(cleanId);
+                var thumbPhysicalPath = FileHelper.GetPhysicalPath(_env, cleanNameWithoutExt) + $"{w}x{h}{(crop ? "c" : "")}" + ext;
+                var resizeOptions = new ResizeOptions { Size = new Size(w, h), Mode = crop ? ResizeMode.Crop : ResizeMode.Min };
+
+                if (!System.IO.File.Exists(thumbPhysicalPath) && (ext == ".png" || ext == ".jpg" || ext == ".jpeg"))
+                {
+                    using var image = Image.Load(physicalPath);
+                    image.Mutate(x => x.AutoOrient());
+                    image.Mutate(x => x.Resize(resizeOptions));
+                    image.Save(thumbPhysicalPath, new WebpEncoder());
+                }
+
+                if (System.IO.File.Exists(thumbPhysicalPath))
+                {
+                    return new PhysicalFileResult(thumbPhysicalPath, MimeTypeMap.GetMimeType(".webp"));
+                }
+
+                return new PhysicalFileResult(physicalPath, MimeTypeMap.GetMimeType(ext));
             }
-
-            var thumbPhysicalPath = FileHelper.GetPhysicalPath(_env, id.Replace(ext, "")) + $"{w}x{h}{(crop ? "c" : "")}" + ext;
-            var resizeOptions = new ResizeOptions { Size = new Size(w, h), Mode = crop ? ResizeMode.Crop : ResizeMode.Min };
-
-            if (!System.IO.File.Exists(thumbPhysicalPath) && (ext == ".png" || ext == ".jpg" || ext == ".jpeg"))
+            catch (Exception)
             {
-                using var image = Image.Load(physicalPath);
-
-                image.Mutate(x => x.AutoOrient());
-                image.Mutate(x => x.Resize(resizeOptions));
-                //if (ext == ".png")
-                //    image.Save(thumbPhysicalPath, new PngEncoder());
-                //else
-                //    image.Save(thumbPhysicalPath, new JpegEncoder());
-                image.Save(thumbPhysicalPath, new WebpEncoder());
+                return NotFound();
             }
-
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
-            {
-                return new PhysicalFileResult(thumbPhysicalPath, MimeTypeMap.GetMimeType(".webp"));
-            }
-            return File($"/lib/file-icon-vectors/icons/vivid/{ext.Substring(1)}.svg", "image/svg+xml");
         }
 
     }

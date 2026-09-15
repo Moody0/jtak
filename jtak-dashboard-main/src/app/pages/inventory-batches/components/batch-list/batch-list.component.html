@@ -1,0 +1,610 @@
+<div class="ops-inventory-container">
+  <!-- 1. Streamlined Operations Utility Bar -->
+  <div class="ops-utility-bar mb-4">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span class="fw-bold">{{ 'INVENTORY_BATCHES_PAGE.LIVE_MONITOR' | translate }}</span>
+      </div>
+      <div class="ops-sync-meta">
+        <i class="fas fa-boxes text-primary me-1"></i>
+        <span>{{ 'INVENTORY_BATCHES_PAGE.KPI_TOTAL_STOCK' | translate }}: <strong>{{ allCount }}</strong></span>
+      </div>
+    </div>
+    <div class="ops-utility-right">
+      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="loadData()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>{{ 'COMMON.REFRESH' | translate }}</span>
+      </button>
+      <button type="button" class="btn btn-sm ops-btn-primary" (click)="openCreateModal()">
+        <i class="fas fa-plus me-1"></i>
+        <span>{{ 'INVENTORY_BATCHES_PAGE.INTAKE_BATCH' | translate }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. Operational Inventory KPI Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6 col-12">
+      <div class="ops-kpi-card ops-kpi-card--primary">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'INVENTORY_BATCHES_PAGE.KPI_ACTIVE_BATCHES' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--primary">
+            <i class="fas fa-boxes"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-primary">
+          {{ kpis?.activeBatches ?? activeCount }}
+        </div>
+        <div class="ops-kpi-card-hint">دفعات سارية وجاهزة للصرف الفوري في المستودع</div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 col-12">
+      <div class="ops-kpi-card ops-kpi-card--warning">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'INVENTORY_BATCHES_PAGE.KPI_NEAR_EXPIRY' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--warning">
+            <i class="fas fa-hourglass-half"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-warning">
+          {{ kpis?.nearExpiryBatches ?? nearExpiryCount }}
+        </div>
+        <div class="ops-kpi-card-hint">أوشكت على الانتهاء خلال 7 أيام - أولوية FEFO</div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 col-12">
+      <div class="ops-kpi-card ops-kpi-card--danger">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'INVENTORY_BATCHES_PAGE.KPI_EXPIRED' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--danger">
+            <i class="fas fa-times-circle"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-danger">
+          {{ kpis?.expiredBatches ?? expiredCount }}
+        </div>
+        <div class="ops-kpi-card-hint">دفعات منتهية الصلاحية تتطلب العزل أو الإتلاف</div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 col-12">
+      <div class="ops-kpi-card ops-kpi-card--success">
+        <div class="ops-kpi-card-header">
+          <span class="ops-kpi-card-label">{{ 'INVENTORY_BATCHES_PAGE.KPI_TOTAL_STOCK' | translate }}</span>
+          <div class="ops-kpi-card-icon ops-kpi-card-icon--success">
+            <i class="fas fa-warehouse"></i>
+          </div>
+        </div>
+        <div class="ops-kpi-card-value text-success">
+          {{ (kpis?.totalQuantityOnHand ?? 0) | number:'1.0-0' }}
+        </div>
+        <div class="ops-kpi-card-hint">
+          <span class="text-success fw-bold">{{ kpis?.totalQuantityAvailable ?? 0 }} متاح</span> •
+          <span class="text-warning fw-bold">{{ kpis?.totalQuantityReserved ?? 0 }} محجوز</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expiration Alerts Banner -->
+  <div *ngIf="alerts.length > 0" class="alert alert-warning d-flex align-items-center p-4 mb-4 rounded-3 border-0 shadow-xs">
+    <i class="fas fa-exclamation-triangle fs-2 text-warning me-3"></i>
+    <div class="d-flex flex-column">
+      <h6 class="mb-1 text-warning fw-bolder">{{ 'INVENTORY_BATCHES_PAGE.EXPIRY_WARNING' | translate }}</h6>
+      <span class="fs-8 text-dark">{{ 'INVENTORY_BATCHES_PAGE.EXPIRY_WARNING_DESC' | translate }}</span>
+    </div>
+  </div>
+
+  <!-- 3. Navigation Filter Tabs & Action Toolbar -->
+  <div class="ops-controls-section mb-4">
+    <div class="ops-tabs-row">
+      <nav class="ops-status-tabs" aria-label="Batch Navigation">
+        <button type="button" class="ops-status-tab" [class.active]="selectedStatus === 'all'" (click)="selectStatusTab('all')">
+          <span>{{ 'INVENTORY_BATCHES_PAGE.TAB_ALL' | translate }}</span>
+          <span class="ops-status-tab-count">{{ allCount }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="selectedStatus === '0'" (click)="selectStatusTab('0')">
+          <i class="fas fa-check-circle text-primary me-1 fs-8"></i>
+          <span>{{ 'INVENTORY_BATCHES_PAGE.TAB_ACTIVE' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--blue">{{ activeCount }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="selectedStatus === '1'" (click)="selectStatusTab('1')">
+          <i class="fas fa-hourglass-half text-warning me-1 fs-8"></i>
+          <span>{{ 'INVENTORY_BATCHES_PAGE.TAB_NEAR_EXPIRY' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--amber">{{ nearExpiryCount }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="selectedStatus === '2'" (click)="selectStatusTab('2')">
+          <i class="fas fa-exclamation-circle text-danger me-1 fs-8"></i>
+          <span>{{ 'INVENTORY_BATCHES_PAGE.TAB_EXPIRED' | translate }}</span>
+          <span class="ops-status-tab-count ops-status-tab-count--rose">{{ expiredCount }}</span>
+        </button>
+        <button type="button" class="ops-status-tab" [class.active]="selectedStatus === '3'" (click)="selectStatusTab('3')">
+          <i class="fas fa-shield-alt text-dark me-1 fs-8"></i>
+          <span>{{ 'INVENTORY_BATCHES_PAGE.TAB_QUARANTINED' | translate }}</span>
+          <span class="ops-status-tab-count">{{ quarantinedCount }}</span>
+        </button>
+      </nav>
+
+      <div class="ops-filter-cluster">
+        <!-- Merchant / Warehouse Dropdown -->
+        <select class="form-select ops-filter-select" [(ngModel)]="selectedMerchantFilter" (change)="loadData()">
+          <option value="all">{{ 'INVENTORY_BATCHES_PAGE.SELECT_MERCHANT' | translate }}</option>
+          <option *ngFor="let m of merchantsList" [value]="m.id">{{ m.title }}</option>
+        </select>
+
+        <!-- FEFO Sort Dropdown -->
+        <select class="form-select ops-filter-select" [(ngModel)]="selectedSort" (change)="applyFilter()">
+          <option value="fefo">{{ 'INVENTORY_BATCHES_PAGE.SORT_EXPIRY_ASC' | translate }}</option>
+          <option value="expiry_desc">{{ 'INVENTORY_BATCHES_PAGE.SORT_EXPIRY_DESC' | translate }}</option>
+          <option value="stock_desc">{{ 'INVENTORY_BATCHES_PAGE.SORT_STOCK_DESC' | translate }}</option>
+          <option value="newest">{{ 'INVENTORY_BATCHES_PAGE.SORT_NEWEST' | translate }}</option>
+        </select>
+
+        <!-- Compact Search Box -->
+        <div class="ops-search-box">
+          <i class="fas fa-search ops-search-icon"></i>
+          <input
+            type="text"
+            class="form-control ops-search-input"
+            [placeholder]="'INVENTORY_BATCHES_PAGE.SEARCH_PLACEHOLDER' | translate"
+            [(ngModel)]="searchQuery"
+            (input)="applyFilter()"
+          />
+          <button type="button" class="btn ops-search-clear" *ngIf="searchQuery" (click)="searchQuery = ''; applyFilter()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error State Banner -->
+  <div *ngIf="hasError" class="alert alert-danger d-flex align-items-center justify-content-between p-4 mb-4 rounded-3">
+    <div class="d-flex align-items-center">
+      <i class="fas fa-exclamation-circle fs-2 text-danger me-3"></i>
+      <span class="fs-7">{{ errorMessage }}</span>
+    </div>
+    <button type="button" class="btn btn-sm btn-danger" (click)="loadData()">
+      <i class="fas fa-redo me-1"></i> {{ 'COMMON.REFRESH' | translate }}
+    </button>
+  </div>
+
+  <!-- 4. Modern WMS Table Card -->
+  <div class="ops-orders-card">
+    <div class="table-responsive">
+      <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
+        <thead>
+          <tr class="ops-table-header text-muted fs-8">
+            <th scope="col" style="min-width: 220px;">{{ 'INVENTORY_BATCHES_PAGE.COL_PRODUCT_SKU' | translate }}</th>
+            <th scope="col" style="width: 150px;">{{ 'INVENTORY_BATCHES_PAGE.COL_BATCH_LOT' | translate }}</th>
+            <th scope="col" style="width: 130px;">{{ 'INVENTORY_BATCHES_PAGE.COL_BARCODE' | translate }}</th>
+            <th scope="col" style="width: 120px;">{{ 'INVENTORY_BATCHES_PAGE.COL_LOCATION_BIN' | translate }}</th>
+            <th scope="col" style="width: 160px;">{{ 'INVENTORY_BATCHES_PAGE.COL_EXPIRY_DATE' | translate }}</th>
+            <th scope="col" style="width: 170px;" class="text-center">{{ 'INVENTORY_BATCHES_PAGE.COL_STOCK' | translate }}</th>
+            <th scope="col" style="width: 110px;" class="text-center">{{ 'INVENTORY_BATCHES_PAGE.COL_STATUS' | translate }}</th>
+            <th scope="col" style="width: 120px;" class="text-center">{{ 'INVENTORY_BATCHES_PAGE.COL_ACTIONS' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Loading State -->
+          <tr *ngIf="isLoading">
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="fas fa-spinner fa-spin me-2"></i> {{ 'COMMON.LOADING' | translate }}
+            </td>
+          </tr>
+
+          <!-- Empty State -->
+          <tr *ngIf="!isLoading && filteredBatches.length === 0">
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="fas fa-box-open fs-2 text-muted mb-2 d-block"></i>
+              <span>{{ 'COMMON.NO_RECORDS' | translate }}</span>
+            </td>
+          </tr>
+
+          <!-- Data Rows -->
+          <tr *ngFor="let b of pagedBatches" class="ops-table-row">
+            <!-- 1. Product & SKU -->
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="ops-product-avatar">
+                  <i class="fas fa-box text-primary"></i>
+                </span>
+                <div class="min-w-0">
+                  <strong class="ops-product-title d-block text-truncate" [title]="b.productTitle">{{ b.productTitle || ('Product #' + b.productId) }}</strong>
+                  <div class="d-flex align-items-center gap-1 mt-1">
+                    <span class="badge badge-light-secondary fs-8 font-monospace">SKU: {{ b.sku || '-' }}</span>
+                    <span *ngIf="b.merchantTitle" class="badge badge-light-info fs-8">{{ b.merchantTitle }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- 2. Batch & Lot -->
+            <td>
+              <span class="badge badge-light-primary fw-bold font-monospace d-block text-truncate" style="max-width: 130px;">{{ b.batchNumber }}</span>
+              <small class="text-muted fs-8 mt-1 d-block">Lot: {{ b.lotNumber || '-' }}</small>
+            </td>
+
+            <!-- 3. Barcode -->
+            <td>
+              <span class="ops-barcode-pill font-monospace">
+                <i class="fas fa-barcode me-1 text-muted"></i>{{ b.barcode }}
+              </span>
+            </td>
+
+            <!-- 4. Location Bin -->
+            <td>
+              <span class="ops-bin-pill">
+                📍 {{ b.locationBin || '-' }}
+              </span>
+            </td>
+
+            <!-- 5. Expiry Date & FEFO Urgency -->
+            <td>
+              <div class="ops-order-meta mb-1">
+                <span>{{ b.expirationDate | date:'d MMM y' }}</span>
+              </div>
+              <span *ngIf="b.isExpired" class="badge ops-pill-expired">
+                <i class="fas fa-times-circle me-1"></i>{{ 'INVENTORY_BATCHES_PAGE.STATUS_EXPIRED' | translate }}
+              </span>
+              <span *ngIf="b.isNearExpiry" class="badge ops-pill-near-expiry">
+                <i class="fas fa-exclamation-triangle me-1"></i>باقي {{ b.daysUntilExpiry }} يوم
+              </span>
+              <span *ngIf="!b.isExpired && !b.isNearExpiry" class="badge ops-pill-valid">
+                <i class="fas fa-check me-1"></i>ساري ({{ b.daysUntilExpiry }} يوم)
+              </span>
+            </td>
+
+            <!-- 6. Stock Breakdown -->
+            <td class="text-center">
+              <div class="ops-stock-breakdown">
+                <div class="ops-stock-item" title="متاح للصرف">
+                  <span class="ops-stock-val text-success">{{ b.quantityAvailable }}</span>
+                  <span class="ops-stock-lbl">متاح</span>
+                </div>
+                <span class="ops-stock-sep">/</span>
+                <div class="ops-stock-item" title="محجوز لطلبات جارية">
+                  <span class="ops-stock-val text-warning">{{ b.quantityReserved }}</span>
+                  <span class="ops-stock-lbl">محجوز</span>
+                </div>
+                <span class="ops-stock-sep">/</span>
+                <div class="ops-stock-item" title="إجمالي بالمستودع">
+                  <span class="ops-stock-val text-dark">{{ b.quantityOnHand }}</span>
+                  <span class="ops-stock-lbl">إجمالي</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- 7. Status -->
+            <td class="text-center">
+              <span class="badge" [ngClass]="{
+                'badge-light-success text-success': b.status === 0,
+                'badge-light-warning text-warning': b.status === 1,
+                'badge-light-danger text-danger': b.status === 2,
+                'badge-light-dark text-dark': b.status === 3,
+                'badge-light-secondary text-muted': b.status === 4
+              }">
+                {{ b.statusName }}
+              </span>
+            </td>
+
+            <!-- 8. Actions Cluster -->
+            <td class="text-center">
+              <div class="ops-actions-cluster">
+                <!-- Adjust Stock -->
+                <button
+                  type="button"
+                  class="btn ops-btn-tool"
+                  [title]="'INVENTORY_BATCHES_PAGE.ACTION_ADJUST' | translate"
+                  (click)="openAdjustModal(b)"
+                >
+                  <i class="fas fa-sliders-h"></i>
+                </button>
+
+                <!-- Print Shelf Label -->
+                <button
+                  type="button"
+                  class="btn ops-btn-tool"
+                  [title]="'INVENTORY_BATCHES_PAGE.ACTION_PRINT_LABEL' | translate"
+                  (click)="openPrintModal(b)"
+                >
+                  <i class="fas fa-print"></i>
+                </button>
+
+                <!-- Quarantine Toggle -->
+                <button
+                  type="button"
+                  class="btn ops-btn-tool"
+                  [ngClass]="b.status === 3 ? 'ops-btn-tool--warning' : 'ops-btn-tool--danger'"
+                  [title]="(b.status === 3 ? 'INVENTORY_BATCHES_PAGE.ACTION_RELEASE_QUARANTINE' : 'INVENTORY_BATCHES_PAGE.ACTION_QUARANTINE') | translate"
+                  (click)="toggleQuarantine(b)"
+                >
+                  <i [class]="b.status === 3 ? 'fas fa-shield-alt' : 'fas fa-ban'"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div *ngIf="filteredBatches.length > 0" class="d-flex flex-wrap align-items-center justify-content-between px-4 py-3 border-top">
+      <div class="text-muted fs-8">
+        عرض {{ (page - 1) * pageSize + 1 }} إلى {{ Math.min(page * pageSize, totalItems) }} من إجمالي {{ totalItems }} سجل
+      </div>
+      <ngb-pagination
+        [(page)]="page"
+        [pageSize]="pageSize"
+        [collectionSize]="totalItems"
+        (pageChange)="onPageChange($event)"
+        [maxSize]="5"
+        [rotate]="true"
+        [boundaryLinks]="true"
+      ></ngb-pagination>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Intake New Batch -->
+<ng-template #createModal let-modal>
+  <div class="modal-header">
+    <h4 class="modal-title fw-bolder text-dark">
+      <i class="fas fa-box-open text-primary me-2"></i> {{ 'INVENTORY_BATCHES_PAGE.INTAKE_BATCH' | translate }}
+    </h4>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+      <div class="row g-3">
+        <!-- Searchable Product Selection -->
+        <div class="col-12">
+          <label class="form-label required fw-bold">المنتج (بحث بالاسم أو الباركود)</label>
+          <ng-select
+            [items]="productSearchResults"
+            bindLabel="title"
+            [typeahead]="productSearch$"
+            [loading]="isSearchingProducts"
+            [placeholder]="'INVENTORY_BATCHES_PAGE.SEARCH_PRODUCT_PLACEHOLDER' | translate"
+            (change)="onProductSelected($event)"
+          >
+            <ng-template ng-option-tmp let-item="item">
+              <div class="d-flex align-items-center py-1">
+                <div class="symbol symbol-35px me-3">
+                  <span class="symbol-label bg-light-primary text-primary fw-bolder fs-5">
+                    <i class="fas fa-box"></i>
+                  </span>
+                </div>
+                <div class="d-flex flex-column">
+                  <span class="fw-bolder text-dark fs-6">{{ item.title }}</span>
+                  <span class="text-muted fs-8">
+                    {{ item.merchantTitle }} &bull; SKU: {{ item.sku }} &bull; {{ item.price | currency:'SYP':'symbol':'1.0-0' }}
+                  </span>
+                </div>
+              </div>
+            </ng-template>
+          </ng-select>
+        </div>
+
+        <!-- Selected Product Info Banner -->
+        <div *ngIf="selectedProductDetails" class="col-12">
+          <div class="bg-light-primary rounded p-3 d-flex align-items-center justify-content-between border border-primary border-opacity-10">
+            <div>
+              <span class="fw-bolder text-dark fs-6 d-block">{{ selectedProductDetails.title }}</span>
+              <span class="text-muted fs-8">المستودع: {{ selectedProductDetails.merchantTitle }} | الباركود: {{ selectedProductDetails.barcode }}</span>
+            </div>
+            <span class="badge badge-light-primary fw-bolder fs-7">{{ selectedProductDetails.sku }}</span>
+          </div>
+        </div>
+
+        <!-- Batch Number & Auto-generate -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <label class="form-label required fw-bold mb-0">{{ 'INVENTORY_BATCHES_PAGE.COL_BATCH_NUM' | translate }}</label>
+            <button type="button" class="btn btn-link btn-color-primary p-0 fs-8" (click)="generateBatchNumber()">
+              <i class="fas fa-magic me-1"></i> {{ 'INVENTORY_BATCHES_PAGE.AUTO_GENERATE' | translate }}
+            </button>
+          </div>
+          <input type="text" class="form-control form-control-solid font-monospace" formControlName="batchNumber" placeholder="BAT-2026-001" />
+        </div>
+
+        <!-- Lot Number -->
+        <div class="col-md-6">
+          <label class="form-label fw-bold mb-1">رقم التشغيلة (Lot Number)</label>
+          <input type="text" class="form-control form-control-solid" formControlName="lotNumber" placeholder="رقم تشغيلة المصنع" />
+        </div>
+
+        <!-- Barcode -->
+        <div class="col-md-6">
+          <label class="form-label required fw-bold mb-1">{{ 'INVENTORY_BATCHES_PAGE.COL_BARCODE' | translate }}</label>
+          <input type="text" class="form-control form-control-solid font-monospace" formControlName="barcode" placeholder="الرمز الشريطي" />
+        </div>
+
+        <!-- Shelf Location Bin -->
+        <div class="col-md-6">
+          <label class="form-label required fw-bold mb-1">{{ 'INVENTORY_BATCHES_PAGE.COL_LOCATION_BIN' | translate }}</label>
+          <input type="text" class="form-control form-control-solid" formControlName="locationBin" placeholder="الممر - الرف - الخانة (مثال: A-02-04)" />
+        </div>
+
+        <!-- Expiration Date with quick helpers -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <label class="form-label required fw-bold mb-0">{{ 'INVENTORY_BATCHES_PAGE.COL_EXPIRY_DATE' | translate }}</label>
+            <div class="d-flex gap-1">
+              <button type="button" class="btn btn-xs btn-light-primary px-2 py-0 fs-8" (click)="setQuickExpiry(3)">+3 أشهر</button>
+              <button type="button" class="btn btn-xs btn-light-primary px-2 py-0 fs-8" (click)="setQuickExpiry(6)">+6 أشهر</button>
+              <button type="button" class="btn btn-xs btn-light-primary px-2 py-0 fs-8" (click)="setQuickExpiry(12)">+سنة</button>
+            </div>
+          </div>
+          <input type="date" class="form-control form-control-solid" formControlName="expirationDate" />
+        </div>
+
+        <!-- Initial Quantity -->
+        <div class="col-md-6">
+          <label class="form-label required fw-bold mb-1">الكمية المدخلة (Quantity)</label>
+          <input type="number" class="form-control form-control-solid" formControlName="initialQuantity" min="1" />
+        </div>
+
+        <!-- Cost Price & Selling Price -->
+        <div class="col-md-6">
+          <label class="form-label required fw-bold mb-1">سعر التكلفة (Cost Price)</label>
+          <input type="number" step="0.01" class="form-control form-control-solid" formControlName="costPrice" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-bold mb-1">سعر البيع (Selling Price)</label>
+          <input type="number" step="0.01" class="form-control form-control-solid" formControlName="sellingPrice" placeholder="اختياري" />
+        </div>
+
+        <!-- Notes -->
+        <div class="col-12">
+          <label class="form-label fw-bold mb-1">{{ 'COMMON.DESCRIPTION' | translate }}</label>
+          <textarea class="form-control form-control-solid" formControlName="notes" rows="2" placeholder="المورد، ملاحظات الشحنة، الفاتورة..."></textarea>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-5">
+        <button type="button" class="btn btn-light" (click)="modal.dismiss()">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="submit" class="btn btn-primary fw-bold" [disabled]="createForm.invalid || isSubmitting">
+          <span *ngIf="isSubmitting" class="spinner-border spinner-border-sm me-1"></span>
+          {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </form>
+  </div>
+</ng-template>
+
+<!-- Modal: Adjust Stock -->
+<ng-template #adjustModal let-modal>
+  <div class="modal-header">
+    <h4 class="modal-title fw-bolder text-dark">
+      <i class="fas fa-sliders-h text-primary me-2"></i> {{ 'INVENTORY_BATCHES_PAGE.ACTION_ADJUST' | translate }} - {{ selectedBatch?.batchNumber }}
+    </h4>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <div class="bg-light rounded p-4 mb-4">
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted">المنتج:</span>
+        <strong class="text-dark">{{ selectedBatch?.productTitle }}</strong>
+      </div>
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted">مكان التخزين:</span>
+        <span class="badge badge-light-dark fw-bolder">📍 {{ selectedBatch?.locationBin }}</span>
+      </div>
+      <div class="d-flex justify-content-between">
+        <span class="text-muted">المخزون الحالي:</span>
+        <span class="fw-bolder fs-6">
+          <span class="text-success">{{ selectedBatch?.quantityAvailable }} متاح</span> /
+          <span class="text-warning">{{ selectedBatch?.quantityReserved }} محجوز</span> /
+          <span class="text-dark">{{ selectedBatch?.quantityOnHand }} إجمالي</span>
+        </span>
+      </div>
+    </div>
+
+    <form [formGroup]="adjustForm" (ngSubmit)="submitAdjust()">
+      <!-- Adjustment Type Radio Toggle -->
+      <div class="mb-4">
+        <label class="form-label required fw-bold d-block">نوع التسوية</label>
+        <div class="d-flex gap-3">
+          <label class="btn btn-outline btn-outline-danger flex-fill d-flex align-items-center justify-content-center p-3"
+                 [class.active]="adjustForm.get('adjustmentType')?.value === 'deduct'">
+            <input type="radio" class="d-none" formControlName="adjustmentType" value="deduct" />
+            <i class="fas fa-minus-circle me-2 fs-5"></i> خصم مخزون (تالف / عجز / منتهي)
+          </label>
+          <label class="btn btn-outline btn-outline-success flex-fill d-flex align-items-center justify-content-center p-3"
+                 [class.active]="adjustForm.get('adjustmentType')?.value === 'add'">
+            <input type="radio" class="d-none" formControlName="adjustmentType" value="add" />
+            <i class="fas fa-plus-circle me-2 fs-5"></i> إضافة مخزون (فائض جرد / مرتجع)
+          </label>
+        </div>
+      </div>
+
+      <!-- Quantity -->
+      <div class="mb-3">
+        <label class="form-label required fw-bold">الكمية المراد تسويتها</label>
+        <input type="number" class="form-control form-control-solid" formControlName="quantity" min="1" />
+      </div>
+
+      <!-- Reason Preset -->
+      <div class="mb-3">
+        <label class="form-label required fw-bold">سبب التسوية</label>
+        <select class="form-select form-select-solid" formControlName="reasonPreset">
+          <option value="تالف أثناء التخزين">تالف أثناء التخزين</option>
+          <option value="انتهاء الصلاحية">انتهاء الصلاحية</option>
+          <option value="عجز جرد فعلي">عجز جرد فعلي</option>
+          <option value="فائض جرد فعلي">فائض جرد فعلي</option>
+          <option value="عينة فحص مخبري">عينة فحص مخبري</option>
+          <option value="مرتجع من طلب">مرتجع من طلب</option>
+          <option value="أخرى">أخرى</option>
+        </select>
+      </div>
+
+      <!-- Additional Notes -->
+      <div class="mb-3">
+        <label class="form-label fw-bold">ملاحظات إضافية</label>
+        <input type="text" class="form-control form-control-solid" formControlName="notes" placeholder="تفاصيل تقرير الجرد أو رقم المستند..." />
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-4">
+        <button type="button" class="btn btn-light" (click)="modal.dismiss()">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="submit" class="btn btn-primary fw-bold" [disabled]="adjustForm.invalid || isSubmitting">
+          <span *ngIf="isSubmitting" class="spinner-border spinner-border-sm me-1"></span>
+          تطبيق التسوية
+        </button>
+      </div>
+    </form>
+  </div>
+</ng-template>
+
+<!-- Modal: Print Shelf Label -->
+<ng-template #printModal let-modal>
+  <div class="modal-header">
+    <h4 class="modal-title fw-bolder text-dark">
+      <i class="fas fa-barcode text-primary me-2"></i> {{ 'INVENTORY_BATCHES_PAGE.PRINT_LABEL_TITLE' | translate }}
+    </h4>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <!-- Physical Printable Sticker Card -->
+    <div class="shelf-label-sticker text-center">
+      <div class="label-header">
+        <div class="fs-4 fw-bolder text-uppercase">{{ printBatch?.productTitle }}</div>
+        <div class="fs-7 text-muted">SKU: {{ printBatch?.sku || 'N/A' }} | Store: {{ printBatch?.merchantTitle }}</div>
+      </div>
+
+      <div class="my-3">
+        <div class="barcode-display mb-1">{{ printBatch?.barcode }}</div>
+        <div class="fs-8 text-muted font-monospace">CODE-128 STANDARD</div>
+      </div>
+
+      <div class="row g-2 border-top pt-2 mt-2 text-start">
+        <div class="col-6">
+          <span class="fs-8 text-muted d-block">الدفعة (BATCH #)</span>
+          <span class="fs-6 fw-bolder text-dark">{{ printBatch?.batchNumber }}</span>
+        </div>
+        <div class="col-6 text-end">
+          <span class="fs-8 text-muted d-block">مكان الرف (BIN)</span>
+          <span class="fs-6 fw-bolder text-dark">📍 {{ printBatch?.locationBin }}</span>
+        </div>
+        <div class="col-6">
+          <span class="fs-8 text-muted d-block">انتهاء الصلاحية (EXP)</span>
+          <span class="fs-6 fw-bolder text-danger">{{ printBatch?.expirationDate | date:'yyyy-MM-dd' }}</span>
+        </div>
+        <div class="col-6 text-end">
+          <span class="fs-8 text-muted d-block">FEFO PRIORITY</span>
+          <span class="badge badge-dark fs-8">FEFO-MANAGED</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-5">
+      <button type="button" class="btn btn-light" (click)="modal.dismiss()">{{ 'COMMON.CANCEL' | translate }}</button>
+      <button type="button" class="btn btn-primary fw-bold" (click)="printCurrentLabel()">
+        <i class="fas fa-print me-1"></i> {{ 'INVENTORY_BATCHES_PAGE.PRINT_BUTTON' | translate }}
+      </button>
+    </div>
+  </div>
+</ng-template>

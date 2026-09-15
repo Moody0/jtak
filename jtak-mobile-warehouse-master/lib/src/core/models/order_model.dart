@@ -22,6 +22,12 @@ class OrderModel {
   List<OrderDetailsModel>? orderDetails;
   double? price;
   String? createdDate;
+  String? deliveryUser;
+  String? deliveryUserPhone;
+  String? deliveryNotes;
+  String? notes;
+  int? prepTimeMinutes;
+
   OrderModel({
     this.id,
     this.user,
@@ -37,6 +43,11 @@ class OrderModel {
     this.orderDetails,
     this.price,
     this.createdDate,
+    this.deliveryUser,
+    this.deliveryUserPhone,
+    this.deliveryNotes,
+    this.notes,
+    this.prepTimeMinutes,
   });
 
   OrderModel copyWith({
@@ -54,6 +65,11 @@ class OrderModel {
     List<OrderDetailsModel>? orderDetails,
     double? price,
     String? createdDate,
+    String? deliveryUser,
+    String? deliveryUserPhone,
+    String? deliveryNotes,
+    String? notes,
+    int? prepTimeMinutes,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -70,6 +86,11 @@ class OrderModel {
       orderDetails: orderDetails ?? this.orderDetails,
       price: price ?? this.price,
       createdDate: createdDate ?? this.createdDate,
+      deliveryUser: deliveryUser ?? this.deliveryUser,
+      deliveryUserPhone: deliveryUserPhone ?? this.deliveryUserPhone,
+      deliveryNotes: deliveryNotes ?? this.deliveryNotes,
+      notes: notes ?? this.notes,
+      prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
     );
   }
 
@@ -89,33 +110,43 @@ class OrderModel {
       'orderDetails': orderDetails?.map((x) => x.toMap()).toList(),
       'price': price,
       'createdDate': createdDate,
+      'deliveryUser': deliveryUser,
+      'deliveryUserPhone': deliveryUserPhone,
+      'deliveryNotes': deliveryNotes,
+      'notes': notes,
+      'prepTimeMinutes': prepTimeMinutes,
     };
   }
 
   factory OrderModel.fromMap(Map<String, dynamic> map) {
+    final paymentRaw = map['paymentMethod'] ?? map['PaymentMethod'];
+    final statusRaw = map['orderStatus'] ?? map['OrderStatus'];
+    final detailsRaw = map['orderDetails'] ?? map['OrderDetails'];
+
     return OrderModel(
-      id: map['id']?.toInt(),
-      user: map['user'],
-      userId: map['userId'],
-      purchaseDate: map['purchaseDate'],
-      description: map['description'],
-      phonenumber: map['phonenumber'],
-      lat: map['lat']?.toDouble(),
-      lng: map['lng']?.toDouble(),
-      address: map['address'],
-      paymentMethod: map['paymentMethod'] != null
-          ? (map['paymentMethod'] as int).parsePaymentMethod
-          : null,
-      orderStatus: map['orderStatus'] != null
-          ? (map['orderStatus'] as int).parseOrderStatus
-          : null,
-      orderDetails: map['orderDetails'] != null
+      id: (map['id'] ?? map['Id']) is num ? (map['id'] ?? map['Id']).toInt() : int.tryParse('${map['id'] ?? map['Id']}'),
+      user: (map['user'] ?? map['User'])?.toString(),
+      userId: (map['userId'] ?? map['UserId'])?.toString(),
+      purchaseDate: (map['purchaseDate'] ?? map['PurchaseDate'])?.toString(),
+      description: (map['description'] ?? map['Description'])?.toString(),
+      phonenumber: (map['phonenumber'] ?? map['Phonenumber'] ?? map['phoneNumber'])?.toString(),
+      lat: (map['lat'] ?? map['Lat']) is num ? (map['lat'] ?? map['Lat']).toDouble() : double.tryParse('${map['lat'] ?? map['Lat']}'),
+      lng: (map['lng'] ?? map['Lng']) is num ? (map['lng'] ?? map['Lng']).toDouble() : double.tryParse('${map['lng'] ?? map['Lng']}'),
+      address: (map['address'] ?? map['Address'])?.toString(),
+      paymentMethod: paymentRaw != null ? parsePaymentMethodSafe(paymentRaw) : PaymentMethod.payOnDelivery,
+      orderStatus: statusRaw != null ? parseOrderStatusSafe(statusRaw) : OrderStatus.pending,
+      orderDetails: detailsRaw != null
           ? List<OrderDetailsModel>.from(
-              map['orderDetails']?.map((x) => OrderDetailsModel.fromMap(x)),
+              detailsRaw.map((x) => OrderDetailsModel.fromMap(x is Map<String, dynamic> ? x : Map<String, dynamic>.from(x))),
             )
           : null,
-      price: map['price']?.toDouble(),
-      createdDate: map['createdDate'],
+      price: (map['price'] ?? map['Price']) is num ? (map['price'] ?? map['Price']).toDouble() : double.tryParse('${map['price'] ?? map['Price']}'),
+      createdDate: (map['createdDate'] ?? map['CreatedDate'])?.toString(),
+      deliveryUser: (map['deliveryUser'] ?? map['DeliveryUser'])?.toString(),
+      deliveryUserPhone: (map['deliveryUserPhone'] ?? map['DeliveryUserPhone'])?.toString(),
+      deliveryNotes: (map['deliveryNotes'] ?? map['DeliveryNotes'])?.toString(),
+      notes: (map['notes'] ?? map['Notes'])?.toString(),
+      prepTimeMinutes: (map['prepTimeMinutes'] ?? map['PrepTimeMinutes']) is num ? (map['prepTimeMinutes'] ?? map['PrepTimeMinutes']).toInt() : int.tryParse('${map['prepTimeMinutes'] ?? map['PrepTimeMinutes']}'),
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:app_jtak_warehouse/src/config/constants/app_constant.dart';
 import 'package:app_jtak_warehouse/src/core/controllers/app/base_provider.dart';
 import 'package:app_jtak_warehouse/src/core/models/phone_number_model.dart';
+import 'package:app_jtak_warehouse/src/utils/providers/custom_exception.dart';
 import 'package:app_jtak_warehouse/src/utils/providers/sol_api.dart';
 
 import '../services/locator.dart';
@@ -13,6 +14,7 @@ class UserProvider extends BaseProvider {
   String apiPrefex = SolApi.apiVersionPrefex + '/Authorization';
   String? fullName, email, oldPassword, newPassword;
   PhoneNumberModel? phoneNumber;
+  String? lastVerificationCode;
 
   void loadUserDataProfile() async {
     if (authService.user == null) {
@@ -47,8 +49,21 @@ class UserProvider extends BaseProvider {
     await loadBaseData(
       loadBody: () async {
         Map<String, String> body = {"phoneNumber": phoneNumber};
-        var res = await _api.postRequest('/Account/RegisterOrSignInByPhoneNumber', body, apiPrefex: apiPrefex);
-        debugPrint('registerOrSignInByPhoneNumber : $res');
+        try {
+          // Attempt gated merchant login first
+          var res = await _api.postRequest('/Account/MerchantSignInByPhoneNumber', body, apiPrefex: apiPrefex);
+          debugPrint('merchantSignInByPhoneNumber : $res');
+          if (res != null) {
+            lastVerificationCode = res.toString().replaceAll('"', '').trim();
+          }
+        } on NotFoundException {
+          // Fallback if backend does not have the new MerchantSignInByPhoneNumber deployed yet
+          var res = await _api.postRequest('/Account/RegisterOrSignInByPhoneNumber', body, apiPrefex: apiPrefex);
+          debugPrint('registerOrSignInByPhoneNumber (legacy fallback) : $res');
+          if (res != null) {
+            lastVerificationCode = res.toString().replaceAll('"', '').trim();
+          }
+        }
       },
     );
   }

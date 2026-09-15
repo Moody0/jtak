@@ -5,12 +5,14 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/themes/colors.dart';
+import '../../core/controllers/catalog/markets_provider.dart';
 import '../../core/controllers/order/cart_provider.dart';
 import '../../core/data/mock_catalog_data.dart';
 import '../../core/services/locator.dart';
 import 'catalog/item_customization_sheet.dart';
 import 'catalog/meal_card_widget.dart';
 import 'catalog/replace_cart_bottom_sheet.dart';
+import 'clean_shimmer_skeletons.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Most Popular Dishes Section (الأكثر طلباً)
@@ -36,44 +38,38 @@ class JtakDeliveryOffersSection extends StatelessWidget {
   });
 
   void _handleQuickAdd(BuildContext context, MealItemData meal) async {
-    final mockItem = MockCatalogData.getMenuItemById(meal.id);
-    if (mockItem == null) return;
     final cart = locator<CartProvider>();
+    final mockItem = MockCatalogData.getMenuItemById(meal.id);
+    final int merchantId = meal.merchantId > 0
+        ? meal.merchantId
+        : (mockItem?.restaurantId ?? 12);
 
-    if (cart.isDifferentMerchant(mockItem.restaurantId)) {
+    if (cart.isDifferentMerchant(merchantId)) {
       final shouldReplace = await ReplaceCartBottomSheet.show(
         context,
-        currentStoreName: cart.currentMerchantName,
-        newStoreName: mockItem.restaurantName.split(' - ').first,
+        currentStoreName: cart.getConflictingMerchantName(merchantId),
+        newStoreName: meal.merchantName.isNotEmpty
+            ? meal.merchantName.split(' - ').first
+            : (mockItem?.restaurantName.split(' - ').first ?? 'المتجر الجديد'),
       );
       if (shouldReplace != true || !context.mounted) return;
-
-      if (mockItem.optionGroups.isNotEmpty) {
-        ItemCustomizationBottomSheet.show(
-          context,
-          item: mockItem,
-          isPreConfirmedReplace: true,
-          onAddToCart: (data) {
-            onQuickAdd?.call(meal);
-          },
-        );
-        return;
-      }
-
+      final double price = meal.numericPrice > 0
+          ? meal.numericPrice
+          : (mockItem?.basePriceValue.toDouble() ?? 0.0);
       await cart.replaceCartWithItem(
-        mockItem.id,
-        mockItem.restaurantId,
-        mockItem.basePriceValue.toDouble(),
+        meal.id,
+        merchantId,
+        price,
         1,
+        title: meal.title,
+        imageUrl: meal.coverUrl,
       );
       onQuickAdd?.call(meal);
       return;
     }
 
-    final currentQty = cart.getProductQuantity(meal.id);
-
     // If item has options and not yet customized, open bottom sheet directly on home page
-    if (mockItem.optionGroups.isNotEmpty && currentQty == 0) {
+    if (mockItem != null && mockItem.optionGroups.isNotEmpty && cart.getProductQuantity(meal.id) == 0) {
       ItemCustomizationBottomSheet.show(
         context,
         item: mockItem,
@@ -86,32 +82,45 @@ class JtakDeliveryOffersSection extends StatelessWidget {
 
     // Otherwise increment directly
     HapticFeedback.lightImpact();
-    cart.addToCart(
-      mockItem.id,
-      mockItem.restaurantId,
-      mockItem.basePriceValue.toDouble(),
+    final double price = meal.numericPrice > 0
+        ? meal.numericPrice
+        : (mockItem?.basePriceValue.toDouble() ?? 0.0);
+
+    await cart.addToCart(
+      meal.id,
+      merchantId,
+      price,
       quantity: 1,
+      title: meal.title,
+      imageUrl: meal.coverUrl,
     );
     onQuickAdd?.call(meal);
   }
 
   void _handleQuickRemove(MealItemData meal) {
     HapticFeedback.lightImpact();
+    final cart = locator<CartProvider>();
     final mockItem = MockCatalogData.getMenuItemById(meal.id);
-    final currentQty = locator<CartProvider>().getProductQuantity(meal.id);
+    final currentQty = cart.getProductQuantity(meal.id);
     final newQty = currentQty <= 1 ? 0 : currentQty - 1;
+    final int merchantId = meal.merchantId > 0
+        ? meal.merchantId
+        : (mockItem?.restaurantId ?? 0);
+    final double price = meal.numericPrice > 0
+        ? meal.numericPrice
+        : (mockItem?.basePriceValue.toDouble() ?? 0.0);
 
-    if (mockItem != null) {
-      if (newQty <= 0) {
-        locator<CartProvider>().removeFromCart(mockItem.id, mockItem.restaurantId);
-      } else {
-        locator<CartProvider>().setToCart(
-          mockItem.id,
-          mockItem.restaurantId,
-          mockItem.basePriceValue.toDouble(),
-          newQty,
-        );
-      }
+    if (newQty <= 0) {
+      cart.removeFromCart(meal.id, merchantId);
+    } else {
+      cart.setToCart(
+        meal.id,
+        merchantId,
+        price,
+        newQty,
+        title: meal.title,
+        imageUrl: meal.coverUrl,
+      );
     }
   }
 
@@ -171,9 +180,30 @@ class JtakDeliveryOffersSection extends StatelessWidget {
           height: 240,
           child: ScrollConfiguration(
             behavior: const ScrollBehavior().copyWith(overscroll: false),
-            child: Consumer<CartProvider>(
-              builder: (context, cartProvider, _) {
-                final meals = MockCatalogData.allDeliveryMeals;
+            child: Consumer2<MarketsProvider, CartProvider>(
+              builder: (context, marketsProv, cartProvider, _) {
+                if (marketsProv.isLoadingPopularMeals &&
+                    marketsProv.popularMeals.isEmpty) {
+                  return ListView.separated(
+                    physics: const NeverScrollableScrollPhysics(),
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: 4,
+                    separatorBuilder: (_, __) => const SizedBox(width: 14),
+                    itemBuilder: (_, __) => const CleanShimmer(
+                      child: SkeletonBox(
+                        width: 205,
+                        height: 235,
+                        borderRadius: 18,
+                      ),
+                    ),
+                  );
+                }
+
+                final allMeals = marketsProv.popularMeals.isNotEmpty
+                    ? marketsProv.popularMeals
+                    : MockCatalogData.allDeliveryMeals;
+                final meals = allMeals.where((m) => !m.isMarket).toList();
                 return ListView.separated(
                   physics: const ClampingScrollPhysics(),
                   scrollDirection: Axis.horizontal,

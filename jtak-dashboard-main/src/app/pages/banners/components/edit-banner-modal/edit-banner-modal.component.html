@@ -10,73 +10,226 @@
   <ng-container *ngIf="item">
     <form class="form form-label-right" [formGroup]="formGroup">
       <div class="row">
-        <div class="col-md-4">
-          <div class="mb-8">
-            <label for="title">Title</label>
+        <!-- Banner Title -->
+        <div class="col-md-7">
+          <div class="mb-6">
+            <label for="title" class="form-label fw-bold mb-2">
+              {{ 'BANNERS_PAGE.COL_TITLE' | translate }} <span class="text-danger">*</span>
+            </label>
             <app-input-container [control]="formGroup.controls.title">
               <input
                 type="text"
                 class="form-control form-control-solid"
                 formControlName="title"
                 id="title"
-                placeholder="Enter title"
-                #input
-              />
-            </app-input-container>
-          </div>
-        </div>        
-        <div class="col-md-8">
-          <div class="mb-8">
-            <label for="url">URL</label>
-            <app-input-container [control]="formGroup.controls.url">
-              <input
-                type="text"
-                class="form-control form-control-solid"
-                formControlName="url"
-                id="url"
-                placeholder="Enter URL"
+                [placeholder]="'BANNERS_PAGE.COL_TITLE' | translate"
                 #input
               />
             </app-input-container>
           </div>
         </div>
-        <div class="col-md-10">
-          <div class="mb-8">
-            <label for="description">Description</label>
+
+        <!-- Section Placement -->
+        <div class="col-md-5">
+          <div class="mb-6">
+            <label for="sectionPlacement" class="form-label fw-bold mb-2">
+              {{ 'BANNERS_PAGE.COL_SECTION' | translate }} <span class="text-danger">*</span>
+            </label>
+            <select
+              class="form-select form-select-solid"
+              formControlName="sectionPlacement"
+              id="sectionPlacement"
+            >
+              <option value="daily_offers">⭐ {{ 'BANNERS_PAGE.SECTION_DAILY_OFFERS' | translate }} (الرئيسية - أعلى الصفحة)</option>
+              <option value="dont_miss">🔥 {{ 'BANNERS_PAGE.SECTION_DONT_MISS' | translate }} (الرئيسية - لا تفوتها)</option>
+              <option value="restaurants">🍽️ {{ 'BANNERS_PAGE.SECTION_RESTAURANTS' | translate }} (بانرات المطاعم والأطباق)</option>
+              <option value="market">🛒 {{ 'BANNERS_PAGE.SECTION_MARKET' | translate }} (بانرات الماركت)</option>
+              <option value="all">🌐 {{ 'BANNERS_PAGE.SECTION_BOTH' | translate }} (يظهر في جميع الأقسام)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="col-md-12">
+          <div class="mb-6">
+            <label for="description" class="form-label fw-bold mb-2">
+              {{ 'COMMON.DESCRIPTION' | translate }} <span class="text-danger">*</span>
+            </label>
             <app-input-container [control]="formGroup.controls.description">
               <textarea
                 type="text"
+                rows="2"
                 class="form-control form-control-solid"
                 formControlName="description"
                 id="description"
-                placeholder="Enter description"
+                [placeholder]="'COMMON.DESCRIPTION' | translate"
                 #input
               ></textarea>
             </app-input-container>
           </div>
         </div>
 
-        <div class="col-md-6">
-          <div class="mb-8">
-            <label for="sectionPlacement">مكان العرض في التطبيق (Placement)</label>
-            <select
-              class="form-select form-select-solid"
-              formControlName="sectionPlacement"
-              id="sectionPlacement"
-            >
-              <option value="daily_offers">العروض اليومية (أعلى الصفحة) - Daily Offers</option>
-              <option value="dont_miss">لا تفوتها (بانرات العروض الترويجية) - Don't Miss</option>
-              <option value="all">كلاهما (يظهر في القسمين) - Both Sections</option>
-            </select>
-            <div class="form-text text-muted">
-              حدد القسم الذي سيظهر فيه البانر في الصفحة الرئيسية
+        <!-- In-App Navigation / Click Action (Modern UX replacing raw URL input) -->
+        <div class="col-md-12">
+          <div class="card bg-light-primary border border-primary border-dashed p-4 mb-6">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="d-flex align-items-center">
+                <i class="fas fa-route text-primary fs-3 me-2"></i>
+                <h6 class="mb-0 text-dark fw-bolder">
+                  {{ 'BANNERS_PAGE.TARGET_SECTION_TITLE' | translate }}
+                </h6>
+              </div>
+              <span class="badge badge-light-primary fs-8">توجيه ذكي لتطبيق الهاتف</span>
+            </div>
+
+            <p class="text-muted fs-7 mb-4">
+              {{ 'BANNERS_PAGE.TARGET_HINT' | translate }}
+            </p>
+
+            <div class="row g-3">
+              <!-- Destination Type Dropdown -->
+              <div class="col-md-5">
+                <label class="form-label fw-bold mb-1">
+                  {{ 'BANNERS_PAGE.TARGET_TYPE_LABEL' | translate }}
+                </label>
+                <select
+                  class="form-select form-select-solid"
+                  formControlName="targetType"
+                  (change)="onTargetTypeChange($any($event.target).value)"
+                >
+                  <option value="none">🚫 {{ 'BANNERS_PAGE.TARGET_TYPE_NONE' | translate }}</option>
+                  <option value="restaurant">🍽️ {{ 'BANNERS_PAGE.TARGET_TYPE_RESTAURANT' | translate }}</option>
+                  <option value="market">🛒 {{ 'BANNERS_PAGE.TARGET_TYPE_MARKET' | translate }}</option>
+                  <option value="offers">🏷️ {{ 'BANNERS_PAGE.TARGET_TYPE_OFFERS' | translate }}</option>
+                  <option value="external">🌐 {{ 'BANNERS_PAGE.TARGET_TYPE_EXTERNAL' | translate }}</option>
+                </select>
+              </div>
+
+              <!-- Contextual Action Details -->
+              <div class="col-md-7">
+                <!-- If None (Display Only) -->
+                <div *ngIf="formGroup.get('targetType')?.value === 'none'" class="h-100 d-flex align-items-center pt-md-4">
+                  <div class="alert alert-secondary d-flex align-items-center w-100 py-2 px-3 mb-0">
+                    <i class="fas fa-info-circle text-muted fs-4 me-2"></i>
+                    <span class="text-muted fs-7">{{ 'BANNERS_PAGE.TARGET_PREVIEW_NONE' | translate }}</span>
+                  </div>
+                </div>
+
+                <!-- If Restaurant -->
+                <div *ngIf="formGroup.get('targetType')?.value === 'restaurant'">
+                  <label class="form-label fw-bold mb-1">
+                    {{ 'BANNERS_PAGE.SELECT_RESTAURANT' | translate }} <span class="text-danger">*</span>
+                  </label>
+                  <ng-select
+                    class="custom-modern-select"
+                    [items]="restaurants"
+                    bindLabel="title"
+                    bindValue="id"
+                    formControlName="targetMerchantId"
+                    [searchFn]="merchantSearchFn"
+                    [placeholder]="'BANNERS_PAGE.SELECT_RESTAURANT_PLACEHOLDER' | translate"
+                    [loading]="loadingMerchants"
+                    loadingText="جاري تحميل قائمة المطاعم..."
+                    notFoundText="لم يتم العثور على مطاعم مطابقة"
+                    [clearable]="true"
+                  >
+                    <ng-template ng-label-tmp let-item="item">
+                      <div class="d-flex align-items-center justify-content-between w-100">
+                        <span class="fw-bold text-dark">🍽️ {{ item.title }}</span>
+                        <span class="badge badge-light-primary fs-8">#{{ item.id }}</span>
+                      </div>
+                    </ng-template>
+                    <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                      <div class="d-flex align-items-center justify-content-between py-1">
+                        <div>
+                          <div class="fw-bold text-dark">🍽️ {{ item.title }}</div>
+                          <div class="text-muted fs-8" *ngIf="item.shortDescription">{{ item.shortDescription }}</div>
+                        </div>
+                        <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
+                      </div>
+                    </ng-template>
+                  </ng-select>
+                  <div class="form-text text-success mt-1" *ngIf="formGroup.get('targetMerchantId')?.value">
+                    <i class="fas fa-check-circle me-1"></i>
+                    {{ 'BANNERS_PAGE.TARGET_PREVIEW_RESTAURANT' | translate }}
+                    <strong>{{ getMerchantName(formGroup.get('targetMerchantId')?.value) }}</strong>
+                  </div>
+                </div>
+
+                <!-- If Market -->
+                <div *ngIf="formGroup.get('targetType')?.value === 'market'">
+                  <label class="form-label fw-bold mb-1">
+                    {{ 'BANNERS_PAGE.SELECT_MARKET' | translate }} <span class="text-danger">*</span>
+                  </label>
+                  <ng-select
+                    class="custom-modern-select"
+                    [items]="markets"
+                    bindLabel="title"
+                    bindValue="id"
+                    formControlName="targetMerchantId"
+                    [searchFn]="merchantSearchFn"
+                    [placeholder]="'BANNERS_PAGE.SELECT_MARKET_PLACEHOLDER' | translate"
+                    [loading]="loadingMerchants"
+                    loadingText="جاري تحميل قائمة المتاجر والماركت..."
+                    notFoundText="لم يتم العثور على متاجر مطابقة"
+                    [clearable]="true"
+                  >
+                    <ng-template ng-label-tmp let-item="item">
+                      <div class="d-flex align-items-center justify-content-between w-100">
+                        <span class="fw-bold text-dark">🛒 {{ item.title }}</span>
+                        <span class="badge badge-light-primary fs-8">#{{ item.id }}</span>
+                      </div>
+                    </ng-template>
+                    <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                      <div class="d-flex align-items-center justify-content-between py-1">
+                        <div>
+                          <div class="fw-bold text-dark">🛒 {{ item.title }}</div>
+                          <div class="text-muted fs-8" *ngIf="item.shortDescription">{{ item.shortDescription }}</div>
+                        </div>
+                        <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
+                      </div>
+                    </ng-template>
+                  </ng-select>
+                  <div class="form-text text-success mt-1" *ngIf="formGroup.get('targetMerchantId')?.value">
+                    <i class="fas fa-check-circle me-1"></i>
+                    {{ 'BANNERS_PAGE.TARGET_PREVIEW_MARKET' | translate }}
+                    <strong>{{ getMerchantName(formGroup.get('targetMerchantId')?.value) }}</strong>
+                  </div>
+                </div>
+
+                <!-- If Offers -->
+                <div *ngIf="formGroup.get('targetType')?.value === 'offers'" class="h-100 d-flex align-items-center pt-md-4">
+                  <div class="alert alert-warning d-flex align-items-center w-100 py-2 px-3 mb-0">
+                    <i class="fas fa-tags text-warning fs-4 me-2"></i>
+                    <span class="text-dark fs-7">{{ 'BANNERS_PAGE.TARGET_PREVIEW_OFFERS' | translate }}</span>
+                  </div>
+                </div>
+
+                <!-- If External URL -->
+                <div *ngIf="formGroup.get('targetType')?.value === 'external'">
+                  <label class="form-label fw-bold mb-1">
+                    {{ 'BANNERS_PAGE.EXTERNAL_URL_LABEL' | translate }} <span class="text-danger">*</span>
+                  </label>
+                  <input
+                    type="url"
+                    class="form-control form-control-solid"
+                    formControlName="targetExternalUrl"
+                    [placeholder]="'BANNERS_PAGE.EXTERNAL_URL_PLACEHOLDER' | translate"
+                    dir="ltr"
+                  />
+                  <div class="form-text text-muted mt-1">
+                    {{ 'BANNERS_PAGE.EXTERNAL_URL_HINT' | translate }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="col-md-4">
-          <div class="mb-8">
-            <label for="order">الترتيب (Order)</label>
+        <!-- Order -->
+        <div class="col-md-6">
+          <div class="mb-6">
+            <label for="order" class="form-label fw-bold mb-2">{{ 'COMMON.ORDER' | translate }}</label>
             <input
               type="number"
               class="form-control form-control-solid"
@@ -87,24 +240,30 @@
           </div>
         </div>
 
-        <div class="col-md-2">
-          <label class="checkbox checkbox-single pt-10">
-            <input type="checkbox" formControlName="active" />
-            <span class="mx-2 fs-5">isActive</span>
-          </label>
+        <!-- Active Switch -->
+        <div class="col-md-6">
+          <div class="mb-6 pt-md-8">
+            <label class="form-check form-switch form-check-custom form-check-solid">
+              <input class="form-check-input" type="checkbox" formControlName="active" />
+              <span class="form-check-label fw-bold fs-6 mx-2">{{ 'COMMON.ACTIVE' | translate }}</span>
+            </label>
+          </div>
         </div>
 
+        <!-- Banner Image Upload -->
         <div class="col-md-12">
           <app-file-uploader
-            uploaderTitle="Upload banner image"
+            uploaderTitle="رفع صورة الإعلان"
             (fileUploaded)="onFileUploaded($event, 'featuredImage')"
           ></app-file-uploader>
 
-          <app-uploaded-image
-            [imageId]="formGroup.get('featuredImage')?.value"
-            [dimensions]="{ width: 600, height: 300 }"
-            (imageDeleted)="onFileDelete('featuredImage')"
-          ></app-uploaded-image>
+          <div class="mt-3">
+            <app-uploaded-image
+              [imageId]="formGroup.get('featuredImage')?.value"
+              [dimensions]="{ width: 600, height: 300 }"
+              (imageDeleted)="onFileDelete('featuredImage')"
+            ></app-uploaded-image>
+          </div>
         </div>
       </div>
     </form>

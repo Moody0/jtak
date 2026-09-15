@@ -17,4 +17,44 @@ export interface Order extends BaseModel {
     orderDetails: OrdersDetail[];
     createdDate: string;
     paymentMethod: number;
+    deliveryOtp?: string;
+    deliveredAt?: string;
+    isJtakMarketOrder?: boolean;
+    requiresMerchantDecision?: boolean;
+    canAdminApprove?: boolean;
+    canAdminMarkReady?: boolean;
+    adminFlowMessage?: string;
+}
+
+export interface ShippingStopProgress {
+    index: number;
+    title: string;
+    isDarkStore: boolean;
+    isCompleted: boolean;
+    lat: number;
+    lng: number;
+    stopType: number;
+}
+
+export interface OrderLiveTrack {
+    orderId: number;
+    orderStatus: number;
+    driverId?: string;
+    driverName?: string;
+    driverPhoneNumber?: string;
+    driverLat?: number;
+    driverLng?: number;
+    heading?: number;
+    speed?: number;
+    locationUpdatedAt?: string;
+    isLive: boolean;
+    etaMinutes: number;
+    remainingDistanceMeters: number;
+    destinationLat: number;
+    destinationLng: number;
+    destinationAddress?: string;
+    currentStopIndex: number;
+    currentStopTitle?: string;
+    currentStopIsDarkStore: boolean;
+    stops: ShippingStopProgress[];
 }

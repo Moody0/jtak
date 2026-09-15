@@ -7,6 +7,7 @@ import '../../../../main_imports.dart';
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/order/cart_provider.dart';
 import '../../../core/controllers/user/user_provider.dart';
+import '../../../core/models/phone_number_model.dart';
 import '../../../core/services/authentication_service.dart';
 import '../../../core/services/locator.dart';
 import '../../../ui/widgets/code_input_widget.dart';
@@ -22,8 +23,9 @@ import '../../widgets/header_circle_button.dart';
 class PhoneCodePage extends StatefulWidget {
   static const String routeName = '/PhoneCodePage';
   final String phoneNumber;
+  final String? autoFillCode;
 
-  const PhoneCodePage(this.phoneNumber, {super.key});
+  const PhoneCodePage(this.phoneNumber, {super.key, this.autoFillCode});
 
   @override
   State<PhoneCodePage> createState() => _PhoneCodePageState();
@@ -32,6 +34,17 @@ class PhoneCodePage extends StatefulWidget {
 class _PhoneCodePageState extends State<PhoneCodePage> {
   String _code = '';
   late UserProvider userProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      final prov = locator<UserProvider>();
+      _code = widget.autoFillCode ?? prov.lastVerificationCode ?? '';
+    } catch (_) {
+      _code = widget.autoFillCode ?? '';
+    }
+  }
 
   String _formatDisplayPhone(String phone) {
     String clean = phone.replaceAll(RegExp(r'\s+'), '');
@@ -55,135 +68,124 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
           body: SafeArea(
             child: FullScreenLoading(
               inAsyncCall: userProvider.isBusy,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight - 32,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Spacer(),
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
 
-                            // 1. Phone Info Header
-                            Center(
-                              child: Text(
-                                'رمز التحقق',
-                                style: GoogleFonts.ibmPlexSansArabic(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: kCharcoalDark,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Center(
-                              child: Text(
-                                'تم إرسال رمز التحقق إلى الرقم:',
-                                style: GoogleFonts.ibmPlexSansArabic(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  displayPhone,
-                                  style: GoogleFonts.ibmPlexSansArabic(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: kCharcoalDark,
-                                  ),
-                                  textDirection: TextDirection.ltr,
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // 2. Verification Code Input Card
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'أدخل رمز التحقق (4 أرقام)',
-                                    style: GoogleFonts.ibmPlexSansArabic(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: kCharcoalDark,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 18),
-
-                                  // Discrete 4 OTP Squircles
-                                  CodeInputWidget(
-                                    codeLength: 4,
-                                    onChange: (code) => _code = code,
-                                    onEnd: (code) {
-                                      _code = code;
-                                      _loginFun();
-                                    },
-                                  ),
-
-                                  const SizedBox(height: 18),
-                                  _buildResendRow(),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            // 3. Primary CTA: Verify & Login
-                            GestureDetector(
-                              onTap: _loginFun,
-                              behavior: HitTestBehavior.opaque,
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: kPrimaryOrange,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'تأكيد ومتابعة',
-                                    style: GoogleFonts.ibmPlexSansArabic(
-                                      fontSize: 15.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const Spacer(flex: 2),
-                          ],
+                    // 1. Phone Info Header
+                    Center(
+                      child: Text(
+                        'رمز التحقق',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: kCharcoalDark,
                         ),
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Text(
+                        'تم إرسال رمز التحقق إلى الرقم:',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          displayPhone,
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: kCharcoalDark,
+                          ),
+                          textDirection: TextDirection.ltr,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 2. Verification Code Input Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'أدخل رمز التحقق',
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: kCharcoalDark,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+
+                          // Discrete OTP Squircles (6 digits)
+                          CodeInputWidget(
+                            codeLength: 6,
+                            initialValue: _code.isNotEmpty ? _code : (userProvider.lastVerificationCode ?? ''),
+                            onChange: (code) => _code = code,
+                            onEnd: (code) {
+                              _code = code;
+                              _loginFun();
+                            },
+                          ),
+
+                          const SizedBox(height: 18),
+                          _buildResendRow(),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 3. Primary CTA: Verify & Login
+                    GestureDetector(
+                      onTap: _loginFun,
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: kPrimaryOrange,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'تأكيد ومتابعة',
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
           ),
@@ -258,13 +260,29 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
       if (!mounted) return;
 
       final authUser = locator<AuthenticationService>().user;
-      final bool isReturningUser = authUser?.fullName != null &&
+      bool isReturningUser = authUser?.fullName != null &&
           authUser!.fullName!.trim().isNotEmpty &&
           authUser.fullName != 'مستخدم جيتك' &&
-          authUser.fullName != 'عميل جيتك';
+          authUser.fullName != 'عميل جيتك' &&
+          authUser.fullName != 'مستخدم جتاك' &&
+          authUser.fullName != 'عميل جتاك';
 
       if (!isReturningUser) {
-        await _promptUserNameBottomSheet();
+        final saved = await locator<AuthenticationService>().getSavedUserByPhone(widget.phoneNumber);
+        if (saved?.fullName != null &&
+            saved!.fullName!.trim().isNotEmpty &&
+            saved.fullName != 'مستخدم جيتك' &&
+            saved.fullName != 'عميل جيتك' &&
+            saved.fullName != 'مستخدم جتاك' &&
+            saved.fullName != 'عميل جتاك') {
+          if (authUser != null) {
+            authUser.fullName = saved.fullName;
+            locator<AuthenticationService>().saveUserData(authUser);
+          }
+          isReturningUser = true;
+        } else {
+          await _promptUserNameBottomSheet();
+        }
       }
 
       await locator<CartProvider>().cartInfo.initData();
@@ -279,9 +297,20 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
       Navigator.pop(context, true);
     } catch (err) {
       if (mounted) {
+        final cleanMsg = err
+            .toString()
+            .replaceAll('Exception: ', '')
+            .replaceAll('Exception:', '')
+            .replaceAll('Error: ', '')
+            .trim();
         showDialog(
           context: context,
-          builder: (context) => CustomDialog(message: err.toString()),
+          builder: (context) => CustomDialog(
+            title: 'تنبيه التحقق',
+            message: cleanMsg.isNotEmpty
+                ? cleanMsg
+                : 'رمز التحقق غير صحيح أو انتهت صلاحيته. يرجى التأكد من الرمز والمحاولة مجدداً.',
+          ),
         );
       }
     }
@@ -309,6 +338,11 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                 try {
                   final enteredName = nameController.text.trim();
                   userProvider.fullName = enteredName;
+                  userProvider.phoneNumber = PhoneNumberModel(
+                    phoneNumber: widget.phoneNumber,
+                    dialCode: '+963',
+                    isoCode: 'SY',
+                  );
                   await userProvider.update();
                   locator<CartProvider>().cartInfo.name = enteredName;
                   if (sheetCtx.mounted) {

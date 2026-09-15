@@ -1,151 +1,332 @@
-<div class="card card-custom gutter-b">
-    <div class="card-header">
-      <div class="card-title">
-        <div><h3 class="card-label">Bills</h3><span class="card-subtitle">Review bill history and reconciliation details.</span></div>
+<div class="ops-bills-container">
+
+  <!-- 1. Operations Utility Bar -->
+  <div class="ops-utility-bar">
+    <div class="ops-utility-left">
+      <div class="ops-live-pulse-badge">
+        <span class="ops-pulse-dot"></span>
+        <span>{{ 'BILLS_PAGE.LIVE_OPERATIONS' | translate }}</span>
+      </div>
+      <span class="ops-sync-meta">
+        <i class="fas fa-file-invoice-dollar text-muted me-1"></i>
+        <span>{{ 'BILLS_PAGE.TOTAL_RECORDS' | translate }}:</span>
+        <strong>{{ totalRecords | number }}</strong>
+      </span>
+    </div>
+    <div class="ops-utility-right">
+      <button type="button" class="ops-btn-refresh" (click)="refresh()" [disabled]="isLoading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>{{ 'BILLS_PAGE.REFRESH' | translate }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. Real Financial Operational KPI Cards -->
+  <div class="row g-3">
+    <!-- Gross Billed Volume -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-total">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BILLS_PAGE.KPI_TOTAL_BILLED' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-coins"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value">{{ kpiTotalBilled | number }}</span>
+          <span class="ops-kpi-unit">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+        </div>
       </div>
     </div>
-    <div class="card-body">
-      <!-- begin: Filtration form -->
-      <div class="form form-label-right">
-        <div class="form-group row">
-          <div class="col-lg-2" [formGroup]="searchGroup">
-            <input
-              type="text"
-              class="form-control"
-              name="searchText"
-              placeholder="Search bills"
-              formControlName="searchTerm"
-            />
-          </div>
+
+    <!-- Merchant Payouts -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-merchants">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BILLS_PAGE.KPI_MERCHANT_SHARE' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-store"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-success">{{ kpiMerchantShare | number }}</span>
+          <span class="ops-kpi-unit">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
         </div>
       </div>
-      <!-- end: Filtration form -->
-      <ng-container *ngIf="billsService.items$ | async as items">
-        <div class="bulk-action-bar" *ngIf="selection.count > 0">
-          <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-          <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'bills')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
+    </div>
+
+    <!-- JTAK Platform Revenue -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-platform">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BILLS_PAGE.KPI_PLATFORM_REVENUE' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-chart-line"></i></div>
         </div>
-      </ng-container>
-  
-      <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="billsService.items$ | async as items">
-        <table
-          class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-primary">{{ kpiPlatformRevenue | number }}</span>
+          <span class="ops-kpi-unit">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total Invoiced Orders -->
+    <div class="col-xl-3 col-sm-6">
+      <div class="ops-kpi-card kpi-orders">
+        <div class="ops-kpi-header">
+          <span class="ops-kpi-label">{{ 'BILLS_PAGE.KPI_ORDERS_BILLED' | translate }}</span>
+          <div class="ops-kpi-icon"><i class="fas fa-receipt"></i></div>
+        </div>
+        <div class="ops-kpi-body">
+          <span class="ops-kpi-value text-purple">{{ kpiBillsCount | number }}</span>
+          <span class="ops-kpi-unit">{{ 'BILLS_PAGE.KPI_ORDERS_BILLED_SUB' | translate }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Consolidated Search & Filter Panel -->
+  <div class="ops-filter-panel">
+    <div class="ops-filter-row">
+      <!-- Search Input -->
+      <div class="ops-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search ops-search-icon"></i>
+        <input
+          type="text"
+          class="ops-search-input"
+          [placeholder]="'BILLS_PAGE.SEARCH_PLACEHOLDER' | translate"
+          formControlName="searchTerm"
+        />
+      </div>
+
+      <!-- Dues Status Filter Tabs -->
+      <div class="ops-status-tabs" role="tablist">
+        <button
+          type="button"
+          [class.active]="selectedDuesFilter === 'all'"
+          (click)="filterByDues('all')"
         >
+          {{ 'BANNERS_PAGE.ALL_STATUS' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedDuesFilter === 'added'"
+          (click)="filterByDues('added')"
+        >
+          <i class="fas fa-check-circle text-success me-1"></i>
+          {{ 'BILLS_PAGE.DUES_ADDED' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedDuesFilter === 'pending'"
+          (click)="filterByDues('pending')"
+        >
+          <i class="fas fa-clock text-warning me-1"></i>
+          {{ 'BILLS_PAGE.DUES_PENDING' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Bills Table Card -->
+  <div class="ops-table-card" *ngIf="billsService.items$ | async as rawItems">
+    <!-- Filtered visible items -->
+    <ng-container *ngIf="getDisplayedItems(rawItems) as items">
+
+      <!-- Bulk Action Bar -->
+      <div class="ops-bulk-bar" *ngIf="selection.count > 0">
+        <div class="ops-bulk-count">
+          <strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}
+        </div>
+        <div class="ops-bulk-actions">
+          <button
+            type="button"
+            class="btn btn-sm btn-light-primary"
+            (click)="selection.exportSelected(items, 'bills')"
+          >
+            <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-link text-muted"
+            (click)="selection.clear()"
+          >
+            {{ 'COMMON.CLEAR' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <!-- High-Density Responsive Financial Table -->
+      <div class="table-responsive">
+        <table class="ops-table">
           <thead>
-            <tr class="fw-bolder text-muted">
-              <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all bills on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-              <th scope="col">
-                #
-                <app-sort-icon
-                  column="id"
-                  [activeColumn]="sorting.column"
-                  [activeDirection]="sorting.direction"
-                  (sort)="sort($event)"
-                ></app-sort-icon>
+            <tr>
+              <th scope="col" class="table-select-cell" style="width: 44px;">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  aria-label="Select all bills on this page"
+                  [checked]="selection.allSelected(items)"
+                  [indeterminate]="selection.partiallySelected(items)"
+                  (change)="selection.toggleAll(items, $any($event.target).checked)"
+                />
+              </th>
+              <th scope="col" style="width: 140px;">
+                <span role="button" (click)="sort('id')">
+                  {{ 'BILLS_PAGE.COL_BILL_NUM' | translate }}
+                  <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
               <th scope="col">
-                Order Id
-                <app-sort-icon
-                  column="orderId"
-                  [activeColumn]="sorting.column"
-                  [activeDirection]="sorting.direction"
-                  (sort)="sort($event)"
-                ></app-sort-icon>
+                {{ 'BILLS_PAGE.COL_MERCHANT' | translate }}
               </th>
-              <th scope="col">
-                Total Amount
-                <app-sort-icon
-                  column="totalAmount"
-                  [activeColumn]="sorting.column"
-                  [activeDirection]="sorting.direction"
-                  (sort)="sort($event)"
-                ></app-sort-icon>
+              <th scope="col" style="width: 120px;">
+                <span role="button" (click)="sort('orderId')">
+                  {{ 'BILLS_PAGE.COL_ORDER_ID' | translate }}
+                  <app-sort-icon column="orderId" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <th scope="col">
-                Merchant Amount
-                <app-sort-icon
-                  column="merchantAmount"
-                  [activeColumn]="sorting.column"
-                  [activeDirection]="sorting.direction"
-                  (sort)="sort($event)"
-                ></app-sort-icon>
+              <th scope="col" style="width: 150px; text-align: left;">
+                <span role="button" (click)="sort('totalAmount')">
+                  {{ 'BILLS_PAGE.COL_TOTAL_AMOUNT' | translate }}
+                  <app-sort-icon column="totalAmount" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <th scope="col">
-                jTak Amount
-                <app-sort-icon
-                  column="jTakAmount"
-                  [activeColumn]="sorting.column"
-                  [activeDirection]="sorting.direction"
-                  (sort)="sort($event)"
-                ></app-sort-icon>
+              <th scope="col" style="width: 150px; text-align: left;">
+                <span role="button" (click)="sort('merchantAmount')">
+                  {{ 'BILLS_PAGE.COL_MERCHANT_AMOUNT' | translate }}
+                  <app-sort-icon column="merchantAmount" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <th scope="col">
-                jTak Additional Amount
+              <th scope="col" style="width: 150px; text-align: left;">
+                <span role="button" (click)="sort('jTakAmount')">
+                  {{ 'BILLS_PAGE.COL_JTAK_AMOUNT' | translate }}
+                  <app-sort-icon column="jTakAmount" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
+                </span>
               </th>
-              <!-- <th scope="col">
-                Added To Dues
+              <th scope="col" style="width: 130px; text-align: center;">
+                {{ 'BILLS_PAGE.COL_DUES' | translate }}
               </th>
-              <th scope="col">
-                Method
-              </th> -->
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
-              <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select bill ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
-              <td>
-                <div>#{{ i.id }}</div>
-                <div>{{ i.dueDate | date:'d/M/yy, h:mm a' }}</div>
-                <div>{{ i.merchantTitle }}</div>
+            <tr
+              *ngFor="let bill of items"
+              [class.table-row-selected]="selection.isSelected(bill)"
+            >
+              <!-- Select Checkbox -->
+              <td class="table-select-cell">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="selection.isSelected(bill)"
+                  [attr.aria-label]="'Select bill ' + bill.id"
+                  (change)="selection.toggle(bill, $any($event.target).checked)"
+                />
               </td>
-              <td>{{ i.orderId }}</td>
+
+              <!-- Bill Ref & Date -->
               <td>
-                <span class="fw-bolder">{{ i.totalAmount | number }}</span>
-                <span class="currency-badge">SYP</span>
+                <div class="ops-bill-ref">
+                  <span class="ref-num">#{{ bill.id }}</span>
+                  <span class="ref-date text-muted" *ngIf="bill.dueDate">
+                    {{ bill.dueDate | date:'yyyy/MM/dd, h:mm a' }}
+                  </span>
+                </div>
               </td>
+
+              <!-- Merchant -->
               <td>
-                <span class="fw-bolder">{{ i.merchantAmount | number }}</span>
-                <span class="currency-badge">SYP</span>
+                <div class="ops-merchant-cell">
+                  <div class="ops-merchant-icon">
+                    <i class="fas fa-store"></i>
+                  </div>
+                  <div class="ops-merchant-info">
+                    <span class="merchant-name">{{ bill.merchantTitle || ('COMMON.NOT_AVAILABLE' | translate) }}</span>
+                    <span class="merchant-sub text-muted">ID: #{{ bill.merchantId }}</span>
+                  </div>
+                </div>
               </td>
+
+              <!-- Order ID -->
               <td>
-                <span class="fw-bolder">{{ i.jTakAmount | number }}</span>
-                <span class="currency-badge">SYP</span>
+                <span class="ops-order-pill">
+                  <i class="fas fa-shopping-bag me-1"></i>
+                  #{{ bill.orderId }}
+                </span>
               </td>
-              <td>
-                <span class="fw-bolder">{{ i.jTakAdditionalAmount | number }}</span>
-                <span class="currency-badge">SYP</span>
+
+              <!-- Gross Total -->
+              <td style="text-align: left;">
+                <div class="ops-amount-cell">
+                  <span class="amount-val fw-bold text-dark">{{ bill.totalAmount | number }}</span>
+                  <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                </div>
               </td>
-              <td></td>
-              <!-- <td>
-                <i 
-                class="fas"
-                [ngClass]="{'fa-times text-danger' : i.isAddedToDues === false,
-                'fa-check text-success': i.isAddedToDues === true
-                }"
-                ></i>
+
+              <!-- Merchant Share -->
+              <td style="text-align: left;">
+                <div class="ops-amount-cell">
+                  <span class="amount-val fw-bold text-success">{{ bill.merchantAmount | number }}</span>
+                  <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                </div>
               </td>
-              <td>
-                <span 
-                *ngIf="i.paymentMethod === 1"
-                class='badge m-1 p-1 badge-primary'>Credit Card</span>
-                <span 
-                *ngIf="i.paymentMethod === 0"
-                class='badge m-1 p-1 badge-secondary'>pay on delivery</span>
-              </td> -->
+
+              <!-- JTAK Commission & Extras -->
+              <td style="text-align: left;">
+                <div class="ops-amount-cell">
+                  <span class="amount-val fw-bold text-primary">{{ bill.jTakAmount | number }}</span>
+                  <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                  <span class="extra-tag text-muted" *ngIf="bill.jTakAdditionalAmount">
+                    +{{ bill.jTakAdditionalAmount | number }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- Dues Status -->
+              <td style="text-align: center;">
+                <span
+                  class="ops-status-pill"
+                  [class.status-active]="bill.isAddedToDues"
+                  [class.status-pending]="!bill.isAddedToDues"
+                >
+                  <span class="status-dot"></span>
+                  <span>
+                    {{ (bill.isAddedToDues ? 'BILLS_PAGE.DUES_ADDED' : 'BILLS_PAGE.DUES_PENDING') | translate }}
+                  </span>
+                </span>
+              </td>
+            </tr>
+
+            <!-- Empty State -->
+            <tr *ngIf="items.length === 0">
+              <td colspan="8" class="text-center py-10">
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                  <div style="width: 60px; height: 60px; border-radius: 50%; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #94a3b8; font-size: 24px;">
+                    <i class="fas fa-file-invoice"></i>
+                  </div>
+                  <h5 class="text-dark fw-bold mb-1">{{ 'BILLS_PAGE.EMPTY_TITLE' | translate }}</h5>
+                  <p class="text-muted fs-7 mb-3">{{ 'BILLS_PAGE.EMPTY_DESC' | translate }}</p>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light-primary"
+                    (click)="searchGroup.get('searchTerm')?.setValue(''); selectedDuesFilter = 'all'; filterByDues('all');"
+                  >
+                    <i class="fas fa-redo me-1"></i> {{ 'BILLS_PAGE.RESET_FILTERS' | translate }}
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-  
+
+    </ng-container>
+
+    <!-- Table Footer with Paginator -->
+    <div class="ops-table-footer">
       <app-paginator
         class="d-flex justify-content-between align-items-center flex-wrap"
         [paginator]="paginator"
         [isLoading]="isLoading"
         (paginate)="paginate($event)"
       ></app-paginator>
-  
-      <!-- begin:Table -->
     </div>
-    <!-- end: Table -->
   </div>
-  
+
+</div>

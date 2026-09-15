@@ -7,10 +7,11 @@ namespace App.Shared.Services.Extentions
 {
     public static class EmailServiceExtensions
     {
-        public static async Task SendContactMessage(this IEmailService service, string displayName, string title, string email, string msg, AppUser user)
+        public static async Task SendContactMessage(this IEmailService service, string displayName, string title, string email, string msg, AppUser user, string phone = null)
         {
             var subject = $"{title} - Message from: '{displayName}' / contact form";
             var body = $@"<p>Message from: '{displayName}</p>'
+                          <p>Phone: {phone}</p>
                           <p>Email: {email}</p>
                           <p>Message: {msg}</p> 
                           <hr>

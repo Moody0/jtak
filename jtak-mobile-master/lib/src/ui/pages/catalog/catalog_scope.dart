@@ -1,4 +1,4 @@
-enum CatalogScopeKind { grocery, pharmacy, stores }
+enum CatalogScopeKind { grocery, stores }
 
 /// Describes a top-level, product-based marketplace opened from the home page.
 /// The backend category id is deliberately carried through every screen so
@@ -11,7 +11,7 @@ class CatalogScope {
   const CatalogScope({
     required this.categoryId,
     required this.title,
-    required this.kind,
+    this.kind = CatalogScopeKind.grocery,
   });
 
   static CatalogScope? fromCategory(int? id, String title) {
@@ -21,19 +21,13 @@ class CatalogScope {
     if (normalized == 'البقالة' ||
         normalized == 'بقالة' ||
         normalized == 'غذائيات' ||
+        normalized.contains('سوبرماركت') ||
+        normalized.contains('ماركت') ||
         normalized.contains('grocery')) {
       return CatalogScope(
         categoryId: id,
         title: title,
         kind: CatalogScopeKind.grocery,
-      );
-    }
-
-    if (normalized.contains('صيدلي') || normalized.contains('pharmacy')) {
-      return CatalogScope(
-        categoryId: id,
-        title: title,
-        kind: CatalogScopeKind.pharmacy,
       );
     }
 
@@ -54,8 +48,6 @@ class CatalogScope {
     switch (kind) {
       case CatalogScopeKind.grocery:
         return 'ابحث عن بقالة أو منتج';
-      case CatalogScopeKind.pharmacy:
-        return 'ابحث عن صيدلية أو دواء';
       case CatalogScopeKind.stores:
         return 'ابحث عن متجر أو منتج';
     }
@@ -65,8 +57,6 @@ class CatalogScope {
     switch (kind) {
       case CatalogScopeKind.grocery:
         return 'كل البقالات';
-      case CatalogScopeKind.pharmacy:
-        return 'كل الصيدليات';
       case CatalogScopeKind.stores:
         return 'كل المتاجر';
     }
@@ -75,9 +65,6 @@ class CatalogScope {
   String get categorySelectorTitle {
     switch (kind) {
       case CatalogScopeKind.grocery:
-        return 'الأقسام';
-      case CatalogScopeKind.pharmacy:
-        return 'أقسام الصيدلية';
       case CatalogScopeKind.stores:
         return 'الأقسام';
     }
@@ -87,8 +74,6 @@ class CatalogScope {
     switch (kind) {
       case CatalogScopeKind.grocery:
         return 'لا توجد بقالات مطابقة للفلاتر';
-      case CatalogScopeKind.pharmacy:
-        return 'لا توجد صيدليات مطابقة للفلاتر';
       case CatalogScopeKind.stores:
         return 'لا توجد متاجر مطابقة للفلاتر';
     }
@@ -98,8 +83,6 @@ class CatalogScope {
     switch (kind) {
       case CatalogScopeKind.grocery:
         return 'assets/images/categories/cat_grocery.webp';
-      case CatalogScopeKind.pharmacy:
-        return 'assets/images/categories/cat_pharmacy.jpg';
       case CatalogScopeKind.stores:
         return 'assets/images/categories/cat_stores.jpg';
     }
@@ -109,10 +92,8 @@ class CatalogScope {
     switch (kind) {
       case CatalogScopeKind.grocery:
         return 1;
-      case CatalogScopeKind.pharmacy:
-        return 2;
       case CatalogScopeKind.stores:
-        return 3;
+        return 1;
     }
   }
 }

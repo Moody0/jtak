@@ -41,13 +41,13 @@ class _PhoneWidgetState extends State<PhoneWidget> {
         _isPhoneNumberValid = value;
       },
       maxLength: 13,
-      textStyle: const TextStyle(fontSize: 18, fontFamily: ''),
+      textStyle: const TextStyle(fontSize: 16, fontFamily: AppTheme.fontFamily),
       spaceBetweenSelectorAndTextField: 0,
       locale: locator<AppStateManager>().appLanguage,
       hintText: str.formAndAction.phone,
       isEnabled: widget.isEnabled,
       countries: kCountriesCode.values.toList(),
-      selectorTextStyle: const TextStyle(fontSize: 18, fontFamily: '', color: colorGrey),
+      selectorTextStyle: const TextStyle(fontSize: 15, fontFamily: AppTheme.fontFamily, color: colorGrey),
       searchBoxDecoration: InputDecoration(labelText: str.main.search),
       selectorConfig: const SelectorConfig(selectorType: PhoneInputSelectorType.DIALOG),
       inputDecoration: AppTheme.getBorderdTextFieldDecoration(lable: str.formAndAction.phone).copyWith(

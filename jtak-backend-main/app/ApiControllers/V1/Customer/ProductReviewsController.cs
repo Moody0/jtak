@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Extensions;
 using App.Shared.Services;
 using App.Shared.Services.Domain;
@@ -109,13 +109,14 @@ namespace App.ApiControllers.V1.Customer
         /// </summary>
         /// <returns></returns>
         [HttpPost]
-        [Route("{id}")]
+        [Route("{orderId}")]
         public async Task<ActionResult<int>> Create(int orderId, CreateOrderReview model)
         {
             var uid = User.GetUserId();
+            var targetOrderId = orderId > 0 ? orderId : model.OrderId;
             var orderDetails = await _orderDetailService.Queryable()
                                                   .Include(x => x.Order)
-                                                  .Where(x => x.OrderId == model.OrderId && x.Order.UserId == uid)
+                                                  .Where(x => x.OrderId == targetOrderId && x.Order.UserId == uid)
                                                   .ToArrayAsync();
 
             var reviews = orderDetails.Select(x => new ProductReview
@@ -125,7 +126,7 @@ namespace App.ApiControllers.V1.Customer
                 //ImageReview = model.ImageReview,
                 TextReview = model.TextReview,
 
-                ProductId = x.Id,
+                ProductId = x.ProductId,
                 ProductTitle = x.ProductTitle,
                 ProductImage = x.ProductImage,
 
@@ -142,10 +143,20 @@ namespace App.ApiControllers.V1.Customer
         /// Delete product review
         /// </summary>
         /// <returns></returns>
+        [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         [HttpDelete]
         [Route("{id}")]
         public async Task<ActionResult<bool>> Delete(int id)
         {
+            var entity = await _service.FindAsync(id);
+            if (entity == null) return NotFound();
+
+            var uid = User.GetUserId();
+            if (uid == null || entity.ReviewerId != uid.Value)
+            {
+                return Forbid();
+            }
+
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();
             return true;

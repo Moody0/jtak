@@ -5,12 +5,17 @@ import 'package:jtek_app/src/core/services/firebase_notification_services.dart';
 import 'package:jtek_app/src/core/services/local_notification_service.dart';
 
 class AppParametersProvider extends BaseProvider {
-  MainAddressService mainAddressService = MainAddressService();
-  FireBaseNotificationServices notificationServices = FireBaseNotificationServices();
-  LocalNotificationService localNotificationService = LocalNotificationService();
+  late final MainAddressService mainAddressService;
+  final FireBaseNotificationServices notificationServices = FireBaseNotificationServices();
+  final LocalNotificationService localNotificationService = LocalNotificationService();
+
+  AppParametersProvider() {
+    mainAddressService = MainAddressService(onAddressChanged: notifyListeners);
+  }
 
   Future loadMainParameters(BuildContext context) async {
     await mainAddressService.checkMainCorrdinate(context);
+    notifyListeners();
   }
 
   Future initServices(BuildContext context) async {

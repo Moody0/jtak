@@ -24,15 +24,17 @@ namespace App.ApiControllers.V1.Admin
     {
         private readonly IProductService _service;
         private readonly IProductCategoryService _categoryService;
+        private readonly IMerchantService _merchantService;
         private readonly IGenericSettingService _genericSetting;
         private readonly IAppUnitOfWork _unitOfWork;
         private readonly ILogger _logger;
         private readonly IMapper _mapper;
 
-        public SettingsController(IProductService service, IProductCategoryService categoryService, IGenericSettingService genericSetting, IAppUnitOfWork unitOfWork, IMapper mapper, ILogger<SettingsController> logger)
+        public SettingsController(IProductService service, IProductCategoryService categoryService, IMerchantService merchantService, IGenericSettingService genericSetting, IAppUnitOfWork unitOfWork, IMapper mapper, ILogger<SettingsController> logger)
         {
             _service = service;
             _categoryService = categoryService;
+            _merchantService = merchantService;
             _genericSetting = genericSetting;
             _unitOfWork = unitOfWork;
             _logger = logger;
@@ -49,6 +51,22 @@ namespace App.ApiControllers.V1.Admin
             vm.HomeFeaturedCategories = null;
             vm.HomeFeaturedProducts = null;
             await _genericSetting.SetValue(nameof(SettingsVm), vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+
+            // The rest of the settings blob is stored per language, but a rate
+            // is not translatable and every culture has to resolve the same
+            // one, so it is kept under its own neutral key as well.
+            var previous = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
+            if (vm.UsdToSypExchangeRate > 0 && (previous?.Rate ?? 0) != vm.UsdToSypExchangeRate)
+            {
+                await _genericSetting.SetValue(UsdExchangeRateSetting.Key,
+                                               new UsdExchangeRateSetting { Rate = vm.UsdToSypExchangeRate });
+
+                // Dollar-quoted products store their selling price in the local
+                // currency, so the new rate has to be written through to them.
+                var repriced = await _merchantService.RepriceUsdDenominatedProducts(vm.UsdToSypExchangeRate);
+                _logger.LogInformation("Exchange rate changed to {Rate}; repriced {Count} dollar-quoted products.",
+                                       vm.UsdToSypExchangeRate, repriced);
+            }
             return true;
         }
 
@@ -63,6 +81,14 @@ namespace App.ApiControllers.V1.Admin
             if (settings == null)
             {
                 settings = new SettingsVm();
+            }
+
+            // The neutral key is the authority for the rate; the copy inside the
+            // localized blob is only there for older clients.
+            var rate = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
+            if (rate != null && rate.Rate > 0)
+            {
+                settings.UsdToSypExchangeRate = rate.Rate;
             }
             var featuredCategoryIds = settings.HomeFeaturedCategoryIds?
                 .Where(id => id > 0)

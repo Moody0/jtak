@@ -80,10 +80,8 @@ class ProductSingleItem extends StatelessWidget {
           return IconButton(
             icon: Icon(icon, color: color),
             onPressed: () {
-              if (res) {
-                favProvider.delete(item.id!);
-              } else {
-                favProvider.add(item);
+              if (item.id != null) {
+                favProvider.toggleMealFavorite(item.id!, item);
               }
             },
           );

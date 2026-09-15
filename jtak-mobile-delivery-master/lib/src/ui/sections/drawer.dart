@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../main_imports.dart';
 import '../../config/themes/colors.dart';
 import '../../core/controllers/app/app_state_manager.dart';
+import '../../core/controllers/order_provider.dart';
 import '../../core/services/authentication_service.dart';
 import '../../core/services/locator.dart';
 import '../../utils/custom_widgets/messages.dart';
@@ -160,6 +161,47 @@ class _HomeDrawerState extends State<HomeDrawer> {
                         textDirection: TextDirection.ltr,
                       ),
                     ],
+                    const SizedBox(height: 6),
+                    Consumer<OrderProvider>(
+                      builder: (ctx, orderProv, _) {
+                        final online = orderProv.isOnline;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: online
+                                ? (isDark ? const Color(0xFF064E3B) : kGreenLight)
+                                : (isDark ? const Color(0xFF7F1D1D) : kRedLight),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: online ? kGreen : kRed,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                online
+                                    ? (isArabic ? 'الوردية نشطة (متاح)' : 'Shift Active (Online)')
+                                    : (isArabic ? 'الوردية متوقفة (غير متاح)' : 'Shift Paused (Offline)'),
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: online
+                                      ? (isDark ? const Color(0xFF34D399) : kGreen)
+                                      : (isDark ? const Color(0xFFF87171) : kRed),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -188,7 +230,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         border: isSelected
-            ? Border.all(color: kPrimaryOrange.withOpacity(0.35), width: 1.1)
+            ? Border.all(color: kPrimaryOrange.withValues(alpha: 0.35), width: 1.1)
             : Border.all(color: Colors.transparent, width: 1.1),
       ),
       child: Material(

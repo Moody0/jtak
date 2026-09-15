@@ -8,8 +8,12 @@ import 'package:provider/provider.dart';
 import '../../config/themes/colors.dart';
 import '../../core/controllers/initial_data_provider.dart';
 import '../../core/models/banner_model.dart';
-import '../../utils/custom_widgets/shimmer.dart';
 import '../../utils/utilities/global_var.dart';
+import 'clean_shimmer_skeletons.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../pages/catalog/market_page.dart';
+import '../pages/catalog/restaurant_menu_page.dart';
+import '../pages/catalog/restaurants_list_page.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Daily Offers Section (العروض اليومية)
@@ -133,15 +137,20 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
     final bool hasApiBanners = GlobalVar.checkListNotEmpty(apiBanners);
 
     List<String> validUrls = [];
+    List<BannerModel> validBannerModels = [];
     if (hasApiBanners) {
-      validUrls = apiBanners
-          .map((b) => (b.featuredImage != null && b.featuredImage!.isNotEmpty)
-              ? (b.featuredImage!.startsWith('http')
-                  ? b.featuredImage!
-                  : GlobalVar.getImageUrl(b.featuredImage!, width: 800, height: 450, crop: false))
-              : '')
-          .where((url) => url.isNotEmpty)
-          .toList();
+      for (final b in apiBanners) {
+        final img = b.featuredImage;
+        if (img != null && img.isNotEmpty) {
+          final url = img.startsWith('http')
+              ? img
+              : GlobalVar.getImageUrl(img, width: 800, height: 450, crop: false);
+          if (url.isNotEmpty) {
+            validUrls.add(url);
+            validBannerModels.add(b);
+          }
+        }
+      }
     }
 
     final List<String> bannerList = validUrls.isNotEmpty ? validUrls : _defaultBannerImages;
@@ -234,13 +243,16 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
                 },
                 itemBuilder: (context, index) {
                   final bannerIndex = index % bannerList.length;
+                  final bannerModel = bannerIndex < validBannerModels.length ? validBannerModels[bannerIndex] : null;
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6.0),
                     child: _buildPureImageBanner(
                       imagePath: bannerList[bannerIndex],
                       height: cardHeight,
                       onTap: () {
-                        if (widget.onViewAllTap != null) {
+                        if (bannerModel != null) {
+                          _handleBannerTap(context, bannerModel);
+                        } else if (widget.onViewAllTap != null) {
                           widget.onViewAllTap!();
                         }
                       },
@@ -284,6 +296,64 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
     );
   }
 
+  void _handleBannerTap(BuildContext context, BannerModel banner) async {
+    final rawUrl = (banner.url ?? '').trim();
+    if (rawUrl.isEmpty || rawUrl == 'none' || rawUrl == 'no_link') {
+      return; // Display only
+    }
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      final uri = Uri.tryParse(rawUrl);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+
+    final cleanUrl = rawUrl.split('#').first.trim();
+    if (cleanUrl.startsWith('restaurant:')) {
+      final id = int.tryParse(cleanUrl.split(':').last);
+      if (id != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RestaurantMenuPage(
+              restaurantId: id,
+              restaurantName: (banner.title != null && banner.title!.isNotEmpty) ? banner.title! : 'المطعم',
+            ),
+          ),
+        );
+        return;
+      }
+    } else if (cleanUrl.startsWith('merchant:') || cleanUrl.startsWith('market:')) {
+      final id = int.tryParse(cleanUrl.split(':').last);
+      if (id != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarketPage(
+              marketId: id,
+              marketName: (banner.title != null && banner.title!.isNotEmpty) ? banner.title! : 'المتجر',
+            ),
+          ),
+        );
+        return;
+      }
+    } else if (cleanUrl == 'offers' || cleanUrl == 'promotions') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const RestaurantsListPage(initialFilter: 'عروض'),
+        ),
+      );
+      return;
+    }
+
+    if (widget.onViewAllTap != null) {
+      widget.onViewAllTap!();
+    }
+  }
+
   /// Pure Image Banner Container (100% full-bleed image with crisp 24px rounded corners and soft shadow)
   Widget _buildPureImageBanner({
     required String imagePath,
@@ -310,13 +380,9 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
                   height: height,
                   fadeInDuration: const Duration(milliseconds: 220),
                   fadeOutDuration: const Duration(milliseconds: 150),
-                  placeholder: (context, url) => Shimmer.fromColors(
-                    baseColor: const Color(0xFFF1F5F9),
-                    highlightColor: const Color(0xFFF8FAFC),
-                    child: Container(
-                      width: double.infinity,
-                      height: height,
-                      color: const Color(0xFFF1F5F9),
+                  placeholder: (context, url) => const CleanShimmer(
+                    child: SizedBox.expand(
+                      child: ColoredBox(color: Colors.white),
                     ),
                   ),
                   errorWidget: (context, url, error) => Container(

@@ -1,16 +1,16 @@
 <main class="merchant-workspace">
   <div class="merchant-workspace-loading" *ngIf="isLoading">
-    <span class="spinner-border" aria-hidden="true"></span><strong>Loading merchant workspace…</strong>
+    <span class="spinner-border" aria-hidden="true"></span><strong>{{ 'MERCHANT_WORKSPACE.LOADING' | translate }}</strong>
   </div>
 
   <div class="merchant-workspace-error" *ngIf="loadError">
-    <i class="fas fa-exclamation-circle"></i><h2>Couldn’t load this merchant</h2><p>Check your connection and try again.</p>
-    <button type="button" class="btn btn-primary" (click)="loadWorkspace()">Try again</button>
+    <i class="fas fa-exclamation-circle"></i><h2>{{ 'MERCHANT_WORKSPACE.ERROR_TITLE' | translate }}</h2><p>{{ 'MERCHANT_WORKSPACE.ERROR_DESC' | translate }}</p>
+    <button type="button" class="btn btn-primary" (click)="loadWorkspace()">{{ 'MERCHANT_WORKSPACE.TRY_AGAIN' | translate }}</button>
   </div>
 
   <ng-container *ngIf="merchant && !isLoading">
     <header class="merchant-header">
-      <a routerLink="/merchants" class="merchant-back"><i class="fas fa-arrow-left"></i> All merchants</a>
+      <a routerLink="/merchants" class="merchant-back"><i class="fas fa-arrow-left rtl-flip me-1"></i> {{ 'MERCHANT_WORKSPACE.ALL_MERCHANTS' | translate }}</a>
       <div class="merchant-identity">
         <div class="merchant-logo">
           <img *ngIf="merchant.photo" [src]="filesService.getFile(merchant.photo, 96, 96)" [alt]="merchant.title" (error)="onImageError($event)" />
@@ -22,93 +22,322 @@
               {{ merchantTitleAr }}
               <span class="text-muted fs-5 ms-2 font-weight-normal" *ngIf="merchantTitleEn">({{ merchantTitleEn }})</span>
             </h2>
-            <span class="badge" [ngClass]="merchant.active ? 'badge-light-success' : 'badge-light-danger'">{{ merchant.active ? 'Active' : 'Disabled' }}</span>
+            <span class="badge" [ngClass]="merchant.active ? 'badge-light-success' : 'badge-light-danger'">{{ merchant.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}</span>
           </div>
-          <p>{{ merchant.shortDescription || merchant.address || 'Merchant workspace' }}</p>
-          <div class="merchant-meta"><span><i class="fas fa-box"></i>{{ enabledProductsCount }} active products</span><span><i class="fas fa-folder"></i>{{ merchantMainCount }} main categories</span><span><i class="fas fa-tags"></i>{{ merchantSubCount }} subcategories</span></div>
+          <p>{{ merchant.shortDescription || merchant.address || ('MERCHANT_WORKSPACE.MERCHANT_INFO' | translate) }}</p>
+          <div class="merchant-meta"><span><i class="fas fa-box me-1"></i>{{ enabledProductsCount }} {{ 'MERCHANT_WORKSPACE.ACTIVE_PRODUCTS' | translate }}</span><span><i class="fas fa-folder me-1"></i>{{ merchantMainCount }} {{ 'MERCHANT_WORKSPACE.MAIN_CATEGORIES' | translate }}</span><span><i class="fas fa-tags me-1"></i>{{ merchantSubCount }} {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }}</span></div>
         </div>
       </div>
       <div class="merchant-header-actions">
-        <span class="unsaved-indicator" *ngIf="hasChanges"><i></i> Unsaved catalog changes</span>
-        <button type="button" class="btn btn-light" *ngIf="hasChanges" (click)="resetChanges()">Discard</button>
+        <span class="unsaved-indicator" *ngIf="hasChanges"><i></i> {{ 'MERCHANT_WORKSPACE.UNSAVED_CHANGES' | translate }}</span>
+        <button type="button" class="btn btn-light" *ngIf="hasChanges" (click)="resetChanges()">{{ 'MERCHANT_WORKSPACE.DISCARD' | translate }}</button>
         <button type="button" class="btn btn-primary" [disabled]="!hasChanges || isSaving" (click)="saveCatalog()">
-          <span *ngIf="isSaving" class="spinner-border spinner-border-sm"></span><i *ngIf="!isSaving" class="fas fa-check"></i>{{ isSaving ? 'Saving…' : 'Save catalog' }}
+          <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-1"></span><i *ngIf="!isSaving" class="fas fa-check me-1"></i>{{ isSaving ? ('COMMON.SAVING' | translate) : ('MERCHANT_WORKSPACE.SAVE_CATALOG' | translate) }}
         </button>
       </div>
     </header>
 
     <nav class="merchant-tabs" aria-label="Merchant workspace sections">
-      <a [routerLink]="['/merchants', merchant.id, 'overview']" routerLinkActive="active"><i class="fas fa-store"></i><span>Overview</span></a>
-      <a [routerLink]="['/merchants', merchant.id, 'products']" routerLinkActive="active"><i class="fas fa-box-open"></i><span>Products</span><small>{{ enabledProductsCount }}</small></a>
-      <a [routerLink]="['/merchants', merchant.id, 'categories']" routerLinkActive="active"><i class="fas fa-tags"></i><span>Categories</span><small>{{ merchantMainCount }} main · {{ merchantSubCount }} sub</small></a>
+      <a [routerLink]="['/merchants', merchant.id, 'overview']" routerLinkActive="active"><i class="fas fa-store me-1"></i><span>{{ 'MERCHANT_WORKSPACE.TAB_OVERVIEW' | translate }}</span></a>
+      <a [routerLink]="['/merchants', merchant.id, 'products']" routerLinkActive="active"><i class="fas fa-box-open me-1"></i><span>{{ 'MERCHANT_WORKSPACE.TAB_PRODUCTS' | translate }}</span><small class="ms-1">{{ enabledProductsCount }}</small></a>
+      <a [routerLink]="['/merchants', merchant.id, 'categories']" routerLinkActive="active"><i class="fas fa-tags me-1"></i><span>{{ 'MERCHANT_WORKSPACE.TAB_CATEGORIES' | translate }}</span><small class="ms-1">{{ merchantMainCount }} {{ 'MERCHANT_WORKSPACE.MAIN_CATEGORIES' | translate }} · {{ merchantSubCount }} {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }}</small></a>
     </nav>
 
     <section class="merchant-tab-panel" *ngIf="activeTab === 'overview'">
       <div class="merchant-overview-grid">
         <article class="merchant-detail-card merchant-detail-card--wide">
-          <div class="merchant-card-heading"><div><span>Business profile</span><h3>Merchant information</h3></div><button type="button" class="btn btn-sm btn-light" (click)="editMerchant()"><i class="fas fa-pen"></i>Edit details</button></div>
+          <div class="merchant-card-heading"><div><span>{{ 'MERCHANT_WORKSPACE.BUSINESS_PROFILE' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.MERCHANT_INFO' | translate }}</h3></div><button type="button" class="btn btn-sm btn-light" (click)="editMerchant()"><i class="fas fa-pen me-1"></i>{{ 'MERCHANT_WORKSPACE.EDIT_DETAILS' | translate }}</button></div>
           <dl class="merchant-details">
-            <div><dt>Owner</dt><dd>{{ merchant.owner || 'Not assigned' }}</dd></div>
-            <div><dt>Primary phone</dt><dd>{{ merchant.phone1 || 'Not provided' }}</dd></div>
-            <div><dt>Secondary phone</dt><dd>{{ merchant.phone2 || 'Not provided' }}</dd></div>
-            <div><dt>Address</dt><dd>{{ merchant.address || 'Not provided' }}</dd></div>
+            <div><dt>{{ 'MERCHANT_WORKSPACE.OWNER' | translate }}</dt><dd>{{ merchant.owner || ('MERCHANT_WORKSPACE.NOT_ASSIGNED' | translate) }}</dd></div>
+            <div><dt>{{ 'MERCHANT_WORKSPACE.PRIMARY_PHONE' | translate }}</dt><dd>{{ merchant.phone1 || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</dd></div>
+            <div><dt>{{ 'MERCHANT_WORKSPACE.SECONDARY_PHONE' | translate }}</dt><dd>{{ merchant.phone2 || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</dd></div>
+            <div><dt>{{ 'MERCHANT_WORKSPACE.ADDRESS' | translate }}</dt><dd>{{ merchant.address || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</dd></div>
           </dl>
         </article>
         <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>Commercial</span><h3>Commission</h3></div></div>
-          <strong class="merchant-large-value">{{ merchant.profitOutOfMerchantPricePercent || 0 }}%</strong><p>JTAK profit from merchant price</p>
+          <div class="merchant-card-heading"><div><span>سياسات التوصيل</span><h3>مدة التوصيل المتوقعة</h3></div></div>
+          <strong class="merchant-large-value text-primary">{{ merchant.deliveryTime || '20-30 دقيقة' }}</strong><p>تظهر للعملاء في تطبيق الهواتف الذكية</p>
         </article>
         <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>Delivery</span><h3>Coverage radius</h3></div></div>
-          <strong class="merchant-large-value">{{ merchant.shippingCoverageInMeters | number }}</strong><p>meters from pickup location</p>
+          <div class="merchant-card-heading"><div><span>سياسات التوصيل</span><h3>رسوم التوصيل</h3></div></div>
+          <strong class="merchant-large-value text-success">{{ (merchant.deliveryFee !== undefined && merchant.deliveryFee !== null ? (merchant.deliveryFee | number) : '5,000') }} ل.س</strong><p>تكلفة التوصيل المحسوبة لطلبات هذا المتجر</p>
+        </article>
+        <article class="merchant-detail-card">
+          <div class="merchant-card-heading"><div><span>سياسات التوصيل</span><h3>الحد الأدنى للطلب</h3></div></div>
+          <strong class="merchant-large-value text-warning">{{ (merchant.minOrderAmount !== undefined && merchant.minOrderAmount !== null ? (merchant.minOrderAmount | number) : '15,000') }} ل.س</strong><p>أقل قيمة سلة مسموح بها لإتمام الطلب</p>
+        </article>
+        <article class="merchant-detail-card">
+          <div class="merchant-card-heading"><div><span>حالة المتجر</span><h3>ساعات العمل</h3></div></div>
+          <strong class="merchant-large-value text-dark">{{ merchant.workingHours || 'حتى 3 ص' }}</strong><p>مواعيد الفتح والإغلاق على غلاف المتجر</p>
+        </article>
+        <article class="merchant-detail-card">
+          <div class="merchant-card-heading"><div><span>{{ 'MERCHANTS_PAGE.COL_COMMISSION' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.COMMISSION' | translate }}</h3></div></div>
+          <strong class="merchant-large-value">{{ merchant.profitOutOfMerchantPricePercent || 0 }}%</strong><p>{{ 'MERCHANT_WORKSPACE.COMMISSION_DESC' | translate }}</p>
+        </article>
+        <article class="merchant-detail-card">
+          <div class="merchant-card-heading"><div><span>{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.COVERAGE_RADIUS' | translate }}</h3></div></div>
+          <strong class="merchant-large-value">{{ merchant.shippingCoverageInMeters | number }}</strong><p>{{ 'MERCHANT_WORKSPACE.COVERAGE_METERS' | translate }}</p>
         </article>
         <article class="merchant-detail-card merchant-detail-card--wide">
-          <div class="merchant-card-heading"><div><span>About</span><h3>Description</h3></div></div>
-          <p class="merchant-description">{{ merchant.description || 'No merchant description has been added.' }}</p>
+          <div class="merchant-card-heading"><div><span>{{ 'MERCHANT_WORKSPACE.ABOUT' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.DESCRIPTION' | translate }}</h3></div></div>
+          <p class="merchant-description">{{ merchant.description || ('MERCHANT_WORKSPACE.NO_DESCRIPTION' | translate) }}</p>
         </article>
       </div>
     </section>
 
     <section class="merchant-tab-panel" *ngIf="activeTab === 'products'">
       <div class="workspace-toolbar">
-        <div><h3>Merchant products</h3><p>Manage product details, images, visibility, merchant availability, and profit.</p></div>
+        <div>
+          <h3>{{ 'MERCHANT_WORKSPACE.PRODUCTS_TITLE' | translate }}</h3>
+          <p>{{ 'MERCHANT_WORKSPACE.PRODUCTS_DESC' | translate }}</p>
+        </div>
         <div class="workspace-filters">
-          <button type="button" class="btn btn-primary" (click)="createProduct()"><i class="fas fa-plus"></i>Add product</button>
-          <select class="form-select" [(ngModel)]="categoryFilter" aria-label="Filter by category"><option value="">All categories</option><option *ngFor="let category of categoryNames" [value]="category">{{ category }}</option></select>
-          <div class="workspace-search"><i class="fas fa-search"></i><input type="search" class="form-control" [(ngModel)]="searchTerm" placeholder="Search products" /></div>
+          <button type="button" class="btn btn-primary" (click)="createProduct()">
+            <i class="fas fa-plus me-1"></i>{{ 'MERCHANT_WORKSPACE.ADD_PRODUCT' | translate }}
+          </button>
+          <select
+            class="form-select"
+            [(ngModel)]="categoryFilter"
+            (ngModelChange)="onProductFilterChange()"
+            aria-label="Filter by category"
+          >
+            <option value="">{{ 'MERCHANT_WORKSPACE.ALL_CATEGORIES' | translate }}</option>
+            <option *ngFor="let category of categoryNames" [value]="category">{{ category }}</option>
+          </select>
+          <div class="workspace-search">
+            <i class="fas fa-search"></i>
+            <input
+              type="search"
+              class="form-control"
+              [(ngModel)]="searchTerm"
+              (ngModelChange)="onProductFilterChange()"
+              [placeholder]="'MERCHANT_WORKSPACE.SEARCH_PRODUCTS' | translate"
+            />
+          </div>
         </div>
       </div>
-      <div class="workspace-selection-row">
-        <label><input type="checkbox" class="form-check-input" [checked]="allVisibleSelected()" [indeterminate]="someVisibleSelected()" (change)="toggleAllVisible($any($event.target).checked)" /> Select all {{ visibleProducts.length }} visible products</label>
-        <span>{{ enabledProductsCount }} products enabled</span>
+
+      <!-- Bulk Action Bar -->
+      <div class="workspace-bulk-bar m-4 mb-2" *ngIf="selectedProductsCount > 0">
+        <div class="bulk-bar-left">
+          <span class="bulk-badge">
+            <i class="fas fa-check-double me-1"></i>
+            تم تحديد <strong>{{ selectedProductsCount }}</strong> منتج
+          </span>
+          <button
+            type="button"
+            class="btn btn-sm btn-link text-primary fw-bold"
+            *ngIf="selectedProductsCount < visibleProducts.length"
+            (click)="toggleAllFiltered(true)"
+          >
+            تحديد كافة النتائج المطابقة ({{ visibleProducts.length }})
+          </button>
+        </div>
+        <div class="bulk-bar-actions">
+          <button type="button" class="btn btn-sm btn-light-success" (click)="bulkEnableInMerchant()">
+            <i class="fas fa-check-circle me-1"></i> تفعيل في المتجر
+          </button>
+          <button type="button" class="btn btn-sm btn-light-warning" (click)="bulkRemoveFromMerchant()">
+            <i class="fas fa-ban me-1"></i> تعطيل في المتجر
+          </button>
+
+          <div class="btn-group" ngbDropdown>
+            <button type="button" class="btn btn-sm btn-light dropdown-toggle" ngbDropdownToggle>
+              <i class="fas fa-percentage me-1"></i> نسبة الربح
+            </button>
+            <div ngbDropdownMenu class="dropdown-menu-end shadow">
+              <button ngbDropdownItem (click)="bulkSetExtraProfit(0)">0% (سعر المتجر الأصلي)</button>
+              <button ngbDropdownItem (click)="bulkSetExtraProfit(5)">5% ربح إضافي</button>
+              <button ngbDropdownItem (click)="bulkSetExtraProfit(10)">10% ربح إضافي</button>
+              <button ngbDropdownItem (click)="bulkSetExtraProfit(15)">15% ربح إضافي</button>
+              <button ngbDropdownItem (click)="bulkSetExtraProfit(20)">20% ربح إضافي</button>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-sm btn-danger" (click)="deleteSelectedProducts()">
+            <i class="fas fa-trash me-1"></i> حذف المحدد
+          </button>
+
+          <button type="button" class="btn btn-sm btn-light" (click)="clearProductSelection()" title="إلغاء التحديد">
+            <i class="fas fa-times me-1"></i> إلغاء التحديد
+          </button>
+        </div>
       </div>
+
+      <div class="workspace-selection-row">
+        <div class="d-flex align-items-center gap-3">
+          <label class="d-inline-flex align-items-center cursor-pointer m-0">
+            <input
+              type="checkbox"
+              class="form-check-input me-2"
+              [checked]="allVisibleSelected()"
+              [indeterminate]="someVisibleSelected()"
+              (change)="toggleAllVisible($any($event.target).checked)"
+            />
+            {{ 'MERCHANT_WORKSPACE.SELECT_ALL_PAGE' | translate }} ({{ paginatedProducts.length }})
+          </label>
+          <button
+            type="button"
+            class="btn btn-link btn-sm p-0 text-primary fw-bold"
+            (click)="toggleAllFiltered(true)"
+            *ngIf="visibleProducts.length > paginatedProducts.length"
+          >
+            {{ 'MERCHANT_WORKSPACE.SELECT_ALL_MATCHING' | translate }} ({{ visibleProducts.length }})
+          </button>
+        </div>
+        <span>
+          <strong>{{ enabledProductsCount }}</strong> {{ 'MERCHANT_WORKSPACE.PRODUCTS_ENABLED' | translate }} (إجمالي {{ visibleProducts.length }} مطابق)
+        </span>
+      </div>
+
       <div class="table-responsive merchant-products-table">
-        <table class="table">
-          <thead><tr><th class="table-select-cell">Available</th><th>Product</th><th>Category</th><th class="text-end">Customer price</th><th class="text-end">Additional profit</th><th class="text-end">Actions</th></tr></thead>
-          <tbody>
-            <tr *ngFor="let item of visibleProducts; trackBy: trackByProduct" [class.table-row-selected]="item.isSelected">
-              <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="item.isSelected" [attr.aria-label]="'Enable ' + item.product" (change)="toggleProduct(item, $any($event.target).checked)" /></td>
-              <td><div class="workspace-product"><img [src]="filesService.getFile(item.productPhotos, 56, 56)" [alt]="item.product" loading="lazy" (error)="onImageError($event)" /><div><strong>{{ item.product }}</strong><small>Product #{{ item.productId }} · <span [class.text-danger]="item.productActive === false">{{ item.productActive === false ? 'Globally disabled' : 'Active' }}</span></small></div></div></td>
-              <td><span class="category-path"><span *ngIf="item.productCat2">{{ item.productCat2 }}</span><i *ngIf="item.productCat1 && item.productCat2" class="fas fa-chevron-right"></i><strong>{{ item.productCat1 || 'Uncategorized' }}</strong></span></td>
-              <td class="text-end"><span *ngIf="item.price !== item.finalPrice" class="old-price">{{ item.price | number }}</span><strong>{{ item.finalPrice | number }}</strong><small class="currency-label">SYP</small></td>
-              <td class="text-end"><div class="compact-percent"><input type="number" min="0" max="100" [(ngModel)]="item.additionalProfitPercent" [disabled]="!item.isSelected" [attr.aria-label]="'Additional profit for ' + item.product" /><span>%</span></div></td>
-              <td class="text-end"><div class="workspace-row-actions"><button type="button" class="btn btn-sm btn-light workspace-edit-button" (click)="editProduct(item)"><i class="fas fa-pen"></i>Edit</button><button type="button" class="btn btn-sm btn-light-danger" [attr.aria-label]="'Delete ' + item.product" (click)="deleteProduct(item)"><i class="fas fa-trash"></i></button></div></td>
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th class="table-select-cell">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="allVisibleSelected()"
+                  [indeterminate]="someVisibleSelected()"
+                  (change)="toggleAllVisible($any($event.target).checked)"
+                  title="تحديد الكل"
+                />
+              </th>
+              <th>{{ 'MERCHANT_WORKSPACE.COL_PRODUCT' | translate }}</th>
+              <th>{{ 'MERCHANT_WORKSPACE.COL_CATEGORY' | translate }}</th>
+              <th class="text-end">{{ 'MERCHANT_WORKSPACE.COL_CUSTOMER_PRICE' | translate }}</th>
+              <th class="text-center">{{ 'MERCHANT_WORKSPACE.COL_ADDITIONAL_PROFIT' | translate }}</th>
+              <th class="text-center">{{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}</th>
+              <th class="text-end">{{ 'MERCHANT_WORKSPACE.COL_ACTIONS' | translate }}</th>
             </tr>
-            <tr *ngIf="!visibleProducts.length"><td colspan="6"><div class="ops-empty"><i class="fas fa-search"></i><strong>No matching products</strong><span>Try a different search or category.</span></div></td></tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let item of paginatedProducts; trackBy: trackByProduct"
+              [class.table-row-selected]="isProductRowSelected(item)"
+            >
+              <td class="table-select-cell">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="isProductRowSelected(item)"
+                  [attr.aria-label]="'Select ' + item.product"
+                  (change)="toggleProductRowSelection(item, $any($event.target).checked)"
+                />
+              </td>
+              <td>
+                <div class="workspace-product">
+                  <img
+                    [src]="filesService.getFile(item.productPhotos, 56, 56)"
+                    [alt]="item.product"
+                    loading="lazy"
+                    (error)="onImageError($event)"
+                  />
+                  <div>
+                    <strong>{{ item.product }}</strong>
+                    <small>
+                      #{{ item.productId }} ·
+                      <span [class.text-danger]="item.productActive === false">
+                        {{ item.productActive === false ? ('MERCHANT_WORKSPACE.GLOBALLY_DISABLED' | translate) : ('COMMON.ACTIVE' | translate) }}
+                      </span>
+                    </small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="category-path">
+                  <span *ngIf="item.productCat2">{{ item.productCat2 }}</span>
+                  <i *ngIf="item.productCat1 && item.productCat2" class="fas fa-chevron-right rtl-flip"></i>
+                  <strong>{{ item.productCat1 || ('CATEGORIES_PAGE.SUBCATEGORY' | translate) }}</strong>
+                </span>
+              </td>
+              <td class="text-end">
+                <span *ngIf="item.price !== item.finalPrice" class="old-price">{{ item.price | number }}</span>
+                <strong>{{ item.finalPrice | number }}</strong>
+                <small class="currency-label ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
+              </td>
+              <td class="text-center">
+                <div class="compact-percent">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    [(ngModel)]="item.additionalProfitPercent"
+                    [disabled]="!item.isSelected"
+                    [attr.aria-label]="'Additional profit for ' + item.product"
+                  />
+                  <span>%</span>
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="in-store-switch justify-content-center">
+                  <div class="form-check form-switch form-check-custom form-check-solid m-0">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      [checked]="item.isSelected"
+                      (change)="toggleProduct(item, $any($event.target).checked)"
+                      [title]="item.isSelected ? 'متاح بالمتجر' : 'مخفي من المتجر'"
+                    />
+                  </div>
+                  <span class="store-status-badge" [ngClass]="item.isSelected ? 'status-active' : 'status-inactive'">
+                    {{ item.isSelected ? 'متاح' : 'مخفي' }}
+                  </span>
+                </div>
+              </td>
+              <td class="text-end">
+                <div class="workspace-row-actions">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light workspace-edit-button"
+                    (click)="editProduct(item)"
+                  >
+                    <i class="fas fa-pen me-1"></i>{{ 'COMMON.EDIT' | translate }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light-danger"
+                    [attr.aria-label]="'Delete ' + item.product"
+                    (click)="deleteProduct(item)"
+                    title="حذف من النظام"
+                  >
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="!visibleProducts.length">
+              <td colspan="7">
+                <div class="ops-empty">
+                  <i class="fas fa-search"></i>
+                  <strong>{{ 'MERCHANT_WORKSPACE.NO_MATCHING_PRODUCTS' | translate }}</strong>
+                  <span>{{ 'MERCHANT_WORKSPACE.TRY_DIFFERENT_SEARCH' | translate }}</span>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
+      <!-- Pagination -->
+      <app-paginator
+        *ngIf="visibleProducts.length > 0"
+        class="ops-paginator px-4 py-3 d-flex justify-content-between align-items-center flex-wrap"
+        [paginator]="paginator"
+        [isLoading]="isLoading"
+        (paginate)="paginate($event)"
+      ></app-paginator>
     </section>
 
     <section class="merchant-tab-panel" *ngIf="activeTab === 'categories'">
       <div class="workspace-toolbar">
         <div>
-          <h3>Merchant categories (تصنيفات المتجر)</h3>
-          <p>Split, organize, and toggle availability for main categories and subcategories.</p>
+          <h3>{{ 'MERCHANT_WORKSPACE.CATEGORIES_TITLE' | translate }}</h3>
+          <p>{{ 'MERCHANT_WORKSPACE.CATEGORIES_DESC' | translate }}</p>
         </div>
         <div class="d-flex align-items-center gap-3">
           <button type="button" class="btn btn-primary" (click)="createCategory()">
-            <i class="fas fa-plus"></i> Add category
+            <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
           </button>
         </div>
       </div>
@@ -117,16 +346,16 @@
       <div class="category-controls-bar">
         <div class="category-filter-pills" role="tablist" aria-label="Filter categories by level">
           <button type="button" [class.active]="categoryLevelFilter === 'all'" (click)="categoryLevelFilter = 'all'">
-            <i class="fas fa-layer-group"></i> All categories
-            <span class="count-badge">{{ categories.length }}</span>
+            <i class="fas fa-layer-group me-1"></i> {{ 'MERCHANT_WORKSPACE.ALL_CATS_PILL' | translate }}
+            <span class="count-badge ms-1">{{ categories.length }}</span>
           </button>
           <button type="button" [class.active]="categoryLevelFilter === 'main'" (click)="categoryLevelFilter = 'main'">
-            <i class="fas fa-folder"></i> Main categories (الرئيسية)
-            <span class="count-badge">{{ mainCategories.length }}</span>
+            <i class="fas fa-folder me-1"></i> {{ 'MERCHANT_WORKSPACE.MAIN_CATS_PILL' | translate }}
+            <span class="count-badge ms-1">{{ mainCategories.length }}</span>
           </button>
           <button type="button" [class.active]="categoryLevelFilter === 'sub'" (click)="categoryLevelFilter = 'sub'">
-            <i class="fas fa-tags"></i> Subcategories (الفرعية)
-            <span class="count-badge">{{ subCategories.length }}</span>
+            <i class="fas fa-tags me-1"></i> {{ 'MERCHANT_WORKSPACE.SUB_CATS_PILL' | translate }}
+            <span class="count-badge ms-1">{{ subCategories.length }}</span>
           </button>
         </div>
 
@@ -137,9 +366,9 @@
             [(ngModel)]="selectedMainCategoryId"
             aria-label="Filter by parent category"
           >
-            <option [ngValue]="null">All Main Categories</option>
+            <option [ngValue]="null">{{ 'MERCHANT_WORKSPACE.ALL_MAIN_OPTION' | translate }}</option>
             <option *ngFor="let m of mainCategories" [ngValue]="m.id">
-              {{ m.name }} ({{ m.subcategories.length }} sub)
+              {{ m.name }} ({{ m.subcategories.length }})
             </option>
           </select>
 
@@ -151,7 +380,7 @@
               (click)="categoryViewMode = 'grouped'"
               title="Hierarchical Grouped View"
             >
-              <i class="fas fa-sitemap"></i> Grouped
+              <i class="fas fa-sitemap me-1"></i> {{ 'MERCHANT_WORKSPACE.GROUPED_VIEW' | translate }}
             </button>
             <button
               type="button"
@@ -159,15 +388,15 @@
               (click)="categoryViewMode = 'grid'"
               title="Flat Grid View"
             >
-              <i class="fas fa-th-large"></i> Grid
+              <i class="fas fa-th-large me-1"></i> {{ 'MERCHANT_WORKSPACE.GRID_VIEW' | translate }}
             </button>
           </div>
 
           <!-- Expand / Collapse All (in grouped view) -->
           <div class="d-inline-flex gap-2" *ngIf="categoryLevelFilter === 'all' && categoryViewMode === 'grouped'">
-            <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="expandAll()">Expand all</button>
+            <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="expandAll()">توسيع الكل</button>
             <span class="text-muted">·</span>
-            <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="collapseAll()">Collapse all</button>
+            <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="collapseAll()">طي الكل</button>
           </div>
 
           <!-- Live Search Box -->
@@ -177,7 +406,7 @@
               type="search"
               class="form-control"
               [(ngModel)]="categorySearchTerm"
-              placeholder="Search categories…"
+              [placeholder]="'CATEGORIES_PAGE.SEARCH_PLACEHOLDER' | translate"
               aria-label="Search categories"
             />
           </div>
@@ -212,15 +441,15 @@
               <div class="main-category-texts">
                 <div class="main-category-title-line">
                   <h4>{{ mainCat.name }}</h4>
-                  <span class="badge-main-cat">Main Category</span>
+                  <span class="badge-main-cat">{{ 'CATEGORIES_PAGE.HOME_PAGE_MAIN' | translate }}</span>
                   <span class="badge" [ngClass]="mainCat.active ? 'badge-light-success' : 'badge-light-danger'">
-                    {{ mainCat.active ? 'Active' : 'Disabled' }}
+                    {{ mainCat.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}
                   </span>
                 </div>
 
                 <div class="main-category-meta-line">
-                  <span><i class="fas fa-layer-group text-primary"></i> <strong>{{ mainCat.subcategories.length }}</strong> subcategories</span>
-                  <span><i class="fas fa-box text-muted"></i> <strong>{{ mainCat.enabledProducts }}</strong> of <strong>{{ mainCat.totalProducts }}</strong> products available</span>
+                  <span><i class="fas fa-layer-group text-primary me-1"></i> <strong>{{ mainCat.subcategories.length }}</strong> {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }}</span>
+                  <span><i class="fas fa-box text-muted me-1"></i> <strong>{{ mainCat.enabledProducts }}</strong> / <strong>{{ mainCat.totalProducts }}</strong> {{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}</span>
                 </div>
 
                 <div class="category-progress mt-2" style="max-width: 320px;">
@@ -229,13 +458,13 @@
 
                 <div class="category-actions mt-2">
                   <button type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(mainCat)">
-                    <i class="fas fa-plus"></i> Add subcategory
+                    <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
                   </button>
                   <button *ngIf="mainCat.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(mainCat)">
-                    <i class="fas fa-pen"></i> Edit details & image
+                    <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
                   </button>
                   <button *ngIf="mainCat.id && !mainCat.totalProducts && !mainCat.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(mainCat)">
-                    <i class="fas fa-trash"></i> Delete
+                    <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
                   </button>
                 </div>
               </div>
@@ -273,21 +502,21 @@
                 <div class="merchant-category-copy">
                   <div class="category-title-row">
                     <h4>{{ sub.name }}</h4>
-                    <span class="badge-sub-cat">Subcategory</span>
+                    <span class="badge-sub-cat">{{ 'CATEGORIES_PAGE.SUBCATEGORY' | translate }}</span>
                     <span class="badge" [ngClass]="sub.active ? 'badge-light-success' : 'badge-light-danger'">
-                      {{ sub.active ? 'Active' : 'Disabled' }}
+                      {{ sub.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}
                     </span>
                   </div>
-                  <p>{{ sub.enabled }} of {{ sub.total }} products available</p>
+                  <p>{{ sub.enabled }} / {{ sub.total }} {{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}</p>
                   <div class="category-progress">
                     <span [style.width.%]="sub.total ? (sub.enabled / sub.total * 100) : 0"></span>
                   </div>
                   <div class="category-actions">
                     <button *ngIf="sub.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(sub)">
-                      <i class="fas fa-pen"></i> Edit
+                      <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
                     </button>
                     <button *ngIf="sub.id && !sub.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(sub)">
-                      <i class="fas fa-trash"></i> Delete
+                      <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
                     </button>
                   </div>
                 </div>
@@ -301,16 +530,16 @@
                     (change)="toggleCategory(sub, $any($event.target).checked)"
                   />
                   <span></span>
-                  <small>{{ !sub.total ? 'No products' : sub.enabled === sub.total ? 'Available' : sub.enabled > 0 ? 'Partial' : 'Unavailable' }}</small>
+                  <small>{{ !sub.total ? ('COMMON.NO_RECORDS' | translate) : sub.enabled === sub.total ? ('MERCHANT_WORKSPACE.COL_AVAILABLE' | translate) : sub.enabled > 0 ? 'جزئي' : 'غير متوفر' }}</small>
                 </label>
               </div>
             </div>
 
             <!-- Empty Subcategories in Main Category -->
             <div class="empty-subcategories-placeholder" *ngIf="!mainCat.subcategories.length">
-              <span>No subcategories created under <strong>{{ mainCat.name }}</strong> yet.</span>
-              <button type="button" class="btn btn-sm btn-light-primary" (click)="createSubcategory(mainCat)">
-                <i class="fas fa-plus"></i> Add first subcategory
+              <span>لم يتم إنشاء تصنيفات فرعية تحت <strong>{{ mainCat.name }}</strong> بعد.</span>
+              <button type="button" class="btn btn-sm btn-light-primary mt-2" (click)="createSubcategory(mainCat)">
+                <i class="fas fa-plus me-1"></i> إضافة أول تصنيف فرعي
               </button>
             </div>
           </div>
@@ -319,9 +548,9 @@
         <!-- Empty state when searching in grouped mode -->
         <div class="ops-empty" *ngIf="!displayMainCategories.length">
           <i class="fas fa-search"></i>
-          <strong>No matching categories found</strong>
-          <span>Try clearing the search or category filter.</span>
-          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+          <strong>{{ 'COMMON.NO_RECORDS' | translate }}</strong>
+          <span>جرب مسح البحث أو تغيير التصنيف.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">{{ 'COMMON.CLEAR' | translate }}</button>
         </div>
       </div>
 
@@ -336,29 +565,29 @@
           <div class="merchant-category-copy">
             <div class="category-title-row">
               <h4>{{ category.name }}</h4>
-              <span class="badge-main-cat">Main Category</span>
+              <span class="badge-main-cat">{{ 'CATEGORIES_PAGE.HOME_PAGE_MAIN' | translate }}</span>
               <span class="badge" [ngClass]="category.active ? 'badge-light-success' : 'badge-light-danger'">
-                {{ category.active ? 'Active' : 'Disabled' }}
+                {{ category.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}
               </span>
             </div>
             <p>
-              <strong>{{ category.subcategories.length }}</strong> subcategories · {{ category.enabledProducts }} of {{ category.totalProducts }} products available
+              <strong>{{ category.subcategories.length }}</strong> {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }} · {{ category.enabledProducts }} / {{ category.totalProducts }} {{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}
             </p>
             <div class="category-progress">
               <span [style.width.%]="category.totalProducts ? (category.enabledProducts / category.totalProducts * 100) : 0"></span>
             </div>
             <div class="category-actions">
               <button *ngIf="category.subcategories.length > 0" type="button" class="btn btn-sm btn-link category-edit-link" (click)="focusMainCategory(category.id)">
-                <i class="fas fa-tags"></i> View {{ category.subcategories.length }} subcategories
+                <i class="fas fa-tags me-1"></i> عرض {{ category.subcategories.length }} تصنيفات فرعية
               </button>
               <button type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
-                <i class="fas fa-plus"></i> Add subcategory
+                <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
               </button>
               <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
-                <i class="fas fa-pen"></i> Edit
+                <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
               </button>
               <button *ngIf="category.id && !category.totalProducts && !category.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
-                <i class="fas fa-trash"></i> Delete
+                <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
               </button>
             </div>
           </div>
@@ -378,9 +607,9 @@
 
         <div class="ops-empty" *ngIf="!displayMainCategories.length">
           <i class="fas fa-folder-open"></i>
-          <strong>No main categories found</strong>
-          <span>Try a different search or filter.</span>
-          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+          <strong>{{ 'COMMON.NO_RECORDS' | translate }}</strong>
+          <span>جرب مسح البحث أو تغيير التصنيف.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">{{ 'COMMON.CLEAR' | translate }}</button>
         </div>
       </div>
 
@@ -395,27 +624,27 @@
           <div class="merchant-category-copy">
             <div class="category-title-row">
               <h4>{{ category.name }}</h4>
-              <span class="badge-sub-cat">Subcategory</span>
+              <span class="badge-sub-cat">{{ 'CATEGORIES_PAGE.SUBCATEGORY' | translate }}</span>
               <span class="badge" [ngClass]="category.active ? 'badge-light-success' : 'badge-light-danger'">
-                {{ category.active ? 'Active' : 'Disabled' }}
+                {{ category.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}
               </span>
             </div>
             <p>
               <span class="category-path d-inline-flex align-items-center me-2">
-                <i class="fas fa-folder text-muted"></i> {{ category.parent || 'Uncategorized parent' }}
-                <i class="fas fa-chevron-right text-muted"></i>
+                <i class="fas fa-folder text-muted me-1"></i> {{ category.parent || 'التصنيف الرئيسي' }}
+                <i class="fas fa-chevron-right rtl-flip text-muted mx-1"></i>
               </span>
-              {{ category.enabled }} of {{ category.total }} products available
+              {{ category.enabled }} / {{ category.total }} {{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}
             </p>
             <div class="category-progress">
               <span [style.width.%]="category.total ? (category.enabled / category.total * 100) : 0"></span>
             </div>
             <div class="category-actions">
               <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
-                <i class="fas fa-pen"></i> Edit details & image
+                <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
               </button>
               <button *ngIf="category.id && !category.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
-                <i class="fas fa-trash"></i> Delete
+                <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
               </button>
             </div>
           </div>
@@ -429,15 +658,15 @@
               (change)="toggleCategory(category, $any($event.target).checked)"
             />
             <span></span>
-            <small>{{ !category.total ? 'No products' : category.enabled === category.total ? 'Available' : category.enabled > 0 ? 'Partial' : 'Unavailable' }}</small>
+            <small>{{ !category.total ? ('COMMON.NO_RECORDS' | translate) : category.enabled === category.total ? ('MERCHANT_WORKSPACE.COL_AVAILABLE' | translate) : category.enabled > 0 ? 'جزئي' : 'غير متوفر' }}</small>
           </label>
         </article>
 
         <div class="ops-empty" *ngIf="!displaySubCategories.length">
           <i class="fas fa-tags"></i>
-          <strong>No subcategories found</strong>
-          <span>Try selecting a different main category or clearing your search.</span>
-          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+          <strong>{{ 'COMMON.NO_RECORDS' | translate }}</strong>
+          <span>جرب اختيار تصنيف رئيسي آخر أو مسح البحث.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">{{ 'COMMON.CLEAR' | translate }}</button>
         </div>
       </div>
 
@@ -453,34 +682,34 @@
             <div class="category-title-row">
               <h4>{{ category.name }}</h4>
               <span [class]="category.isMain ? 'badge-main-cat' : 'badge-sub-cat'">
-                {{ category.isMain ? 'Main Category' : 'Subcategory' }}
+                {{ category.isMain ? ('CATEGORIES_PAGE.HOME_PAGE_MAIN' | translate) : ('CATEGORIES_PAGE.SUBCATEGORY' | translate) }}
               </span>
               <span class="badge" [ngClass]="category.active ? 'badge-light-success' : 'badge-light-danger'">
-                {{ category.active ? 'Active' : 'Disabled' }}
+                {{ category.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}
               </span>
             </div>
             <p>
               <span *ngIf="category.parent" class="category-path d-inline-flex align-items-center me-2">
-                <i class="fas fa-folder text-muted"></i> {{ category.parent }}
-                <i class="fas fa-chevron-right text-muted"></i>
+                <i class="fas fa-folder text-muted me-1"></i> {{ category.parent }}
+                <i class="fas fa-chevron-right rtl-flip text-muted mx-1"></i>
               </span>
               <span *ngIf="category.isMain && category.subcategories.length">
-                <strong>{{ category.subcategories.length }}</strong> subcategories ·
+                <strong>{{ category.subcategories.length }}</strong> {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }} ·
               </span>
-              {{ category.isMain ? category.enabledProducts : category.enabled }} of {{ category.isMain ? category.totalProducts : category.total }} products available
+              {{ category.isMain ? category.enabledProducts : category.enabled }} / {{ category.isMain ? category.totalProducts : category.total }} {{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}
             </p>
             <div class="category-progress">
               <span [style.width.%]="category.isMain ? (category.totalProducts ? category.enabledProducts / category.totalProducts * 100 : 0) : (category.total ? category.enabled / category.total * 100 : 0)"></span>
             </div>
             <div class="category-actions">
               <button *ngIf="category.isMain" type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
-                <i class="fas fa-plus"></i> Add subcategory
+                <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
               </button>
               <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
-                <i class="fas fa-pen"></i> Edit details & image
+                <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
               </button>
               <button *ngIf="category.id && !(category.isMain ? category.totalProducts : category.total)" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
-                <i class="fas fa-trash"></i> Delete
+                <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
               </button>
             </div>
           </div>
@@ -500,9 +729,9 @@
 
         <div class="ops-empty" *ngIf="!displayFlatCategories.length">
           <i class="fas fa-tags"></i>
-          <strong>No categories found</strong>
-          <span>Try a different search or filter.</span>
-          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">Clear filters</button>
+          <strong>{{ 'COMMON.NO_RECORDS' | translate }}</strong>
+          <span>جرب مسح البحث أو تغيير التصنيف.</span>
+          <button type="button" class="btn btn-sm btn-light mt-3" (click)="clearCategoryFilter()">{{ 'COMMON.CLEAR' | translate }}</button>
         </div>
       </div>
     </section>

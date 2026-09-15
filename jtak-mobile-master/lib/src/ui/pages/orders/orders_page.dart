@@ -56,12 +56,14 @@ class _OrderPageState extends State<OrderPage> with SingleTickerProviderStateMix
   }
 
   bool _isOrderActive(OrderModel order) {
-    if (order.orderDetails == null || order.orderDetails!.isEmpty) return false;
-    final status = order.orderDetails!.first.orderDetailStatus ?? OrderDetailsStatus.pending;
-    return status != OrderDetailsStatus.delivered &&
-        status != OrderDetailsStatus.customerCanceled &&
-        status != OrderDetailsStatus.deliveryCanceled &&
-        status != OrderDetailsStatus.merchantRejected;
+    if (order.orderDetails != null && order.orderDetails!.isNotEmpty) {
+      final status = order.orderDetails!.first.orderDetailStatus ?? OrderDetailsStatus.pending;
+      return status != OrderDetailsStatus.delivered &&
+          status != OrderDetailsStatus.customerCanceled &&
+          status != OrderDetailsStatus.deliveryCanceled &&
+          status != OrderDetailsStatus.merchantRejected;
+    }
+    return true;
   }
 
   @override
@@ -82,26 +84,24 @@ class _OrderPageState extends State<OrderPage> with SingleTickerProviderStateMix
           padding: const EdgeInsets.only(bottom: BottomNavigation.height),
           child: !isLogin && allOrders.isEmpty
               ? _buildGuestView()
-              : _provider.isBusy && allOrders.isEmpty
-                  ? const OrdersListSkeleton(count: 4)
-                  : Column(
-                      children: [
-                        // 1. Smooth Segmented TabBar
-                        _buildSegmentedTabBar(activeOrders.length, pastOrders.length),
+              : Column(
+                  children: [
+                    // 1. Smooth Segmented TabBar
+                    _buildSegmentedTabBar(activeOrders.length, pastOrders.length),
 
-                        // 2. Gesture-Enabled TabBarView with Zero Flickering
-                        Expanded(
-                          child: TabBarView(
-                            controller: _tabController,
-                            physics: const ClampingScrollPhysics(),
-                            children: [
-                              _buildOrdersTab(activeOrders, isActiveTab: true),
-                              _buildOrdersTab(pastOrders, isActiveTab: false),
-                            ],
-                          ),
-                        ),
-                      ],
+                    // 2. Gesture-Enabled TabBarView with Zero Flickering
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        physics: const ClampingScrollPhysics(),
+                        children: [
+                          _buildOrdersTab(activeOrders, isActiveTab: true),
+                          _buildOrdersTab(pastOrders, isActiveTab: false),
+                        ],
+                      ),
                     ),
+                  ],
+                ),
         ),
       ),
     );
@@ -133,7 +133,7 @@ class _OrderPageState extends State<OrderPage> with SingleTickerProviderStateMix
   Widget _buildSegmentedTabBar(int activeCount, int pastCount) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Container(
         height: 46,
         padding: const EdgeInsets.all(3.5),
@@ -144,6 +144,7 @@ class _OrderPageState extends State<OrderPage> with SingleTickerProviderStateMix
         ),
         child: TabBar(
           controller: _tabController,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
           indicator: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -152,11 +153,11 @@ class _OrderPageState extends State<OrderPage> with SingleTickerProviderStateMix
           labelColor: kPrimaryOrange,
           unselectedLabelColor: const Color(0xFF64748B),
           labelStyle: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w800,
           ),
           unselectedLabelStyle: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
           indicatorSize: TabBarIndicatorSize.tab,
@@ -165,20 +166,38 @@ class _OrderPageState extends State<OrderPage> with SingleTickerProviderStateMix
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(PhosphorIconsFill.motorcycle, size: 16),
-                  const SizedBox(width: 6),
-                  Text('الطلبات الحالية ($activeCount)'),
+                  const Icon(PhosphorIconsFill.motorcycle, size: 15),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'الطلبات الحالية ($activeCount)',
+                        maxLines: 1,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(PhosphorIconsFill.clockCounterClockwise, size: 16),
-                  const SizedBox(width: 6),
-                  Text('الطلبات السابقة ($pastCount)'),
+                  const Icon(PhosphorIconsFill.clockCounterClockwise, size: 15),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'الطلبات السابقة ($pastCount)',
+                        maxLines: 1,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -189,6 +208,9 @@ class _OrderPageState extends State<OrderPage> with SingleTickerProviderStateMix
   }
 
   Widget _buildOrdersTab(List<OrderModel> orders, {required bool isActiveTab}) {
+    if (_provider.isBusy && _provider.dataList.isEmpty) {
+      return const OrdersListSkeleton(count: 4);
+    }
     if (orders.isEmpty) {
       return RefreshIndicator(
         onRefresh: () async => _loadOrders(),

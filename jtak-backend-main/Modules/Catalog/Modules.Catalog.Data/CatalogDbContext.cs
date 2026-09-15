@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,7 +25,11 @@ namespace App.Catalog.Data
             // Set Tables Prefix
             foreach (var entity in builder.Model.GetEntityTypes())
             {
-                entity.SetTableName("Catalog_" + entity.GetTableName());
+                var currentName = entity.GetTableName();
+                if (!currentName.StartsWith("Catalog_"))
+                {
+                    entity.SetTableName("Catalog_" + currentName);
+                }
             }
 
             foreach (var relationship in builder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
@@ -35,14 +39,28 @@ namespace App.Catalog.Data
 
             builder.Entity<ProductCategory>().HasIndex(b => b.Order);
 
+            builder.Entity<Merchant>().ToTable("Catalog_Merchant");
             builder.Entity<Merchant>().HasIndex(b => b.Lat);
             builder.Entity<Merchant>().HasIndex(b => b.Lng);
 
             builder.Entity<ProductTag>().HasKey(c => new { c.ProductId, c.TagId });
 
+            builder.Entity<MerchantProduct>().ToTable("Catalog_MerchantProduct");
             builder.Entity<MerchantProduct>().HasKey(c => new { c.MerchantId, c.ProductId });
             builder.Entity<MerchantProduct>().HasOne(x => x.Merchant).WithMany(x => x.MerchantProducts).HasForeignKey(x => x.MerchantId);
             builder.Entity<MerchantProduct>().HasOne(x => x.Product).WithMany(x => x.MerchantProducts).HasForeignKey(x => x.ProductId);
+
+            builder.Entity<ProductBatch>().HasIndex(b => b.ProductId);
+            builder.Entity<ProductBatch>().HasIndex(b => b.MerchantId);
+            builder.Entity<ProductBatch>().HasIndex(b => b.Barcode);
+            builder.Entity<ProductBatch>().HasIndex(b => b.BatchNumber);
+            builder.Entity<ProductBatch>().HasIndex(b => b.ExpirationDate);
+            builder.Entity<ProductBatch>().HasOne(b => b.Product).WithMany().HasForeignKey(b => b.ProductId).IsRequired(false);
+            builder.Entity<ProductBatch>().HasOne(b => b.Merchant).WithMany().HasForeignKey(b => b.MerchantId).IsRequired(false);
+
+            builder.Entity<BatchReservation>().HasIndex(b => b.OrderId);
+            builder.Entity<BatchReservation>().HasIndex(b => b.OrderDetailId);
+            builder.Entity<BatchReservation>().HasIndex(b => b.ProductBatchId);
 
             builder.Entity<DynamicFieldValue>().HasKey(c => new { c.DynamicFieldId, c.ProductId });
 
@@ -133,9 +151,13 @@ namespace App.Catalog.Data
         public DbSet<GenericSetting> Settings { get; set; }
 
         // Domain Entities
+        public DbSet<Merchant> Merchants { get; set; }
+        public DbSet<MerchantProduct> MerchantProducts { get; set; }
         public DbSet<ProductCategory> ProductCategories { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductTag> ProductTags { get; set; }
         public DbSet<Tag> Tags { get; set; }
+        public DbSet<ProductBatch> ProductBatches { get; set; }
+        public DbSet<BatchReservation> BatchReservations { get; set; }
     }
 }

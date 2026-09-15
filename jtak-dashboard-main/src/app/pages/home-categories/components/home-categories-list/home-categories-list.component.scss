@@ -1,0 +1,10 @@
+// The destination controls sit in a dense row, so keep their labels compact
+// enough that a tile stays readable as one unit.
+.form-label {
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.form-text {
+  font-size: 0.75rem;
+}

@@ -215,6 +215,7 @@
     "smsCodeSend": "sms Code Sent",
     "locationServiceDisabled": "The location service must be enabled",
     "locationPermissionsDenied": "Location permissions are denied, you must allow Location permission to continue",
-    "pleaseEnableLocationService": "please Enable Location Service"
+    "pleaseEnableLocationService": "please Enable Location Service",
+    "locationAlwaysUpgradeRequired": "You've only granted location access \"while using the app\". To finish setup, open app settings and set location permission to \"Allow all the time\""
   }
 }

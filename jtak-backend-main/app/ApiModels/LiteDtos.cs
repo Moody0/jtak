@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using App.Shared.Entities;
 using App.Shared.Entities.Resources;
@@ -20,19 +20,15 @@ namespace App.ApiModels
 
     public class ContactMessageDto
     {
-        [Required(ErrorMessageResourceName = "FieldIsRequired", ErrorMessageResourceType = typeof(_Errors))]
         public string DisplayName { get; set; }
 
-        //[Required(ErrorMessageResourceName = "FieldIsRequired", ErrorMessageResourceType = typeof(_Errors))]
-        //[RegularExpression("^\\+?\\d{10,14}$", ErrorMessageResourceName = "PhoneFormat", ErrorMessageResourceType = typeof(_Errors))]
-        //[Display(Name = "Phone Number")]
-        //public string PhoneNumber { get; set; }
+        public string PhoneNumber { get; set; }
 
-        [Display(Name = "Title")]
-        [Required(ErrorMessageResourceName = "FieldIsRequired", ErrorMessageResourceType = typeof(_Errors))]
         public string Title { get; set; }
 
         public string Email { get; set; }
+
+        [Required(ErrorMessageResourceName = "FieldIsRequired", ErrorMessageResourceType = typeof(_Errors))]
         public string Message { get; set; }
     }
 

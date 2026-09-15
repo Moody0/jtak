@@ -1,73 +1,78 @@
 <div class="card card-custom gutter-b">
-    <div class="card-header">
-      <div class="card-title">
-        <div><h3 class="card-label">Notifications</h3><span class="card-subtitle">Create and review customer communications.</span></div>
-      </div>
-      <div class="card-toolbar">
-        <button type="button" class="btn btn-primary" (click)="create(null)">
-          <i class="fas fa-plus"></i> New notification
-        </button>
+  <div class="card-header">
+    <div class="card-title">
+      <div>
+        <h3 class="card-label fw-bolder">{{ 'NOTIFICATIONS_PAGE.TITLE' | translate }}</h3>
+        <span class="card-subtitle text-muted">{{ 'NOTIFICATIONS_PAGE.SUBTITLE' | translate }}</span>
       </div>
     </div>
-    <div class="card-body">
-      <!-- begin: Filtration form -->
-      <div class="form form-label-right">
-        <div class="form-group row">
-          <div class="col-lg-2" [formGroup]="searchGroup">
-            <input
-              type="text"
-              class="form-control"
-              name="searchText"
-              placeholder="Search notifications"
-              formControlName="searchTerm"
-            />
-          </div>
-        </div>
-      </div>
-      <!-- end: Filtration form -->
-      <ng-container *ngIf="notificationsService.items$ | async as items">
-        <div class="bulk-action-bar" *ngIf="selection.count > 0">
-          <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> selected</div>
-          <div class="bulk-action-buttons"><button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'notifications')"><i class="fas fa-download"></i> Export</button><button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">Clear</button></div>
-        </div>
-      </ng-container>
-  
-      <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="notificationsService.items$ | async as items">
-        <table
-          class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
-        >
-        <thead>
-          <tr>
-            <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all notifications on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-            <th scope="col">Id
-                <app-sort-icon
-                column="title"
-                [activeColumn]="sorting.column"
-                [activeDirection]="sorting.direction"
-                (sort)="sort($event)"
-              ></app-sort-icon>
-            </th>
-          <th scope="col">Title</th>
-          <th scope="col">Text</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let notification of items" [class.table-row-selected]="selection.isSelected(notification)">
-            <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(notification)" [attr.aria-label]="'Select ' + notification.title" (change)="selection.toggle(notification, $any($event.target).checked)" /></td>
-            <td>{{ notification.id }}</td>
-            <td>{{ notification.title }}</td>
-            <td>{{ notification.text }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="card-toolbar">
+      <button type="button" class="btn btn-primary" (click)="create(null)">
+        <i class="fas fa-plus me-1"></i> {{ 'NOTIFICATIONS_PAGE.NEW_NOTIFICATION' | translate }}
+      </button>
     </div>
-    <!-- end: Table -->
-  
-    <app-paginator
-      class="d-flex justify-content-between align-items-center flex-wrap"
-      [paginator]="paginator"
-      [isLoading]="isLoading"
-      (paginate)="paginate($event)"
-    ></app-paginator>
   </div>
-  
+  <div class="card-body">
+    <!-- begin: Filtration form -->
+    <div class="form form-label-right">
+      <div class="form-group row">
+        <div class="col-lg-3" [formGroup]="searchGroup">
+          <input
+            type="text"
+            class="form-control"
+            name="searchText"
+            [placeholder]="'NOTIFICATIONS_PAGE.SEARCH_PLACEHOLDER' | translate"
+            formControlName="searchTerm"
+          />
+        </div>
+      </div>
+    </div>
+    <!-- end: Filtration form -->
+    <ng-container *ngIf="notificationsService.items$ | async as items">
+      <div class="bulk-action-bar" *ngIf="selection.count > 0">
+        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}</div>
+        <div class="bulk-action-buttons">
+          <button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'notifications')"><i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}</button>
+          <button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">{{ 'COMMON.CLEAR' | translate }}</button>
+        </div>
+      </div>
+    </ng-container>
+
+    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="notificationsService.items$ | async as items">
+      <table
+        class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
+      >
+      <thead>
+        <tr class="fw-bolder text-muted bg-light text-uppercase fs-7">
+          <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all notifications on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
+          <th scope="col">{{ 'NOTIFICATIONS_PAGE.COL_ID' | translate }}
+              <app-sort-icon
+              column="title"
+              [activeColumn]="sorting.column"
+              [activeDirection]="sorting.direction"
+              (sort)="sort($event)"
+            ></app-sort-icon>
+          </th>
+        <th scope="col">{{ 'NOTIFICATIONS_PAGE.COL_TITLE' | translate }}</th>
+        <th scope="col">{{ 'NOTIFICATIONS_PAGE.COL_TEXT' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let notification of items" [class.table-row-selected]="selection.isSelected(notification)">
+          <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(notification)" [attr.aria-label]="'Select ' + notification.title" (change)="selection.toggle(notification, $any($event.target).checked)" /></td>
+          <td><span class="badge badge-light-secondary font-monospace">#{{ notification.id }}</span></td>
+          <td><span class="fw-bolder text-dark">{{ notification.title }}</span></td>
+          <td>{{ notification.text }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- end: Table -->
+
+  <app-paginator
+    class="d-flex justify-content-between align-items-center flex-wrap mt-4"
+    [paginator]="paginator"
+    [isLoading]="isLoading"
+    (paginate)="paginate($event)"
+  ></app-paginator>
+</div>

@@ -47,14 +47,50 @@ const Routing: Routes = [
       import('./products/products.module').then((m) => m.ProductsModule),
   },
   {
+    path: 'popular-products',
+    loadChildren: () =>
+      import('./popular-products/popular-products.module').then(
+        (m) => m.PopularProductsModule
+      ),
+  },
+  {
+    path: 'home-categories',
+    loadChildren: () =>
+      import('./home-categories/home-categories.module').then(
+        (m) => m.HomeCategoriesModule
+      ),
+  },
+  {
+    path: 'restaurant-categories',
+    loadChildren: () =>
+      import('./restaurant-categories/restaurant-categories.module').then(
+        (m) => m.RestaurantCategoriesModule
+      ),
+  },
+  {
     path: 'bills',
     loadChildren: () =>
       import('./bills/bills.module').then((m) => m.BillsModule),
   },
   {
+    path: 'reconciliation',
+    loadChildren: () =>
+      import('./reconciliation/reconciliation.module').then((m) => m.ReconciliationModule),
+  },
+  {
+    path: 'inventory-batches',
+    loadChildren: () =>
+      import('./inventory-batches/inventory-batches.module').then((m) => m.InventoryBatchesModule),
+  },
+  {
     path: 'notifications',
     loadChildren: () =>
       import('./notifications/notifications.module').then((m) => m.NotificationsModule),
+  },
+  {
+    path: 'support-messages',
+    loadChildren: () =>
+      import('./support-messages/support-messages.module').then((m) => m.SupportMessagesModule),
   },
   {
     path: 'pages',

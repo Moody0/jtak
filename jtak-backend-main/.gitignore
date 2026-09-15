@@ -340,3 +340,11 @@ ASALocalRun/
 healthchecksdb
 /App/Logs
 /app/FileCenter/
+
+# Secrets & Credentials
+*firebase-adminsdk*.json
+appsettings.Production.json
+appsettings.Local.json
+*.key
+*.pfx
+

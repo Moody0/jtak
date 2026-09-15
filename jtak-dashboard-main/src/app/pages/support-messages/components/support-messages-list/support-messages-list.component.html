@@ -1,0 +1,374 @@
+<div class="card card-custom gutter-b">
+  <!-- Page Header -->
+  <div class="card-header border-0 pt-6 pb-2">
+    <div class="card-title">
+      <div class="d-flex align-items-center gap-3">
+        <div class="symbol symbol-50px symbol-circle bg-light-primary">
+          <span class="symbol-label text-primary">
+            <i class="fas fa-headset fs-2"></i>
+          </span>
+        </div>
+        <div>
+          <h2 class="fw-bolder text-gray-900 mb-1">
+            {{ 'SUPPORT_MESSAGES.TITLE' | translate }}
+          </h2>
+          <span class="text-muted fs-7">
+            {{ 'SUPPORT_MESSAGES.SUBTITLE' | translate }}
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="card-toolbar gap-2">
+      <button
+        type="button"
+        class="btn btn-sm btn-light-primary d-flex align-items-center gap-2"
+        (click)="loadStats(); supportService.fetchPost()"
+      >
+        <i class="fas fa-sync-alt"></i>
+        <span>تحديث القائمة</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card-body pt-2">
+    <!-- Top Metric Overview Cards -->
+    <div class="row g-4 mb-7">
+      <!-- Total Messages -->
+      <div class="col-xl-3 col-sm-6">
+        <div
+          class="card card-dashed border-gray-300 p-5 rounded-3 cursor-pointer transition-all"
+          [class.border-primary]="currentStatusFilter === null"
+          (click)="filterByStatus(null)"
+        >
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-muted fs-7 fw-bolder">{{ 'SUPPORT_MESSAGES.STATS.TOTAL' | translate }}</span>
+            <span class="badge badge-light-dark fs-8 fw-bold">الكل</span>
+          </div>
+          <div class="d-flex align-items-baseline gap-2">
+            <span class="fs-2hx fw-bolder text-gray-900">{{ stats.totalCount }}</span>
+            <span class="text-muted fs-7">رسالة</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- New Inquiries (Unread) -->
+      <div class="col-xl-3 col-sm-6">
+        <div
+          class="card card-dashed border-warning bg-light-warning p-5 rounded-3 cursor-pointer transition-all"
+          [class.border-3]="currentStatusFilter === SupportMessageStatus.New"
+          (click)="filterByStatus(SupportMessageStatus.New)"
+        >
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-warning fs-7 fw-bolder">{{ 'SUPPORT_MESSAGES.STATS.NEW' | translate }}</span>
+            <span class="badge badge-warning fs-8 fw-bold">بحاجة لمتابعة</span>
+          </div>
+          <div class="d-flex align-items-baseline gap-2">
+            <span class="fs-2hx fw-bolder text-warning">{{ stats.newCount }}</span>
+            <span class="text-warning text-opacity-75 fs-7">جديدة</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Under Review / Read -->
+      <div class="col-xl-3 col-sm-6">
+        <div
+          class="card card-dashed border-primary bg-light-primary p-5 rounded-3 cursor-pointer transition-all"
+          [class.border-3]="currentStatusFilter === SupportMessageStatus.Read"
+          (click)="filterByStatus(SupportMessageStatus.Read)"
+        >
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-primary fs-7 fw-bolder">{{ 'SUPPORT_MESSAGES.STATS.IN_PROGRESS' | translate }}</span>
+            <span class="badge badge-light-primary fs-8 fw-bold">مفتوحة</span>
+          </div>
+          <div class="d-flex align-items-baseline gap-2">
+            <span class="fs-2hx fw-bolder text-primary">{{ stats.inProgressCount }}</span>
+            <span class="text-primary text-opacity-75 fs-7">قيد المعالجة</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resolved -->
+      <div class="col-xl-3 col-sm-6">
+        <div
+          class="card card-dashed border-success bg-light-success p-5 rounded-3 cursor-pointer transition-all"
+          [class.border-3]="currentStatusFilter === SupportMessageStatus.Resolved"
+          (click)="filterByStatus(SupportMessageStatus.Resolved)"
+        >
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="text-success fs-7 fw-bolder">{{ 'SUPPORT_MESSAGES.STATS.RESOLVED' | translate }}</span>
+            <span class="badge badge-light-success fs-8 fw-bold">منجزة</span>
+          </div>
+          <div class="d-flex align-items-baseline gap-2">
+            <span class="fs-2hx fw-bolder text-success">{{ stats.resolvedCount }}</span>
+            <span class="text-success text-opacity-75 fs-7">تم الحل</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Pills & Search Bar -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-4 mb-6">
+      <!-- Status Filter Tabs -->
+      <div class="nav nav-pills bg-light p-1 rounded-3">
+        <button
+          type="button"
+          class="nav-link px-4 py-2 fs-7 fw-bold"
+          [class.active]="currentStatusFilter === null"
+          (click)="filterByStatus(null)"
+        >
+          {{ 'SUPPORT_MESSAGES.STATUS.ALL' | translate }}
+          <span class="badge badge-sm badge-circle ms-2" [class.bg-white]="currentStatusFilter === null" [class.text-dark]="currentStatusFilter === null">
+            {{ stats.totalCount }}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="nav-link px-4 py-2 fs-7 fw-bold"
+          [class.active]="currentStatusFilter === SupportMessageStatus.New"
+          (click)="filterByStatus(SupportMessageStatus.New)"
+        >
+          {{ 'SUPPORT_MESSAGES.STATUS.NEW' | translate }}
+          <span class="badge badge-sm badge-circle badge-warning ms-2">
+            {{ stats.newCount }}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="nav-link px-4 py-2 fs-7 fw-bold"
+          [class.active]="currentStatusFilter === SupportMessageStatus.Read"
+          (click)="filterByStatus(SupportMessageStatus.Read)"
+        >
+          {{ 'SUPPORT_MESSAGES.STATUS.READ' | translate }}
+          <span class="badge badge-sm badge-circle badge-primary ms-2">
+            {{ stats.inProgressCount }}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="nav-link px-4 py-2 fs-7 fw-bold"
+          [class.active]="currentStatusFilter === SupportMessageStatus.Resolved"
+          (click)="filterByStatus(SupportMessageStatus.Resolved)"
+        >
+          {{ 'SUPPORT_MESSAGES.STATUS.RESOLVED' | translate }}
+          <span class="badge badge-sm badge-circle badge-success ms-2">
+            {{ stats.resolvedCount }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Instant Search -->
+      <div class="d-flex align-items-center position-relative w-100 w-md-350px" [formGroup]="searchGroup">
+        <span class="svg-icon position-absolute ms-4 text-muted">
+          <i class="fas fa-search"></i>
+        </span>
+        <input
+          type="text"
+          class="form-control form-control-solid ps-12 fs-7"
+          formControlName="searchTerm"
+          placeholder="ابحث بالاسم، الهاتف، أو نص الرسالة..."
+        />
+      </div>
+    </div>
+
+    <!-- Support Messages Table -->
+    <div class="table-responsive">
+      <table class="table table-row-dashed table-row-gray-300 align-middle gs-4 gy-4">
+        <thead>
+          <tr class="fw-bolder fs-7 text-muted text-uppercase bg-light">
+            <th class="min-w-200px">{{ 'SUPPORT_MESSAGES.COLUMNS.SENDER' | translate }}</th>
+            <th class="min-w-160px">{{ 'SUPPORT_MESSAGES.COLUMNS.PHONE' | translate }}</th>
+            <th class="min-w-150px">{{ 'SUPPORT_MESSAGES.COLUMNS.TITLE' | translate }}</th>
+            <th class="min-w-280px">{{ 'SUPPORT_MESSAGES.COLUMNS.MESSAGE' | translate }}</th>
+            <th class="min-w-140px">{{ 'SUPPORT_MESSAGES.COLUMNS.DATE' | translate }}</th>
+            <th class="min-w-120px text-center">{{ 'SUPPORT_MESSAGES.COLUMNS.STATUS' | translate }}</th>
+            <th class="min-w-140px text-end">{{ 'SUPPORT_MESSAGES.COLUMNS.ACTIONS' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody class="fs-6">
+          <tr *ngFor="let item of supportService.items$ | async" class="hover-elevate-up">
+            <!-- Sender -->
+            <td>
+              <div class="d-flex align-items-center gap-3">
+                <div class="symbol symbol-40px symbol-circle bg-light-dark border border-gray-300">
+                  <span class="symbol-label text-dark fw-bolder fs-6">
+                    {{ (item.senderName?.charAt(0) || 'ع') }}
+                  </span>
+                </div>
+                <div>
+                  <a
+                    href="javascript:void(0)"
+                    class="text-gray-900 fw-bolder text-hover-primary mb-1 d-block"
+                    (click)="openViewModal(item)"
+                  >
+                    {{ item.senderName }}
+                  </a>
+                  <span *ngIf="item.senderEmail" class="text-muted fs-8 d-block">
+                    {{ item.senderEmail }}
+                  </span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Phone with Quick WhatsApp & Call Buttons -->
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold text-gray-800 fs-7" style="direction: ltr;">
+                  {{ item.senderPhone || '—' }}
+                </span>
+                <div *ngIf="item.senderPhone" class="d-flex gap-1">
+                  <button
+                    type="button"
+                    class="btn btn-icon btn-sm btn-light-success w-28px h-28px"
+                    title="مراسلة فورية عبر واتساب"
+                    (click)="openWhatsApp(item)"
+                  >
+                    <i class="fab fa-whatsapp fs-6 text-success"></i>
+                  </button>
+                  <a
+                    [href]="'tel:' + item.senderPhone"
+                    class="btn btn-icon btn-sm btn-light-primary w-28px h-28px"
+                    title="اتصال هاتفي"
+                  >
+                    <i class="fas fa-phone-alt fs-7 text-primary"></i>
+                  </a>
+                </div>
+              </div>
+            </td>
+
+            <!-- Title -->
+            <td>
+              <span class="badge badge-light-dark fw-bold fs-7">
+                {{ item.title || 'دعم فني' }}
+              </span>
+            </td>
+
+            <!-- Message Snippet -->
+            <td>
+              <div
+                class="text-gray-700 fs-7 text-truncate cursor-pointer text-hover-primary"
+                style="max-width: 320px;"
+                title="اضغط لقراءة الرسالة كاملة"
+                (click)="openViewModal(item)"
+              >
+                {{ item.message }}
+              </div>
+              <span *ngIf="item.adminNotes" class="badge badge-light-info fs-8 mt-1">
+                <i class="fas fa-sticky-note me-1 fs-9"></i> ملاحظة إدارة
+              </span>
+            </td>
+
+            <!-- Date -->
+            <td>
+              <div class="d-flex flex-column">
+                <span class="text-gray-800 fw-bold fs-7">
+                  {{ item.createdDate | date: 'yyyy/MM/dd' }}
+                </span>
+                <span class="text-muted fs-8">
+                  {{ item.createdDate | date: 'hh:mm a' }}
+                </span>
+              </div>
+            </td>
+
+            <!-- Status -->
+            <td class="text-center">
+              <span
+                *ngIf="item.status === SupportMessageStatus.New"
+                class="badge badge-light-warning text-warning fw-bolder fs-7 px-3 py-2"
+              >
+                <i class="fas fa-exclamation-circle me-1 text-warning"></i> جديدة
+              </span>
+
+              <span
+                *ngIf="item.status === SupportMessageStatus.Read"
+                class="badge badge-light-primary text-primary fw-bolder fs-7 px-3 py-2"
+              >
+                <i class="fas fa-envelope-open-text me-1 text-primary"></i> قيد المتابعة
+              </span>
+
+              <span
+                *ngIf="item.status === SupportMessageStatus.Resolved"
+                class="badge badge-light-success text-success fw-bolder fs-7 px-3 py-2"
+              >
+                <i class="fas fa-check-circle me-1 text-success"></i> تمت المعالجة
+              </span>
+            </td>
+
+            <!-- Actions -->
+            <td class="text-end">
+              <div class="d-flex justify-content-end gap-2">
+                <!-- View Details -->
+                <button
+                  type="button"
+                  class="btn btn-icon btn-sm btn-light-primary"
+                  title="قراءة الرسالة ومتابعتها"
+                  (click)="openViewModal(item)"
+                >
+                  <i class="fas fa-eye fs-6"></i>
+                </button>
+
+                <!-- Quick Resolve -->
+                <button
+                  *ngIf="item.status !== SupportMessageStatus.Resolved"
+                  type="button"
+                  class="btn btn-icon btn-sm btn-light-success"
+                  title="تحديد كمنجز وتمت معالجته"
+                  (click)="quickResolve(item)"
+                >
+                  <i class="fas fa-check fs-6"></i>
+                </button>
+
+                <!-- Delete -->
+                <button
+                  type="button"
+                  class="btn btn-icon btn-sm btn-light-danger"
+                  title="حذف الرسالة"
+                  (click)="deleteMessage(item)"
+                >
+                  <i class="fas fa-trash-alt fs-6"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Empty State -->
+          <tr *ngIf="!(supportService.items$ | async)?.length && !isLoading">
+            <td colspan="7" class="text-center py-12">
+              <div class="d-flex flex-column align-items-center">
+                <div class="symbol symbol-65px symbol-circle bg-light-primary mb-4">
+                  <span class="symbol-label text-primary">
+                    <i class="fas fa-inbox fs-2x"></i>
+                  </span>
+                </div>
+                <h4 class="fw-bolder text-gray-800 mb-1">لا توجد رسائل دعم فني حالياً</h4>
+                <p class="text-muted fs-7 mb-0">
+                  كافة الرسائل والاستفسارات التي يرسلها المستخدمون من التطبيق ستظهر هنا فور إرسالها
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Loading State -->
+          <tr *ngIf="isLoading">
+            <td colspan="7" class="text-center py-10">
+              <div class="d-flex justify-content-center align-items-center gap-3">
+                <span class="spinner-border spinner-border-sm text-primary"></span>
+                <span class="text-muted fs-7">جارٍ تحميل رسائل الدعم...</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginator -->
+    <app-paginator
+      class="d-flex justify-content-between align-items-center flex-wrap pt-4"
+      [paginator]="supportService.paginator"
+      [isLoading]="isLoading"
+      (paginate)="paginate($event)"
+    ></app-paginator>
+  </div>
+</div>

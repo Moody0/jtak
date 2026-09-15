@@ -1,4 +1,4 @@
-﻿using App.Shared.Entities;
+using App.Shared.Entities;
 using Modules.Catalog.Entities;
 using App.Shared.Entities.Domain;
 using Modules.Orders.Entities;
@@ -38,6 +38,7 @@ namespace App
             CreateMap<Address, AddressDto>();
             CreateMap<FavoriteProduct, FavoriteProductDto>();
             CreateMap<ProductReview, ProductReviewDto>();
+            CreateMap<SupportMessage, SupportMessageDto>();
             CreateMap<ProductTag, TagDto>()
                 .ForMember(x => x.Id, o => o.MapFrom(y => y.Tag.Id))
                 .ForMember(x => x.NameAr, o => o.MapFrom(y => y.Tag.NameAr))

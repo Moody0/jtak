@@ -57,6 +57,8 @@ namespace App.Helpers.StartUp
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IMerchantService, MerchantService>();
             services.AddScoped<IProductCategoryService, ProductCategoryService>();
+            services.AddScoped<IHomeCategoriesService, HomeCategoriesService>();
+            services.AddScoped<IInventoryBatchService, InventoryBatchService>();
             services.AddScoped<IOrderService, OrderService>();
             services.AddScoped<IOrderDetailService, OrderDetailService>();
             services.AddScoped<IDynamicFieldService, DynamicFieldService>();
@@ -69,6 +71,10 @@ namespace App.Helpers.StartUp
             services.AddScoped<IBillService, BillService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IBalanceService, BalanceService>();
+            services.AddScoped<ILedgerService, LedgerService>();
+            services.AddScoped<IEodReconciliationService, EodReconciliationService>();
+            services.AddScoped<ISettlementRequestService, SettlementRequestService>();
+            services.AddScoped<ISupportMessageService, SupportMessageService>();
 
             // Background Service Management
             services.AddHostedService<OrderCheckingService>();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -322,7 +322,62 @@ namespace App.ApiControllers.V1.Authorization
 
             await _unitOfWork.SaveChangesAsync();
 
+#if DEBUG
             return code;
+#else
+            return string.Empty;
+#endif
+        }
+
+        /// <summary>
+        /// Sends verification SMS Code strictly to registered and active Merchant accounts.
+        /// Unregistered numbers or non-merchant accounts are rejected without sending an SMS.
+        /// </summary>
+        /// <param name="model">The phoneNumber with this Regex format ^\+?[1-9]\d{1,14}$ </param>
+        /// <returns>Debug verification code or empty string</returns>
+        [AllowAnonymous, HttpPost, Route("MerchantSignInByPhoneNumber")]
+        public async Task<ActionResult<string>> MerchantSignInByPhoneNumber(PhoneNumberModel model)
+        {
+            var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == model.PhoneNumber)
+                    ?? await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == model.PhoneNumber);
+
+            // 1. Verify user exists and has the Merchant role
+            if (user == null || !await _userManager.IsInRoleAsync(user, AppRoleName.Merchant.ToString()))
+            {
+                return StatusCode(403, new
+                {
+                    error = "MERCHANT_NOT_FOUND",
+                    errorDescription = "هذا الرقم غير مسجل كتاجر معتمد في جيتك. يرجى التواصل مع إدارة العمليات لتفعيل متجرك."
+                });
+            }
+
+            // 2. Verify merchant account is active
+            if (!user.IsActive)
+            {
+                return StatusCode(403, new
+                {
+                    error = "MERCHANT_SUSPENDED",
+                    errorDescription = "حساب التاجر موقوف حالياً. يرجى مراجعة إدارة جيتك."
+                });
+            }
+
+            var waitTimeInSecs = 0;
+            if (waitTimeInSecs > 0)
+                return BadRequest($"You need to wait {waitTimeInSecs}s");
+
+            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, model.PhoneNumber);
+            var msg = string.Format(_Account.SmsVerification, code);
+
+            var response = await _notificationService.SendSmsNotification(model.PhoneNumber, msg);
+            _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = msg, Response = response });
+
+            await _unitOfWork.SaveChangesAsync();
+
+#if DEBUG
+            return code;
+#else
+            return string.Empty;
+#endif
         }
 
         /// <summary>
@@ -360,38 +415,55 @@ namespace App.ApiControllers.V1.Authorization
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme), HttpPost, Route("UpdateUser")]
         public async Task<ActionResult<string>> UpdateUserProfile(UserUpdateVm vm)
         {
+            var user = await _userManager.GetUserAsync(User)
+                ?? (User.GetUserId() != null ? await _userManager.FindByIdAsync(User.GetUserId().ToString()) : null);
 
-
-
-            var user = await _userManager.GetUserAsync(User);
-            user.FirstName = vm.FullName.Trim().Split(" ").FirstOrDefault();
-            user.LastName = vm.FullName.Replace(user.FirstName + " ", "");
-            user.FullName = vm.FullName;
-            user.ProfilePhoto = vm.ProfilePhoto;
-            user.PhoneNumber = vm.PhoneNumber;
-            user.CountryPhoneCode = vm.CountryPhoneCode;
-            user.Gender = vm.Gender;
-            user.Birthday = vm.Birthday;
-
-            if (user.Email != vm.Email)
+            if (user == null && !string.IsNullOrWhiteSpace(vm.PhoneNumber))
             {
-                await _userManager.SendEmailChangeConfirmationEmail(_emailService, user, vm.Email);
+                user = await _userManager.FindByPhoneNumberAsync(vm.PhoneNumber)
+                    ?? await _userManager.FindByNameAsync(vm.PhoneNumber);
+            }
+
+            if (user == null)
+                return Unauthorized();
+
+            if (!string.IsNullOrWhiteSpace(vm.FullName))
+            {
+                user.FullName = vm.FullName.Trim();
+                user.FirstName = user.FullName.Split(' ').FirstOrDefault() ?? user.FullName;
+                user.LastName = user.FullName.Contains(' ') ? user.FullName.Substring(user.FirstName.Length).Trim() : "";
+            }
+
+            if (!string.IsNullOrWhiteSpace(vm.ProfilePhoto))
+                user.ProfilePhoto = vm.ProfilePhoto;
+
+            if (!string.IsNullOrWhiteSpace(vm.PhoneNumber))
+                user.PhoneNumber = vm.PhoneNumber;
+
+            if (!string.IsNullOrWhiteSpace(vm.CountryPhoneCode))
+                user.CountryPhoneCode = vm.CountryPhoneCode;
+
+            if (vm.Gender.HasValue)
+                user.Gender = vm.Gender;
+
+            if (vm.Birthday.HasValue)
+                user.Birthday = vm.Birthday;
+
+            if (!string.IsNullOrWhiteSpace(vm.Email) && user.Email != vm.Email)
+            {
+                try
+                {
+                    await _userManager.SendEmailChangeConfirmationEmail(_emailService, user, vm.Email);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Email change confirmation failed: {ex.Message}");
+                }
+                user.Email = vm.Email;
             }
 
             var result = await _userManager.UpdateAsync(user);
-            if (!result.Succeeded) BadRequest(result);
-
-            /*
-            if (user.PhoneNumber != vm.PhoneNumber && !string.IsNullOrWhiteSpace(vm.PhoneNumber))
-            {
-                // Generate the token and send it
-                var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, vm.PhoneNumber);
-
-                var msg = string.Format(_Account.SmsVerification, code);
-                var response = await _notificationService.SendSmsNotification(vm.PhoneNumber, msg);
-
-                _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = msg, Response = response });
-            }*/
+            if (!result.Succeeded) return BadRequest(result);
             await _unitOfWork.SaveChangesAsync();
             return "OK";
         }

@@ -10,6 +10,7 @@ import '../../widgets/header_circle_button.dart';
 import 'login_page.dart';
 import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/loading.dart';
+import '../../../utils/custom_widgets/syrian_flag.dart';
 import '../../../utils/utilities/validation.dart';
 
 /// ---------------------------------------------------------------------------
@@ -28,19 +29,16 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
-  late TextEditingController _emailController;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _emailController = TextEditingController();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
@@ -63,7 +61,6 @@ class _ProfilePageState extends State<ProfilePage> {
           modelProvider.loadUserDataProfile();
           final user = modelProvider.authService.user;
           _nameController.text = modelProvider.fullName ?? user?.fullName ?? '';
-          _emailController.text = modelProvider.email ?? user?.email ?? '';
         }
       },
       builder: (context, modelProvider) {
@@ -80,14 +77,6 @@ class _ProfilePageState extends State<ProfilePage> {
         }
 
         final user = modelProvider.authService.user;
-        final String displayName = _nameController.text.isNotEmpty
-            ? _nameController.text
-            : (user?.fullName ?? 'مستخدم جيتك');
-
-        final String initialChar = displayName.trim().isNotEmpty
-            ? displayName.trim().substring(0, 1).toUpperCase()
-            : 'ج';
-
         final String phoneFormatted = _cleanPhoneNumber(user?.phoneNumber);
 
         return Scaffold(
@@ -102,57 +91,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   const SizedBox(height: 8),
 
-                  // 1. Avatar Section with Camera Action Badge
-                  Center(
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF0E8),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(color: const Color(0xFFFFD6C2), width: 2.0),
-                          ),
-                          child: Center(
-                            child: Text(
-                              initialChar,
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w900,
-                                color: kPrimaryOrange,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: -4,
-                          right: -4,
-                          child: Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: kPrimaryOrange,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                PhosphorIconsFill.camera,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // 2. Personal Information Form Card
+                  // Personal Information Form Card
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -194,7 +133,10 @@ class _ProfilePageState extends State<ProfilePage> {
                               color: kCharcoalDark,
                             ),
                             decoration: InputDecoration(
-                              prefixIcon: const Icon(PhosphorIconsRegular.user, color: Color(0xFF94A3B8), size: 20),
+                              prefixIcon: Transform.flip(
+                                flipX: true,
+                                child: const Icon(PhosphorIconsRegular.user, color: Color(0xFF94A3B8), size: 20),
+                              ),
                               filled: true,
                               fillColor: const Color(0xFFF8FAFC),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -221,51 +163,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
                           const SizedBox(height: 14),
 
-                          // 2. Email Field
-                          Text(
-                            'البريد الإلكتروني',
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            textDirection: TextDirection.ltr,
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: kCharcoalDark,
-                            ),
-                            decoration: InputDecoration(
-                              prefixIcon: const Icon(PhosphorIconsRegular.envelope, color: Color(0xFF94A3B8), size: 20),
-                              filled: true,
-                              fillColor: const Color(0xFFF8FAFC),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: kPrimaryOrange, width: 1.4),
-                              ),
-                            ),
-                            validator: (email) => ValidationUtil.emailValidation(email, false),
-                            onChanged: (value) {
-                              modelProvider.email = value.trim();
-                            },
-                          ),
-
-                          const SizedBox(height: 14),
-
                           // 3. Syrian Verified Phone Field (Locked)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -287,7 +184,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(PhosphorIconsFill.shieldCheck, size: 12, color: Color(0xFF10B981)),
+                                    Transform.flip(
+                                      flipX: true,
+                                      child: const Icon(PhosphorIconsFill.shieldCheck, size: 12, color: Color(0xFF10B981)),
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       'موثق',
@@ -312,7 +212,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                             child: Row(
                               children: [
-                                const Text('🇸🇾', style: TextStyle(fontSize: 18)),
+                                const SyrianFlag(width: 26, height: 17),
                                 const SizedBox(width: 8),
                                 Text(
                                   '+963',
@@ -337,7 +237,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                     textDirection: TextDirection.ltr,
                                   ),
                                 ),
-                                const Icon(PhosphorIconsRegular.lock, size: 16, color: Color(0xFF94A3B8)),
+                                Transform.flip(
+                                  flipX: true,
+                                  child: const Icon(PhosphorIconsRegular.lock, size: 16, color: Color(0xFF94A3B8)),
+                                ),
                               ],
                             ),
                           ),
@@ -394,12 +297,15 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: const Color(0xFFFFF0E8),
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: const Center(
-                child: Icon(
-                  PhosphorIconsFill.userCircle,
-                  color: kPrimaryOrange,
-                  size: 42,
-                  textDirection: TextDirection.ltr,
+              child: Center(
+                child: Transform.flip(
+                  flipX: true,
+                  child: const Icon(
+                    PhosphorIconsFill.userCircle,
+                    color: kPrimaryOrange,
+                    size: 42,
+                    textDirection: TextDirection.ltr,
+                  ),
                 ),
               ),
             ),
@@ -467,8 +373,13 @@ class _ProfilePageState extends State<ProfilePage> {
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
       leading: Center(
-        child: HeaderCircleButton.back(
+        child: HeaderCircleButton(
           onTap: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: kCharcoalDark,
+            size: 20,
+          ),
         ),
       ),
       title: Text(
@@ -490,7 +401,6 @@ class _ProfilePageState extends State<ProfilePage> {
     HapticFeedback.mediumImpact();
     if (_formKey.currentState?.validate() ?? false) {
       modelProvider.fullName = _nameController.text.trim();
-      modelProvider.email = _emailController.text.trim();
       await modelProvider.update();
       if (!mounted) return;
       context.showSnakBar('تم حفظ البيانات بنجاح');

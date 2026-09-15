@@ -56,15 +56,28 @@ export class EditDilevry implements OnInit, OnDestroy {
     });
   }
 
+  getDriverDisplay(driver: User): string {
+    if (!driver) return 'Unknown Driver';
+    const name = driver.fullName && !driver.fullName.includes('?') ? driver.fullName : '';
+    const phone = driver.phoneNumber || '';
+    if (name && phone) return `${name} (${phone})`;
+    return name || phone || driver.email || 'Delivery Driver';
+  }
+
+  unassign() {
+    this.formGroup.get('uid')?.setValue('00000000-0000-0000-0000-000000000000');
+    this.saved();
+  }
+
   saved() {
+    const id = this.formGroup.get('id')?.value;
+    const uid = this.formGroup.get('uid')?.value || '00000000-0000-0000-0000-000000000000';
+
     this.subs.sink = this.orderService
-      .setDelievry(
-        this.formGroup.get('id')?.value,
-        this.formGroup.get('uid')?.value
-      )
+      .setDelievry(id, uid)
       .pipe(
         tap(() => {
-          this.toasterService.success('Dilevry Updated');
+          this.toasterService.success(uid === '00000000-0000-0000-0000-000000000000' ? 'Order returned to Available Pool' : 'Delivery Captain Updated');
           this.modal.close();
         })
       )

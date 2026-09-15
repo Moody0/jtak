@@ -5,11 +5,16 @@ class LocalCartItem {
   int merchantId;
   double singleFinalPrice;
   int quantity;
+  String? productTitle;
+  String? productImage;
+
   LocalCartItem({
     required this.productId,
     required this.merchantId,
     required this.singleFinalPrice,
     required this.quantity,
+    this.productTitle,
+    this.productImage,
   });
 
   LocalCartItem copyWith({
@@ -17,12 +22,16 @@ class LocalCartItem {
     int? merchantId,
     double? singleFinalPrice,
     int? quantity,
+    String? productTitle,
+    String? productImage,
   }) {
     return LocalCartItem(
       productId: productId ?? this.productId,
       merchantId: merchantId ?? this.merchantId,
       singleFinalPrice: singleFinalPrice ?? this.singleFinalPrice,
       quantity: quantity ?? this.quantity,
+      productTitle: productTitle ?? this.productTitle,
+      productImage: productImage ?? this.productImage,
     );
   }
 
@@ -32,15 +41,19 @@ class LocalCartItem {
       'merchantId': merchantId,
       'singleFinalPrice': singleFinalPrice,
       'quantity': quantity,
+      if (productTitle != null) 'productTitle': productTitle,
+      if (productImage != null) 'productImage': productImage,
     };
   }
 
   factory LocalCartItem.fromMap(Map<String, dynamic> map) {
     return LocalCartItem(
-      productId: map['productId']?.toInt() ?? 0,
-      merchantId: map['merchantId']?.toInt() ?? 0,
-      singleFinalPrice: map['singleFinalPrice']?.toDouble() ?? 0.0,
-      quantity: map['quantity']?.toInt() ?? 0,
+      productId: (map['productId'] ?? map['ProductId'])?.toInt() ?? 0,
+      merchantId: (map['merchantId'] ?? map['MerchantId'])?.toInt() ?? 0,
+      singleFinalPrice: (map['singleFinalPrice'] ?? map['SingleFinalPrice'])?.toDouble() ?? 0.0,
+      quantity: (map['quantity'] ?? map['Quantity'])?.toInt() ?? 0,
+      productTitle: map['productTitle'] ?? map['ProductTitle'],
+      productImage: map['productImage'] ?? map['ProductImage'] ?? map['photos'] ?? map['Photos'],
     );
   }
 
@@ -50,7 +63,7 @@ class LocalCartItem {
 
   @override
   String toString() {
-    return 'LocalCartItem(productId: $productId, merchantId: $merchantId, singleFinalPrice: $singleFinalPrice, quantity: $quantity)';
+    return 'LocalCartItem(productId: $productId, merchantId: $merchantId, singleFinalPrice: $singleFinalPrice, quantity: $quantity, productTitle: $productTitle, productImage: $productImage)';
   }
 
   @override
@@ -61,12 +74,19 @@ class LocalCartItem {
         other.productId == productId &&
         other.merchantId == merchantId &&
         other.singleFinalPrice == singleFinalPrice &&
-        other.quantity == quantity;
+        other.quantity == quantity &&
+        other.productTitle == productTitle &&
+        other.productImage == productImage;
   }
 
   @override
   int get hashCode {
-    return productId.hashCode ^ merchantId.hashCode ^ singleFinalPrice.hashCode ^ quantity.hashCode;
+    return productId.hashCode ^
+        merchantId.hashCode ^
+        singleFinalPrice.hashCode ^
+        quantity.hashCode ^
+        (productTitle?.hashCode ?? 0) ^
+        (productImage?.hashCode ?? 0);
   }
 
   static String encode(List<LocalCartItem> items) => json.encode(

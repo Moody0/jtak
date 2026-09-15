@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,6 +31,41 @@ namespace App.Orders.Data
             {
                 relationship.DeleteBehavior = DeleteBehavior.Restrict;
             }
+
+            builder.Entity<Order>(b =>
+            {
+                b.Property(x => x.User).IsRequired(false);
+                b.Property(x => x.DeliveryUser).IsRequired(false);
+                b.Property(x => x.Description).IsRequired(false);
+                b.Property(x => x.PaymentDescription).IsRequired(false);
+                b.Property(x => x.Notes).IsRequired(false);
+                b.Property(x => x.Address).IsRequired(false);
+                b.Property(x => x.Phonenumber).IsRequired(false);
+                b.Property(x => x.DeliveryOtp).IsRequired(false);
+                b.Property(x => x.ProofOfDeliverySignature).IsRequired(false);
+                b.Property(x => x.ProofOfDeliveryPhotoUrl).IsRequired(false);
+                b.Property(x => x.DeliveryNotes).IsRequired(false);
+                b.Property(x => x.CreatedBy).IsRequired(false);
+                b.Property(x => x.UpdatedBy).IsRequired(false);
+            });
+
+            builder.Entity<OrderDetail>(b =>
+            {
+                b.Property(x => x.ProductTitle).IsRequired(false);
+                b.Property(x => x.ProductUnit).IsRequired(false);
+                b.Property(x => x.ProductImage).IsRequired(false);
+                b.Property(x => x.MerchantTitle).IsRequired(false);
+                b.Property(x => x.Warning).IsRequired(false);
+                b.Property(x => x.CreatedBy).IsRequired(false);
+                b.Property(x => x.UpdatedBy).IsRequired(false);
+            });
+
+            builder.Entity<OrderStatusChangeLog>(b =>
+            {
+                b.Property(x => x.OrdreDetails).IsRequired(false);
+                b.Property(x => x.CreatedBy).IsRequired(false);
+                b.Property(x => x.UpdatedBy).IsRequired(false);
+            });
 
             #region Use updated datetime2 , decimal
             //https://stackoverflow.com/questions/43277154/entity-framework-core-setting-the-decimal-precision-and-scale-to-all-decimal-p

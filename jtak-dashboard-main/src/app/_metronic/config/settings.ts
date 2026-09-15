@@ -6,9 +6,14 @@ export const ApplicationRoutes = Object.freeze({
   Products: 'products',
   Categories: 'categories',
   Dashboard: 'dashboard',
+  PopularProducts: 'popular-products',
+  HomeCategories: 'home-categories',
+  RestaurantCategories: 'restaurant-categories',
   Banners: 'banners',
   Orders: 'orders',
   Bills: 'bills',
+  Reconciliation: 'reconciliation',
+  InventoryBatches: 'inventory-batches',
   Auth: 'auth',
   Login: 'login',
   ForgotPassword: 'forgot-password',
@@ -16,6 +21,7 @@ export const ApplicationRoutes = Object.freeze({
   Create: 'create',
   Payments: 'payments',
   Reviews: 'reviews',
+  SupportMessages: 'support-messages',
   Notifications: 'notifications',
   Pages: 'pages',
   PrivacyPolicy: 'pages/PrivacyPolicy',
@@ -32,14 +38,29 @@ export const ApplicationMenu = [
     icon: 'fas fa-tachometer-alt',
   },
   {
-    path: ApplicationRoutes.Merchants,
-    label: 'MENU.MERCHANTS',
-    icon: 'fas fa-user-tie',
+    path: ApplicationRoutes.Orders,
+    label: 'MENU.ORDERS',
+    icon: 'fas fa-shopping-bag',
   },
   {
-    path: ApplicationRoutes.Users,
-    label: 'MENU.USERS',
-    icon: 'fas fa-users',
+    path: ApplicationRoutes.Reconciliation,
+    label: 'MENU.RECONCILIATION',
+    icon: 'fas fa-cash-register',
+  },
+  {
+    path: ApplicationRoutes.InventoryBatches,
+    label: 'MENU.INVENTORY_BATCHES',
+    icon: 'fas fa-warehouse',
+  },
+  {
+    path: ApplicationRoutes.Products,
+    label: 'MENU.PRODUCTS',
+    icon: 'fas fa-box-open',
+  },
+  {
+    path: ApplicationRoutes.PopularProducts,
+    label: 'MENU.POPULAR_PRODUCTS',
+    icon: 'fas fa-fire-alt',
   },
   {
     path: ApplicationRoutes.Categories,
@@ -47,9 +68,29 @@ export const ApplicationMenu = [
     icon: 'fas fa-tags',
   },
   {
-    path: ApplicationRoutes.Products,
-    label: 'MENU.PRODUCTS',
-    icon: 'fas fa-box',
+    path: ApplicationRoutes.HomeCategories,
+    label: 'MENU.HOME_CATEGORIES',
+    icon: 'fas fa-th-large',
+  },
+  {
+    path: ApplicationRoutes.Merchants,
+    label: 'MENU.MERCHANTS',
+    icon: 'fas fa-store',
+  },
+  {
+    path: ApplicationRoutes.Bills,
+    label: 'MENU.BILLS',
+    icon: 'fas fa-file-invoice-dollar',
+  },
+  {
+    path: ApplicationRoutes.Payments,
+    label: 'MENU.PAYMENTS',
+    icon: 'fas fa-hand-holding-usd',
+  },
+  {
+    path: ApplicationRoutes.Users,
+    label: 'MENU.USERS',
+    icon: 'fas fa-users-cog',
   },
   {
     path: ApplicationRoutes.Banners,
@@ -57,19 +98,9 @@ export const ApplicationMenu = [
     icon: 'fas fa-ad',
   },
   {
-    path: ApplicationRoutes.Orders,
-    label: 'MENU.ORDERS',
-    icon: 'fas fa-shopping-cart',
-  },
-  {
-    path: ApplicationRoutes.Payments,
-    label: 'MENU.PAYMENTS',
-    icon: 'fas fa-money-check-alt',
-  },
-  {
-    path: ApplicationRoutes.Bills,
-    label: 'MENU.BILLS',
-    icon: 'fas fa-money-bill',
+    path: ApplicationRoutes.Notifications,
+    label: 'MENU.NOTIFICATIONS',
+    icon: 'fas fa-bell',
   },
   {
     path: ApplicationRoutes.Reviews,
@@ -77,30 +108,25 @@ export const ApplicationMenu = [
     icon: 'fas fa-star',
   },
   {
-    path: ApplicationRoutes.Notifications,
-    label: 'MENU.NOTIFICATIONS',
-    icon: 'fas fa-bell',
+    path: ApplicationRoutes.SupportMessages,
+    label: 'MENU.SUPPORT_MESSAGES',
+    icon: 'fas fa-headset',
   },
   {
     path: ApplicationRoutes.Terms,
     label: 'MENU.TERMS',
-    icon: 'fas fa-file',
+    icon: 'fas fa-file-contract',
   },
   {
     path: ApplicationRoutes.About,
     label: 'MENU.ABOUT',
-    icon: 'fas fa-file',
+    icon: 'fas fa-info-circle',
   },
-  //{
-  //  path: ApplicationRoutes.PaymentTerms,
-  //  label: 'MENU.PAYMENTTERMS',
-  //  icon: 'fas fa-file',
-  //},
-  //{
-  //  path: ApplicationRoutes.PrivacyPolicy,
-  //  label: 'MENU.PRIVACYPOLICY',
-  //  icon: 'fas fa-file',
-  //},
+  {
+    path: ApplicationRoutes.RestaurantCategories,
+    label: 'MENU.RESTAURANT_CATEGORIES',
+    icon: 'fas fa-utensils',
+  },
 ];
 
 export const AppUserRoleMap = {
@@ -111,8 +137,28 @@ export const AppUserRoleMap = {
 };
 
 export const ApplicationMenuGroups = [
-  { label: 'Overview', items: ApplicationMenu.slice(0, 1) },
-  { label: 'Operations', items: ApplicationMenu.slice(1, 9) },
-  { label: 'Engagement', items: ApplicationMenu.slice(9, 11) },
-  { label: 'Content', items: ApplicationMenu.slice(11) },
+  {
+    label: 'MENU.GROUPS.OVERVIEW',
+    items: [ApplicationMenu[0]], // Dashboard
+  },
+  {
+    label: 'MENU.GROUPS.OPERATIONS',
+    items: [ApplicationMenu[1], ApplicationMenu[2], ApplicationMenu[3]], // Orders, Reconciliation, InventoryBatches
+  },
+  {
+    label: 'MENU.GROUPS.CATALOG',
+    items: [ApplicationMenu[4], ApplicationMenu[5], ApplicationMenu[6], ApplicationMenu[17], ApplicationMenu[7]], // Products, PopularProducts, Categories, RestaurantCategories, Merchants
+  },
+  {
+    label: 'MENU.GROUPS.FINANCE',
+    items: [ApplicationMenu[8], ApplicationMenu[9]], // Bills, Payments
+  },
+  {
+    label: 'MENU.GROUPS.USERS',
+    items: [ApplicationMenu[10], ApplicationMenu[14]], // Users & Couriers, Support Messages
+  },
+  {
+    label: 'MENU.GROUPS.MARKETING',
+    items: [ApplicationMenu[11], ApplicationMenu[12], ApplicationMenu[13], ApplicationMenu[15], ApplicationMenu[16]], // Banners, Notifications, Reviews, Terms, About
+  },
 ];

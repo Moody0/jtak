@@ -17,10 +17,19 @@ class PaymentProvider extends BaseProvider<PaymentModel> {
     );
   }
 
-  Future recivePayment(int id) async {
+  Future<bool> recivePayment(int id) async {
+    bool success = false;
     await loadBaseData(loadBody: () async {
-      await _api.postRequest('/Payments/RecivePayment/$id', {});
-      dataList.removeWhere((element) => element.id == id);
+      var res = await _api.postRequest('/Payments/RecivePayment/$id', {});
+      if (res != null) {
+        success = true;
+        final index = dataList.indexWhere((element) => element.id == id);
+        if (index != -1) {
+          dataList[index].handoverDate = DateTime.now().toUtc().toIso8601String();
+        }
+      }
     });
+    notifyListeners();
+    return success;
   }
 }

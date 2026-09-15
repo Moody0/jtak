@@ -214,7 +214,7 @@ Adapted from the approved component sheets to JTAK's **Navy Blue (`#253784`)** +
   * Integrated **IBM Plex Sans Arabic** across the entire text theme with dedicated line-heights (1.25 for compact UI, 1.45 for copy) and standard weights (400, 500, 600, 700).
   * Upgraded default card radii from 5px to **16px** with subtle diffuse ambient shadows (`#0A000000`) and 1px micro-border strokes (`#F1F5F9`).
 * **Top App Bar Component (`top_app_bar_widget.dart`)**:
-  * **Brand Mark**: JTAK brand container + Arabic wordmark (`جتاك`) with vibrant orange badge.
+  * **Brand Mark**: JTAK brand container + Arabic wordmark (`جيتك`) with vibrant orange badge.
   * **Delivery Location Dropdown**: Rounded peach pill (`#FFF3EB`) displaying current destination ("دمشق، المزة...") with location pin and dropdown arrow.
   * **Interactive Address Bottom Sheet (`showJtakAddressBottomSheet`)**: 24px rounded sheet with saved addresses (Home, Work), radio checks, and "+ إضافة عنوان جديد" action.
   * **Cart Action Badge**: 44x44 elevated circular action container with live cart count pill badge.
@@ -259,7 +259,7 @@ Adapted from the approved component sheets to JTAK's **Navy Blue (`#253784`)** +
   1. **Dual-State Hero Identity Component (`account_widget.dart`)**:
      * **Logged-in State (`AccountCard`)**: Elevated card with subtle border (`0.9px #E2E8F0`), soft ambient shadow, vibrant orange gradient avatar ring (`#FF5400` ➔ `#FF8C42`), user name, verified badge pill (`✓ موثق`), locked phone number, and a sleek `"تعديل"` edit pill action.
      * **Embedded Quick-Action Bar**: 3 interactive shortcut capsules (📦 **طلباتي** ➔ fast-jumps to Orders tab, 📍 **عناويني** ➔ opens Saved Addresses, ❤️ **المفضلة** ➔ fast-jumps to Favorites).
-     * **High-Converting Guest State (`GuestAccountCard`)**: Warm peach gradient canvas (`#FFF7F2` ➔ `#FFF0E6`) with glowing user avatar graphic, friendly Arabic copy (*"مرحباً بك في جتاك 👋"*), and a full-width vibrant Orange Gradient CTA button (*"تسجيل الدخول / حساب جديد"*).
+     * **High-Converting Guest State (`GuestAccountCard`)**: Warm peach gradient canvas (`#FFF7F2` ➔ `#FFF0E6`) with glowing user avatar graphic, friendly Arabic copy (*"مرحباً بك في جيتك 👋"*), and a full-width vibrant Orange Gradient CTA button (*"تسجيل الدخول / حساب جديد"*).
   2. **Structured Grouped Card Sections (`account_page.dart`)**:
      * **النشاط والمعاملات (Activity & Orders)**: Grouped card with Orders History, Saved Delivery Addresses, and Favorites.
      * **الإعدادات والتفضيلات (Preferences & Settings)**: Notifications with unread badge counter and App Language modal switcher (`العربية / English`).
@@ -267,7 +267,7 @@ Adapted from the approved component sheets to JTAK's **Navy Blue (`#253784`)** +
      * **إجراءات الحساب (Account Actions)**: Clean danger-styled Logout button with modern dialog confirmation.
   3. **Refined Social Media & Brand Hub (`social_media_widget.dart`)**:
      * Modern card footer with 5 pastel circular brand icon buttons (WhatsApp, Direct Call, Facebook, Instagram, YouTube) with haptic feedback and safe deep-link URL launching.
-     * Brand footer tag: `جتاك JTAK Delivery • الإصدار 1.0.3` • `صُنع بكل ❤️ لتوصيل أسرع وألذ في سورية`.
+     * Brand footer tag: `جيتك JTAK Delivery • الإصدار 1.0.3` • `صُنع بكل ❤️ لتوصيل أسرع وألذ في سورية`.
   4. **Modernized Profile Edit Screen (`profile_page.dart`)**:
      * Centered avatar hero with gradient border and floating camera badge.
      * Modern bordered text inputs (`#F8FAFC` fill, `#E2E8F0` border, `#FF5400` focus) with SolarIcons prefix icons.

@@ -10,9 +10,6 @@ extension StringValueExtention on PaymentMethod {
 
       case PaymentMethod.creditCardPayment:
         return str.app.creditCardPayment;
-
-      default:
-        return '';
     }
   }
 }

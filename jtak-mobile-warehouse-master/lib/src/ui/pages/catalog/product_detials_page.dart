@@ -20,7 +20,7 @@ class ProductDetailsPage extends StatefulWidget {
   static const String routeName = '/ProductDetailsPage';
 
   final ProductModel product;
-  const ProductDetailsPage(this.product);
+  const ProductDetailsPage(this.product, {Key? key}) : super(key: key);
 
   @override
   State<ProductDetailsPage> createState() => _ProductDetailsPageState();

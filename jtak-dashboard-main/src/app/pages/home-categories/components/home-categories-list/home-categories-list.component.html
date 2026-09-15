@@ -1,0 +1,181 @@
+<div class="card">
+  <div class="card-header border-0 pt-6">
+    <div class="card-title flex-column align-items-start">
+      <h3 class="fw-bold m-0">فئات الصفحة الرئيسية</h3>
+      <span class="text-muted fs-7 mt-1">
+        الشبكة التي تظهر للعميل أعلى الصفحة الرئيسية. كل فئة تفتح وجهة تحددها أنت.
+      </span>
+    </div>
+    <div class="card-toolbar">
+      <button type="button" class="btn btn-light-primary me-2" (click)="addTile()" [disabled]="loading">
+        <i class="fas fa-plus me-1"></i> إضافة فئة
+      </button>
+      <button type="button" class="btn btn-primary" (click)="save()" [disabled]="loading || saving">
+        <span *ngIf="!saving">حفظ التغييرات</span>
+        <span *ngIf="saving">جارِ الحفظ...</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card-body pt-0">
+    <div *ngIf="saveSuccess" class="alert alert-success d-flex align-items-center">
+      <i class="fas fa-check-circle me-2"></i>
+      تم حفظ الفئات. ستظهر للعملاء عند تحديث التطبيق للصفحة الرئيسية.
+    </div>
+    <div *ngIf="saveError" class="alert alert-danger d-flex align-items-center">
+      <i class="fas fa-exclamation-triangle me-2"></i> {{ saveError }}
+    </div>
+
+    <div *ngIf="loading" class="text-center py-10 text-muted">جارِ التحميل...</div>
+
+    <ng-container *ngIf="!loading">
+      <!-- Section-level settings -->
+      <div class="row g-4 mb-6">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">عنوان القسم (عربي)</label>
+          <input type="text" class="form-control" [(ngModel)]="config.sectionTitle" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">عنوان القسم (إنجليزي)</label>
+          <input type="text" class="form-control" [(ngModel)]="config.sectionTitleEn" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">عدد الفئات المعروضة</label>
+          <input type="number" min="0" class="form-control" [(ngModel)]="config.maxItems" />
+          <span class="form-text">0 يعني عرض كل الفئات المفعّلة.</span>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+          <div class="form-check form-switch form-check-custom form-check-solid">
+            <input class="form-check-input" type="checkbox" id="sectionEnabled" [(ngModel)]="config.enabled" />
+            <label class="form-check-label fw-semibold" for="sectionEnabled">إظهار القسم</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-4 mb-5 text-muted fs-7">
+        <span><strong class="text-dark">{{ config.tiles.length }}</strong> فئة</span>
+        <span><strong class="text-dark">{{ activeCount }}</strong> مفعّلة</span>
+        <span><strong class="text-dark">{{ visibleCount }}</strong> ستظهر في التطبيق</span>
+        <span *ngIf="invalidCount > 0" class="text-danger">
+          <strong>{{ invalidCount }}</strong> غير مكتملة
+        </span>
+      </div>
+
+      <div *ngIf="!config.tiles.length" class="text-center py-10 text-muted">
+        لا توجد فئات بعد. اضغط "إضافة فئة" للبدء.
+      </div>
+
+      <!-- One editable row per tile -->
+      <div
+        *ngFor="let tile of config.tiles; let i = index; trackBy: trackByIndex"
+        class="border rounded p-4 mb-4"
+        [class.border-danger]="tileProblem(tile)"
+      >
+        <div class="d-flex align-items-center mb-3">
+          <span class="badge badge-light-primary me-3">{{ i + 1 }}</span>
+
+          <div class="btn-group btn-group-sm me-3">
+            <button type="button" class="btn btn-light" (click)="moveUp(i)" [disabled]="i === 0" title="تحريك لأعلى">
+              <i class="fas fa-arrow-up"></i>
+            </button>
+            <button
+              type="button"
+              class="btn btn-light"
+              (click)="moveDown(i)"
+              [disabled]="i === config.tiles.length - 1"
+              title="تحريك لأسفل"
+            >
+              <i class="fas fa-arrow-down"></i>
+            </button>
+          </div>
+
+          <div class="form-check form-switch form-check-custom form-check-solid me-auto">
+            <input class="form-check-input" type="checkbox" [id]="'active' + i" [(ngModel)]="tile.active" />
+            <label class="form-check-label fw-semibold" [for]="'active' + i">مفعّلة</label>
+          </div>
+
+          <span *ngIf="isHidden(i)" class="badge badge-light-warning me-3">
+            خارج عدد الفئات المعروضة
+          </span>
+
+          <button type="button" class="btn btn-sm btn-light-danger" (click)="removeTile(i)">
+            <i class="fas fa-trash"></i> حذف
+          </button>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">الاسم (عربي)</label>
+            <input type="text" class="form-control" [(ngModel)]="tile.title" placeholder="مثال: منظفات" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">الاسم (إنجليزي)</label>
+            <input type="text" class="form-control" [(ngModel)]="tile.titleEn" placeholder="Cleaning" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">رابط الصورة</label>
+            <input type="text" class="form-control" [(ngModel)]="tile.imageUrl" placeholder="اتركه فارغاً لاستخدام صورة القسم" />
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">ماذا تفتح هذه الفئة؟</label>
+            <select class="form-select" [(ngModel)]="tile.linkType" (ngModelChange)="onLinkTypeChange(tile)">
+              <option *ngFor="let type of linkTypes" [ngValue]="type.value">{{ type.label }}</option>
+            </select>
+            <span class="form-text">
+              {{ linkTypes[tile.linkType]?.hint }}
+            </span>
+          </div>
+
+          <!-- Destination, one input per link type -->
+          <div class="col-md-8">
+            <ng-container [ngSwitch]="tile.linkType">
+              <div *ngSwitchCase="LinkType.ProductCategory">
+                <label class="form-label fw-semibold">القسم</label>
+                <select
+                  class="form-select"
+                  [(ngModel)]="tile.productCategoryId"
+                  (ngModelChange)="onTargetChange(tile)"
+                >
+                  <option [ngValue]="null">— اختر قسماً —</option>
+                  <option *ngFor="let category of categories" [ngValue]="category.id">
+                    {{ categoryLabel(category) }} (#{{ category.id }})
+                  </option>
+                </select>
+              </div>
+
+              <div *ngSwitchCase="LinkType.MerchantKind">
+                <label class="form-label fw-semibold">نوع المتاجر</label>
+                <select class="form-select" [(ngModel)]="tile.merchantKind" (ngModelChange)="onTargetChange(tile)">
+                  <option [ngValue]="null">— اختر نوعاً —</option>
+                  <option *ngFor="let kind of merchantKinds" [ngValue]="kind.value">
+                    {{ merchantKindLabel(kind.value) }}
+                  </option>
+                </select>
+              </div>
+
+              <div *ngSwitchCase="LinkType.Merchant">
+                <label class="form-label fw-semibold">المتجر</label>
+                <select class="form-select" [(ngModel)]="tile.merchantId" (ngModelChange)="onTargetChange(tile)">
+                  <option [ngValue]="null">— اختر متجراً —</option>
+                  <option *ngFor="let merchant of merchants" [ngValue]="merchant.id">
+                    {{ merchant.title }} ({{ merchantKindLabel(merchant.merchantKind) }})
+                  </option>
+                </select>
+              </div>
+
+              <div *ngSwitchCase="LinkType.Search">
+                <label class="form-label fw-semibold">كلمة البحث</label>
+                <input type="text" class="form-control" [(ngModel)]="tile.searchTerm" placeholder="مثال: شاورما" />
+              </div>
+            </ng-container>
+          </div>
+        </div>
+
+        <div *ngIf="tileProblem(tile)" class="text-danger fs-8 mt-3">
+          <i class="fas fa-exclamation-circle me-1"></i> {{ tileProblem(tile) }}
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>

@@ -97,6 +97,42 @@ class MockMenuItemData {
       distance: distance,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'price': price,
+      'basePriceValue': basePriceValue,
+      'category': category,
+      'imageUrl': imageUrl,
+      'calories': calories,
+      'rating': rating,
+      'restaurantId': restaurantId,
+      'restaurantName': restaurantName,
+      'eta': eta,
+      'distance': distance,
+    };
+  }
+
+  factory MockMenuItemData.fromMap(Map<String, dynamic> map) {
+    return MockMenuItemData(
+      id: (map['id'] as num?)?.toInt() ?? 0,
+      title: map['title']?.toString() ?? '',
+      description: map['description']?.toString() ?? '',
+      price: map['price']?.toString() ?? '',
+      basePriceValue: (map['basePriceValue'] as num?)?.toInt() ?? 0,
+      category: map['category']?.toString() ?? 'وجبات',
+      imageUrl: map['imageUrl']?.toString() ?? '',
+      calories: map['calories']?.toString() ?? '420 سعرة',
+      rating: (map['rating'] as num?)?.toDouble() ?? 4.8,
+      restaurantId: (map['restaurantId'] as num?)?.toInt() ?? 0,
+      restaurantName: map['restaurantName']?.toString() ?? '',
+      eta: map['eta']?.toString() ?? '20-30 دقيقة',
+      distance: map['distance']?.toString() ?? '2.4 كم',
+    );
+  }
 }
 
 class MockRestaurantData {
@@ -110,6 +146,7 @@ class MockRestaurantData {
   final String distance;
   final String deliveryFee;
   final int minOrder;
+  final String workingHours;
   final bool hasOffers;
   final bool isFast;
   final bool isMarket;
@@ -129,6 +166,7 @@ class MockRestaurantData {
     required this.distance,
     required this.deliveryFee,
     this.minOrder = 30000,
+    this.workingHours = 'حتى 3 ص',
     this.hasOffers = true,
     this.isFast = true,
     this.isMarket = false,
@@ -152,6 +190,54 @@ class MockRestaurantData {
       deliveryFee: deliveryFee,
       isVerified: true,
       isOpen: true,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'cuisine': cuisine,
+      'categoryTag': categoryTag,
+      'rating': rating,
+      'ratingCount': ratingCount,
+      'eta': eta,
+      'distance': distance,
+      'deliveryFee': deliveryFee,
+      'minOrder': minOrder,
+      'workingHours': workingHours,
+      'hasOffers': hasOffers,
+      'isFast': isFast,
+      'isMarket': isMarket,
+      'coverUrl': coverUrl,
+      'logoUrl': logoUrl,
+      'categories': categories,
+    };
+  }
+
+  factory MockRestaurantData.fromMap(Map<String, dynamic> map) {
+    return MockRestaurantData(
+      id: (map['id'] as num?)?.toInt() ?? 0,
+      name: map['name']?.toString() ?? '',
+      cuisine: map['cuisine']?.toString() ?? '',
+      categoryTag: map['categoryTag']?.toString() ?? '',
+      rating: (map['rating'] as num?)?.toDouble() ?? 4.8,
+      ratingCount: (map['ratingCount'] as num?)?.toInt() ?? 100,
+      eta: map['eta']?.toString() ?? '20-30 دقيقة',
+      distance: map['distance']?.toString() ?? '2.5 كم',
+      deliveryFee: map['deliveryFee']?.toString() ?? '5,000 ل.س',
+      minOrder: (map['minOrder'] as num?)?.toInt() ?? 30000,
+      workingHours: map['workingHours']?.toString() ?? 'حتى 3 ص',
+      hasOffers: map['hasOffers'] == true,
+      isFast: map['isFast'] == true,
+      isMarket: map['isMarket'] == true,
+      coverUrl: map['coverUrl']?.toString() ?? '',
+      logoUrl: map['logoUrl']?.toString() ?? '',
+      categories: (map['categories'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const ['الكل'],
+      menuItems: const [],
     );
   }
 }
@@ -1661,68 +1747,104 @@ class MockCatalogData {
     return filtered.isNotEmpty ? filtered : res.menuItems;
   }
 
-  /// Showcase meals for Delivery Offers section (توصيل مجاني وعروض الشام)
+  /// Showcase meals for Delivery Offers section (الأكثر طلباً)
   static List<MealItemData> get allDeliveryMeals {
     return const [
       MealItemData(
         id: 101,
         title: 'وجبة عربي سوبر دجاج أنس',
         price: '48,000 ل.س',
-        coverUrl: 'assets/images/products/Arabic Chicken Shawarma Platter.webp',
-        merchantLogoUrl: 'assets/images/products/Arabic Chicken Shawarma Platter.webp',
+        coverUrl: 'assets/images/restaurants/anas_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/anas_logo.webp',
         merchantName: 'شاورما أنس الدمشقية',
         eta: '15-25 دقيقة',
         distance: '1.8 كم',
+        merchantId: 8,
+        numericPrice: 48000.0,
       ),
       MealItemData(
         id: 201,
         title: 'كيلو كباب حلبي مشوي عالفحم',
         price: '180,000 ل.س',
-        coverUrl: 'assets/images/categories/meat_poultry.png',
-        merchantLogoUrl: 'assets/images/categories/meat_poultry.png',
+        coverUrl: 'assets/images/restaurants/damascus_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/damascus_logo.webp',
         merchantName: 'مشاوي وكباب بوابة دمشق',
         eta: '25-40 دقيقة',
         distance: '2.5 كم',
+        merchantId: 6,
+        numericPrice: 180000.0,
       ),
       MealItemData(
         id: 301,
         title: 'فتة حمص بالسمنة والصنوبر',
         price: '38,000 ل.س',
-        coverUrl: 'assets/images/categories/dish_syrian.png',
-        merchantLogoUrl: 'assets/images/categories/dish_syrian.png',
+        coverUrl: 'assets/images/restaurants/bouz_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/bouz_logo.webp',
         merchantName: 'فطاير وفول بوز الجدي',
         eta: '15-20 دقيقة',
         distance: '1.2 كم',
+        merchantId: 10,
+        numericPrice: 38000.0,
       ),
       MealItemData(
         id: 401,
         title: 'بوظة بكداش شامية بالفستق',
         price: '95,000 ل.س',
-        coverUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80',
-        merchantLogoUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80',
+        coverUrl: 'assets/images/restaurants/bakdash_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/bakdash_logo.webp',
         merchantName: 'حلويات بكداش التراثية',
         eta: '20-30 دقيقة',
         distance: '2.1 كم',
+        merchantId: 7,
+        numericPrice: 95000.0,
       ),
       MealItemData(
         id: 501,
         title: 'سحلب شامي بالقرفة والفستق',
         price: '22,000 ل.س',
-        coverUrl: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=600&q=80',
-        merchantLogoUrl: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=300&q=80',
+        coverUrl: 'assets/images/restaurants/noufara_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/noufara_logo.webp',
         merchantName: 'مقهى النوفرة التراثي',
         eta: '15-25 دقيقة',
         distance: '2.8 كم',
+        merchantId: 11,
+        numericPrice: 22000.0,
       ),
       MealItemData(
         id: 601,
         title: 'برغر كلاسيك لحم بلدي وقشقوان',
         price: '46,000 ل.س',
-        coverUrl: 'assets/images/products/Double Angus Smash Burger.webp',
-        merchantLogoUrl: 'assets/images/products/Double Angus Smash Burger.webp',
+        coverUrl: 'assets/images/restaurants/burger_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/burger_logo.webp',
         merchantName: 'كلاسيك برغر الشام',
         eta: '20-30 دقيقة',
         distance: '2.3 كم',
+        merchantId: 9,
+        numericPrice: 46000.0,
+      ),
+      MealItemData(
+        id: 701,
+        title: 'كيلو مبرومة بالفستق الحلبي البلدي',
+        price: '220,000 ل.س',
+        coverUrl: 'assets/images/restaurants/dawood_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/dawood_logo.webp',
+        merchantName: 'حلويات داوود ومهنا',
+        eta: '25-35 دقيقة',
+        distance: '3.2 كم',
+        merchantId: 5,
+        numericPrice: 220000.0,
+      ),
+      MealItemData(
+        id: 801,
+        title: 'آيسد سبانش لاتيه دمشقي فاخر',
+        price: '32,000 ل.س',
+        coverUrl: 'assets/images/restaurants/art_dish.webp',
+        merchantLogoUrl: 'assets/images/restaurants/art_logo.webp',
+        merchantName: 'أرت كافيه الشام',
+        eta: '15-25 دقيقة',
+        distance: '2.2 كم',
+        merchantId: 4,
+        numericPrice: 32000.0,
       ),
     ];
   }

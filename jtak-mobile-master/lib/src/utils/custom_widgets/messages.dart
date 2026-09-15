@@ -35,10 +35,28 @@ class CustomDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final cleanMsg = message != null ? _cleanMessage(message!) : '';
     final isLoginPrompt = cleanMsg.contains('تسجيل الدخول') || (title != null && title!.contains('تسجيل الدخول'));
+    final isWarning = cleanMsg.contains('تنبيه') ||
+        cleanMsg.contains('تحذير') ||
+        cleanMsg.contains('للأسف') ||
+        cleanMsg.contains('غير متوفر') ||
+        cleanMsg.contains('مراجعة') ||
+        cleanMsg.contains('الحد الأدنى') ||
+        (title != null && (title!.contains('تنبيه') || title!.contains('تحذير')));
 
-    final effectiveIcon = icon ?? (isLoginPrompt ? PhosphorIconsFill.signIn : PhosphorIconsFill.info);
-    final effectiveIconColor = iconColor ?? (isLoginPrompt ? kPrimaryOrange : const Color(0xFF3B82F6));
-    final effectiveIconBg = iconBg ?? (isLoginPrompt ? const Color(0xFFFFF0E8) : const Color(0xFFEFF6FF));
+    final effectiveIcon = icon ??
+        (isLoginPrompt
+            ? PhosphorIconsFill.signIn
+            : (isWarning ? PhosphorIconsFill.warningCircle : PhosphorIconsFill.info));
+    final effectiveIconColor = iconColor ??
+        (isLoginPrompt
+            ? kPrimaryOrange
+            : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF3B82F6)));
+    final effectiveIconBg = iconBg ??
+        (isLoginPrompt
+            ? const Color(0xFFFFF0E8)
+            : (isWarning ? const Color(0xFFFEF3C7) : const Color(0xFFEFF6FF)));
+
+    final isMultiLine = cleanMsg.contains('\n');
 
     return Dialog(
       backgroundColor: Colors.white,
@@ -79,14 +97,18 @@ class CustomDialog extends StatelessWidget {
 
             // 3. Message Body
             if (cleanMsg.isNotEmpty) ...[
-              Text(
-                cleanMsg,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
-                  height: 1.4,
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: isMultiLine ? 4 : 0),
+                child: Text(
+                  cleanMsg,
+                  textAlign: isMultiLine ? TextAlign.start : TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF475569),
+                    height: 1.5,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),

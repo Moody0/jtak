@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import '../utilities/global_var.dart';
 
 import '../../core/controllers/app/app_state_manager.dart';
 import '../../core/services/locator.dart';
@@ -30,23 +29,50 @@ class SolApi {
 
   SolApi({this.accessToken, this.contentType = 'application/json', this.acceptLanguage = '*'}) {
     internetProvider = InternetProvider();
-    getHeaders();
   }
 
-  Map<String, String> getHeaders({String? contentType}) {
+  Map<String, String> getHeaders({String? contentType, bool includeAuth = true}) {
     apiHeaders = {};
     apiHeaders['Content-Type'] = contentType ?? this.contentType;
-    apiHeaders['Accept-Language'] = locator<AppStateManager>().appLanguage;
-    if (accessToken != null) apiHeaders['authorization'] = 'Bearer $accessToken';
+    if (locator.isRegistered<AppStateManager>()) {
+      try {
+        apiHeaders['Accept-Language'] = locator<AppStateManager>().appLanguage;
+      } catch (_) {}
+    }
+    if (includeAuth) {
+      String? token = accessToken;
+      if (token == null || token.isEmpty) {
+        if (locator.isRegistered<AuthenticationService>()) {
+          try {
+            token = locator<AuthenticationService>().getAccessToken;
+          } catch (_) {}
+        }
+      }
+      if (token != null &&
+          token.isNotEmpty &&
+          !token.startsWith('auth_jwt_token_') &&
+          !token.startsWith('live_user_token_')) {
+        apiHeaders['authorization'] = 'Bearer $token';
+      }
+    }
 
     return apiHeaders;
   }
 
+  bool _isAuthEndpoint(String subUrl) {
+    return subUrl == '/connect/token' ||
+        subUrl.contains('/RegisterOrSignInByPhoneNumber') ||
+        subUrl.contains('/VerifyPhoneNumber');
+  }
+
   Future<dynamic> getRequest(String subUrl, {Map<String, String>? headers, String? apiPrefex}) async {
-    if (subUrl != '/connect/token') await locator<AuthenticationService>().checkAuthorizationToken();
+    final bool isAuth = _isAuthEndpoint(subUrl);
+    if (!isAuth && locator.isRegistered<AuthenticationService>()) {
+      await locator<AuthenticationService>().checkAuthorizationToken();
+    }
     String url = getFullUrl(subUrl, prefex: apiPrefex);
     try {
-      final httpResponse = await internetProvider.getRequest(url, headers: headers ?? getHeaders());
+      final httpResponse = await internetProvider.getRequest(url, headers: headers ?? getHeaders(includeAuth: !isAuth));
       return _responseHandel(httpResponse, url: url);
     } catch (err) {
       rethrow;
@@ -54,10 +80,13 @@ class SolApi {
   }
 
   Future<dynamic> postRequest(String subUrl, dynamic body, {Map<String, String>? headers, String? apiPrefex}) async {
-    if (subUrl != '/connect/token') await locator<AuthenticationService>().checkAuthorizationToken();
+    final bool isAuth = _isAuthEndpoint(subUrl);
+    if (!isAuth && locator.isRegistered<AuthenticationService>()) {
+      await locator<AuthenticationService>().checkAuthorizationToken();
+    }
     String url = getFullUrl(subUrl, prefex: apiPrefex);
     try {
-      Map<String, String>? header = headers ?? getHeaders();
+      Map<String, String>? header = headers ?? getHeaders(includeAuth: !isAuth);
       Object newBody = _parseBody(body, header);
 
       final httpResponse = await internetProvider.postRequest(url, newBody, headers: header);
@@ -68,10 +97,13 @@ class SolApi {
   }
 
   Future<dynamic> putRequest(String subUrl, dynamic body, {Map<String, String>? headers, String? apiPrefex}) async {
-    if (subUrl != '/connect/token') await locator<AuthenticationService>().checkAuthorizationToken();
+    final bool isAuth = _isAuthEndpoint(subUrl);
+    if (!isAuth && locator.isRegistered<AuthenticationService>()) {
+      await locator<AuthenticationService>().checkAuthorizationToken();
+    }
     String url = getFullUrl(subUrl, prefex: apiPrefex);
     try {
-      Map<String, String> header = headers ?? getHeaders();
+      Map<String, String> header = headers ?? getHeaders(includeAuth: !isAuth);
       Object newBody = _parseBody(body, header);
 
       final httpResponse = await internetProvider.putRequest(url, newBody, headers: header);
@@ -92,7 +124,7 @@ class SolApi {
     }
   }
 
-  _parseBody(dynamic body, Map<String, String> header) {
+  dynamic _parseBody(dynamic body, Map<String, String> header) {
     Object newBody;
     if (header['Content-Type'] == 'application/json') {
       newBody = jsonEncode(body);
@@ -106,7 +138,7 @@ class SolApi {
   String getFullUrl(String subUrl, {String? prefex}) {
     String url = baseURL + (prefex ?? SolApi.apiPrefex) + subUrl;
     if (kIsWeb && kDebugMode) {
-      return 'https://corsproxy.io/?' + Uri.encodeComponent(url);
+      return 'https://corsproxy.io/?${Uri.encodeComponent(url)}';
     }
     return url;
   }
@@ -114,39 +146,51 @@ class SolApi {
   dynamic _responseHandel(http.Response response, {String url = ''}) {
     try {
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.body.isEmpty) return <String, dynamic>{};
         return json.decode(response.body);
       }
 
-      if (kDebugMode) {
-        debugPrint('$url status code ${response.statusCode}');
+      debugPrint('$url status code ${response.statusCode}: ${response.body}');
+
+      // Attempt to parse structured error response from server
+      if (response.body.isNotEmpty) {
+        try {
+          final decoded = json.decode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            SolApiErrorResponse apiResponse = SolApiErrorResponse();
+            apiResponse.fromJson(decoded);
+            final errStr = apiResponse.getErrorsString();
+            if (errStr.trim().isNotEmpty) {
+              throw FetchDataException(errStr.trim(), response.statusCode, decoded);
+            }
+          } else if (decoded is String && decoded.trim().isNotEmpty) {
+            final localized = SolApiErrorResponse.localizeMessage(decoded.trim());
+            throw FetchDataException(localized, response.statusCode, decoded);
+          }
+        } catch (e) {
+          if (e is FetchDataException) rethrow;
+          debugPrint('SolApi error response parse: $e');
+        }
+      }
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw UnauthorisedException('انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول.');
       }
 
       if (response.statusCode == 404) {
-        throw NotFoundException(str.msg.errConnectionServer);
+        throw NotFoundException('المورد المطلوب غير موجود');
       }
 
-      if (response.statusCode >= 500) {
-        throw FetchDataException(str.msg.errConnectionServer);
+      // If server returned plain text error message (non-HTML)
+      if (response.body.isNotEmpty && !response.body.trim().startsWith('<') && response.body.length < 300) {
+        final localized = SolApiErrorResponse.localizeMessage(response.body.trim());
+        throw FetchDataException(localized, response.statusCode);
       }
 
-      try {
-        final decoded = json.decode(response.body);
-        if (decoded is Map<String, dynamic>) {
-          SolApiErrorResponse apiResponse = SolApiErrorResponse();
-          apiResponse.fromJson(decoded);
-          final errStr = apiResponse.getErrorsString();
-          if (errStr.isNotEmpty) {
-            throw FetchDataException(errStr);
-          }
-        }
-      } catch (e) {
-        if (e is FetchDataException) rethrow;
-      }
-
-      throw FetchDataException(str.msg.errConnectionServer);
+      throw FetchDataException('تعذر إتمام العملية من الخادم، يرجى المحاولة لاحقاً.', response.statusCode);
     } on FormatException catch (e) {
       debugPrint('SolApi format exception: $e');
-      throw FetchDataException(str.msg.errConnectionServer);
+      throw FetchDataException('تعذر معالجة استجابة الخادم، يرجى المحاولة مرة أخرى.');
     } catch (err) {
       debugPrint(err.toString());
       rethrow;

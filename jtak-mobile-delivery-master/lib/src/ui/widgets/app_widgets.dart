@@ -33,6 +33,7 @@ class NoDataAvailableWidget extends StatelessWidget {
   final String? msg;
   final String? subMsg;
   final String? imageName;
+  final IconData? icon;
   final VoidCallback? onRetry;
 
   const NoDataAvailableWidget({
@@ -40,6 +41,7 @@ class NoDataAvailableWidget extends StatelessWidget {
     this.msg,
     this.subMsg,
     this.imageName,
+    this.icon,
     this.onRetry,
   }) : super(key: key);
 
@@ -66,9 +68,9 @@ class NoDataAvailableWidget extends StatelessWidget {
                   width: 1.5,
                 ),
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(
-                  PhosphorIcons.mopedBold,
+                  icon ?? PhosphorIcons.mopedBold,
                   size: 44,
                   color: kPrimaryOrange,
                 ),

@@ -20,6 +20,7 @@ import '../../ui/pages/catalog/restaurants_list_page.dart';
 import '../../ui/pages/catalog/search_page.dart';
 import '../../ui/pages/catalog/single_product_review_page.dart';
 import '../../ui/pages/orders/order_details_page.dart';
+import '../../ui/pages/orders/live_tracking_page.dart';
 
 import '../../../main.dart';
 import '../../../src/utils/custom_widgets/image_slider_page.dart';
@@ -69,6 +70,8 @@ class RouteGenerator {
       ////////////////{ order routes } ////////////////
       case OrderDetailsPage.routeName:
         return CupertinoPageRoute(builder: (context) => OrderDetailsPage(args as OrderModel));
+      case LiveTrackingPage.routeName:
+        return CupertinoPageRoute(builder: (context) => LiveTrackingPage(order: args as OrderModel));
 
       ////////////////{ Address Routes } ////////////////
       case AddressPage.routeName:
@@ -82,10 +85,22 @@ class RouteGenerator {
 
       ////////////////{ image Route } ////////////////
       case ImageViewPage.routeName:
+        if (args is Map) {
+          return MaterialPageRoute(
+            builder: (_) => ImageViewPage(
+              image: args['image'],
+              imageList: args['imageList'] as List<dynamic>?,
+              initialIndex: args['initialIndex'] as int? ?? 0,
+              title: args['title'] as String?,
+              heroTag: args['heroTag'] as String?,
+              subtitle: args['subtitle'] as String?,
+            ),
+          );
+        }
         return MaterialPageRoute(builder: (_) => ImageViewPage(image: args));
 
       case ImageSliderPage.routeName:
-        if (args is List) return MaterialPageRoute(builder: (_) => ImageSliderPage(args[0], cuurentActiveItem: args[1]));
+        if (args is List) return MaterialPageRoute(builder: (_) => ImageSliderPage(args[0], cuurentActiveItem: args.length > 1 ? args[1] : null));
         return _errorRoute();
 
       default:

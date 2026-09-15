@@ -33,12 +33,23 @@ namespace Modules.Catalog.Entities
         /// Original price before discount in USD
         /// </summary>
         public decimal? OriginalPrice { get; set; }
+
+        /// <summary>
+        /// Base price in USD for merchants that quote in dollars. When this is
+        /// set, <see cref="MerchantPrice"/> is a derived local-currency value
+        /// recalculated from this figure every time the administrator changes
+        /// the exchange rate. Merchants that price directly in the local
+        /// currency leave it null and are never repriced.
+        /// </summary>
+        public decimal? PriceUsd { get; set; }
     }
     public class MerchantProductDto
     {
         public int MerchantId { get; set; }
         public int ProductId { get; set; }
         public string Product { get; set; }
+        public string ProductBarcode { get; set; }
+        public string ProductBrand { get; set; }
         public string ProductPhotos { get; set; }
         public string ProductCat1 { get; set; }
         public string ProductCat2 { get; set; }
@@ -69,6 +80,11 @@ namespace Modules.Catalog.Entities
         public decimal? OriginalPrice { get; set; }
 
         /// <summary>
+        /// Base price in USD when the merchant quotes in dollars, otherwise null.
+        /// </summary>
+        public decimal? PriceUsd { get; set; }
+
+        /// <summary>
         /// Additional Profit Percent specified by the admins, to be added to merchant prices
         /// </summary>
         public decimal AdditionalProfitPercent { get; set; }
@@ -97,6 +113,7 @@ namespace Modules.Catalog.Entities
         public decimal AdditionalProfitPercent { get; set; }
         public decimal Discount { get; set; }
         public decimal? OriginalPrice { get; set; }
+        public decimal? PriceUsd { get; set; }
     }
     public class MerchantProductPriceDto
     {

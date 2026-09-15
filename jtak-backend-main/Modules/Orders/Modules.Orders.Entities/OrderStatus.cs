@@ -41,6 +41,11 @@ namespace Modules.Orders.Entities
         CustomerCanceled = 6,
 
         //[Display(Name = "Canceled", ResourceType = typeof(_OrderStatus))]
-        DeliveryCanceled = 7
+        DeliveryCanceled = 7,
+
+        /// <summary>
+        /// Merchant finished preparation; admin may now assign a courier.
+        /// </summary>
+        ReadyForPickup = 8
     }
 }

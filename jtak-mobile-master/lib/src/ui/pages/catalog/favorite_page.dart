@@ -32,6 +32,26 @@ class _FavoritePageState extends State<FavoritePage> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final favProv =
+          Provider.of<FavoriteProductProvider>(context, listen: false);
+      if (favProv.favoriteRestaurants.isEmpty &&
+          favProv.favoriteMeals.isNotEmpty) {
+        if (_tabController.index == 0) {
+          _tabController.index = 1;
+        }
+      }
+      favProv.loadData().then((_) {
+        if (mounted &&
+            favProv.favoriteRestaurants.isEmpty &&
+            favProv.favoriteMeals.isNotEmpty) {
+          if (_tabController.index == 0) {
+            _tabController.animateTo(1);
+          }
+        }
+      });
+    });
   }
 
   @override
@@ -66,10 +86,10 @@ class _FavoritePageState extends State<FavoritePage> with SingleTickerProviderSt
                   physics: const ClampingScrollPhysics(),
                   children: [
                     // Tab 1: Favorite Restaurants & Markets
-                    _buildRestaurantsTab(restaurants),
+                    _buildRestaurantsTab(restaurants, favProvider),
 
                     // Tab 2: Favorite Meals & Dishes
-                    _buildMealsTab(meals),
+                    _buildMealsTab(meals, favProvider),
                   ],
                 ),
               ),
@@ -263,41 +283,72 @@ class _FavoritePageState extends State<FavoritePage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildRestaurantsTab(List restaurants) {
+  Widget _buildRestaurantsTab(
+      List restaurants, FavoriteProductProvider favProvider) {
     if (restaurants.isEmpty) {
-      return _buildEmptyState(
-        icon: PhosphorIconsFill.storefront,
-        title: 'لا توجد مطاعم في المفضلة',
-        description: 'احفظ مطاعمك ومتاجرك المفضلة بالضغط على أيقونة القلب للوصول السريع لطلب أشهى الوجبات.',
+      return RefreshIndicator(
+        onRefresh: () => favProvider.loadData(),
+        color: kPrimaryOrange,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.65,
+            child: _buildEmptyState(
+              icon: PhosphorIconsFill.storefront,
+              title: 'لا توجد مطاعم في المفضلة',
+              description:
+                  'احفظ مطاعمك ومتاجرك المفضلة بالضغط على أيقونة القلب للوصول السريع لطلب أشهى الوجبات.',
+            ),
+          ),
+        ),
       );
     }
 
-    return ListView.builder(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.only(top: 8, bottom: 90),
-      itemCount: restaurants.length,
-      itemBuilder: (context, index) {
-        return FavoriteRestaurantCard(restaurant: restaurants[index]);
-      },
+    return RefreshIndicator(
+      onRefresh: () => favProvider.loadData(),
+      color: kPrimaryOrange,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: 8, bottom: 90),
+        itemCount: restaurants.length,
+        itemBuilder: (context, index) {
+          return FavoriteRestaurantCard(restaurant: restaurants[index]);
+        },
+      ),
     );
   }
 
-  Widget _buildMealsTab(List meals) {
+  Widget _buildMealsTab(List meals, FavoriteProductProvider favProvider) {
     if (meals.isEmpty) {
-      return _buildEmptyState(
-        icon: PhosphorIconsFill.forkKnife,
-        title: 'قائمة أطباقك المفضلة فارغة',
-        description: 'أضف وجباتك وأطباقك المفضلة هنا لإعادة طلبها بضغطة زر واحدة في أي وقت.',
+      return RefreshIndicator(
+        onRefresh: () => favProvider.loadData(),
+        color: kPrimaryOrange,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.65,
+            child: _buildEmptyState(
+              icon: PhosphorIconsFill.forkKnife,
+              title: 'قائمة أطباقك المفضلة فارغة',
+              description:
+                  'أضف وجباتك وأطباقك المفضلة هنا لإعادة طلبها بضغطة زر واحدة في أي وقت.',
+            ),
+          ),
+        ),
       );
     }
 
-    return ListView.builder(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.only(top: 8, bottom: 90),
-      itemCount: meals.length,
-      itemBuilder: (context, index) {
-        return FavoriteMealCard(item: meals[index]);
-      },
+    return RefreshIndicator(
+      onRefresh: () => favProvider.loadData(),
+      color: kPrimaryOrange,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: 8, bottom: 90),
+        itemCount: meals.length,
+        itemBuilder: (context, index) {
+          return FavoriteMealCard(item: meals[index]);
+        },
+      ),
     );
   }
 

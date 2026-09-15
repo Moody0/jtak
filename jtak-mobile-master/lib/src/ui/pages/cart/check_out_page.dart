@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:jtek_app/src/core/controllers/app_parameters_provider.dart';
-import 'package:jtek_app/src/core/controllers/user/address_provider.dart';
 import 'package:jtek_app/src/core/controllers/user/user_provider.dart';
 import 'package:jtek_app/src/core/enums/viewstate.dart';
 import 'package:jtek_app/src/core/services/authentication_service.dart';
@@ -154,10 +152,6 @@ class _CheckOutPageState extends State<CheckOutPage> {
     context.showSnakBar(str.msg.smsCodeSend);
     var res = await context.navigateName(PhoneCodePage.routeName, data: provider.cartInfo.phoneNumber.toString());
     if (res is bool && res) {
-      provider.setState(ViewState.busy);
-      AddressProvider addressProvider = Provider.of<AddressProvider>(context, listen: false);
-      addressProvider.address = locator<AppParametersProvider>().mainAddressService.mainAddress;
-      addressProvider.saveFun();
       provider.setState(ViewState.busy);
       context.navigateName(OrderPaymentPage.routeName);
     }

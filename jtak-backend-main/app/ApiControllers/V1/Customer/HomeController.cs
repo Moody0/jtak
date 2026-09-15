@@ -14,6 +14,10 @@ using App.Shared.Entities;
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using App.Extensions;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace App.ApiControllers.V1.Customer
 {
@@ -25,6 +29,7 @@ namespace App.ApiControllers.V1.Customer
         private readonly IBannerService _bService;
         private readonly IAddressService _addrService;
         private readonly IProductCategoryService _catService;
+        private readonly IHomeCategoriesService _homeCategoriesService;
         private readonly INotificationService _notifService;
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger _logger;
@@ -33,6 +38,7 @@ namespace App.ApiControllers.V1.Customer
         public HomeController(UserManager<AppUser> userManager,
             IAddressService addrService,
             IProductCategoryService catService,
+            IHomeCategoriesService homeCategoriesService,
             INotificationService notifService,
             IBannerService bService,
             IGenericSettingService genericSetting,
@@ -42,6 +48,7 @@ namespace App.ApiControllers.V1.Customer
             _userManager = userManager;
             _addrService = addrService;
             _catService = catService;
+            _homeCategoriesService = homeCategoriesService;
             _notifService = notifService;
             _bService = bService;
             _genericSetting = genericSetting;
@@ -59,6 +66,27 @@ namespace App.ApiControllers.V1.Customer
         {
             //var settings = await _genericSetting.GetValue<SettingsVm>(nameof(SettingsVm), CultureInfo.CurrentCulture.TwoLetterISOLanguageName) ?? new SettingsVm() { };
             var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                var uid = User.GetUserId();
+                if (uid.HasValue)
+                {
+                    user = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == uid.Value);
+                }
+            }
+
+            if (user == null && User.Identity?.IsAuthenticated == true)
+            {
+                var userName = User.Identity?.Name 
+                    ?? User.FindFirst(Claims.Name)?.Value 
+                    ?? User.FindFirst(ClaimTypes.Name)?.Value;
+                if (!string.IsNullOrWhiteSpace(userName))
+                {
+                    user = await _userManager.FindByNameAsync(userName) 
+                        ?? await _userManager.FindByPhoneNumberAsync(userName);
+                }
+            }
+
             var u = user != null ? _mapper.Map<UserDto>(user) : null;
             if (u != null)
                 u.UserTopicId = _notifService.GetUserTopic(u.Id);
@@ -83,13 +111,35 @@ namespace App.ApiControllers.V1.Customer
                     .ToArray()
                 : categories;
 
+            // The curated grid. A tile whose target has been deleted or
+            // deactivated is withheld rather than shipped to the app, where it
+            // would open the wrong screen on tap.
+            var homeCategories = (await _homeCategoriesService.GetTiles(activeOnly: true))
+                .Where(tile => tile.TargetExists)
+                .ToArray();
+
+            // Older app builds read FeaturedCategories and know nothing about
+            // tiles, so mirror the same arrangement into it wherever a tile
+            // points at a product category.
+            if (homeCategories.Any())
+            {
+                var mirrored = homeCategories
+                    .Where(tile => tile.ProductCategoryId.HasValue)
+                    .Select(tile => categories.FirstOrDefault(category => category.Id == tile.ProductCategoryId.Value))
+                    .Where(category => category != null)
+                    .ToArray();
+                if (mirrored.Any())
+                    featuredCategories = mirrored;
+            }
+
             return new HomeVm
             {
                 User = u,
                 Addresses = await _addrService.GetUserAddresses(user?.Id),
-                Banners = await _bService.GetBanners(BannerLocation.HomePage),
+                Banners = await _bService.GetAllActiveBanners(),
                 Categories = categories,
-                FeaturedCategories = featuredCategories
+                FeaturedCategories = featuredCategories,
+                HomeCategories = homeCategories
             };
         }
     }

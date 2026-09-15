@@ -65,50 +65,6 @@ class UserProvider extends BaseProvider {
     );
   }
 
-  Future<void> promoteCurrentDriverToDelivery() async {
-    try {
-      final user = authService.user;
-      if (user == null || user.id == null) return;
-      final adminTokenRes = await _api.postRequest(
-        '/connect/token',
-        {
-          "grant_type": "password",
-          "username": "admin@jtak.app",
-          "password": "P@ssw0rd",
-          "scope": "offline_access profile roles phone email",
-        },
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        apiPrefex: '',
-      );
-      final adminToken = adminTokenRes['access_token'];
-      if (adminToken != null) {
-        final updateBody = {
-          "id": user.id,
-          "firstName": user.fullName ?? "كابتن",
-          "lastName": "توصيل",
-          "fullName": user.fullName ?? "كابتن توصيل",
-          "phoneNumber": (user.phoneNumber ?? "").replaceAll("+963", ""),
-          "countryPhoneCode": "+963",
-          "role": 3,
-          "isActive": true,
-          "gender": 0,
-        };
-        await _api.putRequest(
-          '/Admin/Users/${user.id}',
-          updateBody,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $adminToken',
-          },
-          apiPrefex: SolApi.apiVersionPrefex,
-        );
-        authService.user?.role = 3;
-      }
-    } catch (e) {
-      debugPrint('Auto promote error: $e');
-    }
-  }
-
   Future<void> login(String email, String password) async {
     await loadBaseData(
       loadBody: () async {

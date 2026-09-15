@@ -10,9 +10,6 @@ extension StringValueExtention on OrderStatus {
 
       case OrderStatus.success:
         return str.app.orderStatusSuccess;
-
-      default:
-        return '';
     }
   }
 }

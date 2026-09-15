@@ -1,5 +1,6 @@
-﻿using App.Catalog.Data;
+using App.Catalog.Data;
 using App.Shared.Data.MultiContext;
+using App.Shared.Entities.Enums;
 using App.Shared.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -17,6 +18,8 @@ namespace Modules.Catalog.Services
     {
         Task<Merchant> FindAsync(int id);
         Task<int[]> GetValidMerchants(decimal lat, decimal lng);
+        Task<int[]> GetSearchableMerchants(decimal lat, decimal lng);
+        Task<Dictionary<int, int>> GetMerchantCountsByCategory(int[] categoryIds);
         Task<Guid> GetOwnerId(int id);
         Task<int[]> GetMerchantIds(Guid id);
         Task<(decimal Lat, decimal Lng, int MerchantId)[]> GetMerchantStops(params int[] mids);
@@ -32,6 +35,7 @@ namespace Modules.Catalog.Services
         Task<Dictionary<int, MerchantProductDto>> GetProductPrices(int pid);
         Task<int> AssignMerchantProducts(int[] mid, MerchantProductAssignDto[] mps);
         Task<int> SetMerchantProductPrices(int[] mid, MerchantProductPriceDto[] mps);
+        Task<int> RepriceUsdDenominatedProducts(decimal usdRate);
         Task<(decimal Lat, decimal Lng)[]> GetMerchantLocations(int[] mids);
     }
     public class MerchantService : SolService<Merchant, MerchantDto>, IMerchantService
@@ -39,15 +43,38 @@ namespace Modules.Catalog.Services
         private readonly IMemoryCache _cache;
         private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepo;
         private readonly ICatalogUnitOfWork _uow;
+        private readonly IGenericSettingService _genericSetting;
         public MerchantService(ITrackableRepository<Merchant, CatalogDbContext> r,
             ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepo,
             ICatalogUnitOfWork uow,
+            IGenericSettingService genericSetting,
             IMemoryCache cache) : base(r)
         {
             _merchantProductRepo = merchantProductRepo;
             _uow = uow;
+            _genericSetting = genericSetting;
             _cache = cache;
         }
+
+        /// <summary>
+        /// Current USD rate, or zero when the administrator has not set one yet.
+        /// Callers treat zero as "no dollar pricing available" and fall back to
+        /// the local-currency price they were given.
+        /// </summary>
+        private async Task<decimal> GetUsdRate()
+        {
+            var setting = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
+            return setting?.Rate ?? 0;
+        }
+
+        /// <summary>
+        /// Dollar prices carry more precision than the local currency is quoted
+        /// in, so a converted figure is rounded to whole units to match the
+        /// products that are priced locally by hand.
+        /// </summary>
+        private static decimal ToLocalPrice(decimal priceUsd, decimal usdRate) =>
+            Math.Round(priceUsd * usdRate, 0, MidpointRounding.AwayFromZero);
+
         public async Task<Merchant> FindAsync(int id) =>
             await Queryable().FirstOrDefaultAsync(x => x.Id == id);
 
@@ -57,13 +84,69 @@ namespace Modules.Catalog.Services
                              .Select(x => x.Id)
                              .ToArrayAsync();
 
+        /// <summary>
+        /// Merchants a customer at this location is allowed to find by searching.
+        /// A restaurant sells hot food and stays confined to its delivery
+        /// coverage, but a market ships goods and is already browsable from
+        /// anywhere in the app, so search must not be the one place that hides
+        /// it. Anything that is not a restaurant is therefore searchable
+        /// regardless of distance.
+        /// </summary>
+        public async Task<int[]> GetSearchableMerchants(decimal lat, decimal lng)
+        {
+            var inRange = await GetValidMerchants(lat, lng);
+            var shipsAnywhere = await Queryable().AsNoTracking()
+                                                 .Where(x => x.Active &&
+                                                             x.DeletionDate == null &&
+                                                             x.MerchantKind != MerchantKind.Restaurant)
+                                                 .Select(x => x.Id)
+                                                 .ToArrayAsync();
+            return inRange.Union(shipsAnywhere).ToArray();
+        }
+
+        /// <summary>
+        /// How many merchants actually sell something in each of the given
+        /// categories, counting a category's subcategories as part of it. A
+        /// merchant only counts where it has a priced product, because an
+        /// unpriced row means it does not really stock the item.
+        /// </summary>
+        public async Task<Dictionary<int, int>> GetMerchantCountsByCategory(int[] categoryIds)
+        {
+            var counts = new Dictionary<int, int>();
+            if (categoryIds == null || categoryIds.Length == 0)
+                return counts;
+
+            var offers = await _merchantProductRepo.Queryable().AsNoTracking()
+                                                   .Where(x => x.MerchantPrice > 0 &&
+                                                               x.Merchant.Active &&
+                                                               x.Merchant.DeletionDate == null &&
+                                                               x.Product.Active &&
+                                                               x.Product.DeletionDate == null)
+                                                   .Select(x => new
+                                                   {
+                                                       x.MerchantId,
+                                                       CategoryId = x.Product.ProductCategoryId,
+                                                       ParentId = x.Product.ProductCategory.ParentId
+                                                   })
+                                                   .ToArrayAsync();
+
+            foreach (var id in categoryIds.Distinct())
+            {
+                counts[id] = offers.Where(x => x.CategoryId == id || x.ParentId == id)
+                                   .Select(x => x.MerchantId)
+                                   .Distinct()
+                                   .Count();
+            }
+            return counts;
+        }
+
         public async Task<Dictionary<int, MerchantProductDto>> GetActiveMerchantPrices(int mid) =>
             await _cache.GetValue($"ActiveMerchantPrices_{mid}", null,
                 async () => await _merchantProductRepo.Queryable()
                                                       .AsNoTracking()
                                                       .Include(x => x.Merchant)
                                                       .Where(x => x.MerchantId == mid && x.Merchant.Active)
-                                                      .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
+                                                      .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
                                                       .ToDictionaryAsync(x => x.ProductId));
 
         public async Task<Dictionary<int, MerchantProductDto>> GetAllMerchantPrices(int mid) =>
@@ -72,7 +155,7 @@ namespace Modules.Catalog.Services
                                                       .AsNoTracking()
                                                       .Include(x => x.Merchant)
                                                       .Where(x => x.MerchantId == mid)
-                                                      .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
+                                                      .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
                                                       .ToDictionaryAsync(x => x.ProductId));
 
         public async Task<Dictionary<int, MerchantProductDto>> GetProductPrices(int pid) =>
@@ -80,13 +163,14 @@ namespace Modules.Catalog.Services
                 async () => await _merchantProductRepo.Queryable()
                                                       .AsNoTracking()
                                                       .Include(x => x.Merchant)
-                                                      .Where(x => x.ProductId == pid && x.Merchant.Active)
+                                                      .Where(x => x.ProductId == pid && x.Merchant.Active && x.MerchantPrice > 0)
                                                       .OrderBy(x => x.MerchantPrice + (x.MerchantPrice * x.AdditionalProfitPercent / 100))
                                                       .Select(x => new MerchantProductDto
                                                       {
                                                           MerchantId = x.MerchantId,
                                                           ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent,
                                                           MerchantPrice = x.MerchantPrice,
+                                                          PriceUsd = x.PriceUsd,
                                                           Discount = x.Discount,
                                                           AdditionalProfitPercent = x.AdditionalProfitPercent
                                                       })
@@ -103,6 +187,7 @@ namespace Modules.Catalog.Services
                                                           MerchantId = x.MerchantId,
                                                           ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent,
                                                           MerchantPrice = x.MerchantPrice,
+                                                          PriceUsd = x.PriceUsd,
                                                           Discount = x.Discount,
                                                           AdditionalProfitPercent = x.AdditionalProfitPercent
                                                       })
@@ -124,6 +209,8 @@ namespace Modules.Catalog.Services
             if (products == null)
                 products = Array.Empty<MerchantProductAssignDto>();
 
+            var usdRate = await GetUsdRate();
+
             foreach (var mid in mids)
             {
                 var merchant = await Queryable().FirstOrDefaultAsync(x => x.Id == mid);
@@ -131,7 +218,7 @@ namespace Modules.Catalog.Services
                 var merchantProducts = await _merchantProductRepo.Queryable().Where(x => x.MerchantId == mid).ToArrayAsync();
 
                 var toBeAdded = products.Where(p => !merchantProducts.Any(mp => mp.ProductId == p.ProductId)).ToArray();
-                var toBeUpdated = products.Where(p => merchantProducts.Any(mp => mp.ProductId == p.ProductId && mp.AdditionalProfitPercent != p.AdditionalProfitPercent)).ToArray();
+                var toBeUpdated = products.Where(p => merchantProducts.Any(mp => mp.ProductId == p.ProductId && (mp.AdditionalProfitPercent != p.AdditionalProfitPercent || mp.MerchantPrice != p.MerchantPrice || mp.PriceUsd != p.PriceUsd))).ToArray();
                 var toBeRemoved = merchantProducts.Where(mp => !products.Any(p => p.ProductId == mp.ProductId)).ToArray();
 
                 foreach (var item in toBeAdded)
@@ -145,7 +232,12 @@ namespace Modules.Catalog.Services
                     {
                         MerchantId = mid,
                         ProductId = item.ProductId,
-                        MerchantPrice = item.MerchantPrice,
+                        // A dollar-quoted product derives its selling price from
+                        // the rate; anything else is priced locally as supplied.
+                        MerchantPrice = item.PriceUsd.HasValue && usdRate > 0
+                                            ? ToLocalPrice(item.PriceUsd.Value, usdRate)
+                                            : item.MerchantPrice,
+                        PriceUsd = item.PriceUsd,
                         ProfitOutOfMerchantPricePercent = profitOutOfMerchantPricePercent,
                         AdditionalProfitPercent = item.AdditionalProfitPercent
                     });
@@ -163,6 +255,7 @@ namespace Modules.Catalog.Services
                     mp.ProfitOutOfMerchantPricePercent = profitOutOfMerchantPricePercent;
                     mp.AdditionalProfitPercent = item?.AdditionalProfitPercent ?? 0;
                     mp.MerchantPrice = item?.MerchantPrice ?? 0;
+                    ApplyUsdPricing(mp, item?.PriceUsd, usdRate);
                     _cache.Remove($"ProductPrices_{item.ProductId}");
                     _cache.Remove($"MerchantProduct_{mid}_{item.ProductId}");
                 }
@@ -181,6 +274,69 @@ namespace Modules.Catalog.Services
             return products.Length;
         }
 
+
+        /// <summary>
+        /// Reconciles a row's dollar base with its stored local price after a
+        /// write. A caller that supplies a dollar price is quoting in dollars,
+        /// so the local price is derived from it. A caller that only supplies a
+        /// local price for a row that was already dollar-quoted is overriding it
+        /// by hand, and the base is recomputed from that figure so the next
+        /// exchange rate change does not silently undo the override.
+        /// </summary>
+        private static void ApplyUsdPricing(MerchantProduct mp, decimal? priceUsd, decimal usdRate)
+        {
+            if (usdRate <= 0)
+                return;
+
+            if (priceUsd.HasValue)
+            {
+                mp.PriceUsd = priceUsd;
+                mp.MerchantPrice = ToLocalPrice(priceUsd.Value, usdRate);
+            }
+            else if (mp.PriceUsd.HasValue)
+            {
+                mp.PriceUsd = mp.MerchantPrice / usdRate;
+            }
+        }
+
+        /// <summary>
+        /// Recalculates the stored selling price of every dollar-quoted product
+        /// from its USD base and the given rate. Products priced directly in the
+        /// local currency carry no USD base and are deliberately left alone.
+        /// </summary>
+        public async Task<int> RepriceUsdDenominatedProducts(decimal usdRate)
+        {
+            if (usdRate <= 0)
+                return 0;
+
+            var usdProducts = await _merchantProductRepo.Queryable()
+                                                        .Where(x => x.PriceUsd != null)
+                                                        .ToArrayAsync();
+
+            var repriced = 0;
+            foreach (var mp in usdProducts)
+            {
+                var price = ToLocalPrice(mp.PriceUsd.Value, usdRate);
+                if (mp.MerchantPrice == price)
+                    continue;
+
+                mp.MerchantPrice = price;
+                _cache.Remove($"ProductPrices_{mp.ProductId}");
+                _cache.Remove($"MerchantProduct_{mp.MerchantId}_{mp.ProductId}");
+                repriced++;
+            }
+
+            if (repriced > 0)
+            {
+                await _uow.SaveChangesAsync();
+                foreach (var mid in usdProducts.Select(x => x.MerchantId).Distinct())
+                {
+                    _cache.Remove($"ActiveMerchantPrices_{mid}");
+                    _cache.Remove($"AllMerchantPrices_{mid}");
+                }
+            }
+            return repriced;
+        }
 
         public async Task<bool> SetMerchantPercent(int mid, decimal percent)
         {
@@ -207,17 +363,43 @@ namespace Modules.Catalog.Services
                 newProducts = Array.Empty<MerchantProductPriceDto>();
 
             var merchantProducts = await _merchantProductRepo.Queryable().Where(x => mids.Contains(x.MerchantId)).ToArrayAsync();
+            var usdRate = await GetUsdRate();
 
-            var toBeUpdated = merchantProducts.Where(p => newProducts.Any(np => np.ProductId == p.ProductId && np.MerchantPrice != p.MerchantPrice)).ToArray();
-
-            foreach (var item in toBeUpdated)
-            {
-                item.MerchantPrice = newProducts.FirstOrDefault(x => x.ProductId == item.ProductId)?.MerchantPrice ?? 0;
-                _cache.Remove($"ProductPrices_{item.ProductId}");
-                _cache.Remove($"MerchantProduct_{item.MerchantId}_{item.ProductId}");
-            }
             foreach (var mid in mids)
             {
+                var merchant = await Queryable().FirstOrDefaultAsync(x => x.Id == mid);
+                var midMerchantProducts = merchantProducts.Where(x => x.MerchantId == mid).ToList();
+
+                foreach (var np in newProducts)
+                {
+                    var existing = midMerchantProducts.FirstOrDefault(x => x.ProductId == np.ProductId);
+                    if (existing != null)
+                    {
+                        if (existing.MerchantPrice != np.MerchantPrice)
+                        {
+                            existing.MerchantPrice = np.MerchantPrice;
+                            ApplyUsdPricing(existing, null, usdRate);
+                            _cache.Remove($"ProductPrices_{np.ProductId}");
+                            _cache.Remove($"MerchantProduct_{mid}_{np.ProductId}");
+                        }
+                    }
+                    else
+                    {
+                        var profitOutOfMerchantPricePercent = merchant?.ProfitOutOfMerchantPricePercent ?? 0;
+
+                        _merchantProductRepo.Insert(new MerchantProduct
+                        {
+                            MerchantId = mid,
+                            ProductId = np.ProductId,
+                            MerchantPrice = np.MerchantPrice,
+                            ProfitOutOfMerchantPricePercent = profitOutOfMerchantPricePercent,
+                            AdditionalProfitPercent = 0
+                        });
+                        _cache.Remove($"ProductPrices_{np.ProductId}");
+                        _cache.Remove($"MerchantProduct_{mid}_{np.ProductId}");
+                    }
+                }
+
                 _cache.Remove($"ActiveMerchantPrices_{mid}");
                 _cache.Remove($"AllMerchantPrices_{mid}");
             }

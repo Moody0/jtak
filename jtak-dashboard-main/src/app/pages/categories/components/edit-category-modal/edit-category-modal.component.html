@@ -1,6 +1,6 @@
 <app-edit-modal
   [item]="item"
-  [itemName]="item.title"
+  [itemName]="item.title || ''"
   moduleName="Category"
   [isLoading]="isLoading$ | async"
   [saveDisabled]="formGroup.invalid"
@@ -8,60 +8,288 @@
   (saveClicked)="save()"
 >
   <ng-container *ngIf="item">
-    <form class="form form-label-right" [formGroup]="formGroup">
-      <div class="row">
-        <div class="col-md-4">
-          <div class="mb-8">
-            <label for="title">Title</label>
-            <app-input-container [control]="formGroup.controls.title">
-              <input
-                type="text"
-                class="form-control form-control-solid"
-                formControlName="title"
-                id="title"
-                placeholder="Enter title"
-                #input
-              />
-            </app-input-container>
-          </div>
-        </div>
+    <div class="category-editor-layout">
+      <!-- Form Column -->
+      <div class="category-form-column">
+        <form class="form jtak-edit-form" [formGroup]="formGroup">
 
-        <div class="col-md-4">
-          <div class="mb-8">
-            <label for="parentId">Parent Category</label>
-            <ng-select formControlName="parentId" placeholder="None — Main Category (تصنيف رئيسي)" [clearable]="true">
-              <ng-option *ngFor="let cat of parentCategories" [value]="cat.id">
-                {{ cat.title }}
-              </ng-option>
-            </ng-select>
-            <small class="text-muted d-block mt-1">Leave empty to show on Home Page as Main Category</small>
+          <!-- Section 01: Basic Details -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>01</span>
+              <div>
+                <h3>{{ 'CATEGORIES_PAGE.SEC_BASIC_TITLE' | translate }}</h3>
+                <p>{{ 'CATEGORIES_PAGE.SEC_BASIC_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <!-- Title -->
+              <div class="col-12">
+                <label for="title" class="form-label fw-bold mb-2">
+                  {{ 'CATEGORIES_PAGE.TITLE_LABEL' | translate }}
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.title">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="title"
+                    id="title"
+                    [placeholder]="'CATEGORIES_PAGE.TITLE_PLACEHOLDER' | translate"
+                  />
+                </app-input-container>
+              </div>
+
+              <!-- Order with Quick Presets -->
+              <div class="col-md-6">
+                <label for="order" class="form-label fw-bold mb-2">
+                  {{ 'CATEGORIES_PAGE.ORDER_LABEL' | translate }}
+                </label>
+                <input
+                  type="number"
+                  class="form-control"
+                  formControlName="order"
+                  id="order"
+                  [placeholder]="'CATEGORIES_PAGE.ORDER_PLACEHOLDER' | translate"
+                />
+                <small class="text-muted d-block mt-1">
+                  {{ 'CATEGORIES_PAGE.ORDER_HINT' | translate }}
+                </small>
+
+                <!-- Order quick pills -->
+                <div class="order-presets-row">
+                  <button
+                    type="button"
+                    *ngFor="let preset of orderPresets"
+                    class="order-preset-pill"
+                    [class.active]="formGroup.get('order')?.value === preset"
+                    (click)="setOrder(preset)"
+                  >
+                    {{ preset }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Active Status Switch Card -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold mb-2">{{ 'CATEGORIES_PAGE.COL_STATUS' | translate }}</label>
+                <div class="custom-switch-card" (click)="formGroup.patchValue({ active: !formGroup.get('active')?.value })">
+                  <div class="switch-info">
+                    <span class="switch-title">
+                      {{ formGroup.get('active')?.value ? ('CATEGORIES_PAGE.STATUS_ACTIVE' | translate) : ('CATEGORIES_PAGE.STATUS_INACTIVE' | translate) }}
+                    </span>
+                    <span class="switch-desc">
+                      {{ formGroup.get('active')?.value ? 'يظهر هذا التصنيف للعملاء بالتطبيق' : 'معطل ومخفي عن العملاء' }}
+                    </span>
+                  </div>
+                  <div class="form-check form-switch m-0">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      formControlName="active"
+                      (click)="$event.stopPropagation()"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 02: Hierarchy & Parent Classification -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>02</span>
+              <div>
+                <h3>{{ 'CATEGORIES_PAGE.SEC_HIERARCHY_TITLE' | translate }}</h3>
+                <p>{{ 'CATEGORIES_PAGE.SEC_HIERARCHY_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <div class="col-12">
+                <label for="parentId" class="form-label fw-bold mb-2">
+                  {{ 'CATEGORIES_PAGE.PARENT_LABEL' | translate }}
+                </label>
+                <ng-select
+                  id="parentId"
+                  formControlName="parentId"
+                  [placeholder]="'CATEGORIES_PAGE.PARENT_PLACEHOLDER' | translate"
+                  [items]="getAvailableParents()"
+                  bindValue="id"
+                  bindLabel="title"
+                  [clearable]="true"
+                >
+                </ng-select>
+                <small class="text-muted d-block mt-2">
+                  {{ 'CATEGORIES_PAGE.PARENT_HINT' | translate }}
+                </small>
+
+                <!-- Hierarchy Visual Indicator -->
+                <div class="category-hierarchy-box">
+                  <span class="cat-hierarchy-label">موقع العرض:</span>
+                  <div class="cat-hierarchy-path">
+                    <!-- Root Mode -->
+                    <span *ngIf="!formGroup.get('parentId')?.value" class="cat-root-badge">
+                      <i class="fas fa-home me-1"></i>
+                      {{ 'CATEGORIES_PAGE.HOME_PAGE_MAIN' | translate }}
+                    </span>
+
+                    <!-- Subcategory Mode -->
+                    <ng-container *ngIf="formGroup.get('parentId')?.value">
+                      <span class="cat-parent">
+                        <i class="fas fa-folder me-1"></i>
+                        {{ getParentTitle() }}
+                      </span>
+                      <i class="fas fa-angle-left rtl-flip cat-arrow"></i>
+                      <span class="cat-sub">
+                        {{ formGroup.get('title')?.value || ('CATEGORIES_PAGE.TITLE_PLACEHOLDER' | translate) }}
+                      </span>
+                    </ng-container>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 03: Category Image / Icon -->
+          <section class="edit-section">
+            <div class="edit-section-heading">
+              <span>03</span>
+              <div>
+                <h3>{{ 'CATEGORIES_PAGE.SEC_MEDIA_TITLE' | translate }}</h3>
+                <p>{{ 'CATEGORIES_PAGE.SEC_MEDIA_DESC' | translate }}</p>
+              </div>
+            </div>
+
+            <div class="row g-4">
+              <div class="col-12">
+                <app-file-uploader
+                  uploaderTitle="اختر صورة أو رمز التصنيف"
+                  (fileUploaded)="onFileUploaded($event, 'icon')"
+                ></app-file-uploader>
+
+                <div class="edit-image-grid mt-4" *ngIf="formGroup.get('icon')?.value">
+                  <app-uploaded-image
+                    [imageId]="formGroup.get('icon')?.value"
+                    [dimensions]="{ width: 320, height: 180 }"
+                    (imageDeleted)="onFileDelete('icon')"
+                  ></app-uploaded-image>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </form>
+      </div>
+
+      <!-- Preview Column: Live Mobile App Preview -->
+      <div class="category-preview-column">
+        <div class="preview-phone-card">
+          <!-- Top Phone Bar -->
+          <div class="preview-phone-header">
+            <div class="preview-notch-info">
+              <span class="preview-dot-pulse"></span>
+              <span>{{ 'CATEGORIES_PAGE.PREVIEW_HEADING' | translate }}</span>
+            </div>
+            <span class="preview-app-title">JTAK</span>
           </div>
-        </div>
-        <div class="col-md-2">
-          <div class="mb-8">
-            <label for="order">Display Order</label>
-            <input
-              type="number"
-              class="form-control form-control-solid"
-              formControlName="order"
-              id="order"
-              placeholder="0"
-            />
-            <small class="text-muted d-block mt-1">Order on Home (1, 2, 3...)</small>
+
+          <!-- Customer Card Mockup -->
+          <div class="preview-card-viewport">
+            <div class="customer-category-bubble">
+              <!-- Category Icon -->
+              <div class="customer-icon-wrapper">
+                <img
+                  *ngIf="getIconPreview() && !getIconPreview()?.startsWith('fas ') && !getIconPreview()?.startsWith('fa-')"
+                  [src]="filesService.getFile(getIconPreview()!, 120, 120)"
+                  [alt]="formGroup.get('title')?.value"
+                  (error)="onImageError($event)"
+                />
+                <i
+                  *ngIf="getIconPreview() && (getIconPreview()?.startsWith('fas ') || getIconPreview()?.startsWith('fa-'))"
+                  [class]="getIconPreview()"
+                  class="fa-custom-icon"
+                ></i>
+                <i
+                  *ngIf="!getIconPreview()"
+                  class="fas fa-shapes fallback-icon"
+                ></i>
+              </div>
+
+              <!-- Category Title -->
+              <h4 class="customer-cat-name">
+                {{ formGroup.get('title')?.value || ('CATEGORIES_PAGE.TITLE_PLACEHOLDER' | translate) }}
+              </h4>
+
+              <!-- Hierarchy Level Badge -->
+              <div
+                class="customer-parent-badge"
+                [class.is-root]="!formGroup.get('parentId')?.value"
+              >
+                <i [class]="formGroup.get('parentId')?.value ? 'fas fa-folder-open me-1' : 'fas fa-home me-1'"></i>
+                <span>
+                  {{ formGroup.get('parentId')?.value ? ('تابع لقسم: ' + getParentTitle()) : ('CATEGORIES_PAGE.HOME_PAGE_MAIN' | translate) }}
+                </span>
+              </div>
+
+              <!-- Order sequence info -->
+              <span class="customer-order-info">
+                {{ 'CATEGORIES_PAGE.COL_ORDER' | translate }}: #{{ formGroup.get('order')?.value ?? 0 }}
+              </span>
+
+              <!-- Status Badge -->
+              <span
+                class="customer-status-badge"
+                [class.active]="formGroup.get('active')?.value"
+                [class.inactive]="!formGroup.get('active')?.value"
+              >
+                <i [class]="formGroup.get('active')?.value ? 'fas fa-check-circle me-1' : 'fas fa-ban me-1'"></i>
+                {{ (formGroup.get('active')?.value ? 'CATEGORIES_PAGE.STATUS_ACTIVE' : 'CATEGORIES_PAGE.STATUS_INACTIVE') | translate }}
+              </span>
+            </div>
+
+            <!-- In-App Customer Screen Row Mockup -->
+            <div class="customer-app-row-preview">
+              <div class="preview-row-title">
+                <span>تصفح الأقسام بالتطبيق</span>
+                <i class="fas fa-ellipsis-h text-muted"></i>
+              </div>
+              <div class="mini-bubbles-scroll">
+                <div class="mini-bubble-item">
+                  <div class="mini-bubble-circle active-circle">
+                    <img
+                      *ngIf="getIconPreview() && !getIconPreview()?.startsWith('fas ')"
+                      [src]="filesService.getFile(getIconPreview()!, 60, 60)"
+                      [alt]="formGroup.get('title')?.value"
+                      (error)="onImageError($event)"
+                    />
+                    <i *ngIf="!getIconPreview()" class="fas fa-star"></i>
+                  </div>
+                  <span class="mini-bubble-text">{{ formGroup.get('title')?.value || 'التصنيف' }}</span>
+                </div>
+                <div class="mini-bubble-item">
+                  <div class="mini-bubble-circle"><i class="fas fa-utensils"></i></div>
+                  <span class="mini-bubble-text">المطاعم</span>
+                </div>
+                <div class="mini-bubble-item">
+                  <div class="mini-bubble-circle"><i class="fas fa-shopping-basket"></i></div>
+                  <span class="mini-bubble-text">البقالة</span>
+                </div>
+                <div class="mini-bubble-item">
+                  <div class="mini-bubble-circle"><i class="fas fa-coffee"></i></div>
+                  <span class="mini-bubble-text">كافيهات</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="col-md-2">
-          <label class="checkbox checkbox-single pt-10">
-            <input type="checkbox" formControlName="active" />
-            <span class="mx-2 fs-5">isActive</span>
-          </label>
-        </div>
-        <div class="col-12">
-          <label>Category icon</label>
-          <app-file-uploader uploaderTitle="Choose category image" (fileUploaded)="onFileUploaded($event, 'icon')"></app-file-uploader>
-          <div class="edit-image-grid mt-3"><app-uploaded-image *ngIf="formGroup.get('icon')?.value" [imageId]="formGroup.get('icon')?.value" [dimensions]="{ width: 320, height: 180 }" (imageDeleted)="onFileDelete('icon')"></app-uploaded-image></div>
+
+          <!-- Phone Footer Meta -->
+          <div class="preview-card-meta">
+            {{ 'CATEGORIES_PAGE.PREVIEW_SUB' | translate }}
+          </div>
         </div>
       </div>
-    </form>
+    </div>
   </ng-container>
 </app-edit-modal>

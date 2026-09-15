@@ -9,6 +9,7 @@ import '../../../core/controllers/order/cart_provider.dart';
 import '../../../core/data/mock_catalog_data.dart';
 import '../../../core/models/order/order_details_model.dart';
 import '../../../core/services/locator.dart';
+import '../../../utils/utilities/global_var.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Modern Cart Single Item Card Component
@@ -34,9 +35,10 @@ class CartSingleItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mockItem = MockCatalogData.getMenuItemById(item.productId ?? 0);
-    final imageUrl = item.productImage?.isNotEmpty == true
+    final rawImage = item.productImage?.isNotEmpty == true
         ? item.productImage!
         : (mockItem?.imageUrl ?? '');
+    final imageUrl = GlobalVar.getImageUrl(rawImage);
     final title = item.productTitle?.isNotEmpty == true
         ? item.productTitle!
         : (mockItem?.title ?? 'وجبة خاصة');
@@ -103,6 +105,44 @@ class CartSingleItem extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (item.warning != null && item.warning!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFECACA), width: 0.9),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          PhosphorIconsFill.warningCircle,
+                          size: 13,
+                          color: Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            item.warning!
+                                .replaceAll('\r\n', ' ')
+                                .replaceAll('\n', ' ')
+                                .replaceAll(RegExp(r'^!+'), '')
+                                .trim(),
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              color: const Color(0xFFDC2626),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(
                   '${_formatPrice(totalPrice)} ل.س',
@@ -128,6 +168,8 @@ class CartSingleItem extends StatelessWidget {
                 item.merchantId ?? 0,
                 singlePrice,
                 quantity + 1,
+                title: title,
+                imageUrl: rawImage,
               );
             },
             onDecrement: () {
@@ -143,6 +185,8 @@ class CartSingleItem extends StatelessWidget {
                   item.merchantId ?? 0,
                   singlePrice,
                   quantity - 1,
+                  title: title,
+                  imageUrl: rawImage,
                 );
               }
             },

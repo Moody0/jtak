@@ -88,7 +88,7 @@ class ReplaceCartBottomSheet extends StatelessWidget {
 
             // 3. Title
             Text(
-              'بدء سلة جديدة؟',
+              'استبدال المتجر؟',
               textAlign: TextAlign.center,
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 20,
@@ -128,8 +128,8 @@ class ReplaceCartBottomSheet extends StatelessWidget {
                       color: kPrimaryOrange,
                     ),
                   ),
-                  const TextSpan(
-                    text: ' ستؤدي إلى إفراغ سلتك الحالية والبدء من جديد.',
+                  TextSpan(
+                    text: ' ستؤدي إلى استبدال منتجات «$currentStoreName» ومتابعة الطلب.',
                   ),
                 ],
               ),
@@ -153,7 +153,7 @@ class ReplaceCartBottomSheet extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    'استبدال وبدء سلة جديدة',
+                    'استبدال ومتابعة',
                     style: GoogleFonts.ibmPlexSansArabic(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w800,

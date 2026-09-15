@@ -1,13 +1,42 @@
-<div class="d-flex align-items-center" [ngClass]="toolbarButtonMarginClass">
-  <app-language-selector-inner></app-language-selector-inner>
-</div>
-
-<div class="d-flex align-items-center" [ngClass]="toolbarButtonMarginClass" id="kt_header_user_menu_toggle">
-  <div class="jtak-user-trigger cursor-pointer" data-kt-menu-trigger="click" data-kt-menu-attach="parent"
-    data-kt-menu-placement="bottom-end" data-kt-menu-flip="bottom" *ngIf="auth.user$ | async as user">
-    <span class="jtak-user-copy"><small>Administrator</small><strong>{{ user.fullName || 'JTAK Admin' }}</strong></span>
-    <span class="jtak-user-avatar" aria-hidden="true">{{ user.fullName ? user.fullName.charAt(0) : 'J' }}</span>
-    <i class="fas fa-chevron-down jtak-user-chevron" aria-hidden="true"></i>
+<div class="d-flex align-items-center gap-2">
+  <!-- Quick Shortcuts -->
+  <div class="d-none d-md-flex align-items-center gap-1 me-1">
+    <a routerLink="/orders" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_ORDERS' | translate" routerLinkActive="active">
+      <i class="fas fa-shopping-bag fs-6"></i>
+    </a>
+    <a routerLink="/products" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_PRODUCTS' | translate" routerLinkActive="active">
+      <i class="fas fa-box fs-6"></i>
+    </a>
+    <a routerLink="/inventory-batches" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_INVENTORY' | translate" routerLinkActive="active">
+      <i class="fas fa-warehouse fs-6"></i>
+    </a>
+    <a routerLink="/reconciliation" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_RECONCILIATION' | translate" routerLinkActive="active">
+      <i class="fas fa-cash-register fs-6"></i>
+    </a>
+    <button type="button" class="btn btn-icon btn-sm jtak-topbar-action-btn" (click)="toggleFullscreen()" [title]="'HEADER.FULLSCREEN' | translate">
+      <i class="fas" [ngClass]="isFullscreen() ? 'fa-compress' : 'fa-expand'" style="font-size: 0.9rem;"></i>
+    </button>
   </div>
-  <app-user-inner></app-user-inner>
+
+  <div class="jtak-header-separator d-none d-md-block"></div>
+
+  <!-- Language Selector -->
+  <app-language-selector-inner></app-language-selector-inner>
+
+  <div class="jtak-header-separator"></div>
+
+  <!-- User Menu Toggle -->
+  <div ngbDropdown [placement]="['bottom-right', 'bottom-left']" [autoClose]="true" class="d-flex align-items-center position-relative" id="kt_header_user_menu_toggle" *ngIf="auth.user$ | async as user">
+    <div ngbDropdownToggle class="jtak-user-trigger cursor-pointer" role="button" tabindex="0">
+      <span class="jtak-user-avatar" aria-hidden="true">{{ user.fullName ? user.fullName.charAt(0) : 'J' }}</span>
+      <div class="jtak-user-copy">
+        <span class="jtak-user-name">{{ user.fullName || ('TOPBAR.ADMIN_USER' | translate) }}</span>
+        <span class="jtak-user-role-badge">{{ 'TOPBAR.ADMINISTRATOR' | translate }}</span>
+      </div>
+      <i class="fas fa-chevron-down jtak-user-chevron" aria-hidden="true"></i>
+    </div>
+    <div ngbDropdownMenu class="dropdown-menu p-2 shadow-lg border-0 rounded-3 dropdown-menu-anim-up w-275px">
+      <app-user-inner></app-user-inner>
+    </div>
+  </div>
 </div>

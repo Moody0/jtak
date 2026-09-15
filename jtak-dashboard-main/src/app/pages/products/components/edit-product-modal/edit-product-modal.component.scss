@@ -1,0 +1,427 @@
+// Edit Product Modal Two-Column Architecture & Live App Preview
+
+.product-editor-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+
+  @media (max-width: 991px) {
+    flex-direction: column;
+  }
+}
+
+.product-form-column {
+  flex: 1 1 62%;
+  min-width: 0;
+}
+
+.product-preview-column {
+  flex: 0 0 330px;
+  position: sticky;
+  top: 16px;
+
+  @media (max-width: 991px) {
+    flex: 1 1 100%;
+    width: 100%;
+    position: static;
+  }
+}
+
+// Unit Quick Selection Chips
+.unit-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+
+  .unit-preset-pill {
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.74rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #ffffff;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+
+    &.active {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #ea580c;
+      font-weight: 750;
+    }
+  }
+}
+
+// Visual Category Hierarchy Box
+.category-hierarchy-box {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+
+  .cat-hierarchy-label {
+    font-weight: 700;
+    color: #64748b;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+  }
+
+  .cat-hierarchy-path {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 750;
+    color: #0f172a;
+
+    .cat-parent {
+      color: #ea580c;
+      background: #fff7ed;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.74rem;
+    }
+
+    .cat-arrow {
+      color: #94a3b8;
+      font-size: 0.68rem;
+    }
+
+    .cat-sub {
+      color: #1e293b;
+    }
+  }
+}
+
+// Store & Merchant Linkage Box
+.merchant-linkage-note {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.76rem;
+  color: #166534;
+  line-height: 1.4;
+
+  i {
+    font-size: 0.95rem;
+    color: #16a34a;
+    margin-top: 2px;
+  }
+}
+
+// Photo Management Grid
+.photo-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.photo-item-card {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  &.is-primary {
+    border: 2px solid #ea580c;
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .photo-primary-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(234, 88, 12, 0.92);
+    color: #ffffff;
+    font-size: 0.6rem;
+    font-weight: 750;
+    padding: 1px 5px;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      right: auto;
+      left: 4px;
+    }
+  }
+
+  .photo-delete-btn {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(220, 38, 38, 0.9);
+    color: #ffffff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.62rem;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      left: auto;
+      right: 4px;
+    }
+
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+
+  .photo-set-primary-btn {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    font-size: 0.62rem;
+    background: rgba(15, 23, 42, 0.75);
+    color: #ffffff;
+    border: none;
+    padding: 1px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      left: auto;
+      right: 4px;
+    }
+
+    &:hover {
+      background: rgba(15, 23, 42, 0.95);
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// Live Customer App Preview Phone Mockup
+// -------------------------------------------------------------
+.preview-phone-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-phone-header {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .preview-notch-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    .preview-dot-pulse {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+  }
+
+  .preview-app-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #f97316;
+  }
+}
+
+.preview-card-viewport {
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.customer-app-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease;
+}
+
+.customer-card-media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .customer-media-fallback {
+    color: #cbd5e1;
+    font-size: 2.2rem;
+  }
+
+  .customer-featured-ribbon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      right: auto;
+      left: 8px;
+    }
+  }
+
+  .customer-status-pill {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(15, 23, 42, 0.75);
+    color: #ffffff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      right: auto;
+      left: 8px;
+    }
+
+    &.inactive {
+      background: rgba(220, 38, 38, 0.85);
+    }
+  }
+}
+
+.customer-card-content {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.customer-cat-tag {
+  font-size: 0.68rem;
+  font-weight: 750;
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.customer-product-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+  margin: 0;
+  word-break: break-word;
+}
+
+.customer-product-desc {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.4;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.customer-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.customer-unit-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.customer-btn-cart {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #FF5722 0%, #ea580c 100%);
+  border: none;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 750;
+  cursor: default;
+}
+
+.preview-card-meta {
+  padding: 10px 14px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.71rem;
+  color: #64748b;
+  line-height: 1.4;
+  text-align: center;
+}

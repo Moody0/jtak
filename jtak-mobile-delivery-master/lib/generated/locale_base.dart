@@ -282,5 +282,6 @@ class Localemsg {
   String get locationServiceDisabled => _data["locationServiceDisabled"]!;
   String get locationPermissionsDenied => _data["locationPermissionsDenied"]!;
   String get pleaseEnableLocationService => _data["pleaseEnableLocationService"]!;
+  String get locationAlwaysUpgradeRequired => _data["locationAlwaysUpgradeRequired"]!;
 }
 

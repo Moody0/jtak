@@ -8,15 +8,23 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/app_parameters_provider.dart';
+import '../../../core/controllers/app/app_state_manager.dart';
 import '../../../core/controllers/catalog/markets_provider.dart';
+import '../../../core/controllers/initial_data_provider.dart';
+import '../../../core/models/catalog/restaurant_category_model.dart';
+import '../../../core/controllers/order/order_provider.dart';
 import '../../../core/data/mock_catalog_data.dart';
+import '../../../core/models/banner_model.dart';
 import '../../../core/models/user/address_model.dart';
 import '../../../core/services/locator.dart';
+import '../../../utils/providers/sol_api.dart';
 import '../../widgets/catalog/restaurant_card_widget.dart';
 import '../../widgets/clean_shimmer_skeletons.dart';
 import '../../widgets/header_circle_button.dart';
 import '../../widgets/top_app_bar_widget.dart';
 import '../../../utils/custom_widgets/image_widgets.dart';
+import '../../../utils/utilities/global_var.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'catalog_scope.dart';
 import 'favorite_page.dart';
 import 'market_page.dart';
@@ -42,10 +50,21 @@ class RestaurantsListPage extends StatefulWidget {
   final String? initialFilter;
   final CatalogScope? catalogScope;
 
+  /// Restricts the list to merchants of one kind, matching the backend
+  /// MerchantKind values. Supplied by a Home tile the admin pointed at a
+  /// merchant type rather than at a product category.
+  final int? merchantKind;
+
+  /// Header wording for that case, so the page does not have to guess a name
+  /// for the kind it is showing.
+  final String? title;
+
   const RestaurantsListPage({
     super.key,
     this.initialFilter,
     this.catalogScope,
+    this.merchantKind,
+    this.title,
   });
 
   @override
@@ -68,6 +87,9 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   final Map<int, Set<String>> _merchantProductCategories = {};
   final Map<String, String?> _scopeCategoryImages = {};
   bool _isLoadingScopedMerchants = false;
+  List<BannerModel> _restaurantBanners = [];
+  List<Map<String, dynamic>> _orderAgainList = [];
+  RestaurantCategoriesConfigModel? _restaurantCategoriesConfig;
 
   late final AnimationController _searchAnimController = AnimationController(
     vsync: this,
@@ -98,6 +120,230 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     }
     if (widget.catalogScope != null) {
       unawaited(_loadScopedMerchants());
+    }
+    _initBanners();
+    if (widget.catalogScope == null) {
+      unawaited(_initRestaurantCategories());
+    }
+    unawaited(_initOrderAgain());
+  }
+
+  Future<void> _initRestaurantCategories() async {
+    try {
+      if (!locator.isRegistered<SolApi>()) return;
+      final response =
+          await locator<SolApi>().getRequest('/RestaurantCategories');
+      Map<String, dynamic>? data;
+      if (response is Map<String, dynamic>) {
+        data = response;
+      } else if (response is Map) {
+        data = Map<String, dynamic>.from(response);
+      }
+      if (data == null) return;
+      final config = RestaurantCategoriesConfigModel.fromMap(data);
+      if (!mounted) return;
+      setState(() => _restaurantCategoriesConfig = config);
+    } catch (e) {
+      // Keep the bundled defaults when the endpoint is unavailable/offline.
+      debugPrint('Error fetching restaurant categories: $e');
+    }
+  }
+
+  void _initBanners() {
+    if (locator.isRegistered<InitialDataProvider>()) {
+      final initialData = locator<InitialDataProvider>();
+      final preloaded = initialData.restaurantBanners;
+      if (preloaded.isNotEmpty) {
+        _restaurantBanners = List.from(preloaded);
+      }
+    }
+    unawaited(_fetchLiveRestaurantBanners());
+  }
+
+  Future<void> _fetchLiveRestaurantBanners() async {
+    try {
+      if (!locator.isRegistered<SolApi>()) return;
+      final api = locator<SolApi>();
+      final res = await api.getRequest('/Banner/2');
+      List items = [];
+      if (res is List) {
+        items = res;
+      } else if (res is Map && res['data'] is List) {
+        items = res['data'];
+      } else if (res is Map && res['items'] is List) {
+        items = res['items'];
+      }
+
+      if (items.isNotEmpty) {
+        final List<BannerModel> fetched = [];
+        for (final item in items) {
+          if (item is Map<String, dynamic>) {
+            fetched.add(BannerModel.fromMap(item));
+          } else if (item is Map) {
+            fetched.add(BannerModel.fromMap(Map<String, dynamic>.from(item)));
+          }
+        }
+        if (mounted && fetched.isNotEmpty) {
+          setState(() {
+            _restaurantBanners = fetched;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching live restaurant banners: $e');
+    }
+  }
+
+  void _handleBannerTap(BannerModel banner) async {
+    final rawUrl = (banner.url ?? '').trim();
+    if (rawUrl.isEmpty) return;
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      final uri = Uri.tryParse(rawUrl);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+
+    final cleanUrl = rawUrl.split('#').first.trim();
+    if (cleanUrl.startsWith('restaurant:')) {
+      final id = int.tryParse(cleanUrl.split(':').last);
+      if (id != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RestaurantMenuPage(
+              restaurantId: id,
+              restaurantName: banner.title ?? 'المطعم',
+            ),
+          ),
+        );
+        return;
+      }
+    } else if (cleanUrl.startsWith('merchant:') ||
+        cleanUrl.startsWith('market:')) {
+      final id = int.tryParse(cleanUrl.split(':').last);
+      if (id != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarketPage(
+              marketId: id,
+              marketName: banner.title ?? 'المتجر',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+  }
+
+  Future<void> _initOrderAgain() async {
+    _populateOrderAgain();
+    try {
+      final orderProv = locator.isRegistered<OrderProvider>()
+          ? locator<OrderProvider>()
+          : OrderProvider.instance;
+      if (orderProv != null) {
+        if (orderProv.dataList.isEmpty) {
+          await orderProv.loadPagedData();
+        }
+        if (mounted) {
+          _populateOrderAgain();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading past orders for order again: $e');
+    }
+  }
+
+  void _populateOrderAgain() {
+    final orderProv = locator.isRegistered<OrderProvider>()
+        ? locator<OrderProvider>()
+        : OrderProvider.instance;
+    if (orderProv == null) return;
+
+    final orders = orderProv.dataList;
+    if (orders.isEmpty) {
+      if (_orderAgainList.isNotEmpty && mounted) {
+        setState(() => _orderAgainList = []);
+      }
+      return;
+    }
+
+    final marketsProv = locator.isRegistered<MarketsProvider>()
+        ? locator<MarketsProvider>()
+        : null;
+
+    final List<int> seenMerchantIds = [];
+    final List<Map<String, dynamic>> resolvedList = [];
+
+    for (final order in orders) {
+      if (order.orderDetails == null) continue;
+      for (final detail in order.orderDetails!) {
+        final mId = detail.merchantId;
+        if (mId == null || mId <= 0 || seenMerchantIds.contains(mId)) {
+          continue;
+        }
+
+        // 1. Try finding in restaurants
+        final rest =
+            marketsProv?.restaurants.cast<RestaurantStoreModel?>().firstWhere(
+                  (r) => r?.id == mId,
+                  orElse: () => null,
+                );
+
+        if (rest != null) {
+          seenMerchantIds.add(mId);
+          resolvedList.add({
+            'id': rest.id,
+            'name': rest.name,
+            'logoUrl': rest.logoUrl,
+            'coverUrl': rest.coverUrl,
+            'isProductMerchant': false,
+          });
+          continue;
+        }
+
+        // 2. Try finding in markets
+        final market =
+            marketsProv?.markets.cast<MarketStoreModel?>().firstWhere(
+                  (m) => m?.id == mId,
+                  orElse: () => null,
+                );
+
+        if (market != null) {
+          seenMerchantIds.add(mId);
+          resolvedList.add({
+            'id': market.id,
+            'name': market.name,
+            'logoUrl': market.logoUrl ?? market.assetPath ?? '',
+            'coverUrl': market.assetPath ?? market.logoUrl ?? '',
+            'isProductMerchant': true,
+          });
+          continue;
+        }
+
+        // 3. Fallback to order detail info
+        final merchantTitle = (detail.merchantTitle ?? '').trim();
+        if (merchantTitle.isNotEmpty) {
+          seenMerchantIds.add(mId);
+          resolvedList.add({
+            'id': mId,
+            'name': merchantTitle,
+            'logoUrl': detail.productImage ?? '',
+            'coverUrl': detail.productImage ?? '',
+            'isProductMerchant': false,
+          });
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _orderAgainList = resolvedList;
+      });
     }
   }
 
@@ -207,6 +453,37 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     final a = _selectedCategory.replaceAll('ال', '').trim().toLowerCase();
     final b = catTitle.replaceAll('ال', '').trim().toLowerCase();
     return a == b;
+  }
+
+  String _categoryFilterTag(String title) {
+    final configured = _restaurantCategoriesConfig;
+    if (configured == null) return title;
+    for (final item in configured.items) {
+      if (_sameCategory(item.title, title) ||
+          _sameCategory(item.titleEn ?? '', title)) {
+        final tag = item.filterTag.trim();
+        return tag.isEmpty ? title : tag;
+      }
+    }
+    return title;
+  }
+
+  String _categoryDisplayTitle(RestaurantCategoryModel item) {
+    final isArabic = !locator.isRegistered<AppStateManager>() ||
+        locator<AppStateManager>().appLanguageIsArabic;
+    if (!isArabic && (item.titleEn ?? '').trim().isNotEmpty) {
+      return item.titleEn!.trim();
+    }
+    return item.title;
+  }
+
+  String _sectionDisplayTitle(RestaurantCategoriesConfigModel config) {
+    final isArabic = !locator.isRegistered<AppStateManager>() ||
+        locator<AppStateManager>().appLanguageIsArabic;
+    if (!isArabic && config.sectionTitleEn.trim().isNotEmpty) {
+      return config.sectionTitleEn.trim();
+    }
+    return config.sectionTitle;
   }
 
   bool _matchesCategory(_RestaurantListItem r, String category) {
@@ -348,7 +625,7 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
             return false;
           }
         }
-      } else if (!_matchesCategory(r, _selectedCategory)) {
+      } else if (!_matchesCategory(r, _categoryFilterTag(_selectedCategory))) {
         return false;
       }
       if (_filterOffers && !r.hasOffers) {
@@ -445,23 +722,30 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
                     controller: _scrollController,
                     physics: const ClampingScrollPhysics(),
                     slivers: [
-                      // Section 1: Square Promo Ads Section
-                      const SliverToBoxAdapter(child: SizedBox(height: 12)),
-                      SliverToBoxAdapter(
-                        child: _buildSquarePromoAdsSection(),
-                      ),
+                      // Section 1: Square Promo Ads Section (Dynamically controlled from Admin Dashboard)
+                      if (_restaurantBanners.isNotEmpty) ...[
+                        const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                        SliverToBoxAdapter(
+                          child: _buildSquarePromoAdsSection(),
+                        ),
+                      ],
 
-                      // Section 2: "اطلب من جديد" (Order Again Clean Brand Cards without badges)
-                      const SliverToBoxAdapter(child: SizedBox(height: 22)),
-                      SliverToBoxAdapter(
-                        child: _buildOrderAgainSection(),
-                      ),
+                      // Section 2: "اطلب من جديد" (Order Again - Only past ordered restaurants)
+                      if (_orderAgainList.isNotEmpty) ...[
+                        const SliverToBoxAdapter(child: SizedBox(height: 22)),
+                        SliverToBoxAdapter(
+                          child: _buildOrderAgainSection(),
+                        ),
+                      ],
 
                       // Section 3: "كل المطاعم" (All Restaurant Categories Circular Chips)
-                      const SliverToBoxAdapter(child: SizedBox(height: 22)),
-                      SliverToBoxAdapter(
-                        child: _buildCategoriesSection(),
-                      ),
+                      if (widget.catalogScope != null ||
+                          _restaurantCategoriesConfig?.enabled != false) ...[
+                        const SliverToBoxAdapter(child: SizedBox(height: 22)),
+                        SliverToBoxAdapter(
+                          child: _buildCategoriesSection(),
+                        ),
+                      ],
 
                       // Section 4: Filter Pills Row
                       const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -622,53 +906,11 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   }
 
   // ---------------------------------------------------------------------------
-  // 3. Section 1: Square Promo Ads Section (العروض المربعة)
+  // 3. Section 1: Square Promo Ads Section (Dynamically controlled from Admin Dashboard)
   // ---------------------------------------------------------------------------
   Widget _buildSquarePromoAdsSection() {
-    final List<Map<String, String>> squareAds;
-    if (widget.catalogScope != null) {
-      squareAds = _allRestaurants
-          .take(6)
-          .map((merchant) => <String, String>{
-                'title': merchant.name,
-                'image': merchant.coverUrl.isNotEmpty
-                    ? merchant.coverUrl
-                    : widget.catalogScope!.fallbackImage,
-              })
-          .toList();
-      if (squareAds.isEmpty) {
-        squareAds.add({
-          'title': widget.catalogScope!.title,
-          'image': widget.catalogScope!.fallbackImage,
-        });
-      }
-    } else {
-      squareAds = [
-        {
-          'title': 'انتعاش الصيف',
-          'image': 'assets/images/promos/promo_summer_drinks.png',
-        },
-        {
-          'title': 'حلاوة المولد',
-          'image': 'assets/images/promos/promo_oriental_sweets.png',
-        },
-        {
-          'title': 'اكتشف الجديد',
-          'image': 'assets/images/promos/promo_discount_gem.png',
-        },
-        {
-          'title': 'شاورما ومشاوي',
-          'image': 'assets/images/promos/promo_shawarma_grill.jpg',
-        },
-        {
-          'title': 'عروض البرغر',
-          'image': 'assets/images/promos/promo_burger_combo.jpg',
-        },
-        {
-          'title': 'مهرجان البيتزا',
-          'image': 'assets/images/promos/promo_pizza_feast.jpg',
-        },
-      ];
+    if (_restaurantBanners.isEmpty) {
+      return const SizedBox.shrink();
     }
 
     return SizedBox(
@@ -677,14 +919,20 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
         scrollDirection: Axis.horizontal,
         physics: const ClampingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: squareAds.length,
+        itemCount: _restaurantBanners.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          final ad = squareAds[index];
+          final banner = _restaurantBanners[index];
+          final rawImg = (banner.featuredImage ?? '').trim();
+          final fullUrl = rawImg.startsWith('http')
+              ? rawImg
+              : (rawImg.startsWith('assets')
+                  ? rawImg
+                  : GlobalVar.getImageUrl(rawImg,
+                      width: 600, height: 600, crop: false));
+
           return GestureDetector(
-            onTap: () {
-              // Open Promo Deals Page
-            },
+            onTap: () => _handleBannerTap(banner),
             child: Container(
               width: 140,
               height: 140,
@@ -694,13 +942,29 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: ImageView(
-                  ad['image'],
-                  width: 140,
-                  height: 140,
-                  fit: BoxFit.cover,
-                  showLoader: false,
-                ),
+                child: fullUrl.startsWith('assets')
+                    ? Image.asset(
+                        fullUrl,
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: fullUrl,
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: const Color(0xFFF1F5F9),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ),
               ),
             ),
           );
@@ -710,40 +974,11 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   }
 
   // ---------------------------------------------------------------------------
-  // 4. Section 2: "اطلب من جديد" (Order Again Clean Brand Squircles without badges)
+  // 4. Section 2: "اطلب من جديد" (Order Again - ONLY from user's past placed orders)
   // ---------------------------------------------------------------------------
   Widget _buildOrderAgainSection() {
-    final List<Map<String, dynamic>> orderAgainList = [];
-    if (widget.catalogScope != null) {
-      for (final merchant in _allRestaurants.take(6)) {
-        orderAgainList.add({
-          'id': merchant.id,
-          'name': merchant.name,
-          'logoUrl': merchant.logoUrl,
-          'coverUrl': merchant.coverUrl,
-          'isProductMerchant': merchant.isProductMerchant,
-        });
-      }
-    } else if (locator.isRegistered<MarketsProvider>()) {
-      final prov = locator<MarketsProvider>();
-      for (final r in prov.restaurants.take(6)) {
-        orderAgainList.add({
-          'id': r.id,
-          'name': r.name,
-          'logoUrl': r.logoUrl,
-          'coverUrl': r.coverUrl,
-        });
-      }
-    }
-    if (orderAgainList.isEmpty && widget.catalogScope == null) {
-      for (final r in MockCatalogData.restaurants.take(5)) {
-        orderAgainList.add({
-          'id': r.id,
-          'name': r.name,
-          'logoUrl': r.logoUrl,
-          'coverUrl': r.coverUrl,
-        });
-      }
+    if (_orderAgainList.isEmpty) {
+      return const SizedBox.shrink();
     }
 
     return Column(
@@ -772,27 +1007,28 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
             scrollDirection: Axis.horizontal,
             physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: orderAgainList.length,
+            itemCount: _orderAgainList.length,
             separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (context, index) {
-              final item = orderAgainList[index];
-              final logoUrl = item['logoUrl'] as String;
+              final item = _orderAgainList[index];
+              final logoUrl = (item['logoUrl'] ?? '').toString();
               return GestureDetector(
                 onTap: () {
+                  final isMarket = item['isProductMerchant'] == true;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => widget.catalogScope != null
+                      builder: (context) => isMarket
                           ? MarketPage(
                               marketId: item['id'] as int,
                               marketName: item['name'] as String,
-                              coverUrl: item['coverUrl'] as String,
+                              coverUrl: (item['coverUrl'] ?? '').toString(),
                               logoUrl: logoUrl,
                             )
                           : RestaurantMenuPage(
                               restaurantId: item['id'] as int,
                               restaurantName: item['name'] as String,
-                              coverUrl: item['coverUrl'] as String,
+                              coverUrl: (item['coverUrl'] ?? '').toString(),
                               logoUrl: logoUrl,
                             ),
                     ),
@@ -816,12 +1052,33 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
                             height: 76,
                             fit: BoxFit.cover,
                           )
-                        : CachedNetworkImage(
-                            imageUrl: logoUrl,
-                            width: 76,
-                            height: 76,
-                            fit: BoxFit.cover,
-                          ),
+                        : (logoUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: logoUrl.startsWith('http')
+                                    ? logoUrl
+                                    : GlobalVar.getImageUrl(logoUrl,
+                                        width: 200, height: 200),
+                                width: 76,
+                                height: 76,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  color: const Color(0xFFF8FAFC),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: const Color(0xFFF8FAFC),
+                                  child: const Icon(
+                                    Icons.storefront_outlined,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                color: const Color(0xFFF8FAFC),
+                                child: const Icon(
+                                  Icons.storefront_outlined,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              )),
                   ),
                 ),
               );
@@ -836,6 +1093,13 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   // 5. Section 3: "كل المطاعم" (All Restaurant Categories Circular Chips)
   // ---------------------------------------------------------------------------
   Widget _buildCategoriesSection() {
+    final configured = _restaurantCategoriesConfig;
+    if (widget.catalogScope == null &&
+        configured != null &&
+        !configured.enabled) {
+      return const SizedBox.shrink();
+    }
+
     final List<Map<String, String>> categories;
     if (widget.catalogScope != null) {
       categories = _scopeCategoryImages.entries
@@ -845,6 +1109,17 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
               })
           .toList()
         ..sort((a, b) => a['title']!.compareTo(b['title']!));
+    } else if (configured != null && configured.items.isNotEmpty) {
+      final activeItems = configured.items
+          .where((item) => item.active && item.title.trim().isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+      categories = activeItems
+          .map((item) => <String, String>{
+                'title': _categoryDisplayTitle(item),
+                'image': item.image,
+              })
+          .toList();
     } else {
       categories = [
         {
@@ -879,6 +1154,14 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
       ];
     }
 
+    // When the admin intentionally deactivates every category, do not leave
+    // an empty heading/list placeholder in the customer app.
+    if (widget.catalogScope == null &&
+        configured != null &&
+        categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -886,7 +1169,11 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            widget.catalogScope?.allSectionTitle ?? 'كل المطاعم',
+            widget.catalogScope?.allSectionTitle ??
+                (configured == null
+                    ? null
+                    : _sectionDisplayTitle(configured)) ??
+                'كل المطاعم',
             style: GoogleFonts.ibmPlexSansArabic(
               color: kCharcoalDark,
               fontSize: 20.0,
@@ -1528,6 +1815,19 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   List<_RestaurantListItem> get _allRestaurants {
     if (widget.catalogScope != null) {
       return _scopedMerchants ?? const [];
+    }
+
+    // A tile pointing at a merchant kind lists exactly those merchants. The
+    // provider already splits the backend feed by its merchantKind field, so
+    // restaurants are kind 0 and every other kind lands in markets.
+    if (widget.merchantKind != null && locator.isRegistered<MarketsProvider>()) {
+      final marketsProv = locator<MarketsProvider>();
+      final ofKind = widget.merchantKind == 0
+          ? _buildProviderMerchants(marketsProv)
+          : _buildMarketMerchants(marketsProv.markets
+              .where((m) => m.merchantKind == widget.merchantKind));
+      final seen = <int>{};
+      return ofKind.where((m) => seen.add(m.id)).toList();
     }
 
     if (locator.isRegistered<MarketsProvider>()) {

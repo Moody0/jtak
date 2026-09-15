@@ -5,10 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../../../main_imports.dart';
 import '../../../config/constants/app_constant.dart';
+import '../../../utils/utilities/lunch_url.dart';
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/app_parameters_provider.dart';
 import '../../../core/controllers/order/cart_provider.dart';
@@ -18,11 +18,15 @@ import '../../../core/enums/order_details_status_enum.dart';
 import '../../../core/models/order/order_details_model.dart';
 import '../../../core/models/order/order_model.dart';
 import '../../../core/services/locator.dart';
+import '../../../core/services/route_directions_service.dart';
 import '../../../ui/sections/rate_order.dart';
 import '../../../utils/custom_widgets/loading.dart';
+import '../../../utils/custom_widgets/image_widgets.dart';
 import '../../pages/cart/cart_page.dart';
 import '../../widgets/header_circle_button.dart';
 import 'order_widgets.dart';
+import 'custom_map_markers.dart';
+import 'live_tracking_page.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Modern Order Tracking & Details Page
@@ -45,16 +49,60 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   Timer? _liveSyncTimer;
   GoogleMapController? _previewMapController;
 
+  // Custom Markers & Preview Road Route
+  BitmapDescriptor? _courierMarker;
+  BitmapDescriptor? _customerMarker;
+  List<LatLng> _previewRoadPoints = [];
+  LatLng? _lastPreviewDriverPos;
+
   @override
   void initState() {
     super.initState();
+    _loadCustomMarkers();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        Provider.of<OrderProvider>(context, listen: false)
-            .setOrderObject(widget.order);
+        final prov = Provider.of<OrderProvider>(context, listen: false);
+        prov.setOrderObject(widget.order);
+        final initialStatus = prov.getOrderStatus(widget.order);
+        if (initialStatus == OrderDetailsStatus.merchantRejected ||
+            initialStatus == OrderDetailsStatus.customerCanceled ||
+            initialStatus == OrderDetailsStatus.deliveryCanceled) {
+          locator<CartProvider>().clearCart();
+        }
         _startLiveBackendSync();
       }
     });
+  }
+
+  void _loadCustomMarkers() async {
+    final courier = await CustomMapMarkers.getCourierMarker();
+    final customer = await CustomMapMarkers.getCustomerMarker();
+    if (mounted) {
+      setState(() {
+        _courierMarker = courier;
+        _customerMarker = customer;
+      });
+    }
+  }
+
+  void _updatePreviewRoute(LatLng driverPos, LatLng clientPos) async {
+    if (_lastPreviewDriverPos != null) {
+      final double d = (driverPos.latitude - _lastPreviewDriverPos!.latitude).abs() +
+          (driverPos.longitude - _lastPreviewDriverPos!.longitude).abs();
+      if (d < 0.0002 && _previewRoadPoints.isNotEmpty) return;
+    }
+    _lastPreviewDriverPos = driverPos;
+    try {
+      final route = await RouteDirectionsService.fetchRoadRoute(
+        origin: driverPos,
+        destination: clientPos,
+      );
+      if (mounted && route.points.isNotEmpty) {
+        setState(() {
+          _previewRoadPoints = route.points;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -90,6 +138,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     final currentOrder = provider.order ?? widget.order;
     final status = provider.getOrderStatus(currentOrder);
 
+    // If order was rejected by merchant, guarantee cart vanishes completely
+    if (status == OrderDetailsStatus.merchantRejected) {
+      final cart = locator<CartProvider>();
+      if (cart.totalQuantity > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          cart.clearCart();
+        });
+      }
+    }
+
     // Conditional visibility: Driver & Live Location appear ONLY during Shipping
     final bool isShippingState = (status == OrderDetailsStatus.shipping);
 
@@ -118,7 +176,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   _buildTrackingStatusCard(currentOrder, status),
                   const SizedBox(height: 14),
 
-                  // 2. Delivery Driver Card (Appears ONLY when order is in Shipping state)
+                  // 2. Delivery Confirmation PIN Code Card (رمز تأكيد الاستلام)
+                  if (currentOrder.deliveryOtp != null &&
+                      currentOrder.deliveryOtp!.trim().isNotEmpty &&
+                      status != OrderDetailsStatus.customerCanceled &&
+                      status != OrderDetailsStatus.deliveryCanceled &&
+                      status != OrderDetailsStatus.merchantRejected) ...[
+                    _buildDeliveryPinCard(currentOrder, status),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // 3. Delivery Driver Card (Appears ONLY when order is in Shipping state)
                   if (isShippingState) ...[
                     _buildDeliveryDriverCard(currentOrder),
                     const SizedBox(height: 14),
@@ -245,6 +313,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         subtitle = 'متجر $merchantName يحضر طلبك الآن في المطبخ';
         break;
 
+      case OrderDetailsStatus.readyForPickup:
+        stageIndex = 1;
+        mainTitle = 'طلبك جاهز للاستلام';
+        subtitle = 'أنهى $merchantName تجهيز الطلب وبانتظار تعيين مندوب التوصيل';
+        break;
+
       case OrderDetailsStatus.shipping:
         stageIndex = 2;
         mainTitle = 'طلبك في الطريق';
@@ -258,9 +332,33 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         subtitle = 'تم تسليم طلبك بنجاح. نتمنى لك تجربة ممتعة!';
         break;
 
+      case OrderDetailsStatus.merchantRejected:
+        stageIndex = -1;
+        isCanceled = true;
+        mainTitle = 'نعتذر، تعذر قبول الطلب من قِبل المتجر';
+        // order.warning is a generic backend flag reused for unrelated cart
+        // checks (min order, store hours); on a rejected order it always
+        // resolves to a fixed placeholder ("يرجى مراجعة المواد") that masks
+        // the actual reason the merchant typed. The real reason lives in
+        // order.notes (and mirrored per-item in orderDetails[].warning), so
+        // those take priority here and order.warning is never used as the
+        // displayed reason.
+        final String reason = order.notes ??
+            (order.orderDetails?.firstWhere(
+                (d) => d.warning != null && d.warning!.trim().isNotEmpty,
+                orElse: () => OrderDetailsModel()).warning) ??
+            '';
+        if (reason.trim().isNotEmpty) {
+          subtitle =
+              'اعتذر $merchantName عن قبول طلبك للسبب التالي:\n«$reason»\n\nتم تفريغ سلة المشتريات تلقائياً لتتمكن من اختيار وجبة أخرى أو متجر آخر.';
+        } else {
+          subtitle =
+              'نعتذر منك، اعتذر $merchantName عن قبول طلبك في الوقت الحالي.\nتم تفريغ سلة المشتريات تلقائياً لتتمكن من اختيار وجبة أخرى أو متجر آخر.';
+        }
+        break;
+
       case OrderDetailsStatus.customerCanceled:
       case OrderDetailsStatus.deliveryCanceled:
-      case OrderDetailsStatus.merchantRejected:
         stageIndex = -1;
         isCanceled = true;
         mainTitle = 'تم إلغاء الطلب';
@@ -295,6 +393,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           // B. 4-Stage Horizontal Progress Timeline (RTL Flow: Right -> Left)
           if (!isCanceled)
             _buildTimelineProgressRow(stageIndex)
+          else if (status == OrderDetailsStatus.merchantRejected)
+            _buildRejectedTimelineBadge()
           else
             _buildCanceledTimelineBadge(),
 
@@ -431,13 +531,218 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
+  Widget _buildRejectedTimelineBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(PhosphorIconsFill.xCircle,
+              color: Color(0xFFDC2626), size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'اعتذر المتجر عن قبول الطلب',
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFDC2626),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. Delivery Confirmation PIN Card (رمز تأكيد الاستلام)
+  // ---------------------------------------------------------------------------
+  Widget _buildDeliveryPinCard(OrderModel order, OrderDetailsStatus status) {
+    final String cleanOtp = (order.deliveryOtp ?? '')
+        .replaceAll(RegExp(r'\s+'), '')
+        .trim();
+    final bool isDelivered = status == OrderDetailsStatus.delivered;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: isDelivered ? const Color(0xFFF8FAFC) : const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDelivered ? const Color(0xFFE2E8F0) : const Color(0xFFFFEDD5),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isDelivered ? const Color(0xFFE2E8F0) : const Color(0xFFFFF0E8),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    isDelivered ? PhosphorIconsFill.checkCircle : PhosphorIconsFill.shieldCheck,
+                    size: 22,
+                    color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'رمز تأكيد الاستلام (PIN)',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: isDelivered ? const Color(0xFF475569) : kCharcoalDark,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isDelivered
+                          ? 'تم التحقق من الرمز وتسليم الطلب بنجاح'
+                          : 'أعطِ هذا الرمز لمندوب التوصيل عند استلام طلبك',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (cleanOtp.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // 1. PIN Digit Boxes in strict LTR
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: cleanOtp.split('').map((digit) {
+                      return Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        width: 38,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isDelivered ? const Color(0xFFCBD5E1) : const Color(0xFFFFB280),
+                            width: 1.4,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x0A000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            digit,
+                            textDirection: TextDirection.ltr,
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                // 2. Copy Button
+                InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Clipboard.setData(ClipboardData(text: cleanOtp));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(PhosphorIconsFill.checkCircle, color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              'تم نسخ رمز التأكيد: \u200E$cleanOtp\u200E',
+                              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+                              textDirection: TextDirection.rtl,
+                            ),
+                          ],
+                        ),
+                        duration: const Duration(seconds: 2),
+                        backgroundColor: kCharcoalDark,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDelivered ? const Color(0xFFCBD5E1) : const Color(0xFFFFD8C2),
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          PhosphorIconsRegular.copy,
+                          size: 15,
+                          color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'نسخ الرمز',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // 3. Delivery Driver Card (مندوب التوصيل - Appears only in Shipping)
   // ---------------------------------------------------------------------------
   Widget _buildDeliveryDriverCard(OrderModel order) {
     final driverPos = _resolveDriverCoordinates(order);
     final bool isLive = _isDriverLocationFresh(order);
-    final String statusText = _formatLocationStatus(order, driverPos);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -450,78 +755,77 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         children: [
           // A. Courier Info Row
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Right in RTL: Avatar + Driver Name
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFFFF0E8),
-                      border: Border.all(
-                          color: const Color(0xFFFFD6C2), width: 1.5),
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/person.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(PhosphorIconsFill.user,
-                              color: kPrimaryOrange, size: 24),
-                        ),
-                      ),
+              // Avatar with subtle shadow and border
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFF0E8),
+                  border: Border.all(
+                      color: const Color(0xFFFFD6C2), width: 1.5),
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/person.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(PhosphorIconsFill.user,
+                          color: kPrimaryOrange, size: 24),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'مندوب التوصيل',
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
-                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Courier Name & Title (Expanded to avoid any overflow)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'مندوب التوصيل',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF64748B),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        order.deliveryUser ?? 'مندوب التوصيل',
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: kCharcoalDark,
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '\u2068${order.deliveryUser ?? 'مندوب التوصيل'}\u2069',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        color: kCharcoalDark,
                       ),
-                    ],
-                  ),
-                ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
 
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: (driverPos != null && isLive)
-                      ? const Color(0xFFECFDF5)
-                      : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  statusText,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: (driverPos != null && isLive)
-                        ? const Color(0xFF059669)
-                        : const Color(0xFF64748B),
+              // Live Status Badge (Only shown when live GPS location is active)
+              if (driverPos != null && isLive) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    'التتبع مباشر',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF059669),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
 
@@ -529,71 +833,32 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 12),
 
-          // B. Contact buttons
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _callDriver(context, order),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF7ED),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFFEDD5)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(PhosphorIconsFill.phoneCall,
-                            size: 16, color: kPrimaryOrange),
-                        const SizedBox(width: 6),
-                        Text(
-                          'اتصال بالمندوب',
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: kPrimaryOrange,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+          // B. Contact Delivery - PHONE CALL ONLY (Prominent single call action)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _callDriver(context, order),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFF7ED),
+                foregroundColor: kPrimaryOrange,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: Color(0xFFFFEDD5), width: 1.2),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _openDriverChatSheet(context, order),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(PhosphorIconsFill.chatCircleDots,
-                            size: 16, color: Color(0xFF475569)),
-                        const SizedBox(width: 6),
-                        Text(
-                          'محادثة فورية',
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF475569),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              icon: const Icon(PhosphorIconsFill.phoneCall,
+                  size: 18, color: kPrimaryOrange),
+              label: Text(
+                'اتصال بمندوب التوصيل',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: kPrimaryOrange,
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -606,8 +871,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   Widget _buildLiveMapTrackingCard(OrderModel order) {
     final clientPos = _resolveClientCoordinates(order);
     final driverPos = _resolveDriverCoordinates(order);
-    final bool hasDriverLocation = driverPos != null;
-    final bool isLive = _isDriverLocationFresh(order);
+
+    if (driverPos != null) {
+      _updatePreviewRoute(driverPos, clientPos);
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -623,24 +890,29 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    PhosphorIconsBold.arrowsClockwise,
-                    color: Color(0xFF475569),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'تتبع الموقع المباشر لطلبك',
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      color: kCharcoalDark,
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      PhosphorIconsBold.arrowsClockwise,
+                      color: Color(0xFF475569),
+                      size: 18,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'تتبع الموقع المباشر لطلبك',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: kCharcoalDark,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               GestureDetector(
                 onTap: () => _openFullMap(context, order),
@@ -657,13 +929,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       ),
                     ),
                     const SizedBox(width: 3),
-                    Transform.flip(
-                      flipX: true,
-                      child: const Icon(
-                        PhosphorIconsBold.caretLeft,
-                        size: 13,
-                        color: kPrimaryOrange,
-                      ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: kPrimaryOrange,
                     ),
                   ],
                 ),
@@ -673,7 +942,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
           const SizedBox(height: 12),
 
-          // B. Real Google Map Preview
+          // B. Real Google Map Preview with Road Following Polyline
           GestureDetector(
             onTap: () => _openFullMap(context, order),
             behavior: HitTestBehavior.opaque,
@@ -706,29 +975,44 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         Marker(
                           markerId: const MarkerId('destination'),
                           position: clientPos,
+                          anchor: CustomMapMarkers.customerAnchor,
                           infoWindow:
                               const InfoWindow(title: 'عنوان التوصيل (موقعك)'),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                              BitmapDescriptor.hueRed),
+                          icon: _customerMarker ??
+                              BitmapDescriptor.defaultMarkerWithHue(
+                                  BitmapDescriptor.hueRed),
                         ),
                         if (driverPos != null)
                           Marker(
                             markerId: const MarkerId('driver'),
                             position: driverPos,
+                            anchor: CustomMapMarkers.courierAnchor,
                             infoWindow: InfoWindow(
                                 title: order.deliveryUser ?? 'مندوب التوصيل'),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(
-                                BitmapDescriptor.hueOrange),
+                            icon: _courierMarker ??
+                                BitmapDescriptor.defaultMarkerWithHue(
+                                    BitmapDescriptor.hueOrange),
                           ),
                       },
                       polylines: {
-                        if (driverPos != null)
+                        if (driverPos != null) ...[
+                          Polyline(
+                            polylineId: const PolylineId('route_preview_border'),
+                            points: _previewRoadPoints.isNotEmpty
+                                ? _previewRoadPoints
+                                : [driverPos, clientPos],
+                            color: Colors.white,
+                            width: 6,
+                          ),
                           Polyline(
                             polylineId: const PolylineId('route_preview'),
-                            points: [driverPos, clientPos],
+                            points: _previewRoadPoints.isNotEmpty
+                                ? _previewRoadPoints
+                                : [driverPos, clientPos],
                             color: kPrimaryOrange,
                             width: 4,
                           ),
+                        ],
                       },
                       onMapCreated: (controller) =>
                           _previewMapController = controller,
@@ -744,43 +1028,36 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         ),
                       ),
                     ),
-
-                    // Floating ETA Pill
-                    Positioned(
-                      bottom: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              hasDriverLocation && isLive
-                                  ? PhosphorIconsFill.navigationArrow
-                                  : PhosphorIconsFill.clock,
-                              color: kPrimaryOrange,
-                              size: 13,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatLocationStatus(order, driverPos),
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: kCharcoalDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Action Button to open the separate dedicated Live Tracking Page
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _openFullMap(context, order),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryOrange,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(PhosphorIconsFill.navigationArrow,
+                  size: 18, color: Colors.white),
+              label: Text(
+                'عرض التتبع المباشر على الخريطة',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -924,10 +1201,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     final double itemPrice =
         (item.singleFinalPrice ?? item.singlePrice ?? 0) * (item.quantity ?? 1);
     final mockItem = MockCatalogData.getMenuItemById(item.productId ?? 0);
-    final String image =
-        (item.productImage != null && item.productImage!.isNotEmpty)
-            ? item.productImage!
-            : (mockItem?.imageUrl ?? '');
+    final raw = item.productImage;
+    final img = (raw != null && raw.trim().isNotEmpty && raw != 'null')
+        ? raw.split(',').first.trim()
+        : (mockItem?.imageUrl ?? '');
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -943,19 +1220,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(11),
-            child: image.startsWith('http')
-                ? Image.network(
-                    image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.fastfood, color: Color(0xFF94A3B8)),
-                  )
-                : Image.asset(
-                    image.isNotEmpty ? image : 'assets/images/placeholder.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.fastfood, color: Color(0xFF94A3B8)),
-                  ),
+            child: ImageView(
+              img,
+              width: 58,
+              height: 58,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
 
@@ -1217,6 +1487,45 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
         ),
       );
+    } else if (status == OrderDetailsStatus.merchantRejected) {
+      return GestureDetector(
+        onTap: () {
+          locator<CartProvider>().clearCart();
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: kPrimaryOrange,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: kPrimaryOrange.withValues(alpha: 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(PhosphorIconsRegular.storefront,
+                  color: Colors.white, size: 19),
+              const SizedBox(width: 8),
+              Text(
+                'تصفح المطاعم والمتاجر الأخرى',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return const SizedBox.shrink();
@@ -1263,16 +1572,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     } catch (_) {
       return false;
     }
-  }
-
-  String _formatLocationStatus(OrderModel order, LatLng? driverPos) {
-    if (driverPos == null) {
-      return 'في انتظار تحديد الموقع';
-    }
-    if (_isDriverLocationFresh(order)) {
-      return 'الموقع مباشر';
-    }
-    return 'الموقع غير متصل حالياً';
   }
 
   String _resolveMerchantName(OrderModel order) {
@@ -1338,41 +1637,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   void _callDriver(BuildContext context, [OrderModel? order]) async {
     final phone = order?.deliveryUserPhone?.trim();
-    final targetPhone = (phone != null && phone.isNotEmpty) ? phone : '+963933112233';
-    final url = 'tel:$targetPhone';
-    if (await canLaunchUrlString(url)) {
-      await launchUrlString(url);
-    } else if (context.mounted) {
-      final driverName = order?.deliveryUser ?? 'المندوب';
-      context.showSnakBar('تعذر الاتصال بـ $driverName على الرقم $targetPhone');
-    }
-  }
-
-  void _openDriverChatSheet(BuildContext context, [OrderModel? order]) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _DriverChatSheet(
-        driverName: order?.deliveryUser ?? 'مندوب التوصيل',
-      ),
-    );
+    final targetPhone =
+        (phone != null && phone.isNotEmpty) ? phone : kSupportPhoneNumber;
+    await LunchUrl.makeCall(targetPhone, context: context);
   }
 
   void _openFullMap(BuildContext context, OrderModel order) {
-    final clientPos = _resolveClientCoordinates(order);
-    final driverPos = _resolveDriverCoordinates(order);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _FullLiveMapSheet(
-        order: order,
-        clientPos: clientPos,
-        merchantPos: clientPos,
-        driverPos: driverPos,
-        merchantName: _resolveMerchantName(order),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => LiveTrackingPage(order: order),
       ),
     );
   }
@@ -1433,7 +1707,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  void _showHelpBottomSheet(BuildContext context) {
+  void _showHelpBottomSheet(BuildContext context, [OrderModel? order]) {
+    final currentOrder = order ??
+        Provider.of<OrderProvider>(context, listen: false).order ??
+        widget.order;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1479,10 +1757,18 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
               const SizedBox(height: 18),
               ListTile(
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
-                  context
-                      .showSnakBar('جاري ربطك بخدمة العملاء عبر الواتساب...');
+                  final orderNum =
+                      currentOrder.id != null ? '#${currentOrder.id}' : '';
+                  final msg = orderNum.isNotEmpty
+                      ? 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص طلبي رقم $orderNum'
+                      : 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص طلبي';
+                  await LunchUrl.openWhatsApp(
+                    phone: kSupportWhatsAppNumber,
+                    message: msg,
+                    context: context,
+                  );
                 },
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -1501,9 +1787,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 trailing: const Icon(PhosphorIconsBold.caretLeft, size: 14),
               ),
               ListTile(
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
-                  _callDriver(context);
+                  await LunchUrl.makeCall(kSupportPhoneNumber, context: context);
                 },
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -1576,498 +1862,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFFDC2626),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Driver In-App Chat Modal Sheet (Full RTL)
-// ---------------------------------------------------------------------------
-class _DriverChatSheet extends StatefulWidget {
-  final String driverName;
-
-  const _DriverChatSheet({
-    this.driverName = 'مندوب التوصيل',
-  });
-
-  @override
-  State<_DriverChatSheet> createState() => _DriverChatSheetState();
-}
-
-class _DriverChatSheetState extends State<_DriverChatSheet> {
-  final TextEditingController _msgController = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'text': 'مرحباً، أنا في طريقي لاستلام طلبك من المتجر الآن 🛵',
-      'isMe': false,
-      'time': 'منذ 4 دقائق'
-    },
-    {
-      'text': 'أهلاً بك، الرجاء وضع الصلصات الحارة في كيس منفصل إذا أمكن 🙏',
-      'isMe': true,
-      'time': 'منذ دقيقتين'
-    },
-    {
-      'text': 'تكرم عينك، جاهز تماماً وسأصل إليك خلال 15 دقيقة إن شاء الله 👍',
-      'isMe': false,
-      'time': 'الآن'
-    },
-  ];
-
-  @override
-  void dispose() {
-    _msgController.dispose();
-    super.dispose();
-  }
-
-  void _sendMessage() {
-    final text = _msgController.text.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _messages.add({'text': text, 'isMe': true, 'time': 'الآن'});
-    });
-    _msgController.clear();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        padding:
-            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            // Drag Handle
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFCBD5E1),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Header (RTL: Avatar & Name on Right, Close on Left)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFFFFF0E8),
-                        ),
-                        child: ClipOval(
-                          child: Image.asset('assets/images/person.png',
-                              fit: BoxFit.cover),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.driverName,
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w800,
-                              color: kCharcoalDark,
-                            ),
-                          ),
-                          Text(
-                            'متصل الآن • مندوب التوصيل',
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 11,
-                              color: const Color(0xFF059669),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close_rounded,
-                        color: Color(0xFF64748B)),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 16, color: Color(0xFFF1F5F9)),
-
-            // Message Bubbles List
-            Expanded(
-              child: ListView.builder(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  final bool isMe = msg['isMe'];
-                  return Align(
-                    alignment: isMe
-                        ? AlignmentDirectional.centerStart
-                        : AlignmentDirectional.centerEnd,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.75),
-                      decoration: BoxDecoration(
-                        color: isMe ? kPrimaryOrange : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(16).copyWith(
-                          bottomRight:
-                              isMe ? Radius.zero : const Radius.circular(16),
-                          bottomLeft:
-                              !isMe ? Radius.zero : const Radius.circular(16),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: isMe
-                            ? CrossAxisAlignment.start
-                            : CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            msg['text'],
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 13.5,
-                              color: isMe ? Colors.white : kCharcoalDark,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            msg['time'],
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 10,
-                              color: isMe
-                                  ? Colors.white70
-                                  : const Color(0xFF94A3B8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // Input Bar
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 42,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(21),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: TextField(
-                        controller: _msgController,
-                        style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 13.5, color: kCharcoalDark),
-                        decoration: const InputDecoration(
-                          hintText: 'اكتب رسالتك للمندوب...',
-                          hintStyle:
-                              TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 10),
-                        ),
-                        onSubmitted: (_) => _sendMessage(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: _sendMessage,
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: const BoxDecoration(
-                        color: kPrimaryOrange,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(PhosphorIconsFill.paperPlaneRight,
-                            color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Full Interactive Live Map Sheet with Real Google Maps API
-// ---------------------------------------------------------------------------
-class _FullLiveMapSheet extends StatefulWidget {
-  final OrderModel order;
-  final LatLng clientPos;
-  final LatLng merchantPos;
-  final LatLng? driverPos;
-  final String merchantName;
-
-  const _FullLiveMapSheet({
-    required this.order,
-    required this.clientPos,
-    required this.merchantPos,
-    this.driverPos,
-    required this.merchantName,
-  });
-
-  @override
-  State<_FullLiveMapSheet> createState() => _FullLiveMapSheetState();
-}
-
-class _FullLiveMapSheetState extends State<_FullLiveMapSheet> {
-  GoogleMapController? _mapController;
-
-  bool _isDriverLocationFresh(OrderModel order) {
-    final raw = order.deliveryLocationUpdatedAt;
-    if (raw == null || raw.isEmpty) return false;
-    try {
-      final updatedAt = DateTime.parse(raw);
-      final diff = DateTime.now().difference(updatedAt);
-      return diff.inMinutes < 3 && !diff.isNegative;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool hasDriver = widget.driverPos != null;
-    final bool isLive = hasDriver && _isDriverLocationFresh(widget.order);
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.88,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            // Handle
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFCBD5E1),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'تتبع المندوب على الخريطة',
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: kCharcoalDark,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close_rounded,
-                        color: Color(0xFF64748B)),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 16, color: Color(0xFFF1F5F9)),
-
-            // Interactive Map Canvas
-            Expanded(
-              child: Stack(
-                children: [
-                  GoogleMap(
-                    mapType: MapType.normal,
-                    zoomControlsEnabled: false,
-                    myLocationButtonEnabled: false,
-                    compassEnabled: true,
-                    initialCameraPosition: CameraPosition(
-                      target: widget.driverPos ?? widget.clientPos,
-                      zoom: 14.5,
-                    ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId('full_destination'),
-                        position: widget.clientPos,
-                        infoWindow:
-                            const InfoWindow(title: 'موقعك (عنوان التوصيل)'),
-                        icon: BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueRed),
-                      ),
-                      if (hasDriver)
-                        Marker(
-                          markerId: const MarkerId('full_driver'),
-                          position: widget.driverPos!,
-                          infoWindow: InfoWindow(
-                              title:
-                                  widget.order.deliveryUser ?? 'مندوب التوصيل'),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                              BitmapDescriptor.hueOrange),
-                        ),
-                    },
-                    polylines: {
-                      if (hasDriver)
-                        Polyline(
-                          polylineId: const PolylineId('full_route'),
-                          points: [widget.driverPos!, widget.clientPos],
-                          color: kPrimaryOrange,
-                          width: 5,
-                        ),
-                    },
-                    onMapCreated: (controller) {
-                      _mapController = controller;
-                    },
-                  ),
-
-                  // Floating Info Header
-                  Positioned(
-                    top: 14,
-                    right: 14,
-                    left: 14,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(PhosphorIconsFill.motorcycle,
-                                  color: kPrimaryOrange, size: 20),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${widget.order.deliveryUser ?? 'مندوب التوصيل'} (المندوب)',
-                                    style: GoogleFonts.ibmPlexSansArabic(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: kCharcoalDark,
-                                    ),
-                                  ),
-                                  Text(
-                                    hasDriver && isLive
-                                        ? 'الموقع يتحدث مباشرة أثناء التوصيل'
-                                        : (hasDriver
-                                            ? 'الموقع غير متصل حالياً'
-                                            : 'في انتظار تحديد موقع المندوب'),
-                                    style: GoogleFonts.ibmPlexSansArabic(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isLive
-                                  ? const Color(0xFFECFDF5)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              isLive ? 'مباشر' : 'غير متصل',
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: isLive
-                                    ? const Color(0xFF059669)
-                                    : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Recenter to Driver Button
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    child: GestureDetector(
-                      onTap: () {
-                        _mapController?.animateCamera(
-                          CameraUpdate.newLatLngZoom(
-                              widget.driverPos ?? widget.clientPos, 15.5),
-                        );
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Center(
-                          child: Icon(PhosphorIconsBold.crosshair,
-                              color: kPrimaryOrange, size: 22),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

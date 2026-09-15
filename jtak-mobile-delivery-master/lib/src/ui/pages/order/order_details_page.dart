@@ -33,9 +33,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     super.initState();
     Provider.of<OrderProvider>(context, listen: false)
         .setOrderObject(widget.order);
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       final model = Provider.of<OrderProvider>(context, listen: false);
-      if (!model.isBusy) model.refreshData();
+      if (widget.order.id != null) model.silentSyncOrder(widget.order.id!);
     });
   }
 
@@ -174,6 +174,41 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       ),
                     ],
                   ),
+                Builder(
+                  builder: (context) {
+                    final navUrl = GlobalVar.getCustomerNavigationUrl(
+                      lat: order.lat,
+                      lng: order.lng,
+                      address: order.address,
+                    );
+
+                    if (navUrl == null) return const SizedBox.shrink();
+
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => launchUrl(Uri.parse(navUrl),
+                              mode: LaunchMode.externalApplication),
+                          icon: const AppIcon(PhosphorIcons.navigationArrowBold,
+                              size: 16),
+                          label: const Text('تتبع موقع العميل على الخريطة'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kPrimaryOrange,
+                            side: const BorderSide(
+                                color: kPrimaryOrange, width: 1.2),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),

@@ -41,14 +41,25 @@ namespace App.Shared.Services
                 {
                     _cache.Set<T>(key, default, TimeSpan.FromDays(1));
                 }
-                try
+                else if (setting.Value != null)
                 {
-                    if (setting?.Value != null)
+                    try
                     {
-                        _cache.Set(key, JsonSerializer.Deserialize<T>(setting.Value), TimeSpan.FromDays(1));
+                        result = JsonSerializer.Deserialize<T>(setting.Value);
+                        _cache.Set(key, result, TimeSpan.FromDays(1));
+                    }
+                    catch (Exception)
+                    {
+                        // Invalid settings should behave like a missing setting, but must not
+                        // make every request fail. Cache the fallback for the same period.
+                        result = default;
+                        _cache.Set<T>(key, default, TimeSpan.FromDays(1));
                     }
                 }
-                catch (Exception) { }
+                else
+                {
+                    _cache.Set<T>(key, default, TimeSpan.FromDays(1));
+                }
             }
 
             return result ?? default;

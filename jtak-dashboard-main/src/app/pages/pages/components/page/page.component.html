@@ -1,11 +1,9 @@
 <div class="card card-custom gutter-b">
   <div class="card-header">
     <div class="card-title">
-      <h3 class="card-label">Edit Static Page</h3>
+      <h3 class="card-label fw-bolder">{{ 'PAGES.EDIT_STATIC_PAGE' | translate }}</h3>
     </div>
-    <div class="card-toolbar">
-
-    </div>
+    <div class="card-toolbar"></div>
   </div>
   <div class="card-body" *ngIf="_pageData">
     <form [formGroup]="formGroup" (ngSubmit)="save()">
@@ -18,9 +16,9 @@
             placeholder=""></ngx-editor>
           </div>
         </div>
-        <div style="text-align: end">
-          <button type="submit" class="btn btn-primary font-weight-bold mr-2">
-            Save
+        <div class="text-end mt-4">
+          <button type="submit" class="btn btn-primary font-weight-bold">
+            {{ 'COMMON.SAVE' | translate }}
           </button>
         </div>
       </div>

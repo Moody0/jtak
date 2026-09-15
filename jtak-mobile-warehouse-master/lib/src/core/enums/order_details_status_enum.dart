@@ -9,6 +9,7 @@ enum OrderDetailsStatus {
   customerPending,
   customerCanceled,
   deliveryCanceled,
+  readyForPickup,
 }
 
 extension StringValueExtention on OrderDetailsStatus {
@@ -37,6 +38,8 @@ extension StringValueExtention on OrderDetailsStatus {
 
       case OrderDetailsStatus.deliveryCanceled:
         return str.app.orderDetailsStatusDeliveryCanceled;
+      case OrderDetailsStatus.readyForPickup:
+        return 'جاهز للاستلام';
     }
   }
 }
@@ -60,8 +63,45 @@ extension ParseEnumExtention on int {
         return OrderDetailsStatus.customerCanceled;
       case 7:
         return OrderDetailsStatus.deliveryCanceled;
+      case 8:
+        return OrderDetailsStatus.readyForPickup;
       default:
-        throw Exception('order details status not recognized');
+        return OrderDetailsStatus.pending;
     }
   }
+}
+
+OrderDetailsStatus parseOrderDetailsStatusSafe(dynamic val) {
+  if (val == null) return OrderDetailsStatus.pending;
+  if (val is OrderDetailsStatus) return val;
+  if (val is int) return val.parseOrderDetailsStatus;
+  if (val is num) return val.toInt().parseOrderDetailsStatus;
+  if (val is String) {
+    final parsed = int.tryParse(val.trim());
+    if (parsed != null) return parsed.parseOrderDetailsStatus;
+    final s = val.trim().toLowerCase();
+    switch (s) {
+      case 'pending':
+        return OrderDetailsStatus.pending;
+      case 'merchantaccepted':
+        return OrderDetailsStatus.merchantAccepted;
+      case 'shipping':
+        return OrderDetailsStatus.shipping;
+      case 'delivered':
+        return OrderDetailsStatus.delivered;
+      case 'merchantrejected':
+        return OrderDetailsStatus.merchantRejected;
+      case 'customerpending':
+        return OrderDetailsStatus.customerPending;
+      case 'customercanceled':
+        return OrderDetailsStatus.customerCanceled;
+      case 'deliverycanceled':
+        return OrderDetailsStatus.deliveryCanceled;
+      case 'readyforpickup':
+        return OrderDetailsStatus.readyForPickup;
+      default:
+        return OrderDetailsStatus.pending;
+    }
+  }
+  return OrderDetailsStatus.pending;
 }

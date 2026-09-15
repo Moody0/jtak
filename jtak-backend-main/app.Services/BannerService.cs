@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using AutoMapper;
@@ -13,6 +13,7 @@ namespace App.Shared.Services
     public interface IBannerService : ISolService<Banner, BannerDto>
     {
         Task<BannerLiteDto[]> GetBanners(BannerLocation location = BannerLocation.HomePage);
+        Task<BannerLiteDto[]> GetAllActiveBanners();
     }
 
     public class BannerService : SolService<Banner, BannerDto>, IBannerService
@@ -28,14 +29,34 @@ namespace App.Shared.Services
         public async Task<BannerLiteDto[]> GetBanners(BannerLocation location = BannerLocation.HomePage) =>
             await _cache.GetValue($"BannerCache_{location}", null,
                 async () => await Repository.Queryable()
-                                            .Where(x=>x.Active)
+                                            .Where(x => x.Active && (x.BannerLocation == location || x.BannerLocation == BannerLocation.All))
+                                            .OrderBy(x => x.Order)
                                             .Select(x => new BannerLiteDto
                                             {
                                                 Id = x.Id,
                                                 Title = x.Title,
                                                 Description = x.Description,
                                                 Url = x.Url,
-                                                FeaturedImage = x.FeaturedImage
+                                                FeaturedImage = x.FeaturedImage,
+                                                Order = x.Order,
+                                                BannerLocation = x.BannerLocation
+                                            })
+                                            .ToArrayAsync());
+
+        public async Task<BannerLiteDto[]> GetAllActiveBanners() =>
+            await _cache.GetValue("BannerCache_AllActive", null,
+                async () => await Repository.Queryable()
+                                            .Where(x => x.Active)
+                                            .OrderBy(x => x.Order)
+                                            .Select(x => new BannerLiteDto
+                                            {
+                                                Id = x.Id,
+                                                Title = x.Title,
+                                                Description = x.Description,
+                                                Url = x.Url,
+                                                FeaturedImage = x.FeaturedImage,
+                                                Order = x.Order,
+                                                BannerLocation = x.BannerLocation
                                             })
                                             .ToArrayAsync());
 

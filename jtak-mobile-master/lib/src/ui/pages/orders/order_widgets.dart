@@ -7,6 +7,7 @@ import '../../../../main_imports.dart';
 import '../../../config/constants/app_constant.dart';
 import '../../../config/themes/colors.dart';
 import '../../../core/enums/order_details_status_enum.dart';
+import '../../../core/data/mock_catalog_data.dart';
 import '../../../core/models/order/order_details_model.dart';
 import '../../../core/models/order/order_model.dart';
 import '../../../utils/custom_widgets/image_widgets.dart';
@@ -92,13 +93,13 @@ class OrderSingleItem extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
 
-                    // Store Name & Order #
+                    // Order # as Primary Title & Store/Date as Subtitle
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            storeName,
+                            'طلب #${item.id ?? ""}',
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 15.5,
                               fontWeight: FontWeight.w800,
@@ -110,24 +111,30 @@ class OrderSingleItem extends StatelessWidget {
                           const SizedBox(height: 2),
                           Row(
                             children: [
-                              Text(
-                                'طلب #${item.id ?? ""}',
-                                style: GoogleFonts.ibmPlexSansArabic(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF64748B),
+                              if (storeName.isNotEmpty &&
+                                  storeName != 'متجر جيتك' &&
+                                  storeName != 'طلب توصيل جيتك') ...[
+                                Text(
+                                  storeName,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                width: 3,
-                                height: 3,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF94A3B8),
-                                  shape: BoxShape.circle,
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 3,
+                                  height: 3,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF94A3B8),
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 6),
+                                const SizedBox(width: 6),
+                              ],
                               Expanded(
                                 child: Text(
                                   _formatDate(item.purchaseDate),
@@ -383,10 +390,18 @@ class OrderSingleItem extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(11),
-              child: ImageView(
-                details[i].productImage?.split(',').first,
-                height: 44,
-                width: 44,
+              child: Builder(
+                builder: (context) {
+                  final raw = details[i].productImage;
+                  final img = (raw != null && raw.trim().isNotEmpty && raw != 'null')
+                      ? raw.split(',').first.trim()
+                      : MockCatalogData.getMenuItemById(details[i].productId ?? 0)?.imageUrl;
+                  return ImageView(
+                    img,
+                    height: 44,
+                    width: 44,
+                  );
+                },
               ),
             ),
           ),
@@ -434,6 +449,12 @@ class OrderSingleItem extends StatelessWidget {
         text = 'قيد التحضير';
         icon = PhosphorIconsFill.clock;
         break;
+      case OrderDetailsStatus.readyForPickup:
+        bg = const Color(0xFFECFDF5);
+        textColor = const Color(0xFF059669);
+        text = 'جاهز للاستلام';
+        icon = PhosphorIconsFill.package;
+        break;
       case OrderDetailsStatus.delivered:
         bg = const Color(0xFFECFDF5);
         textColor = const Color(0xFF059669);
@@ -476,13 +497,44 @@ class OrderSingleItem extends StatelessWidget {
 
   OrderDetailsStatus _getOrderStatus(OrderModel order) {
     if (GlobalVar.checkListNotEmpty(order.orderDetails)) {
-      var status = order.orderDetails!.first.orderDetailStatus ?? OrderDetailsStatus.pending;
-      for (var element in order.orderDetails!) {
-        if ((element.orderDetailStatus?.index ?? 0) < status.index) {
-          status = element.orderDetailStatus ?? OrderDetailsStatus.pending;
-        }
+      final items = order.orderDetails!;
+      if (items.every((e) => e.orderDetailStatus == OrderDetailsStatus.merchantRejected)) {
+        return OrderDetailsStatus.merchantRejected;
       }
-      return status;
+      final allTerminal = items.every((e) =>
+          e.orderDetailStatus == OrderDetailsStatus.merchantRejected ||
+          e.orderDetailStatus == OrderDetailsStatus.customerCanceled ||
+          e.orderDetailStatus == OrderDetailsStatus.deliveryCanceled);
+      if (allTerminal) {
+        if (items.any((e) => e.orderDetailStatus == OrderDetailsStatus.merchantRejected)) {
+          return OrderDetailsStatus.merchantRejected;
+        }
+        if (items.any((e) => e.orderDetailStatus == OrderDetailsStatus.deliveryCanceled)) {
+          return OrderDetailsStatus.deliveryCanceled;
+        }
+        return OrderDetailsStatus.customerCanceled;
+      }
+
+      final activeItems = items.where((e) =>
+          e.orderDetailStatus != OrderDetailsStatus.merchantRejected &&
+          e.orderDetailStatus != OrderDetailsStatus.customerCanceled &&
+          e.orderDetailStatus != OrderDetailsStatus.deliveryCanceled).toList();
+      if (activeItems.isNotEmpty && activeItems.every((e) => e.orderDetailStatus == OrderDetailsStatus.delivered)) {
+        return OrderDetailsStatus.delivered;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.shipping)) {
+        return OrderDetailsStatus.shipping;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.readyForPickup)) {
+        return OrderDetailsStatus.readyForPickup;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.merchantAccepted)) {
+        return OrderDetailsStatus.merchantAccepted;
+      }
+      if (activeItems.any((e) => e.orderDetailStatus == OrderDetailsStatus.customerPending)) {
+        return OrderDetailsStatus.customerPending;
+      }
+      return OrderDetailsStatus.pending;
     }
     return OrderDetailsStatus.pending;
   }
@@ -554,10 +606,18 @@ class OrderDetailsSingleItem extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(11),
-              child: ImageView(
-                item.productImage?.split(',').first,
-                height: 60,
-                width: 60,
+              child: Builder(
+                builder: (context) {
+                  final raw = item.productImage;
+                  final img = (raw != null && raw.trim().isNotEmpty && raw != 'null')
+                      ? raw.split(',').first.trim()
+                      : MockCatalogData.getMenuItemById(item.productId ?? 0)?.imageUrl;
+                  return ImageView(
+                    img,
+                    height: 60,
+                    width: 60,
+                  );
+                },
               ),
             ),
           ),

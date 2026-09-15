@@ -8,6 +8,7 @@ import '../../config/themes/colors.dart';
 import '../../core/controllers/catalog/markets_provider.dart';
 import '../../core/data/mock_catalog_data.dart';
 import 'catalog/restaurant_card_widget.dart';
+import 'clean_shimmer_skeletons.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Nearby Restaurants Section (مطاعم بالقرب منك)
@@ -88,6 +89,9 @@ class JtakNearbyRestaurantsSection extends StatelessWidget {
             child: Builder(
               builder: (context) {
                 final marketsProv = Provider.of<MarketsProvider>(context);
+                if (marketsProv.isLoading && marketsProv.restaurants.isEmpty) {
+                  return _buildLoadingCards();
+                }
                 final restaurants = marketsProv.restaurants.isNotEmpty
                     ? marketsProv.restaurants
                         .map((r) => r.toRestaurantItemData())
@@ -120,6 +124,74 @@ class JtakNearbyRestaurantsSection extends StatelessWidget {
 
         const SizedBox(height: 10),
       ],
+    );
+  }
+
+  Widget _buildLoadingCards() {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: 3,
+      separatorBuilder: (_, __) => const SizedBox(width: 14),
+      itemBuilder: (context, index) {
+        return CleanShimmer(
+          child: Container(
+            width: 250,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFEBEBEF), width: 1.2),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  height: 130,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(17)),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 140,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 90,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 160,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

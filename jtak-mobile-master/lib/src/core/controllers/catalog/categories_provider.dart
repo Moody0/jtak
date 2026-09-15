@@ -3,6 +3,7 @@ import '../../enums/viewstate.dart';
 import '../../services/locator.dart';
 import '../app/base_provider.dart';
 import '../../models/catalog/category_model.dart';
+import 'package:jtek_app/src/core/models/catalog/home_category_tile.dart';
 import '../../../utils/providers/sol_api.dart';
 
 class CategoriesProvider extends BaseProvider<CategoryModel> {
@@ -17,10 +18,6 @@ class CategoriesProvider extends BaseProvider<CategoryModel> {
     'مطاعم': '2026_9_10_6d5b7ddac77344cca57899d237306499.jpg',
     'البقالة': '2026_9_9_b025b708c360481487f839e5f7d5151d.webp',
     'بقالة': '2026_9_9_b025b708c360481487f839e5f7d5151d.webp',
-    'صيدليات': '2026_9_10_91dec2d7e5c84a1f9f7005232bfa1279.jpg',
-    'صيدلية': '2026_9_10_91dec2d7e5c84a1f9f7005232bfa1279.jpg',
-    'المتاجر': '2026_9_10_4f6acb8f06dd4caaa56ce2fc431cb485.jpg',
-    'متاجر': '2026_9_10_4f6acb8f06dd4caaa56ce2fc431cb485.jpg',
     'حلويات ومخابز': '2026_9_10_edb3d6717f7946e09ffe536866a5d15b.jpg',
     'حلويات': '2026_9_10_edb3d6717f7946e09ffe536866a5d15b.jpg',
     'قهوة ومشروبات': '2026_9_9_7849ac5d25364622bb5f05bdefe1d4e9.webp',
@@ -88,12 +85,10 @@ class CategoriesProvider extends BaseProvider<CategoryModel> {
   static List<CategoryModel> get defaultCategories => [
     CategoryModel(id: 191, title: 'المطاعم', icon: '2026_9_10_6d5b7ddac77344cca57899d237306499.jpg', order: 1),
     CategoryModel(id: 110, title: 'البقالة', icon: '2026_9_9_b025b708c360481487f839e5f7d5151d.webp', order: 2),
-    CategoryModel(id: 149, title: 'صيدليات', icon: '2026_9_10_91dec2d7e5c84a1f9f7005232bfa1279.jpg', order: 3),
-    CategoryModel(id: 192, title: 'المتاجر', icon: '2026_9_10_4f6acb8f06dd4caaa56ce2fc431cb485.jpg', order: 4),
-    CategoryModel(id: 122, title: 'حلويات ومخابز', icon: '2026_9_10_edb3d6717f7946e09ffe536866a5d15b.jpg', order: 5),
-    CategoryModel(id: 140, title: 'قهوة ومشروبات', icon: '2026_9_9_7849ac5d25364622bb5f05bdefe1d4e9.webp', order: 6),
-    CategoryModel(id: 107, title: 'خضار وفواكه', icon: '2026_9_9_100a77725ce74b7ab7090c4d00e8197c.webp', order: 7),
-    CategoryModel(id: 167, title: 'لحوم ودواجن', icon: '2026_9_9_bcebb1f48db84e23a93aa322f481216b.webp', order: 8),
+    CategoryModel(id: 122, title: 'حلويات ومخابز', icon: '2026_9_10_edb3d6717f7946e09ffe536866a5d15b.jpg', order: 3),
+    CategoryModel(id: 140, title: 'قهوة ومشروبات', icon: '2026_9_9_7849ac5d25364622bb5f05bdefe1d4e9.webp', order: 4),
+    CategoryModel(id: 107, title: 'خضار وفواكه', icon: '2026_9_9_100a77725ce74b7ab7090c4d00e8197c.webp', order: 5),
+    CategoryModel(id: 167, title: 'لحوم ودواجن', icon: '2026_9_9_bcebb1f48db84e23a93aa322f481216b.webp', order: 6),
   ];
 
   CategoriesProvider() {
@@ -113,17 +108,25 @@ class CategoriesProvider extends BaseProvider<CategoryModel> {
     notifyListeners();
   }
 
+  /// The curated Home grid. Each tile states its own destination, so the grid
+  /// never has to work out where a category leads from its title.
+  List<HomeCategoryTile> homeCategoryTiles = [];
+
+  void setHomeCategoryTiles(List<HomeCategoryTile> tiles) {
+    homeCategoryTiles = tiles.where((tile) => tile.isRoutable).toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    notifyListeners();
+  }
+
   int _getCategoryPriority(CategoryModel cat) {
     if (cat.order != null && cat.order! > 0) return cat.order!;
     final t = (cat.title ?? '').trim();
     if (t == 'المطاعم' || t == 'مطاعم') return 1;
-    if (t == 'البقالة' || t == 'بقالة' || t == 'غذائيات') return 2;
-    if (t.contains('صيدلي') || t.contains('صيدليات')) return 3;
-    if (t == 'المتاجر' || t == 'متاجر') return 4;
-    if (t.contains('حلويات') || t.contains('مخبوزات')) return 5;
-    if (t.contains('قهوة') || t.contains('مشروبات')) return 6;
-    if (t.contains('خضار') || t.contains('فواكه')) return 7;
-    if (t.contains('لحوم') || t.contains('دواجن')) return 8;
+    if (t == 'البقالة' || t == 'بقالة' || t == 'غذائيات' || t.contains('سوبرماركت') || t.contains('ماركت')) return 2;
+    if (t.contains('حلويات') || t.contains('مخبوزات')) return 3;
+    if (t.contains('قهوة') || t.contains('مشروبات')) return 4;
+    if (t.contains('خضار') || t.contains('فواكه')) return 5;
+    if (t.contains('لحوم') || t.contains('دواجن')) return 6;
     return 99 + (cat.id ?? 0);
   }
 
@@ -134,7 +137,10 @@ class CategoriesProvider extends BaseProvider<CategoryModel> {
       if (res is List && res.isNotEmpty) {
         List<CategoryModel> items = [];
         for (var element in res) {
-          items.add(CategoryModel.fromMap(element));
+          final cat = CategoryModel.fromMap(element);
+          final t = (cat.title ?? '').trim();
+          if (t.contains('صيدلي') || t == 'المتاجر' || t == 'متاجر') continue;
+          items.add(cat);
         }
         setCategories(items);
       }

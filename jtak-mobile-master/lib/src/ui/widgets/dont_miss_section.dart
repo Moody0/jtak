@@ -7,11 +7,12 @@ import 'package:provider/provider.dart';
 import '../../config/themes/colors.dart';
 import '../../core/controllers/initial_data_provider.dart';
 import '../../core/models/banner_model.dart';
-import '../../utils/custom_widgets/shimmer.dart';
 import '../../utils/utilities/global_var.dart';
+import 'clean_shimmer_skeletons.dart';
 import '../pages/catalog/market_page.dart';
 import '../pages/catalog/restaurant_menu_page.dart';
 import '../pages/catalog/restaurants_list_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK "Don't Miss" Section (لا تفوتها)
@@ -187,24 +188,26 @@ class _JtakDontMissSectionState extends State<JtakDontMissSection> {
     return _defaultDontMissBanners;
   }
 
-  void _handleTap(BuildContext context, DontMissBannerItem item) {
+  void _handleTap(BuildContext context, DontMissBannerItem item) async {
     if (widget.onBannerTap != null) {
       widget.onBannerTap!();
       return;
     }
 
     final rawUrl = (item.url ?? '').trim();
-    if (rawUrl.isEmpty) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const RestaurantsListPage(initialFilter: 'عروض'),
-        ),
-      );
+    if (rawUrl.isEmpty || rawUrl == 'none' || rawUrl == 'no_link') {
+      return; // Display only
+    }
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      final uri = Uri.tryParse(rawUrl);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
       return;
     }
 
-    // Parse deep-link targets: "merchant:18", "restaurant:8", "market:19"
+    // Parse deep-link targets: "merchant:18", "restaurant:8", "market:19", "offers"
     final cleanUrl = rawUrl.split('#').first.trim();
     if (cleanUrl.startsWith('merchant:') || cleanUrl.startsWith('market:')) {
       final idStr = cleanUrl.split(':').last;
@@ -236,6 +239,14 @@ class _JtakDontMissSectionState extends State<JtakDontMissSection> {
         );
         return;
       }
+    } else if (cleanUrl == 'offers' || cleanUrl == 'promotions') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const RestaurantsListPage(initialFilter: 'عروض'),
+        ),
+      );
+      return;
     }
 
     // Fallback: Open promotional catalog
@@ -352,13 +363,9 @@ class _JtakDontMissSectionState extends State<JtakDontMissSection> {
                   height: height,
                   fadeInDuration: const Duration(milliseconds: 220),
                   fadeOutDuration: const Duration(milliseconds: 150),
-                  placeholder: (context, url) => Shimmer.fromColors(
-                    baseColor: const Color(0xFFF1F5F9),
-                    highlightColor: const Color(0xFFF8FAFC),
-                    child: Container(
-                      width: double.infinity,
-                      height: height,
-                      color: const Color(0xFFF1F5F9),
+                  placeholder: (context, url) => const CleanShimmer(
+                    child: SizedBox.expand(
+                      child: ColoredBox(color: Colors.white),
                     ),
                   ),
                   errorWidget: (context, url, error) => Container(
