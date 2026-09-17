@@ -335,7 +335,7 @@ WHERE `MerchantId` = 12
 -- ------------------------------------------------------------------------------
 -- 10. Record EF Core Migration History
 -- ------------------------------------------------------------------------------
-INSERT IGNORE INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`) VALUES
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`) VALUES
 ('20220114132548_AppInit', '6.0.12'),
 ('20220120122434_addedBanners', '6.0.12'),
 ('20220123111100_removedUnusedPropertiesFromAppUser', '6.0.12'),
@@ -375,7 +375,8 @@ INSERT IGNORE INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`) VAL
 ('20260911120259_AddDoubleEntryLedgerTables', '6.0.12'),
 ('20260915071938_AddSettlementRequestWorkflow', '6.0.12'),
 ('20260915080246_EnforceLedgerIdempotency', '6.0.12'),
-('20260915123000_AddUniqueConstraintToBillOrderIdMerchantId', '6.0.12');
+('20260915123000_AddUniqueConstraintToBillOrderIdMerchantId', '6.0.12')
+ON DUPLICATE KEY UPDATE `ProductVersion` = VALUES(`ProductVersion`);
 
 SET FOREIGN_KEY_CHECKS = 1;
 
