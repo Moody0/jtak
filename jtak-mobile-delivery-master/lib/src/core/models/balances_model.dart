@@ -51,20 +51,32 @@ class BalancesModel {
   }
 
   factory BalancesModel.fromMap(Map<String, dynamic> map) {
+    final rawMaxCashFloat = map['maxCashFloat'] ?? map['maxCashLimit'];
+    final parsedMaxCashFloat = rawMaxCashFloat is num
+        ? rawMaxCashFloat.toDouble()
+        : double.tryParse(rawMaxCashFloat?.toString() ?? '');
+
     return BalancesModel(
       id: map['id']?.toString(),
-      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
-      pendingAmount: (map['pendingAmount'] as num?)?.toDouble() ?? 0.0,
-      maxCashFloat: (map['maxCashFloat'] ?? map['maxCashLimit'] as num?)?.toDouble() ?? 5000.0,
-      availableAmount: (map['availableAmount'] as num?)?.toDouble(),
-      hasPendingSettlement: map['hasPendingSettlement'] == true || ((map['pendingAmount'] as num?)?.toDouble() ?? 0) > 0,
+      amount: _readAmount(map['amount']),
+      pendingAmount: _readAmount(map['pendingAmount']),
+      maxCashFloat: parsedMaxCashFloat ?? 5000.0,
+      availableAmount: _readAmount(map['availableAmount']),
+      hasPendingSettlement: map['hasPendingSettlement'] == true ||
+          (_readAmount(map['pendingAmount']) ?? 0) > 0,
       createdDate: map['createdDate']?.toString(),
     );
   }
 
+  static double? _readAmount(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
   String toJson() => json.encode(toMap());
 
-  factory BalancesModel.fromJson(String source) => BalancesModel.fromMap(json.decode(source));
+  factory BalancesModel.fromJson(String source) =>
+      BalancesModel.fromMap(json.decode(source));
 
   @override
   String toString() {
@@ -84,6 +96,9 @@ class BalancesModel {
 
   @override
   int get hashCode {
-    return id.hashCode ^ amount.hashCode ^ pendingAmount.hashCode ^ createdDate.hashCode;
+    return id.hashCode ^
+        amount.hashCode ^
+        pendingAmount.hashCode ^
+        createdDate.hashCode;
   }
 }

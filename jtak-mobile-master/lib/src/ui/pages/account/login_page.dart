@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/user/user_provider.dart';
+import '../../../core/services/authentication_service.dart';
+import '../../../core/services/locator.dart';
 import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/custom_widgets/messages.dart';
@@ -60,7 +62,8 @@ class _LoginPageState extends State<LoginPage> {
               inAsyncCall: userProvider.isBusy,
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -72,7 +75,8 @@ class _LoginPageState extends State<LoginPage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+                        border: Border.all(
+                            color: const Color(0xFFE2E8F0), width: 1.1),
                       ),
                       child: Form(
                         key: _formKey,
@@ -94,16 +98,19 @@ class _LoginPageState extends State<LoginPage> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+                                border: Border.all(
+                                    color: const Color(0xFFE2E8F0), width: 1.0),
                               ),
                               child: Row(
                                 children: [
                                   // Syrian Flag & Dial Code (+963)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 12),
                                     decoration: const BoxDecoration(
                                       border: Border(
-                                        left: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                                        left: BorderSide(
+                                            color: Color(0xFFE2E8F0), width: 1),
                                       ),
                                     ),
                                     child: Row(
@@ -139,16 +146,20 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                                       decoration: InputDecoration(
                                         hintText: '09xx xxx xxx',
-                                        hintStyle: GoogleFonts.ibmPlexSansArabic(
+                                        hintStyle:
+                                            GoogleFonts.ibmPlexSansArabic(
                                           color: const Color(0xFF94A3B8),
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
                                         ),
                                         border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 14, vertical: 12),
                                       ),
                                       validator: (value) {
-                                        if (value == null || value.trim().isEmpty) {
+                                        if (value == null ||
+                                            value.trim().isEmpty) {
                                           return 'يرجى إدخال رقم الهاتف';
                                         }
                                         if (value.trim().length < 8) {
@@ -248,7 +259,10 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
         if (res is bool && res && mounted) {
-          Navigator.pop(context, true);
+          final authService = locator<AuthenticationService>();
+          if (authService.isLogin() && authService.hasCompletedProfile) {
+            Navigator.pop(context, true);
+          }
         }
       } catch (err) {
         if (mounted) {

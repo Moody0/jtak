@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/themes/colors.dart';
 import '../../core/controllers/order_provider.dart';
+import '../widgets/app_widgets.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Delivery Bottom Navigation Bar (Animated Brand Harmony with PhosphorIcons)
@@ -70,10 +71,14 @@ class DeliveryBottomNavigation extends StatelessWidget {
                 height: pillHeight,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFFFF0E8),
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFFFF0E8),
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF475569) : const Color(0xFFFFD6C2),
+                      color: isDark
+                          ? const Color(0xFF475569)
+                          : const Color(0xFFFFD6C2),
                       width: 0.9,
                     ),
                   ),
@@ -171,11 +176,12 @@ class DeliveryBottomNavigation extends StatelessWidget {
                     curve: Curves.easeOutBack,
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
-                      child: Icon(
+                      child: HomeMirroredIcon(
                         isActive ? activeIcon : inactiveIcon,
                         key: ValueKey<bool>(isActive),
                         size: 22,
-                        color: isActive ? kPrimaryOrange : const Color(0xFF64748B),
+                        color:
+                            isActive ? kPrimaryOrange : const Color(0xFF64748B),
                       ),
                     ),
                   ),
@@ -186,13 +192,15 @@ class DeliveryBottomNavigation extends StatelessWidget {
                       top: -4,
                       right: -8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: kPrimaryOrange,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints:
+                            const BoxConstraints(minWidth: 16, minHeight: 16),
                         child: Center(
                           child: Text(
                             '$badgeCount',

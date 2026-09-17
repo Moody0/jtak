@@ -79,8 +79,10 @@ class _CheckOutPageState extends State<CheckOutPage> {
     return TextFormField(
       initialValue: provider.cartInfo.name,
       keyboardType: TextInputType.name,
-      decoration: AppTheme.getBorderdTextFieldDecoration(lable: str.formAndAction.name),
-      validator: (value) => ValidationUtil.stringLengthValidation(value, str.msg.pleaseAddFullName),
+      decoration:
+          AppTheme.getBorderdTextFieldDecoration(lable: str.formAndAction.name),
+      validator: (value) => ValidationUtil.stringLengthValidation(
+          value, str.msg.pleaseAddFullName),
       onChanged: (value) {
         provider.cartInfo.name = value.trim();
       },
@@ -91,8 +93,10 @@ class _CheckOutPageState extends State<CheckOutPage> {
     return TextFormField(
       initialValue: provider.cartInfo.address,
       keyboardType: TextInputType.text,
-      decoration: AppTheme.getBorderdTextFieldDecoration(lable: str.formAndAction.address),
-      validator: (value) => ValidationUtil.stringLengthValidation(value, str.msg.pleaseAddAddress),
+      decoration: AppTheme.getBorderdTextFieldDecoration(
+          lable: str.formAndAction.address),
+      validator: (value) => ValidationUtil.stringLengthValidation(
+          value, str.msg.pleaseAddAddress),
       onChanged: (value) {
         provider.cartInfo.address = value.trim();
       },
@@ -112,7 +116,9 @@ class _CheckOutPageState extends State<CheckOutPage> {
   Widget _bottomSection(BuildContext context) {
     return SafeArea(
       child: Container(
-        decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1))),
+        decoration: BoxDecoration(
+            border:
+                Border(top: BorderSide(color: Colors.grey.shade300, width: 1))),
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
@@ -126,7 +132,10 @@ class _CheckOutPageState extends State<CheckOutPage> {
                     : () async {
                         try {
                           if (formKey.currentState?.validate() ?? false) {
-                            if (locator<AuthenticationService>().isLogin()) {
+                            final authService =
+                                locator<AuthenticationService>();
+                            if (authService.isLogin() &&
+                                authService.hasCompletedProfile) {
                               context.navigateName(OrderPaymentPage.routeName);
                             } else {
                               await quickRegisterByPhoneNumber();
@@ -134,7 +143,10 @@ class _CheckOutPageState extends State<CheckOutPage> {
                           }
                         } catch (err) {
                           provider.setState(ViewState.idle);
-                          showDialog(context: context, builder: (context) => CustomDialog(message: err.toString()));
+                          showDialog(
+                              context: context,
+                              builder: (context) =>
+                                  CustomDialog(message: err.toString()));
                         }
                       },
               ),
@@ -147,11 +159,17 @@ class _CheckOutPageState extends State<CheckOutPage> {
 
   Future<void> quickRegisterByPhoneNumber() async {
     provider.setState(ViewState.busy);
-    await UserProvider().registerOrSignInByPhoneNumber(provider.cartInfo.phoneNumber.toString());
+    await UserProvider().registerOrSignInByPhoneNumber(
+        provider.cartInfo.phoneNumber.toString());
     provider.setState(ViewState.idle);
     context.showSnakBar(str.msg.smsCodeSend);
-    var res = await context.navigateName(PhoneCodePage.routeName, data: provider.cartInfo.phoneNumber.toString());
-    if (res is bool && res) {
+    var res = await context.navigateName(PhoneCodePage.routeName,
+        data: provider.cartInfo.phoneNumber.toString());
+    final authService = locator<AuthenticationService>();
+    if (res is bool &&
+        res &&
+        authService.isLogin() &&
+        authService.hasCompletedProfile) {
       provider.setState(ViewState.busy);
       context.navigateName(OrderPaymentPage.routeName);
     }

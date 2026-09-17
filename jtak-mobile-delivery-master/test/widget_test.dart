@@ -4,33 +4,63 @@ import 'package:app_jtak_delivery/src/core/models/order_model.dart';
 import 'package:app_jtak_delivery/src/core/models/merchant_order_details.dart';
 import 'package:app_jtak_delivery/src/core/enums/order_details_status_enum.dart';
 import 'package:app_jtak_delivery/src/core/enums/payment_method_enum.dart';
+import 'package:app_jtak_delivery/src/core/models/balances_model.dart';
 
 void main() {
   group('PhoneHelper - Syrian Phone & WhatsApp Normalization', () {
     test('Converts Eastern Arabic and Persian numerals to Western digits', () {
       expect(PhoneHelper.cleanDigits('٠٩٣٣١٢٣٤٥٦'), equals('0933123456'));
       expect(PhoneHelper.cleanDigits('۰۹۸۷۶۵۴۳۲۱'), equals('0987654321'));
-      expect(PhoneHelper.cleanDigits('+٩٦٣ (٩٣٣) ١٢-٣٤-٥٦'), equals('+963933123456'));
+      expect(PhoneHelper.cleanDigits('+٩٦٣ (٩٣٣) ١٢-٣٤-٥٦'),
+          equals('+963933123456'));
     });
 
     test('Strips non-phone characters correctly', () {
-      expect(PhoneHelper.cleanDigits('  +963 933 123 456  '), equals('+963933123456'));
+      expect(PhoneHelper.cleanDigits('  +963 933 123 456  '),
+          equals('+963933123456'));
       expect(PhoneHelper.cleanDigits('0933-123-456'), equals('0933123456'));
       expect(PhoneHelper.cleanDigits(null), equals(''));
     });
 
     test('Formats Syrian local numbers for WhatsApp (wa.me/9639...)', () {
-      expect(PhoneHelper.formatForWhatsApp('0985615705'), equals('963985615705'));
-      expect(PhoneHelper.formatForWhatsApp('985615705'), equals('963985615705'));
-      expect(PhoneHelper.formatForWhatsApp('+963985615705'), equals('963985615705'));
-      expect(PhoneHelper.formatForWhatsApp('00963985615705'), equals('963985615705'));
-      expect(PhoneHelper.formatForWhatsApp('٠٩٨٥٦١٥٧٠٥'), equals('963985615705'));
+      expect(
+          PhoneHelper.formatForWhatsApp('0985615705'), equals('963985615705'));
+      expect(
+          PhoneHelper.formatForWhatsApp('985615705'), equals('963985615705'));
+      expect(PhoneHelper.formatForWhatsApp('+963985615705'),
+          equals('963985615705'));
+      expect(PhoneHelper.formatForWhatsApp('00963985615705'),
+          equals('963985615705'));
+      expect(
+          PhoneHelper.formatForWhatsApp('٠٩٨٥٦١٥٧٠٥'), equals('963985615705'));
     });
 
     test('Formats Syrian phone numbers for direct tel: dialing', () {
-      expect(PhoneHelper.formatForCalling('0985615705'), equals('tel:0985615705'));
-      expect(PhoneHelper.formatForCalling('+963985615705'), equals('tel:+963985615705'));
-      expect(PhoneHelper.formatForCalling('٠٩٨٥٦١٥٧٠٥'), equals('tel:0985615705'));
+      expect(
+          PhoneHelper.formatForCalling('0985615705'), equals('tel:0985615705'));
+      expect(PhoneHelper.formatForCalling('+963985615705'),
+          equals('tel:+963985615705'));
+      expect(
+          PhoneHelper.formatForCalling('٠٩٨٥٦١٥٧٠٥'), equals('tel:0985615705'));
+    });
+  });
+
+  group('BalancesModel - Money API parsing', () {
+    test('parses numeric and string amounts without losing available custody',
+        () {
+      final balances = BalancesModel.fromMap({
+        'amount': '125000.50',
+        'pendingAmount': 25000,
+        'availableAmount': '100000.50',
+        'maxCashFloat': 500000,
+        'hasPendingSettlement': true,
+      });
+
+      expect(balances.amount, 125000.50);
+      expect(balances.pendingAmount, 25000.0);
+      expect(balances.availableAmount, 100000.50);
+      expect(balances.maxCashFloat, 500000.0);
+      expect(balances.hasPendingSettlement, isTrue);
     });
   });
 
@@ -58,7 +88,8 @@ void main() {
       expect(order.isCod, isTrue);
     });
 
-    test('Order with all items in shipping state enables customer drop-off PoD', () {
+    test('Order with all items in shipping state enables customer drop-off PoD',
+        () {
       final order = OrderModel(
         id: 102,
         address: 'Damascus, Malki',
@@ -80,7 +111,9 @@ void main() {
       expect(order.isCod, isFalse); // Credit card is prepaid
     });
 
-    test('Multi-merchant order requires ALL active stores picked up before customer delivery', () {
+    test(
+        'Multi-merchant order requires ALL active stores picked up before customer delivery',
+        () {
       final order = OrderModel(
         id: 103,
         address: 'Damascus, Abu Rummaneh',
@@ -94,7 +127,8 @@ void main() {
           MerchentOrderDetailsModel(
             merchantId: 2,
             merchantTitle: 'Sweet Shop',
-            orderDetailStatus: OrderDetailsStatus.readyForPickup, // Store 2 still waiting
+            orderDetailStatus:
+                OrderDetailsStatus.readyForPickup, // Store 2 still waiting
           ),
         ],
       );
@@ -107,7 +141,9 @@ void main() {
       expect(order.deliveryStatus, equals(OrderDetailsStatus.readyForPickup));
     });
 
-    test('Multi-merchant order enables delivery once all merchants are picked up', () {
+    test(
+        'Multi-merchant order enables delivery once all merchants are picked up',
+        () {
       final order = OrderModel(
         id: 104,
         address: 'Damascus, Abu Rummaneh',

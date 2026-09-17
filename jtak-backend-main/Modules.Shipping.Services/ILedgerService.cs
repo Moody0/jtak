@@ -12,6 +12,7 @@ namespace Modules.Accounting.Services
         Task<Account> GetOrCreateSystemAccountAsync(string accountCode, string accountName, AccountType type, string currency = "SYP");
         Task<JournalTransactionDto> PostTransactionAsync(PostTransactionRequest request);
         Task<JournalTransactionDto> PostOrderDeliveredSplitAsync(OrderDeliveredSplitRequest request);
+        Task<JournalTransactionDto> PostCaptainCashHandoverAsync(Guid captainUserId, decimal amount, string referenceId, string captainName = null, string currency = "SYP");
         Task<JournalTransactionDto> PostOrderCancellationReversalAsync(int orderId, string reason);
         Task<decimal> GetAccountBalanceAsync(Guid accountId);
         Task<decimal> GetUserCashFloatBalanceAsync(Guid captainUserId, string currency = "SYP");

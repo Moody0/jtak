@@ -64,7 +64,9 @@ class NoDataAvailableWidget extends StatelessWidget {
                 color: isDark ? const Color(0xFF1E293B) : kSurfaceWarm,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : kPrimaryOrange.withOpacity(0.2),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : kPrimaryOrange.withOpacity(0.2),
                   width: 1.5,
                 ),
               ),
@@ -78,7 +80,8 @@ class NoDataAvailableWidget extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              msg ?? (isArabic ? 'لا توجد طلبات حالياً' : 'No orders available'),
+              msg ??
+                  (isArabic ? 'لا توجد طلبات حالياً' : 'No orders available'),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -104,13 +107,16 @@ class NoDataAvailableWidget extends StatelessWidget {
               const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: onRetry,
-                icon: const AppIcon(PhosphorIcons.arrowsClockwiseBold, size: 16),
+                icon:
+                    const AppIcon(PhosphorIcons.arrowsClockwiseBold, size: 16),
                 label: Text(isArabic ? 'تحديث' : 'Refresh'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: kPrimaryOrange,
                   side: const BorderSide(color: kPrimaryOrange, width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 ),
               ),
             ],
@@ -145,6 +151,40 @@ class AppIcon extends StatelessWidget {
       color: color,
       semanticLabel: semanticLabel,
       textDirection: TextDirection.ltr,
+    );
+  }
+}
+
+/// Horizontally mirrors an icon for the delivery work surfaces. This is kept
+/// separate from AppIcon so the rest of the app can retain its existing icon
+/// orientation.
+class HomeMirroredIcon extends StatelessWidget {
+  final IconData? icon;
+  final double? size;
+  final Color? color;
+  final String? semanticLabel;
+
+  const HomeMirroredIcon(
+    this.icon, {
+    Key? key,
+    this.size,
+    this.color,
+    this.semanticLabel,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    if (icon == null) return const SizedBox.shrink();
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.diagonal3Values(-1.0, 1.0, 1.0),
+      child: Icon(
+        icon,
+        size: size,
+        color: color,
+        semanticLabel: semanticLabel,
+        textDirection: TextDirection.ltr,
+      ),
     );
   }
 }

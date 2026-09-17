@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -15,7 +16,7 @@ import '../../core/services/location_service.dart';
 
 class IncomingOrderModal extends StatefulWidget {
   final OrderModel order;
-  final VoidCallback onAccept;
+  final Future<void> Function() onAccept;
   final VoidCallback onDismiss;
 
   const IncomingOrderModal({
@@ -36,7 +37,8 @@ class IncomingOrderModal extends StatefulWidget {
           order: order,
           onAccept: () async {
             final prov = Provider.of<OrderProvider>(context, listen: false);
-            final isAvailable = prov.availableOrders.any((a) => a.id == order.id);
+            final isAvailable =
+                prov.availableOrders.any((a) => a.id == order.id);
             if (isAvailable && order.id != null) {
               await prov.claimOrder(order.id!);
             }
@@ -46,7 +48,8 @@ class IncomingOrderModal extends StatefulWidget {
             }
           },
           onDismiss: () {
-            Provider.of<OrderProvider>(context, listen: false).dismissIncomingOrderAlert();
+            Provider.of<OrderProvider>(context, listen: false)
+                .dismissIncomingOrderAlert();
             if (Navigator.of(ctx).canPop()) {
               Navigator.of(ctx).pop();
             }
@@ -73,6 +76,7 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
   Timer? _timer;
   late AnimationController _pulseController;
   LatLng? _driverLocation;
+  bool _isAccepting = false;
 
   @override
   void initState() {
@@ -111,7 +115,8 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
 
   String _formatCurrency(double? amount) {
     if (amount == null) return '0';
-    final rounded = amount.toStringAsFixed(amount.truncateToDouble() == amount ? 0 : 2);
+    final rounded =
+        amount.toStringAsFixed(amount.truncateToDouble() == amount ? 0 : 2);
     return rounded.replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',
@@ -126,6 +131,28 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
       }
     } catch (_) {
       // Best-effort only: falls back to showing no distance/ETA.
+    }
+  }
+
+  Future<void> _acceptOrder() async {
+    if (_isAccepting) return;
+    setState(() => _isAccepting = true);
+    try {
+      await widget.onAccept();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('Exception: ', '').trim(),
+            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: kRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isAccepting = false);
     }
   }
 
@@ -159,9 +186,10 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
     final merchantTitle = (firstMerchant?.merchantTitle?.isNotEmpty ?? false)
         ? firstMerchant!.merchantTitle!
         : (isArabic ? 'متجر غير معروف' : 'Unknown merchant');
-    final merchantAddress = (firstMerchant?.merchantAddress?.isNotEmpty ?? false)
-        ? firstMerchant!.merchantAddress!
-        : (isArabic ? 'العنوان غير متوفر' : 'Address unavailable');
+    final merchantAddress =
+        (firstMerchant?.merchantAddress?.isNotEmpty ?? false)
+            ? firstMerchant!.merchantAddress!
+            : (isArabic ? 'العنوان غير متوفر' : 'Address unavailable');
     final customerAddress = (widget.order.address?.isNotEmpty ?? false)
         ? widget.order.address!
         : (isArabic ? 'العنوان غير متوفر' : 'Address unavailable');
@@ -183,11 +211,14 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
 
     final priceFormatted = _formatCurrency(widget.order.price);
     final distanceKm = _distanceToPickupKm();
-    final distanceFormatted =
-        distanceKm != null ? '${distanceKm.toStringAsFixed(1)} ${isArabic ? 'كم' : 'km'}' : '-- ${isArabic ? 'كم' : 'km'}';
+    final distanceFormatted = distanceKm != null
+        ? '${distanceKm.toStringAsFixed(1)} ${isArabic ? 'كم' : 'km'}'
+        : '-- ${isArabic ? 'كم' : 'km'}';
     // Estimated at a conservative average moped speed (no routing/ETA backend exists yet).
     const averageSpeedKmh = 25;
-    final etaMinutes = distanceKm != null ? (distanceKm / averageSpeedKmh * 60).ceil().clamp(1, 999) : null;
+    final etaMinutes = distanceKm != null
+        ? (distanceKm / averageSpeedKmh * 60).ceil().clamp(1, 999)
+        : null;
     final etaFormatted = etaMinutes != null
         ? (isArabic ? '$etaMinutes دقيقة' : '$etaMinutes mins')
         : (isArabic ? '-- دقيقة' : '-- mins');
@@ -203,7 +234,8 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
             borderRadius: BorderRadius.circular(26),
             boxShadow: [
               BoxShadow(
-                color: (isUrgent ? kRed : kPrimaryOrange).withValues(alpha: 0.22),
+                color:
+                    (isUrgent ? kRed : kPrimaryOrange).withValues(alpha: 0.22),
                 blurRadius: 36,
                 spreadRadius: 2,
                 offset: const Offset(0, 10),
@@ -235,18 +267,23 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                       Row(
                         children: [
                           ScaleTransition(
-                            scale: Tween<double>(begin: 0.92, end: 1.08).animate(_pulseController),
+                            scale: Tween<double>(begin: 0.92, end: 1.08)
+                                .animate(_pulseController),
                             child: Container(
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
                                 color: isUrgent
-                                    ? (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2))
+                                    ? (isDark
+                                        ? const Color(0xFF7F1D1D)
+                                        : const Color(0xFFFEE2E2))
                                     : const Color(0xFFFFF0E8),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                isUrgent ? PhosphorIcons.warningBold : PhosphorIcons.mopedBold,
+                                isUrgent
+                                    ? PhosphorIcons.warningBold
+                                    : PhosphorIcons.mopedBold,
                                 color: isUrgent ? kRed : kPrimaryOrange,
                                 size: 24,
                               ),
@@ -266,7 +303,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                                 ),
                               ),
                               Text(
-                                widget.order.id != null ? '#${widget.order.id}' : '',
+                                widget.order.id != null
+                                    ? '#${widget.order.id}'
+                                    : '',
                                 style: GoogleFonts.ibmPlexSansArabic(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -280,14 +319,19 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
 
                       // Countdown Circle Pill
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: isUrgent
                               ? const Color(0xFFFEF2F2)
-                              : (isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC)),
+                              : (isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFF8FAFC)),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isUrgent ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0),
+                            color: isUrgent
+                                ? const Color(0xFFFECACA)
+                                : const Color(0xFFE2E8F0),
                           ),
                         ),
                         child: Row(
@@ -326,10 +370,14 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      color: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
                       ),
                     ),
                     child: Column(
@@ -345,7 +393,8 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFF0E8),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFFFD4C0)),
+                                border:
+                                    Border.all(color: const Color(0xFFFFD4C0)),
                               ),
                               child: const Icon(
                                 PhosphorIcons.storefrontBold,
@@ -375,7 +424,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                                           style: GoogleFonts.ibmPlexSansArabic(
                                             fontSize: 13.5,
                                             fontWeight: FontWeight.w800,
-                                            color: isDark ? Colors.white : kCharcoalDark,
+                                            color: isDark
+                                                ? Colors.white
+                                                : kCharcoalDark,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -401,9 +452,12 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
 
                         // Route Connecting Line
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 2),
                           child: Align(
-                            alignment: isArabic ? Alignment.centerRight : Alignment.centerLeft,
+                            alignment: isArabic
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
                             child: Container(
                               margin: EdgeInsets.only(
                                 right: isArabic ? 1 : 0,
@@ -430,7 +484,8 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                               decoration: BoxDecoration(
                                 color: const Color(0xFFECFDF5),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFA7F3D0)),
+                                border:
+                                    Border.all(color: const Color(0xFFA7F3D0)),
                               ),
                               child: const Icon(
                                 PhosphorIcons.mapPinBold,
@@ -456,13 +511,18 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                                       const SizedBox(width: 6),
                                       Expanded(
                                         child: Text(
-                                          widget.order.user != null && widget.order.user!.isNotEmpty
+                                          widget.order.user != null &&
+                                                  widget.order.user!.isNotEmpty
                                               ? widget.order.user!
-                                              : (isArabic ? 'العميل' : 'Customer'),
+                                              : (isArabic
+                                                  ? 'العميل'
+                                                  : 'Customer'),
                                           style: GoogleFonts.ibmPlexSansArabic(
                                             fontSize: 13.5,
                                             fontWeight: FontWeight.w800,
-                                            color: isDark ? Colors.white : kCharcoalDark,
+                                            color: isDark
+                                                ? Colors.white
+                                                : kCharcoalDark,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -538,43 +598,59 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
 
                   // 4. Products / Items Preview & Payment Method Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      color: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(PhosphorIcons.receiptBold, size: 16, color: kCharcoalMuted),
+                        const Icon(PhosphorIcons.receiptBold,
+                            size: 16, color: kCharcoalMuted),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             itemNames.isNotEmpty
                                 ? '${totalItemCount > 0 ? '$totalItemCount منتجات: ' : ''}${itemNames.take(2).join('، ')}${itemNames.length > 2 ? ' ...' : ''}'
-                                : (isArabic ? 'مجموعة منتجات طازجة' : 'Fresh items bundle'),
+                                : (isArabic
+                                    ? 'مجموعة منتجات طازجة'
+                                    : 'Fresh items bundle'),
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFCBD5E1) : kCharcoalDark,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : kCharcoalDark,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF0E8),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            widget.order.paymentMethod == PaymentMethod.payOnDelivery ||
+                            widget.order.paymentMethod ==
+                                        PaymentMethod.payOnDelivery ||
                                     widget.order.paymentMethod == null
-                                ? (isArabic ? 'الدفع نقداً' : 'Cash on Delivery')
-                                : (isArabic ? 'محفظة إلكترونية' : 'Digital Wallet'),
+                                ? (isArabic
+                                    ? 'الدفع نقداً'
+                                    : 'Cash on Delivery')
+                                : (isArabic
+                                    ? 'محفظة إلكترونية'
+                                    : 'Digital Wallet'),
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w800,
@@ -595,11 +671,14 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                       Expanded(
                         flex: 3,
                         child: OutlinedButton(
-                          onPressed: widget.onDismiss,
+                          onPressed: _isAccepting ? null : widget.onDismiss,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: isDark ? Colors.white70 : kCharcoalMuted,
+                            foregroundColor:
+                                isDark ? Colors.white70 : kCharcoalMuted,
                             side: BorderSide(
-                              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                              color: isDark
+                                  ? const Color(0xFF475569)
+                                  : const Color(0xFFCBD5E1),
                               width: 1.2,
                             ),
                             shape: RoundedRectangleBorder(
@@ -612,7 +691,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w700,
-                              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMedium,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : kCharcoalMedium,
                             ),
                           ),
                         ),
@@ -624,14 +705,27 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                       Expanded(
                         flex: 7,
                         child: ElevatedButton.icon(
-                          onPressed: widget.onAccept,
-                          icon: const Icon(
-                            PhosphorIcons.checkCircleBold,
-                            size: 20,
-                            color: Colors.white,
-                          ),
+                          onPressed: _isAccepting ? null : _acceptOrder,
+                          icon: _isAccepting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  PhosphorIcons.checkCircleBold,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
                           label: Text(
-                            isArabic ? 'قبول الطلب' : 'Accept Order',
+                            _isAccepting
+                                ? (isArabic
+                                    ? 'جارٍ استلام الطلب...'
+                                    : 'Receiving order...')
+                                : (isArabic ? 'استلام الطلب' : 'Receive order'),
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 15.5,
                               fontWeight: FontWeight.w800,

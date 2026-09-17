@@ -23,7 +23,9 @@ class _TransactionPageState extends State<TransactionPage> {
 
   @override
   void initState() {
-    Future.microtask(() => Provider.of<TransactionsProvider>(context, listen: false).loadBalances());
+    Future.microtask(() =>
+        Provider.of<TransactionsProvider>(context, listen: false)
+            .loadBalances());
     super.initState();
   }
 
@@ -47,10 +49,13 @@ class _TransactionPageState extends State<TransactionPage> {
               children: [
                 Row(
                   children: [
-                    const AppIcon(PhosphorIcons.receiptBold, size: 18, color: kPrimaryOrange),
+                    const AppIcon(PhosphorIcons.receiptBold,
+                        size: 18, color: kPrimaryOrange),
                     const SizedBox(width: 8),
                     Text(
-                      isArabic ? 'سجل الدفعات والتحويلات' : 'Payment & Transfer History',
+                      isArabic
+                          ? 'سجل الدفعات والتحويلات'
+                          : 'Payment & Transfer History',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -66,17 +71,24 @@ class _TransactionPageState extends State<TransactionPage> {
                   },
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Row(
                       children: [
-                        AppIcon(PhosphorIcons.arrowsClockwiseBold, size: 14, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
+                        AppIcon(PhosphorIcons.arrowsClockwiseBold,
+                            size: 14,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : kCharcoalMuted),
                         const SizedBox(width: 4),
                         Text(
                           isArabic ? 'تحديث' : 'Refresh',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : kCharcoalMuted,
                           ),
                         ),
                       ],
@@ -100,7 +112,11 @@ class _TransactionPageState extends State<TransactionPage> {
 
   Widget _buildBalanceHero(BuildContext context, bool isDark, bool isArabic) {
     final balance = provider.balances.amount ?? 0.0;
-    final double maxCashFloat = provider.balances.maxCashFloat ?? 5000.0; // 5k SYP custody limit (#27)
+    final pendingAmount = provider.balances.pendingAmount ?? 0.0;
+    final availableAmount = provider.balances.availableAmount ??
+        (balance - pendingAmount).clamp(0.0, double.infinity);
+    final double maxCashFloat =
+        provider.balances.maxCashFloat ?? 5000.0; // 5k SYP custody limit (#27)
     final rawRatio = maxCashFloat > 0 ? (balance.abs() / maxCashFloat) : 0.0;
     final floatRatio = rawRatio.clamp(0.0, 1.0);
     final percent = (rawRatio * 100).toInt();
@@ -115,7 +131,11 @@ class _TransactionPageState extends State<TransactionPage> {
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isCritical ? kRed : (isWarning ? kAmber : (isDark ? const Color(0xFF334155) : kCardBorderColor)),
+          color: isCritical
+              ? kRed
+              : (isWarning
+                  ? kAmber
+                  : (isDark ? const Color(0xFF334155) : kCardBorderColor)),
           width: (isCritical || isWarning) ? 1.5 : 1.1,
         ),
       ),
@@ -131,7 +151,9 @@ class _TransactionPageState extends State<TransactionPage> {
                   color: isDark ? const Color(0xFF334155) : kSurfaceWarm,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF475569) : kPrimaryOrange.withValues(alpha: 0.25),
+                    color: isDark
+                        ? const Color(0xFF475569)
+                        : kPrimaryOrange.withValues(alpha: 0.25),
                     width: 1.2,
                   ),
                 ),
@@ -149,11 +171,14 @@ class _TransactionPageState extends State<TransactionPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isArabic ? 'الرصيد المستحق للسائق' : 'Driver Balance Due',
+                      isArabic
+                          ? 'العهدة النقدية الحالية'
+                          : 'Cash currently in custody',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+                        color:
+                            isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -168,7 +193,29 @@ class _TransactionPageState extends State<TransactionPage> {
           ),
 
           const SizedBox(height: 16),
-          Divider(height: 1, color: isDark ? const Color(0xFF334155) : kBorderColor),
+          Divider(
+              height: 1,
+              color: isDark ? const Color(0xFF334155) : kBorderColor),
+          const SizedBox(height: 14),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _balanceBreakdown(
+                isArabic ? 'المتاح للتسوية' : 'Available to settle',
+                availableAmount,
+                isDark,
+                isArabic,
+              ),
+              if (pendingAmount > 0)
+                _balanceBreakdown(
+                  isArabic ? 'قيد المراجعة' : 'Pending review',
+                  pendingAmount,
+                  isDark,
+                  isArabic,
+                ),
+            ],
+          ),
           const SizedBox(height: 14),
 
           // Cash Float Limit Progress Bar
@@ -184,7 +231,9 @@ class _TransactionPageState extends State<TransactionPage> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    isArabic ? 'سقف العهدة النقدية (COD)' : 'Cash Float Limit (COD)',
+                    isArabic
+                        ? 'سقف العهدة النقدية (COD)'
+                        : 'Cash Float Limit (COD)',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -210,7 +259,8 @@ class _TransactionPageState extends State<TransactionPage> {
             child: LinearProgressIndicator(
               value: floatRatio,
               minHeight: 7,
-              backgroundColor: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+              backgroundColor:
+                  isDark ? const Color(0xFF334155) : Colors.grey.shade200,
               valueColor: AlwaysStoppedAnimation<Color>(statusColor),
             ),
           ),
@@ -221,11 +271,15 @@ class _TransactionPageState extends State<TransactionPage> {
             children: [
               Text(
                 '${GlobalVar.priceForamt(balance.abs())} ${isArabic ? 'ل.س' : 'SYP'}',
-                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
+                style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
               ),
               Text(
                 '${isArabic ? 'الحد:' : 'Max:'} ${GlobalVar.priceForamt(maxCashFloat)} ${isArabic ? 'ل.س' : 'SYP'}',
-                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
+                style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
               ),
             ],
           ),
@@ -235,13 +289,16 @@ class _TransactionPageState extends State<TransactionPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : const Color(0xFFFEE2E2),
+                color: isDark
+                    ? const Color(0xFF7F1D1D).withValues(alpha: 0.3)
+                    : const Color(0xFFFEE2E2),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: kRed.withValues(alpha: 0.5)),
               ),
               child: Row(
                 children: [
-                  const AppIcon(PhosphorIcons.warningCircleBold, size: 18, color: kRed),
+                  const AppIcon(PhosphorIcons.warningCircleBold,
+                      size: 18, color: kRed),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -263,13 +320,16 @@ class _TransactionPageState extends State<TransactionPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFEF3C7),
+                color: isDark
+                    ? const Color(0xFF78350F).withValues(alpha: 0.3)
+                    : const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: kAmber.withValues(alpha: 0.6)),
               ),
               child: Row(
                 children: [
-                  const AppIcon(PhosphorIcons.warningBold, size: 18, color: kAmber),
+                  const AppIcon(PhosphorIcons.warningBold,
+                      size: 18, color: kAmber),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -291,24 +351,37 @@ class _TransactionPageState extends State<TransactionPage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: balance <= 0 || provider.balances.hasPendingSettlement || _requestingSettlement
+              onPressed: availableAmount <= 0 ||
+                      provider.balances.hasPendingSettlement ||
+                      _requestingSettlement
                   ? null
                   : () => _requestFullSettlement(isArabic),
               icon: _requestingSettlement
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const AppIcon(PhosphorIcons.handCoinsBold, size: 19, color: Colors.white),
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const AppIcon(PhosphorIcons.handCoinsBold,
+                      size: 19, color: Colors.white),
               label: Text(
                 provider.balances.hasPendingSettlement
-                    ? (isArabic ? 'طلب التسوية قيد مراجعة الإدارة' : 'Settlement request is under review')
-                    : (isArabic ? 'طلب تسوية كامل العهدة' : 'Request full cash settlement'),
+                    ? (isArabic
+                        ? 'طلب التسوية قيد مراجعة الإدارة'
+                        : 'Settlement request is under review')
+                    : (isArabic
+                        ? 'طلب تسوية المبلغ المتاح'
+                        : 'Request available settlement'),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryOrange,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                disabledBackgroundColor:
+                    isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                 padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
             ),
@@ -318,17 +391,42 @@ class _TransactionPageState extends State<TransactionPage> {
     );
   }
 
+  Widget _balanceBreakdown(
+      String label, double amount, bool isDark, bool isArabic) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+              fontSize: 11,
+              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
+        ),
+        const SizedBox(height: 3),
+        PriceTextWidget.small(
+          price: amount,
+          currencyString: isArabic ? 'ل.س' : 'SYP',
+        ),
+      ],
+    );
+  }
+
   Future<void> _requestFullSettlement(bool isArabic) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isArabic ? 'تأكيد طلب التسوية' : 'Confirm settlement request'),
+        title:
+            Text(isArabic ? 'تأكيد طلب التسوية' : 'Confirm settlement request'),
         content: Text(isArabic
             ? 'سيصل الطلب إلى الإدارة. بعد أن تؤكد الإدارة استلام كامل المبلغ ستصبح عهدتك صفراً.'
             : 'The request will be sent to admin. Your cash custody becomes zero after admin confirms receiving the full amount.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(isArabic ? 'إلغاء' : 'Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(isArabic ? 'إرسال الطلب' : 'Send request')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(isArabic ? 'إلغاء' : 'Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(isArabic ? 'إرسال الطلب' : 'Send request')),
         ],
       ),
     );
@@ -338,13 +436,16 @@ class _TransactionPageState extends State<TransactionPage> {
       final ok = await provider.requestSettlement();
       if (mounted && ok) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(isArabic ? 'تم إرسال طلب التسوية للإدارة' : 'Settlement request sent to admin'),
+          content: Text(isArabic
+              ? 'تم إرسال طلب التسوية للإدارة'
+              : 'Settlement request sent to admin'),
           backgroundColor: Colors.green,
         ));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _requestingSettlement = false);

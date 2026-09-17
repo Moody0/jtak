@@ -7,6 +7,7 @@ class LocalCartItem {
   int quantity;
   String? productTitle;
   String? productImage;
+  String? merchantTitle;
 
   LocalCartItem({
     required this.productId,
@@ -15,6 +16,7 @@ class LocalCartItem {
     required this.quantity,
     this.productTitle,
     this.productImage,
+    this.merchantTitle,
   });
 
   LocalCartItem copyWith({
@@ -24,6 +26,7 @@ class LocalCartItem {
     int? quantity,
     String? productTitle,
     String? productImage,
+    String? merchantTitle,
   }) {
     return LocalCartItem(
       productId: productId ?? this.productId,
@@ -32,6 +35,7 @@ class LocalCartItem {
       quantity: quantity ?? this.quantity,
       productTitle: productTitle ?? this.productTitle,
       productImage: productImage ?? this.productImage,
+      merchantTitle: merchantTitle ?? this.merchantTitle,
     );
   }
 
@@ -43,6 +47,7 @@ class LocalCartItem {
       'quantity': quantity,
       if (productTitle != null) 'productTitle': productTitle,
       if (productImage != null) 'productImage': productImage,
+      if (merchantTitle != null) 'merchantTitle': merchantTitle,
     };
   }
 
@@ -54,6 +59,7 @@ class LocalCartItem {
       quantity: (map['quantity'] ?? map['Quantity'])?.toInt() ?? 0,
       productTitle: map['productTitle'] ?? map['ProductTitle'],
       productImage: map['productImage'] ?? map['ProductImage'] ?? map['photos'] ?? map['Photos'],
+      merchantTitle: map['merchantTitle'] ?? map['MerchantTitle'] ?? map['merchant'] ?? map['Merchant'],
     );
   }
 

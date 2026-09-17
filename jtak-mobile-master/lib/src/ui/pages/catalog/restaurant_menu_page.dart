@@ -124,6 +124,7 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
       quantity: 1,
       title: product.title,
       imageUrl: product.imageUrl,
+      merchantTitle: product.restaurantName,
     );
   }
 
@@ -141,6 +142,7 @@ class _RestaurantMenuPageState extends State<RestaurantMenuPage>
         currentQty - 1,
         title: product.title,
         imageUrl: product.imageUrl,
+        merchantTitle: product.restaurantName,
       );
     }
   }

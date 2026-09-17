@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
+using System.Data;
 using OpenIddict.Validation.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
 using System.Linq;
@@ -40,6 +41,7 @@ namespace App.ApiControllers.V1.Warehouse
         private readonly IPaymentService _service;
         private readonly IBillService _billService;
         private readonly IBalanceService _balanceService;
+        private readonly ILedgerService _ledgerService;
 
         public PaymentsController(IAppUnitOfWork unitOfWork,
             IAccountingUnitOfWork auow,
@@ -50,6 +52,7 @@ namespace App.ApiControllers.V1.Warehouse
             IPaymentService service,
             IBillService billService,
             IBalanceService balanceService,
+            ILedgerService ledgerService,
             IMapper mapper)
         {
             _uow = unitOfWork;
@@ -62,6 +65,7 @@ namespace App.ApiControllers.V1.Warehouse
             _service = service;
             _billService = billService;
             _balanceService = balanceService;
+            _ledgerService = ledgerService;
         }
 
 
@@ -95,16 +99,33 @@ namespace App.ApiControllers.V1.Warehouse
         public async Task<ActionResult<bool>> RecivePayment(int id)
         {
             var uid = User.GetUserId();
+            if (!uid.HasValue)
+                return Unauthorized();
+
+            await using var transaction = _auow.Context.Database.IsRelational()
+                ? await _auow.Context.Database.BeginTransactionAsync(IsolationLevel.Serializable)
+                : null;
+
             var payment = await _service.Queryable()
                                         .FirstOrDefaultAsync(x => x.Id == id && x.ToUserId == uid);
 
             if (payment == null)
                 return NotFound("The specified payment was not found!");
 
+            // Receiving a payment is idempotent. A retry after a successful request
+            // must not decrease the courier balance a second time.
+            if (payment.HandoverDate.HasValue)
+            {
+                if (transaction != null) await transaction.CommitAsync();
+                return true;
+            }
+
             //var deliveryBalance = await _balanceService.GetBalance(payment.ByUserId);
             //var oldDeliveryBalance = deliveryBalance?.Amount ?? 0;
             //var newDeliveryBalance = oldDeliveryBalance - payment.Amount;
             var dUser = await _userManager.Users.Where(x => x.Id == payment.ByUserId).Select(x => x.FullName).FirstOrDefaultAsync();
+
+            await _ledgerService.PostCaptainCashHandoverAsync(payment.ByUserId, payment.Amount, $"Payment-{payment.Id}", dUser);
 
             var oldMerchantBalance = (await _balanceService.GetBalance(payment.ToUserId))?.Amount ?? 0;
             var mUser = await _userManager.Users.Where(x => x.Id == payment.ToUserId).Select(x => x.FullName).FirstOrDefaultAsync();
@@ -116,6 +137,8 @@ namespace App.ApiControllers.V1.Warehouse
             await _balanceService.DecreaseAppBalance(payment.ByUserId, payment.Amount, dUser); // VERIFIED
             await _balanceService.IncreaseAppBalance(payment.ToUserId, payment.Amount, mUser); // VERIFIED
 
+            await _auow.SaveChangesAsync();
+            if (transaction != null) await transaction.CommitAsync();
             await _notificationService.SendPaymentRecived(new[] { payment.ByUserId }, payment.Id, payment.Amount);
 
             return true;

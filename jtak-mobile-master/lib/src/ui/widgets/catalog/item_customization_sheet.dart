@@ -776,6 +776,7 @@ class _ItemCustomizationBottomSheetState
                     quantity: _quantity,
                     title: widget.item.title,
                     imageUrl: widget.item.imageUrl,
+                    merchantTitle: widget.item.restaurantName,
                   );
                   widget.onAddToCart?.call({
                     'item': widget.item,

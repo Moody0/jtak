@@ -18,11 +18,17 @@ class BaseProvider<T> extends ChangeNotifier {
   int page = 0;
   bool isMoreAvailable = true;
 
-  Future loadInfinityData({required Future<List<T>> Function(int page) loadData}) async {
+  Future loadInfinityData(
+      {required Future<List<T>> Function(int page) loadData}) async {
     log('///////////////////////////////  loadinfinityData  $page');
     try {
       _state = ViewState.busy;
-      if (page == 0) dataList.clear();
+      if (page == 0) {
+        dataList.clear();
+        // A completed previous pagination run must not prevent a later
+        // pull-to-refresh from requesting the first page again.
+        isMoreAvailable = true;
+      }
 
       var list = await loadData(page);
 

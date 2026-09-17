@@ -27,13 +27,16 @@ class OrderProvider extends BaseProvider<OrderModel> {
   bool get shiftLoading => _shiftLoading;
 
   final Set<int> _actionInFlightOrderIds = {};
-  bool isActionInFlight(int? orderId) => orderId != null && _actionInFlightOrderIds.contains(orderId);
+  bool isActionInFlight(int? orderId) =>
+      orderId != null && _actionInFlightOrderIds.contains(orderId);
 
   final Set<int> _acknowledgedOrders = {};
   OrderModel? incomingOrderAlert;
 
-  List<OrderModel> get activeOrders => dataList.where((o) => !o.isTerminal).toList();
-  List<OrderModel> get completedOrders => dataList.where((o) => o.isTerminal).toList();
+  List<OrderModel> get activeOrders =>
+      dataList.where((o) => !o.isTerminal).toList();
+  List<OrderModel> get completedOrders =>
+      dataList.where((o) => o.isTerminal).toList();
 
   OrderProvider() {
     _loadAcknowledgedOrders();
@@ -58,7 +61,8 @@ class OrderProvider extends BaseProvider<OrderModel> {
       if (recent.length > 100) {
         recent.removeRange(0, recent.length - 100);
       }
-      await prefs.setStringList('ack_orders', recent.map((e) => e.toString()).toList());
+      await prefs.setStringList(
+          'ack_orders', recent.map((e) => e.toString()).toList());
     } catch (_) {}
   }
 
@@ -132,14 +136,23 @@ class OrderProvider extends BaseProvider<OrderModel> {
       final res = await _api.postRequest('/Orders/Available', body);
       if (res is Map && res['items'] is List) {
         final List data = res['items'];
-        availableOrders = data.map((e) => OrderModel.fromMap(e)).toList();
+        final fetchedOrders = data.map((e) => OrderModel.fromMap(e)).toList();
+        final myOrderIds = dataList.map((e) => e.id).toSet();
+        // A refresh can overlap with a completed claim. Filter locally so a
+        // stale response never shows a claimed order as available again.
+        availableOrders = fetchedOrders
+            .where((o) =>
+                o.id != null &&
+                !_acknowledgedOrders.contains(o.id) &&
+                !myOrderIds.contains(o.id))
+            .toList();
 
         // Alert rider ONLY for new available orders in the pool that are not acknowledged and not already claimed
         if (isOnline && availableOrders.isNotEmpty) {
-          final myOrderIds = dataList.map((e) => e.id).toSet();
           for (final o in availableOrders) {
-            if (o.id != null && !_acknowledgedOrders.contains(o.id) && !myOrderIds.contains(o.id)) {
-              if (incomingOrderAlert == null || incomingOrderAlert!.id != o.id) {
+            if (o.id != null) {
+              if (incomingOrderAlert == null ||
+                  incomingOrderAlert!.id != o.id) {
                 incomingOrderAlert = o;
                 HapticFeedback.heavyImpact();
                 break;
@@ -159,8 +172,14 @@ class OrderProvider extends BaseProvider<OrderModel> {
   }
 
   Future<bool> claimOrder(int orderId) async {
+    if (isActionInFlight(orderId)) return false;
+    _actionInFlightOrderIds.add(orderId);
+    notifyListeners();
     try {
-      await _api.postRequest('/Orders/Claim/$orderId', {});
+      final response = await _api.postRequest('/Orders/Claim/$orderId', {});
+      if (response == false || response == 'false') {
+        throw Exception('تعذر استلام الطلب. ربما استلمه مندوب آخر.');
+      }
       await _persistAcknowledgedOrder(orderId);
       availableOrders.removeWhere((o) => o.id == orderId);
       await refreshData();
@@ -169,6 +188,9 @@ class OrderProvider extends BaseProvider<OrderModel> {
     } catch (e) {
       GlobalVar.log('claimOrder error: $e');
       rethrow;
+    } finally {
+      _actionInFlightOrderIds.remove(orderId);
+      notifyListeners();
     }
   }
 
@@ -198,14 +220,33 @@ class OrderProvider extends BaseProvider<OrderModel> {
     final res = await _api.postRequest('/Orders/Mine', body);
     if (res is Map && res['items'] is List) {
       final List data = res['items'];
-      final List<OrderModel> newOrders = data.map((e) => OrderModel.fromMap(e)).toList();
+      final List<OrderModel> newOrders =
+          data.map((e) => OrderModel.fromMap(e)).toList();
+
+      // The silent endpoint returns only the newest page. Merge it into the
+      // already loaded list so older history does not disappear every 10
+      // seconds while the active dashboard is being refreshed.
+      final refreshedIds = newOrders
+          .where((updated) => updated.id != null)
+          .map((updated) => updated.id!)
+          .toSet();
+      final mergedOrders = <OrderModel>[...newOrders];
+      mergedOrders.addAll(
+        dataList.where(
+          (existing) =>
+              existing.id == null || !refreshedIds.contains(existing.id),
+        ),
+      );
+      mergedOrders.sort(
+        (a, b) => (b.id ?? -1).compareTo(a.id ?? -1),
+      );
 
       bool changed = false;
-      if (dataList.length != newOrders.length) {
+      if (dataList.length != mergedOrders.length) {
         changed = true;
       } else {
-        for (int i = 0; i < newOrders.length; i++) {
-          if (dataList[i] != newOrders[i]) {
+        for (int i = 0; i < mergedOrders.length; i++) {
+          if (dataList[i] != mergedOrders[i]) {
             changed = true;
             break;
           }
@@ -213,17 +254,17 @@ class OrderProvider extends BaseProvider<OrderModel> {
       }
 
       if (changed) {
-        dataList = newOrders;
-        for (final o in newOrders) {
+        dataList = mergedOrders;
+        for (final o in mergedOrders) {
           if (o.id != null) {
             _acknowledgedOrders.add(o.id!);
           }
         }
         if (order != null) {
           final updatedCurrent = newOrders.cast<OrderModel?>().firstWhere(
-            (o) => o?.id == order!.id,
-            orElse: () => null,
-          );
+                (o) => o?.id == order!.id,
+                orElse: () => null,
+              );
           if (updatedCurrent != null && updatedCurrent != order) {
             order = updatedCurrent;
           }
@@ -232,7 +273,8 @@ class OrderProvider extends BaseProvider<OrderModel> {
       }
 
       final active = (dataList.cast<OrderModel?>()).firstWhere(
-        (item) => item != null && item.deliveryStatus == OrderDetailsStatus.shipping,
+        (item) =>
+            item != null && item.deliveryStatus == OrderDetailsStatus.shipping,
         orElse: () => null,
       );
       if (active?.id != null && isOnline) {
@@ -282,22 +324,43 @@ class OrderProvider extends BaseProvider<OrderModel> {
     }
   }
 
-  Future refreshData() async {
+  bool _isRefreshingData = false;
+
+  Future<void> refreshData() async {
+    if (_isRefreshingData) return;
+    _isRefreshingData = true;
+
     final selectedId = order?.id;
-    page = 0;
-    await loadPagedData();
-    if (selectedId != null) {
-      order = dataList
-          .cast<OrderModel?>()
-          .firstWhere((item) => item?.id == selectedId, orElse: () => order);
-      if (order?.id != null) {
-        await _reloadSingleOrder(order!.id!);
+    try {
+      page = 0;
+      isMoreAvailable = true;
+
+      // The homepage owns both the active and history tabs, so load every page
+      // during an explicit refresh. Otherwise history silently stopped at the
+      // first 20 orders even though the API supports pagination.
+      do {
+        final pageBeforeLoad = page;
+        await loadPagedData();
+        if (page == pageBeforeLoad) break;
+      } while (isMoreAvailable && page < 100);
+
+      if (selectedId != null) {
+        order = dataList.cast<OrderModel?>().firstWhere(
+              (item) => item?.id == selectedId,
+              orElse: () => order,
+            );
+        if (order?.id != null) {
+          await _reloadSingleOrder(order!.id!);
+        }
+        notifyListeners();
       }
-      notifyListeners();
+    } finally {
+      _isRefreshingData = false;
     }
   }
 
   Future loadPagedData() async {
+    var lastPageCount = 0;
     await loadInfinityData(
       loadData: (page) async {
         Map body = {
@@ -307,7 +370,11 @@ class OrderProvider extends BaseProvider<OrderModel> {
           "sortOrder": "desc"
         };
         var res = await _api.postRequest('/Orders/Mine', body);
+        if (res is! Map || res['items'] is! List) {
+          throw Exception('تعذر تحميل الطلبات الحالية والسجل');
+        }
         List data = res['items'];
+        lastPageCount = data.length;
         final orders = data.map((e) => OrderModel.fromMap(e)).toList();
 
         // Mark all active orders belonging to this driver as acknowledged so they never trigger incoming popups
@@ -331,6 +398,10 @@ class OrderProvider extends BaseProvider<OrderModel> {
         return orders;
       },
     );
+
+    // The API uses a fixed page size. Avoid one unnecessary empty request for
+    // the normal final partial page while still handling an exact multiple.
+    if (lastPageCount < 20) isMoreAvailable = false;
   }
 
   Future loadOrder(int id) async {
@@ -367,7 +438,8 @@ class OrderProvider extends BaseProvider<OrderModel> {
     }
   }
 
-  Future<bool> deliverOrder(int orderId, {String? otp, String? notes, String? photoUrl}) async {
+  Future<bool> deliverOrder(int orderId,
+      {String? otp, String? notes, String? photoUrl}) async {
     if (isActionInFlight(orderId)) return false;
     _actionInFlightOrderIds.add(orderId);
     notifyListeners();
@@ -379,7 +451,8 @@ class OrderProvider extends BaseProvider<OrderModel> {
         'photoUrl': photoUrl,
       });
       if (res == false || res == 'false') {
-        throw Exception('تعذر تأكيد تسليم الطلب. يرجى التأكد من استلام كافة أصناف المتاجر وصحة رمز التحقق.');
+        throw Exception(
+            'تعذر تأكيد تسليم الطلب. يرجى التأكد من استلام كافة أصناف المتاجر وصحة رمز التحقق.');
       }
       await _stopLocationSharing(orderId);
       await _reloadSingleOrder(orderId);
@@ -404,17 +477,21 @@ class OrderProvider extends BaseProvider<OrderModel> {
       request.files.add(http.MultipartFile.fromBytes(
         'file',
         bytes,
-        filename: file.name.isNotEmpty ? file.name : 'pod_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        filename: file.name.isNotEmpty
+            ? file.name
+            : 'pod_${DateTime.now().millisecondsSinceEpoch}.jpg',
       ));
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = json.decode(response.body);
         if (decoded is String) return decoded;
-        if (decoded is Map && decoded['id'] != null) return decoded['id'].toString();
+        if (decoded is Map && decoded['id'] != null)
+          return decoded['id'].toString();
         return response.body.replaceAll('"', '').trim();
       } else {
-        GlobalVar.log('PoD photo upload failed: ${response.statusCode} ${response.body}');
+        GlobalVar.log(
+            'PoD photo upload failed: ${response.statusCode} ${response.body}');
         return null;
       }
     } catch (e) {

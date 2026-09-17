@@ -514,6 +514,9 @@ class FavoriteMealCard extends StatelessWidget {
                 item.restaurantId,
                 item.basePriceValue.toDouble(),
                 quantity: qty,
+                title: item.title,
+                imageUrl: item.imageUrl,
+                merchantTitle: item.restaurantName,
               );
             },
           );
@@ -523,6 +526,9 @@ class FavoriteMealCard extends StatelessWidget {
             item.restaurantId,
             item.basePriceValue.toDouble(),
             quantity: 1,
+            title: item.title,
+            imageUrl: item.imageUrl,
+            merchantTitle: item.restaurantName,
           );
         }
       },

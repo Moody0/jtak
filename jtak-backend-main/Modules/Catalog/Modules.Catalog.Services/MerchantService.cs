@@ -142,21 +142,45 @@ namespace Modules.Catalog.Services
 
         public async Task<Dictionary<int, MerchantProductDto>> GetActiveMerchantPrices(int mid) =>
             await _cache.GetValue($"ActiveMerchantPrices_{mid}", null,
-                async () => await _merchantProductRepo.Queryable()
-                                                      .AsNoTracking()
-                                                      .Include(x => x.Merchant)
-                                                      .Where(x => x.MerchantId == mid && x.Merchant.Active)
-                                                      .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
-                                                      .ToDictionaryAsync(x => x.ProductId));
+                async () =>
+                {
+                    var usdRate = await GetUsdRate();
+                    var list = await _merchantProductRepo.Queryable()
+                                                         .AsNoTracking()
+                                                         .Include(x => x.Merchant)
+                                                         .Where(x => x.MerchantId == mid && x.Merchant.Active)
+                                                         .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
+                                                         .ToListAsync();
+                    foreach (var item in list)
+                    {
+                        if (item.PriceUsd.HasValue && item.PriceUsd.Value > 0 && usdRate > 0)
+                        {
+                            item.MerchantPrice = ToLocalPrice(item.PriceUsd.Value, usdRate);
+                        }
+                    }
+                    return list.ToDictionary(x => x.ProductId);
+                });
 
         public async Task<Dictionary<int, MerchantProductDto>> GetAllMerchantPrices(int mid) =>
             await _cache.GetValue($"AllMerchantPrices_{mid}", null,
-                async () => await _merchantProductRepo.Queryable()
-                                                      .AsNoTracking()
-                                                      .Include(x => x.Merchant)
-                                                      .Where(x => x.MerchantId == mid)
-                                                      .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
-                                                      .ToDictionaryAsync(x => x.ProductId));
+                async () =>
+                {
+                    var usdRate = await GetUsdRate();
+                    var list = await _merchantProductRepo.Queryable()
+                                                         .AsNoTracking()
+                                                         .Include(x => x.Merchant)
+                                                         .Where(x => x.MerchantId == mid)
+                                                         .Select(x => new MerchantProductDto { ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, AdditionalProfitPercent = x.AdditionalProfitPercent })
+                                                         .ToListAsync();
+                    foreach (var item in list)
+                    {
+                        if (item.PriceUsd.HasValue && item.PriceUsd.Value > 0 && usdRate > 0)
+                        {
+                            item.MerchantPrice = ToLocalPrice(item.PriceUsd.Value, usdRate);
+                        }
+                    }
+                    return list.ToDictionary(x => x.ProductId);
+                });
 
         public async Task<Dictionary<int, MerchantProductDto>> GetProductPrices(int pid) =>
             await _cache.GetValue($"ProductPrices_{pid}", null,
@@ -350,11 +374,12 @@ namespace Modules.Catalog.Services
             if (repriced > 0)
             {
                 await _uow.SaveChangesAsync();
-                foreach (var mid in usdProducts.Select(x => x.MerchantId).Distinct())
-                {
-                    _cache.Remove($"ActiveMerchantPrices_{mid}");
-                    _cache.Remove($"AllMerchantPrices_{mid}");
-                }
+            }
+
+            foreach (var mid in usdProducts.Select(x => x.MerchantId).Distinct())
+            {
+                _cache.Remove($"ActiveMerchantPrices_{mid}");
+                _cache.Remove($"AllMerchantPrices_{mid}");
             }
             return repriced;
         }

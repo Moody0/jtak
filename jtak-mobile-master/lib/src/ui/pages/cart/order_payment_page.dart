@@ -135,7 +135,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                 const SizedBox(height: 20),
 
                 // 3. Bill & Payment Summary Card
-                _buildInvoiceSummaryCard(subtotal, deliveryFee, grandTotal, itemsCount),
+                _buildInvoiceSummaryCard(
+                    subtotal, deliveryFee, grandTotal, itemsCount),
                 const SizedBox(height: 24),
               ],
             ),
@@ -219,8 +220,10 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final item = items[index];
-                final mock = MockCatalogData.getMenuItemById(item.productId ?? 0);
-                final rawImg = (item.productImage != null && item.productImage!.trim().isNotEmpty)
+                final mock =
+                    MockCatalogData.getMenuItemById(item.productId ?? 0);
+                final rawImg = (item.productImage != null &&
+                        item.productImage!.trim().isNotEmpty)
                     ? item.productImage!
                     : (mock?.imageUrl ?? '');
                 final imgUrl = GlobalVar.getImageUrl(rawImg);
@@ -236,7 +239,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                      border:
+                          Border.all(color: const Color(0xFFE2E8F0), width: 1),
                     ),
                     child: Stack(
                       clipBehavior: Clip.none,
@@ -251,19 +255,25 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                                     ? Image.asset(
                                         imgUrl,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Center(
-                                          child: Icon(PhosphorIconsFill.hamburger,
-                                              color: Color(0xFF94A3B8), size: 24),
+                                        errorBuilder: (_, __, ___) =>
+                                            const Center(
+                                          child: Icon(
+                                              PhosphorIconsFill.hamburger,
+                                              color: Color(0xFF94A3B8),
+                                              size: 24),
                                         ),
                                       )
                                     : CachedNetworkImage(
                                         imageUrl: imgUrl,
                                         fit: BoxFit.cover,
-                                        placeholder: (_, __) =>
-                                            Container(color: const Color(0xFFF1F5F9)),
-                                        errorWidget: (_, __, ___) => const Center(
-                                          child: Icon(PhosphorIconsFill.hamburger,
-                                              color: Color(0xFF94A3B8), size: 24),
+                                        placeholder: (_, __) => Container(
+                                            color: const Color(0xFFF1F5F9)),
+                                        errorWidget: (_, __, ___) =>
+                                            const Center(
+                                          child: Icon(
+                                              PhosphorIconsFill.hamburger,
+                                              color: Color(0xFF94A3B8),
+                                              size: 24),
                                         ),
                                       ))
                                 : const Center(
@@ -278,7 +288,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                           left: 0,
                           right: 0,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 3),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
@@ -416,19 +427,22 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
   }
 
   Widget _buildDeliveryAddressCard() {
-    final mainAddress = locator<AppParametersProvider>().mainAddressService.mainAddress;
+    final mainAddress =
+        locator<AppParametersProvider>().mainAddressService.mainAddress;
     final authUser = locator<AuthenticationService>().user;
 
     final String? rawAddress = _cartProvider.cartInfo.address;
     final String addressText = (rawAddress != null && rawAddress.isNotEmpty)
         ? rawAddress
-        : ((mainAddress.fullAddress != null && mainAddress.fullAddress!.isNotEmpty)
+        : ((mainAddress.fullAddress != null &&
+                mainAddress.fullAddress!.isNotEmpty)
             ? mainAddress.fullAddress!
             : ((mainAddress.title != null && mainAddress.title!.isNotEmpty)
                 ? mainAddress.title!
                 : 'دمشق، سوريا'));
 
-    final String? rawPhone = _cartProvider.cartInfo.phoneNumber?.phoneNumber ?? authUser?.phoneNumber;
+    final String? rawPhone = _cartProvider.cartInfo.phoneNumber?.phoneNumber ??
+        authUser?.phoneNumber;
     String phoneText = '09xx xxx xxx';
     if (rawPhone != null && rawPhone.isNotEmpty) {
       String clean = rawPhone.replaceAll(RegExp(r'\s+'), '');
@@ -436,7 +450,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
         clean = '0${clean.substring(4)}';
       }
       if (clean.length == 10 && clean.startsWith('09')) {
-        phoneText = '${clean.substring(0, 4)} ${clean.substring(4, 7)} ${clean.substring(7)}';
+        phoneText =
+            '${clean.substring(0, 4)} ${clean.substring(4, 7)} ${clean.substring(7)}';
       } else {
         phoneText = clean;
       }
@@ -472,7 +487,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Center(
-                  child: Icon(PhosphorIconsFill.mapPin, color: kPrimaryOrange, size: 22),
+                  child: Icon(PhosphorIconsFill.mapPin,
+                      color: kPrimaryOrange, size: 22),
                 ),
               ),
               const SizedBox(width: 12),
@@ -496,16 +512,19 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFF0E8),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFFFD8C2), width: 0.8),
+                                border: Border.all(
+                                    color: const Color(0xFFFFD8C2), width: 0.8),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(PhosphorIconsBold.pencilSimple, size: 10, color: kPrimaryOrange),
+                                  const Icon(PhosphorIconsBold.pencilSimple,
+                                      size: 10, color: kPrimaryOrange),
                                   const SizedBox(width: 3),
                                   Text(
                                     'تعديل',
@@ -521,7 +540,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
@@ -529,7 +549,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const SyrianFlag(width: 17, height: 11, borderRadius: 1.5),
+                              const SyrianFlag(
+                                  width: 17, height: 11, borderRadius: 1.5),
                               const SizedBox(width: 5),
                               Text(
                                 phoneText,
@@ -554,7 +575,9 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                         color: kCharcoalDark,
                         height: 1.35,
                       ),
-                      textDirection: isEnglishAddress ? TextDirection.ltr : TextDirection.rtl,
+                      textDirection: isEnglishAddress
+                          ? TextDirection.ltr
+                          : TextDirection.rtl,
                       textAlign: TextAlign.start,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -588,7 +611,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
     required bool isEnabled,
     String? badgeText,
   }) {
-    final bool isSelected = _cartProvider.orderPayment.paymentMethod == method && isEnabled;
+    final bool isSelected =
+        _cartProvider.orderPayment.paymentMethod == method && isEnabled;
 
     return GestureDetector(
       onTap: isEnabled
@@ -599,7 +623,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
               });
             }
           : () {
-              context.showSnakBar('سيتم تفعيل الدفع الإلكتروني قريباً في التحديث القادم');
+              context.showSnakBar(
+                  'سيتم تفعيل الدفع الإلكتروني قريباً في التحديث القادم');
             },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
@@ -641,13 +666,16 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w800,
-                          color: isEnabled ? kCharcoalDark : const Color(0xFF94A3B8),
+                          color: isEnabled
+                              ? kCharcoalDark
+                              : const Color(0xFF94A3B8),
                         ),
                       ),
                       if (badgeText != null) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFEF3C7),
                             borderRadius: BorderRadius.circular(6),
@@ -736,11 +764,14 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
             ],
           ),
           const SizedBox(height: 14),
-          _buildSummaryRow('المجموع الفرعي للوجبات', '${_formatPrice(subtotal)} $kMainCurrencySymbol'),
+          _buildSummaryRow('المجموع الفرعي للوجبات',
+              '${_formatPrice(subtotal)} $kMainCurrencySymbol'),
           const SizedBox(height: 8),
           _buildSummaryRow(
             'رسوم خدمة التوصيل',
-            deliveryFee > 0 ? '${_formatPrice(deliveryFee)} $kMainCurrencySymbol' : 'مجاناً',
+            deliveryFee > 0
+                ? '${_formatPrice(deliveryFee)} $kMainCurrencySymbol'
+                : 'مجاناً',
             isHighlight: deliveryFee == 0,
           ),
           const SizedBox(height: 10),
@@ -772,7 +803,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isHighlight = false}) {
+  Widget _buildSummaryRow(String label, String value,
+      {bool isHighlight = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -890,11 +922,11 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
 
     final authService = locator<AuthenticationService>();
 
-    if (!authService.isLogin()) {
+    if (!authService.isLogin() || !authService.hasCompletedProfile) {
       await authService.getAuthorizationData();
     }
 
-    if (!authService.isLogin()) {
+    if (!authService.isLogin() || !authService.hasCompletedProfile) {
       if (!mounted) return;
       final shouldLogin = await _showLoginRequiredSheet(context);
       if (shouldLogin != true || !mounted) return;
@@ -908,7 +940,12 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
         await _cartProvider.cartInfo.initData();
         setState(() {});
       }
-      if (loggedIn != true || !mounted) return;
+      if (loggedIn != true ||
+          !authService.isLogin() ||
+          !authService.hasCompletedProfile ||
+          !mounted) {
+        return;
+      }
     }
 
     if (mounted) {
@@ -932,7 +969,8 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
           return;
         } else {
           Navigator.of(context).popUntil((route) => route.isFirst);
-          Provider.of<HomeNavigationProvider>(context, listen: false).changePage(1);
+          Provider.of<HomeNavigationProvider>(context, listen: false)
+              .changePage(1);
           return;
         }
       }
@@ -976,7 +1014,9 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
             context: context,
             builder: (context) => CustomDialog(
               title: 'تنبيه بخصوص الطلب',
-              message: cleanMsg.isNotEmpty ? cleanMsg : 'حدث خطأ أثناء إرسال الطلب، يرجى المحاولة لاحقاً',
+              message: cleanMsg.isNotEmpty
+                  ? cleanMsg
+                  : 'حدث خطأ أثناء إرسال الطلب، يرجى المحاولة لاحقاً',
             ),
           );
         }
@@ -1110,4 +1150,3 @@ class _OrderPaymentPageState extends State<OrderPaymentPage> {
     );
   }
 }
-

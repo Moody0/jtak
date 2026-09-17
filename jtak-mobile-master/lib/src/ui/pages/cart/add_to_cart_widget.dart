@@ -270,6 +270,7 @@ class _AddToCartButtonState extends State<AddToCartButton> {
       quantity: 1,
       title: widget.item.title,
       imageUrl: widget.item.photos?.firstOrNull,
+      merchantTitle: widget.item.merchant,
     );
   }
 
@@ -285,6 +286,7 @@ class _AddToCartButtonState extends State<AddToCartButton> {
         cartItem!.quantity - 1,
         title: widget.item.title,
         imageUrl: widget.item.photos?.firstOrNull,
+        merchantTitle: widget.item.merchant,
       );
     } else {
       await cartProvider.removeFromCart(widget.item.id!, mid);
@@ -320,6 +322,7 @@ class _AddToCartButtonState extends State<AddToCartButton> {
             1,
             title: product.title,
             imageUrl: product.photos?.firstOrNull,
+            merchantTitle: product.merchant,
           );
           if (widget.showSuccessMessage && context.mounted) {
             ScaffoldMessenger.of(context).clearSnackBars();
@@ -338,6 +341,7 @@ class _AddToCartButtonState extends State<AddToCartButton> {
           product.canonicalSellingPrice,
           title: product.title,
           imageUrl: product.photos?.firstOrNull,
+          merchantTitle: product.merchant,
         );
         if (widget.showSuccessMessage && context.mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();

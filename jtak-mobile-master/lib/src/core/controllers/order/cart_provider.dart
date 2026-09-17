@@ -72,27 +72,28 @@ class CartProvider extends BaseProvider<OrderModel> {
     return _buildFallbackDetails(localCartItems);
   }
 
+  static bool _isGenericMerchantName(String? name) {
+    if (name == null) return true;
+    final trimmed = name.trim();
+    return trimmed.isEmpty ||
+        trimmed == 'المتجر' ||
+        trimmed == 'متجر جيتك' ||
+        trimmed == 'المتجر السابق' ||
+        trimmed.toLowerCase() == 'store' ||
+        trimmed.toLowerCase() == 'merchant';
+  }
+
   List<OrderDetailsModel> _buildFallbackDetails(List<LocalCartItem> items) {
     return items.map((item) {
-      String storeTitle = 'متجر جيتك';
-      if (locator.isRegistered<MarketsProvider>()) {
-        final prov = locator<MarketsProvider>();
-        final mStore =
-            prov.markets.where((m) => m.id == item.merchantId).firstOrNull;
-        if (mStore != null && mStore.name.isNotEmpty) {
-          storeTitle = mStore.name;
-        } else {
-          final rStore = prov.restaurants
-              .where((r) => r.id == item.merchantId)
-              .firstOrNull;
-          if (rStore != null && rStore.name.isNotEmpty) {
-            storeTitle = rStore.name;
-          }
-        }
+      String storeTitle = '';
+      if (!_isGenericMerchantName(item.merchantTitle)) {
+        storeTitle = item.merchantTitle!.trim();
+      } else {
+        storeTitle = getMerchantTitle(item.merchantId);
       }
 
       final mock = MockCatalogData.getMenuItemById(item.productId);
-      if (storeTitle == 'متجر جيتك' &&
+      if (_isGenericMerchantName(storeTitle) &&
           mock?.restaurantName != null &&
           mock!.restaurantName.isNotEmpty) {
         storeTitle = mock.restaurantName;
@@ -171,22 +172,64 @@ class CartProvider extends BaseProvider<OrderModel> {
   }
 
   String getMerchantTitle(int merchantId) {
-    final detail =
-        effectiveOrderDetails.where((i) => i.merchantId == merchantId).firstOrNull;
-    if (detail?.merchantTitle != null && detail!.merchantTitle!.trim().isNotEmpty) {
+    if (merchantId <= 0) return 'المتجر';
+
+    // 1. Check local items for a non-generic merchant title
+    final localItem = localCartItems.where((i) =>
+        i.merchantId == merchantId &&
+        !_isGenericMerchantName(i.merchantTitle)).firstOrNull;
+    if (localItem != null && !_isGenericMerchantName(localItem.merchantTitle)) {
+      return localItem.merchantTitle!.trim();
+    }
+
+    // 2. Check effectiveOrderDetails for a non-generic merchant title
+    final detail = effectiveOrderDetails.where((i) =>
+        i.merchantId == merchantId &&
+        !_isGenericMerchantName(i.merchantTitle)).firstOrNull;
+    if (detail != null && !_isGenericMerchantName(detail.merchantTitle)) {
       return detail.merchantTitle!.trim();
     }
+
+    // 3. Query MarketsProvider (live / seeded restaurants & markets)
     if (locator.isRegistered<MarketsProvider>()) {
       final prov = locator<MarketsProvider>();
-      final mStore = prov.markets.where((m) => m.id == merchantId).firstOrNull;
-      if (mStore != null && mStore.name.trim().isNotEmpty) return mStore.name.trim();
       final rStore = prov.restaurants.where((r) => r.id == merchantId).firstOrNull;
       if (rStore != null && rStore.name.trim().isNotEmpty) return rStore.name.trim();
+      final mStore = prov.markets.where((m) => m.id == merchantId).firstOrNull;
+      if (mStore != null && mStore.name.trim().isNotEmpty) return mStore.name.trim();
     }
+
+    // 4. Query MockCatalogData by restaurant id
     try {
       final rest = MockCatalogData.getRestaurantById(merchantId);
       if (rest.name.trim().isNotEmpty) return rest.name.trim();
     } catch (_) {}
+
+    // 5. Query MockCatalogData restaurants in case merchantId matches
+    try {
+      for (final res in MockCatalogData.restaurants) {
+        if (res.id == merchantId && res.name.trim().isNotEmpty) {
+          return res.name.trim();
+        }
+      }
+    } catch (_) {}
+
+    // 6. Check if any local cart item under this merchant has a product whose mock data knows the restaurant
+    for (final it in localCartItems.where((i) => i.merchantId == merchantId)) {
+      final mock = MockCatalogData.getMenuItemById(it.productId);
+      if (mock != null && mock.restaurantName.trim().isNotEmpty) {
+        return mock.restaurantName.trim();
+      }
+    }
+
+    // 7. Fallback to detail / local title even if generic
+    if (detail?.merchantTitle != null && detail!.merchantTitle!.trim().isNotEmpty) {
+      return detail.merchantTitle!.trim();
+    }
+    if (localItem?.merchantTitle != null && localItem!.merchantTitle!.trim().isNotEmpty) {
+      return localItem.merchantTitle!.trim();
+    }
+
     return 'المتجر';
   }
 
@@ -260,30 +303,8 @@ class CartProvider extends BaseProvider<OrderModel> {
       return 'عدة متاجر (${mIds.length})';
     }
     final mId = localCartItems.first.merchantId;
-    if (order.orderDetails != null && order.orderDetails!.isNotEmpty) {
-      final name = order.orderDetails!.first.merchantTitle;
-      if (name != null && name.isNotEmpty) return name.split(' - ').first;
-    }
-    if (locator.isRegistered<MarketsProvider>()) {
-      final prov = locator<MarketsProvider>();
-      final mStore = prov.markets.where((m) => m.id == mId).firstOrNull;
-      if (mStore != null && mStore.name.isNotEmpty) return mStore.name.split(' - ').first;
-      final rStore = prov.restaurants.where((r) => r.id == mId).firstOrNull;
-      if (rStore != null && rStore.name.isNotEmpty) return rStore.name.split(' - ').first;
-    }
-    final mockItem =
-        MockCatalogData.getMenuItemById(localCartItems.first.productId);
-    if (mockItem?.restaurantName != null &&
-        mockItem!.restaurantName.isNotEmpty) {
-      return mockItem.restaurantName.split(' - ').first;
-    }
-    if (mId > 0) {
-      try {
-        final rest = MockCatalogData.getRestaurantById(mId);
-        return rest.name.split(' - ').first;
-      } catch (_) {}
-    }
-    return 'المتجر السابق';
+    final title = getMerchantTitle(mId);
+    return title.split(' - ').first;
   }
 
   /// Returns whether a merchant ID represents a Restaurant (kind = 0).
@@ -385,7 +406,7 @@ class CartProvider extends BaseProvider<OrderModel> {
 
   Future<void> replaceCartWithItem(int productId, int merchantId,
       double singleFinalPrice, int quantity,
-      {String? title, String? imageUrl}) async {
+      {String? title, String? imageUrl, String? merchantTitle}) async {
     final bool isNewRest = isRestaurantMerchant(merchantId);
 
     // Remove only items from the conflicting merchant category (restaurants or markets)
@@ -399,7 +420,7 @@ class CartProvider extends BaseProvider<OrderModel> {
     count = localCartItems.length;
     await _saveLocalItems(localCartItems);
     await setToCart(productId, merchantId, singleFinalPrice, quantity,
-        title: title, imageUrl: imageUrl);
+        title: title, imageUrl: imageUrl, merchantTitle: merchantTitle);
   }
 
   int getProductQuantity(int? productId, [int? merchantId]) {
@@ -717,6 +738,16 @@ class CartProvider extends BaseProvider<OrderModel> {
             ? local.productTitle
             : (mock?.title ?? 'وجبة خاصة');
       }
+      if (_isGenericMerchantName(d.merchantTitle)) {
+        final mId = d.merchantId ?? local?.merchantId ?? 0;
+        if (mId > 0) {
+          d.merchantTitle = getMerchantTitle(mId);
+        } else if (local?.merchantTitle != null && !_isGenericMerchantName(local!.merchantTitle)) {
+          d.merchantTitle = local.merchantTitle;
+        } else if (mock?.restaurantName != null && mock!.restaurantName.trim().isNotEmpty) {
+          d.merchantTitle = mock.restaurantName.trim();
+        }
+      }
       if (local != null && local.singleFinalPrice > 0) {
         d.singleFinalPrice = local.singleFinalPrice;
         d.singlePrice = local.singleFinalPrice;
@@ -770,14 +801,14 @@ class CartProvider extends BaseProvider<OrderModel> {
   }
 
   Future addToCart(int productId, int merchantId, double singleFinalPrice,
-      {int quantity = 1, String? title, String? imageUrl}) async {
+      {int quantity = 1, String? title, String? imageUrl, String? merchantTitle}) async {
     try {
       final current =
           _findInLocalCart(localCartItems, productId, merchantId)?.quantity ??
               0;
       _setToLocalCart(
           productId, merchantId, singleFinalPrice, current + quantity,
-          title: title, imageUrl: imageUrl);
+          title: title, imageUrl: imageUrl, merchantTitle: merchantTitle);
       // Instant optimistic UI update
       order = _buildFallbackOrder(localCartItems);
       notifyListeners();
@@ -789,10 +820,10 @@ class CartProvider extends BaseProvider<OrderModel> {
   }
 
   Future setToCart(int productId, int merchantId, double singleFinalPrice,
-      int quantity, {String? title, String? imageUrl}) async {
+      int quantity, {String? title, String? imageUrl, String? merchantTitle}) async {
     try {
       _setToLocalCart(productId, merchantId, singleFinalPrice, quantity,
-          title: title, imageUrl: imageUrl);
+          title: title, imageUrl: imageUrl, merchantTitle: merchantTitle);
       // Instant optimistic UI update
       order = _buildFallbackOrder(localCartItems);
       notifyListeners();
@@ -829,10 +860,15 @@ class CartProvider extends BaseProvider<OrderModel> {
 
   List<LocalCartItem> _setToLocalCart(
       int productId, int merchantId, double singleFinalPrice, int quantity,
-      {String? title, String? imageUrl}) {
+      {String? title, String? imageUrl, String? merchantTitle}) {
     if (quantity > 0) {
       LocalCartItem? item =
           _findInLocalCart(localCartItems, productId, merchantId);
+      final resolvedMerchantTitle = (merchantTitle != null &&
+              merchantTitle.trim().isNotEmpty &&
+              !_isGenericMerchantName(merchantTitle))
+          ? merchantTitle.trim()
+          : getMerchantTitle(merchantId);
       if (item == null) {
         item = LocalCartItem(
             productId: productId,
@@ -840,7 +876,8 @@ class CartProvider extends BaseProvider<OrderModel> {
             singleFinalPrice: singleFinalPrice,
             quantity: quantity,
             productTitle: title,
-            productImage: imageUrl);
+            productImage: imageUrl,
+            merchantTitle: resolvedMerchantTitle);
         localCartItems.add(item);
       } else {
         item.singleFinalPrice = singleFinalPrice;
@@ -850,6 +887,10 @@ class CartProvider extends BaseProvider<OrderModel> {
         }
         if (imageUrl != null && imageUrl.trim().isNotEmpty) {
           item.productImage = imageUrl;
+        }
+        if (resolvedMerchantTitle.isNotEmpty &&
+            !_isGenericMerchantName(resolvedMerchantTitle)) {
+          item.merchantTitle = resolvedMerchantTitle;
         }
       }
     } else {

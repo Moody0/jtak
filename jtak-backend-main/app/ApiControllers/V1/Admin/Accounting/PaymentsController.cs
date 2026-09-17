@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
+using System;
+using System.Data;
 using OpenIddict.Validation.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
 using System.Linq;
@@ -38,6 +40,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IPaymentService _service;
         private readonly IBillService _billService;
         private readonly IBalanceService _balanceService;
+        private readonly ILedgerService _ledgerService;
 
         public PaymentsController(IAppUnitOfWork unitOfWork,
             IAccountingUnitOfWork auow,
@@ -48,6 +51,7 @@ namespace App.ApiControllers.V1.Admin
             IPaymentService service,
             IBillService billService,
             IBalanceService balanceService,
+            ILedgerService ledgerService,
             IMapper mapper)
         {
             _uow = unitOfWork;
@@ -60,6 +64,7 @@ namespace App.ApiControllers.V1.Admin
             _service = service;
             _billService = billService;
             _balanceService = balanceService;
+            _ledgerService = ledgerService;
         }
 
 
@@ -92,13 +97,18 @@ namespace App.ApiControllers.V1.Admin
         [Route("Create")]
         public async Task<ActionResult<bool>> Create(PaymentDto dto)
         {
+            if (dto == null || dto.ByUserId == Guid.Empty || dto.ToUserId == Guid.Empty || dto.Amount <= 0m)
+                return BadRequest(ApiErr.Create("بيانات الدفعة غير صالحة."));
+
             // Create new payment
             var byUser = await _userManager.Users.Where(x => x.Id == dto.ByUserId).Select(x => x.FullName).FirstOrDefaultAsync();
             var toUser = await _userManager.Users.Where(x => x.Id == dto.ToUserId).Select(x => x.FullName).FirstOrDefaultAsync();
             var dBalance = await _balanceService.GetBalance(dto.ByUserId);
-            //var oldBalance = dBalance?.Amount ?? 0;
-            //var newBalance = oldBalance - dto.Amount;
-            var newBalance = dto.Amount;
+            var ledgerBalance = await _ledgerService.GetUserCashFloatBalanceAsync(dto.ByUserId);
+            if (ledgerBalance + 0.001m < dto.Amount)
+                return BadRequest(ApiErr.Create($"المبلغ المطلوب يتجاوز عهدة المندوب المتاحة ({ledgerBalance:N0})."));
+
+            var newBalance = Math.Max(0m, dBalance.Amount - dto.Amount);
             var payment = new Payment
             {
                 ByUserId = dto.ByUserId,
@@ -108,11 +118,27 @@ namespace App.ApiControllers.V1.Admin
                 NewBalance = newBalance,
                 Amount = dto.Amount
             };
-            _service.Insert(payment);
+            await using var transaction = _auow.Context.Database.IsRelational()
+                ? await _auow.Context.Database.BeginTransactionAsync(IsolationLevel.Serializable)
+                : null;
+            try
+            {
+                _service.Insert(payment);
+                await _auow.SaveChangesAsync();
 
-            // Update delivery user balance
-            await _balanceService.UpdateAppBalance(new BalanceDto { Amount = newBalance, PendingAmount = dBalance.PendingAmount, Id = dto.ByUserId, Name = byUser });
-            await _uow.SaveChangesAsync();
+                await _ledgerService.PostCaptainCashHandoverAsync(dto.ByUserId, dto.Amount, $"Payment-{payment.Id}", byUser);
+
+                // Keep the legacy balance as a compatibility mirror while the
+                // ledger remains the source of truth for current app screens.
+                await _balanceService.UpdateAppBalance(new BalanceDto { Amount = newBalance, PendingAmount = dBalance.PendingAmount, Id = dto.ByUserId, Name = byUser });
+                await _auow.SaveChangesAsync();
+                if (transaction != null) await transaction.CommitAsync();
+            }
+            catch
+            {
+                if (transaction != null) await transaction.RollbackAsync();
+                throw;
+            }
             return true;
         }
     }

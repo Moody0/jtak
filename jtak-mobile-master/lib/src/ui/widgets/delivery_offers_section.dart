@@ -63,6 +63,7 @@ class JtakDeliveryOffersSection extends StatelessWidget {
         1,
         title: meal.title,
         imageUrl: meal.coverUrl,
+        merchantTitle: meal.merchantName,
       );
       onQuickAdd?.call(meal);
       return;
@@ -93,6 +94,7 @@ class JtakDeliveryOffersSection extends StatelessWidget {
       quantity: 1,
       title: meal.title,
       imageUrl: meal.coverUrl,
+      merchantTitle: meal.merchantName,
     );
     onQuickAdd?.call(meal);
   }
@@ -120,6 +122,7 @@ class JtakDeliveryOffersSection extends StatelessWidget {
         newQty,
         title: meal.title,
         imageUrl: meal.coverUrl,
+        merchantTitle: meal.merchantName,
       );
     }
   }

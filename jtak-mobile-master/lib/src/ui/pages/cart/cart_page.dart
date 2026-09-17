@@ -15,6 +15,8 @@ import '../../../core/services/locator.dart';
 import '../../widgets/top_app_bar_widget.dart';
 import '../../widgets/header_circle_button.dart';
 import '../account/login_page.dart';
+import '../catalog/market_page.dart';
+import '../catalog/restaurant_menu_page.dart';
 import 'cart_widgets.dart';
 import 'order_payment_page.dart';
 
@@ -97,7 +99,8 @@ class _CartPageState extends State<CartPage> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             onPressed: () {
@@ -228,11 +231,14 @@ class _CartPageState extends State<CartPage> {
   }
 
   Widget _buildAddressBar(BuildContext context) {
-    final mainAddressService = locator<AppParametersProvider>().mainAddressService;
+    final mainAddressService =
+        locator<AppParametersProvider>().mainAddressService;
     AddressModel currentAddress = mainAddressService.mainAddress;
     final displayAddress = currentAddress.title?.isNotEmpty == true
         ? currentAddress.title!
-        : (currentAddress.fullAddress?.isNotEmpty == true ? currentAddress.fullAddress! : 'موقعك الحالي');
+        : (currentAddress.fullAddress?.isNotEmpty == true
+            ? currentAddress.fullAddress!
+            : 'موقعك الحالي');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -373,7 +379,13 @@ class _CartPageState extends State<CartPage> {
 
     for (final entry in groups.entries) {
       final storeItems = entry.value;
-      final storeName = storeItems.first.merchantTitle ?? 'المتجر';
+      String storeName = cartProvider.getMerchantTitle(entry.key);
+      if (storeName.isEmpty || storeName == 'المتجر') {
+        final itemTitle = storeItems.first.merchantTitle;
+        if (itemTitle != null && itemTitle.trim().isNotEmpty && itemTitle != 'المتجر') {
+          storeName = itemTitle.trim();
+        }
+      }
       widgets.add(_buildStoreHeader(entry.key, storeName, cartProvider));
       widgets.add(const SizedBox(height: 8));
       for (final item in storeItems) {
@@ -385,10 +397,37 @@ class _CartPageState extends State<CartPage> {
     return widgets;
   }
 
+  void _navigateToStore(int merchantId, String storeName, CartProvider cartProvider) {
+    HapticFeedback.lightImpact();
+    final isMarket = cartProvider.isMarketMerchant(merchantId);
+    if (isMarket) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MarketPage(
+            marketId: merchantId,
+            marketName: storeName,
+          ),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RestaurantMenuPage(
+            restaurantId: merchantId,
+            restaurantName: storeName,
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildStoreHeader(
       int merchantId, String storeName, CartProvider cartProvider) {
     final int storeMinOrder = cartProvider.getMinOrderForMerchant(merchantId);
-    final double storeSubtotal = cartProvider.getSubtotalForMerchant(merchantId);
+    final double storeSubtotal =
+        cartProvider.getSubtotalForMerchant(merchantId);
     final bool hasMinOrder = storeMinOrder > 0;
     final bool reachedMin = !hasMinOrder || storeSubtotal >= storeMinOrder;
     final double remaining =
@@ -409,106 +448,110 @@ class _CartPageState extends State<CartPage> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF0E8),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: const Center(
-              child: Icon(
-                PhosphorIconsFill.storefront,
-                color: kPrimaryOrange,
-                size: 20,
+          GestureDetector(
+            onTap: () => _navigateToStore(merchantId, storeName, cartProvider),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0E8),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: const Center(
+                child: Icon(
+                  PhosphorIconsFill.storefront,
+                  color: kPrimaryOrange,
+                  size: 20,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        storeName,
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          color: kCharcoalDark,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (hasMinOrder) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: reachedMin
-                              ? const Color(0xFFECFDF5)
-                              : const Color(0xFFFFFBEB),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: reachedMin
-                                ? const Color(0xFFA7F3D0)
-                                : const Color(0xFFFDE68A),
-                            width: 0.8,
-                          ),
-                        ),
+            child: GestureDetector(
+              onTap: () => _navigateToStore(merchantId, storeName, cartProvider),
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          reachedMin
-                              ? 'مستوفي الحد'
-                              : 'متبقي ${_formatPrice(remaining)} ل.س',
+                          storeName,
                           style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: reachedMin
-                                ? const Color(0xFF065F46)
-                                : const Color(0xFFB45309),
+                            color: kCharcoalDark,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (hasMinOrder && !reachedMin) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFFFDE68A),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            'متبقي ${_formatPrice(remaining)} ل.س',
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(PhosphorIconsRegular.clock,
+                          size: 13, color: Color(0xFF6B7280)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'توصيل خلال 15-25 دقيقة',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          color: const Color(0xFF6B7280),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(PhosphorIconsRegular.clock,
-                        size: 13, color: Color(0xFF6B7280)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'توصيل خلال 15-25 دقيقة',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        color: const Color(0xFF6B7280),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => _navigateToStore(merchantId, storeName, cartProvider),
             behavior: HitTestBehavior.opaque,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
+                color: const Color(0xFFFFF0E8),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: kPrimaryOrange.withOpacity(0.3),
+                  width: 1.0,
+                ),
               ),
               child: Text(
                 '+ إضافة المزيد',
                 style: GoogleFonts.ibmPlexSansArabic(
-                  color: kCharcoalDark,
+                  color: kPrimaryOrange,
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                 ),
@@ -534,7 +577,8 @@ class _CartPageState extends State<CartPage> {
         children: [
           Row(
             children: [
-              const Icon(PhosphorIconsRegular.pencilSimple, size: 18, color: kPrimaryOrange),
+              const Icon(PhosphorIconsRegular.pencilSimple,
+                  size: 18, color: kPrimaryOrange),
               const SizedBox(width: 8),
               Text(
                 'ملاحظات خاصة للطلب',
@@ -561,7 +605,8 @@ class _CartPageState extends State<CartPage> {
               ),
               filled: true,
               fillColor: const Color(0xFFF8FAFC),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -581,7 +626,8 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildBillBreakdownCard(double subtotal, double deliveryFee, double grandTotal) {
+  Widget _buildBillBreakdownCard(
+      double subtotal, double deliveryFee, double grandTotal) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -691,9 +737,10 @@ class _CartPageState extends State<CartPage> {
         violation?.minOrder ?? cartProvider.currentMerchantMinOrder;
     final double remaining = violation?.remaining ??
         (minOrder - subtotal).clamp(0.0, double.infinity);
-    final String storeLabel = (violation != null && violation.merchantName.isNotEmpty)
-        ? ' من «${violation.merchantName}»'
-        : '';
+    final String storeLabel =
+        (violation != null && violation.merchantName.isNotEmpty)
+            ? ' من «${violation.merchantName}»'
+            : '';
 
     return Container(
       decoration: const BoxDecoration(
@@ -781,7 +828,8 @@ class _CartPageState extends State<CartPage> {
                           if (!authService.isLogin()) {
                             await authService.getAuthorizationData();
                           }
-                          if (authService.isLogin()) {
+                          if (authService.isLogin() &&
+                              authService.hasCompletedProfile) {
                             if (!context.mounted) return;
                             Navigator.pushNamed(
                                 context, OrderPaymentPage.routeName);
@@ -792,7 +840,10 @@ class _CartPageState extends State<CartPage> {
                               MaterialPageRoute(
                                   builder: (context) => const LoginPage()),
                             );
-                            if (loggedIn == true && context.mounted) {
+                            if (loggedIn == true &&
+                                authService.isLogin() &&
+                                authService.hasCompletedProfile &&
+                                context.mounted) {
                               await authService.getAuthorizationData();
                               if (!context.mounted) return;
                               await Provider.of<CartProvider>(context,
@@ -928,8 +979,7 @@ class _CartPageState extends State<CartPage> {
             },
             behavior: HitTestBehavior.opaque,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 32, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
               decoration: BoxDecoration(
                 color: kPrimaryOrange,
                 borderRadius: BorderRadius.circular(16),

@@ -223,7 +223,27 @@ namespace Modules.Accounting.Services
             }
 
             _context.JournalTransactions.Add(transaction);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+            {
+                // Two retries can pass the read-before-insert check at the same
+                // time. The unique database index is the final arbiter; return
+                // the already committed transaction instead of surfacing a
+                // duplicate-payment error to the caller.
+                foreach (var entry in transaction.Entries)
+                    _context.Entry(entry).State = EntityState.Detached;
+                _context.Entry(transaction).State = EntityState.Detached;
+
+                var committed = await _context.JournalTransactions
+                    .Include(t => t.Entries)
+                    .ThenInclude(e => e.Account)
+                    .FirstOrDefaultAsync(t => t.IdempotencyKey == request.IdempotencyKey);
+                if (committed == null) throw;
+                return MapToDto(committed);
+            }
 
             _logger.LogInformation("Posted balanced journal transaction {TxnNumber} with {Count} entries.", txnNumber, transaction.Entries.Count);
             return MapToDto(transaction);
@@ -402,6 +422,54 @@ namespace Modules.Accounting.Services
             }
 
             return await PostTransactionAsync(txnRequest);
+        }
+
+        public async Task<JournalTransactionDto> PostCaptainCashHandoverAsync(
+            Guid captainUserId,
+            decimal amount,
+            string referenceId,
+            string captainName = null,
+            string currency = "SYP")
+        {
+            if (captainUserId == Guid.Empty) throw new ArgumentException("CaptainUserId is required.", nameof(captainUserId));
+            if (amount <= 0m) throw new ArgumentException("Amount must be greater than zero.", nameof(amount));
+            if (string.IsNullOrWhiteSpace(referenceId)) throw new ArgumentException("ReferenceId is required.", nameof(referenceId));
+
+            currency = (currency ?? "SYP").ToUpperInvariant();
+            var idempotencyKey = $"CaptainCashHandover-{referenceId.Trim()}";
+            var existing = await _context.JournalTransactions
+                .Include(t => t.Entries)
+                .ThenInclude(e => e.Account)
+                .FirstOrDefaultAsync(t => t.IdempotencyKey == idempotencyKey);
+            if (existing != null) return MapToDto(existing);
+
+            var captainFloat = await GetOrCreateUserAccountAsync(
+                captainUserId,
+                AccountType.Asset,
+                SystemAccountCodes.CaptainCashFloatPrefix,
+                string.IsNullOrWhiteSpace(captainName) ? $"Cash Float {captainUserId}" : $"Cash Float - {captainName}",
+                currency);
+            var vault = await GetOrCreateSystemAccountAsync(
+                SystemAccountCodes.CompanyMainVault,
+                "Company Cash Vault",
+                AccountType.Asset,
+                currency);
+            var floatBalance = await GetAccountBalanceAsync(captainFloat.Id);
+            if (floatBalance + 0.001m < amount)
+                throw new InvalidOperationException($"Captain cash custody ({floatBalance:N2} {currency}) is less than the handover amount ({amount:N2} {currency}).");
+
+            return await PostTransactionAsync(new PostTransactionRequest
+            {
+                ReferenceType = "CaptainCashHandover",
+                ReferenceId = referenceId.Trim(),
+                IdempotencyKey = idempotencyKey,
+                Description = $"Cash handed over by captain {captainName ?? captainUserId.ToString()}",
+                Entries = new List<PostLedgerEntryRequest>
+                {
+                    new() { AccountId = vault.Id, Debit = amount, Currency = currency, Memo = "Cash received into company vault" },
+                    new() { AccountId = captainFloat.Id, Credit = amount, Currency = currency, Memo = "Captain cash custody cleared" }
+                }
+            });
         }
 
         public async Task<JournalTransactionDto> PostOrderCancellationReversalAsync(int orderId, string reason)

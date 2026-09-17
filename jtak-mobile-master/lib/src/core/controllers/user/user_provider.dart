@@ -31,7 +31,8 @@ class UserProvider extends BaseProvider {
     fullName = authService.user?.fullName;
     email = authService.user?.email;
     phoneNumber = PhoneNumberModel(
-      isoCode: authService.user?.countryPhoneCode ?? kCountriesCode[kCountryPhoneCodeDefualt],
+      isoCode: authService.user?.countryPhoneCode ??
+          kCountriesCode[kCountryPhoneCodeDefualt],
       dialCode: authService.user?.countryPhoneCode ?? kCountryPhoneCodeDefualt,
       phoneNumber: authService.user?.phoneNumber,
     );
@@ -63,7 +64,9 @@ class UserProvider extends BaseProvider {
     await loadBaseData(
       loadBody: () async {
         Map<String, String> body = {"phoneNumber": phoneNumber};
-        var res = await _api.postRequest('/Account/RegisterOrSignInByPhoneNumber', body, apiPrefex: apiPrefex);
+        var res = await _api.postRequest(
+            '/Account/RegisterOrSignInByPhoneNumber', body,
+            apiPrefex: apiPrefex);
         log('registerOrSignInByPhoneNumber : $res');
         if (res != null) {
           lastVerificationCode = res.toString().replaceAll('"', '').trim();
@@ -76,7 +79,8 @@ class UserProvider extends BaseProvider {
     await loadBaseData(
       loadBody: () async {
         Map<String, String> body = {"phoneNumber": phoneNumber};
-        await _api.postRequest('/Account/ResendSmsCode', body, apiPrefex: apiPrefex);
+        await _api.postRequest('/Account/ResendSmsCode', body,
+            apiPrefex: apiPrefex);
       },
     );
   }
@@ -84,38 +88,42 @@ class UserProvider extends BaseProvider {
   Future<void> update() async {
     await loadBaseData(
       loadBody: () async {
-        final phone = (phoneNumber?.phoneNumber != null && phoneNumber!.phoneNumber!.isNotEmpty)
+        final phone = (phoneNumber?.phoneNumber != null &&
+                phoneNumber!.phoneNumber!.isNotEmpty)
             ? phoneNumber!.phoneNumber!
             : (authService.user?.phoneNumber ?? '');
-        final dial = (phoneNumber?.dialCode != null && phoneNumber!.dialCode!.isNotEmpty)
-            ? phoneNumber!.dialCode!
-            : (authService.user?.countryPhoneCode ?? '+963');
-        final cleanEmail = (email != null && email!.isNotEmpty)
-            ? email!
-            : (authService.user?.email ?? 'user@jtak.app');
+        final dial =
+            (phoneNumber?.dialCode != null && phoneNumber!.dialCode!.isNotEmpty)
+                ? phoneNumber!.dialCode!
+                : (authService.user?.countryPhoneCode ?? '+963');
+        final cleanEmail = (email != null && email!.trim().isNotEmpty)
+            ? email!.trim()
+            : (authService.user?.email?.trim() ?? '');
 
-        try {
-          Map body = {
-            "fullName": fullName ?? '',
-            "email": cleanEmail,
-            "phoneNumber": phone,
-            "countryPhoneCode": dial,
-          };
-          await _api.postRequest('/Account/UpdateUser', body, apiPrefex: apiPrefex);
-        } catch (e) {
-          debugPrint('UpdateUser error: $e');
+        final Map<String, dynamic> body = {
+          "fullName": fullName?.trim() ?? '',
+          "phoneNumber": phone,
+          "countryPhoneCode": dial,
+        };
+        if (cleanEmail.isNotEmpty && cleanEmail != 'user@jtak.app') {
+          body['email'] = cleanEmail;
         }
+
+        // A required profile step must not appear successful when the server
+        // rejected it. Only update local state after the API confirms the save.
+        await _api.postRequest('/Account/UpdateUser', body,
+            apiPrefex: apiPrefex);
 
         if (authService.user != null) {
           UserModel user = authService.user!;
           user.fullName = fullName;
-          user.email = cleanEmail;
+          if (cleanEmail.isNotEmpty) user.email = cleanEmail;
           if (phone.isNotEmpty) user.phoneNumber = phone;
           authService.user = user;
         } else {
           authService.user = UserModel(
             fullName: fullName,
-            email: cleanEmail,
+            email: cleanEmail.isEmpty ? null : cleanEmail,
             phoneNumber: phone,
             countryPhoneCode: dial,
           );
@@ -133,7 +141,8 @@ class UserProvider extends BaseProvider {
           "newPassword": newPassword,
           "confirmPassword": newPassword,
         };
-        await _api.postRequest('/Account/ChangePassword', body, apiPrefex: apiPrefex);
+        await _api.postRequest('/Account/ChangePassword', body,
+            apiPrefex: apiPrefex);
       },
     );
   }

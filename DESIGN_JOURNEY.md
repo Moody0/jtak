@@ -273,6 +273,18 @@ Adapted from the approved component sheets to JTAK's **Navy Blue (`#253784`)** +
      * Modern bordered text inputs (`#F8FAFC` fill, `#E2E8F0` border, `#FF5400` focus) with SolarIcons prefix icons.
      * Locked phone number notice with security shield and full-width gradient Save button.
 
+### 2026-09-17: Delivery Captain Dispatch Simplification & Receive Flow
+* **Simplified Captain Home**: Removed duplicated finance/profile/settings/logout blocks from the orders screen; those actions remain in their dedicated navigation destinations.
+* **Operational Order Focus**: Added a compact dispatch summary and a visible list of available orders with one clear `Receive order` action.
+* **Receive Contract Fixed**: Removed the backend early 400 response that made `Claim/{id}` unreachable. The captain app now treats a successful claim as a real state transition, shows progress while claiming, and reports API failures clearly.
+* **Refresh Safety**: Available orders are filtered against acknowledged and already-owned orders so stale polling responses cannot resurrect an order after it has been claimed.
+
+### 2026-09-17: Money Flow Safety Review
+* **Settlement Integrity**: Captain shift settlement now commits the ledger transaction and settlement batch atomically, rejects negative cash, and refuses duplicate zero-balance settlements.
+* **Retry Safety**: Ledger idempotency races and warehouse payment receipt retries resolve to the original transaction/state instead of applying money changes twice.
+* **Server Pricing Authority**: Cart submission no longer accepts a client-supplied fallback price when the server cannot resolve the merchant price.
+* **Balance Clarity**: The delivery app distinguishes gross cash custody, pending settlement, and the amount actually available to request.
+
 
 
 

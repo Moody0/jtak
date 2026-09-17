@@ -82,6 +82,14 @@ namespace Modules.Orders.Entities
         public string MerchantAddress { get; set; }
         public bool IsDarkStore { get; set; }
         public OrderDetailDto[] OrderDetails { get; set; }
-        public decimal Price => OrderDetails.Sum(x => x.TotalFinalPrice);
+        // Terminal canceled/rejected lines remain in the delivery payload so
+        // the client can classify history correctly, but they must not be
+        // included in the COD amount shown to or collected by the driver.
+        public decimal Price => OrderDetails
+            .Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                        x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                        x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                        x.OrderDetailStatus != OrderDetailStatus.CustomerPending)
+            .Sum(x => x.TotalFinalPrice);
     }
 }

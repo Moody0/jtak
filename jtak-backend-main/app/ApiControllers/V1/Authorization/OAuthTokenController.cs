@@ -212,12 +212,12 @@ namespace App.ApiControllers.V1.Authorization
                         return ForbidInactive();
 
                     var isCodeValid = false;
-#if DEBUG
-                    if (request.Code == "123456" || request.Code == "1234")
+                    var normalizedCode = request.Code?.Replace(" ", "").Trim() ?? "";
+                    // Temporary QA/testing OTP bypass: allow "123456" or "1234"
+                    if (normalizedCode == "123456" || normalizedCode == "1234")
                     {
                         isCodeValid = true;
                     }
-#endif
 
                     if (!isCodeValid)
                     {

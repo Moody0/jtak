@@ -340,11 +340,9 @@ namespace App.ApiControllers.V1.Customer.Orders
                     merchantProfit = mp.MerchantProfit;
                     additionalProfit = mp.AdditionalProfit;
                 }
-                else if (item.SingleFinalPrice.HasValue && item.SingleFinalPrice.Value > 0)
-                {
-                    singlePrice = item.SingleFinalPrice.Value;
-                    singleFinalPrice = item.SingleFinalPrice.Value;
-                }
+                // Never trust a price supplied by the client. If the merchant
+                // price cannot be resolved, keep the item invalid so CanSubmit
+                // rejects the order instead of allowing a manipulated total.
 
                 // Only emit warning if product doesn't exist in DB at all or has 0 price
                 if (p == null)

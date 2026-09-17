@@ -15,7 +15,6 @@ import '../pages/order/orders_page.dart';
 import '../pages/setting_page.dart';
 import '../pages/transaction/transaction_page.dart';
 import '../sections/delivery_bottom_navigation.dart';
-import '../sections/drawer.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/incoming_order_modal.dart';
 
@@ -61,22 +60,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           pageTitle = isArabic ? 'الإعدادات' : 'Settings';
           break;
       }
-    });
-  }
-
-  void drawerHandler(Widget page, String title) {
-    int index = 0;
-    if (page is TransactionPage) {
-      index = 1;
-    } else if (page is ProfilePage) {
-      index = 2;
-    } else if (page is SettingPage) {
-      index = 3;
-    }
-    setState(() {
-      homeBody = page;
-      pageTitle = title;
-      _currentNavIndex = index;
     });
   }
 
@@ -157,7 +140,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     if (!_locationReady) return _locationGate(context);
@@ -191,7 +173,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
             child: homeBody,
           ),
         ),
-        drawer: HomeDrawer(drawerHandler, currentPage: pageTitle),
         bottomNavigationBar: DeliveryBottomNavigation(
           currentIndex: _currentNavIndex,
           onChange: _onBottomNavChange,
@@ -224,21 +205,27 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     final reasons = <(IconData, String, String)>[
       (
         PhosphorIcons.packageBold,
-        isArabic ? 'استلام الطلبات القريبة منك فوراً' : 'Get nearby orders the instant they open',
+        isArabic
+            ? 'استلام الطلبات القريبة منك فوراً'
+            : 'Get nearby orders the instant they open',
         isArabic
             ? 'نستخدم موقعك لعرض الطلبات القريبة منك أولاً.'
             : 'We use your position to surface the closest orders first.',
       ),
       (
         PhosphorIcons.navigationArrowBold,
-        isArabic ? 'مشاركة موقعك الحي مع العميل' : 'Share live location with the customer',
+        isArabic
+            ? 'مشاركة موقعك الحي مع العميل'
+            : 'Share live location with the customer',
         isArabic
             ? 'يتتبّع العميل توصيله لحظة بلحظة أثناء الطريق.'
             : 'Customers track their delivery in real time while it\'s on the way.',
       ),
       (
         PhosphorIcons.clockBold,
-        isArabic ? 'مسافة ووقت وصول دقيقين' : 'Accurate distance & arrival estimates',
+        isArabic
+            ? 'مسافة ووقت وصول دقيقين'
+            : 'Accurate distance & arrival estimates',
         isArabic
             ? 'حساب المسافة والوقت المتوقع يعتمد على موقعك الفعلي.'
             : 'Distance and ETA on every order are computed from your real position.',
@@ -255,13 +242,15 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
             color: Color(0xFFFFF0E8),
             shape: BoxShape.circle,
           ),
-          child: const Icon(PhosphorIcons.mapPinBold, color: kPrimaryOrange, size: 40),
+          child: const HomeMirroredIcon(PhosphorIcons.mapPinBold,
+              color: kPrimaryOrange, size: 40),
         ),
         const SizedBox(height: 24),
         Text(
           isArabic ? 'لماذا نحتاج موقعك؟' : 'Why we need your location',
           textAlign: TextAlign.center,
-          style: GoogleFonts.ibmPlexSansArabic(fontSize: 22, fontWeight: FontWeight.w800),
+          style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 22, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 20),
         ...reasons.map(
@@ -277,7 +266,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                     color: const Color(0xFFFFF0E8),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(r.$1, color: kPrimaryOrange, size: 18),
+                  child:
+                      HomeMirroredIcon(r.$1, color: kPrimaryOrange, size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -287,14 +277,17 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                       Text(
                         r.$2,
                         textAlign: TextAlign.start,
-                        style: GoogleFonts.ibmPlexSansArabic(fontSize: 14, fontWeight: FontWeight.w700),
+                        style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 14, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         r.$3,
                         textAlign: TextAlign.start,
                         style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 12.5, height: 1.4, color: const Color(0xFF64748B)),
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: const Color(0xFF64748B)),
                       ),
                     ],
                   ),
@@ -310,8 +303,10 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
             onPressed: _checkingLocation ? null : _ensureLocationAccess,
             icon: _checkingLocation
                 ? const SizedBox(
-                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.location_on_rounded),
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const HomeMirroredIcon(Icons.location_on_rounded),
             label: Text(
               isArabic ? 'متابعة وتفعيل الموقع' : 'Continue & enable location',
               style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
@@ -341,11 +336,13 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         icon = Icons.location_off_rounded;
         iconColor = kRed;
         iconBg = const Color(0xFFFEE2E2);
-        title = isArabic ? 'خدمة الموقع غير مفعّلة' : 'Location services are off';
+        title =
+            isArabic ? 'خدمة الموقع غير مفعّلة' : 'Location services are off';
         primaryOpensSettings = true;
         break;
       case LocationAccessIssue.permissionDenied:
-        title = isArabic ? 'صلاحية الموقع مطلوبة' : 'Location permission needed';
+        title =
+            isArabic ? 'صلاحية الموقع مطلوبة' : 'Location permission needed';
         primaryOpensSettings = false;
         break;
       case LocationAccessIssue.permissionDeniedForever:
@@ -357,7 +354,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         break;
       case LocationAccessIssue.needsAlwaysUpgrade:
         icon = Icons.my_location_rounded;
-        title = isArabic ? 'خطوة أخيرة لإكمال الإعداد' : 'One last step to finish setup';
+        title = isArabic
+            ? 'خطوة أخيرة لإكمال الإعداد'
+            : 'One last step to finish setup';
         primaryOpensSettings = true;
         steps = isArabic
             ? [
@@ -383,13 +382,14 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           width: 84,
           height: 84,
           decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-          child: Icon(icon, color: iconColor, size: 40),
+          child: HomeMirroredIcon(icon, color: iconColor, size: 40),
         ),
         const SizedBox(height: 24),
         Text(
           title,
           textAlign: TextAlign.center,
-          style: GoogleFonts.ibmPlexSansArabic(fontSize: 22, fontWeight: FontWeight.w800),
+          style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 22, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
         Text(
@@ -398,7 +398,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   ? 'يجب السماح بالموقع دائماً وتشغيل GPS لاستلام الطلبات ومشاركة موقعك أثناء التوصيل.'
                   : 'Always-on location and GPS are required to receive orders and share your position during delivery.'),
           textAlign: TextAlign.center,
-          style: GoogleFonts.ibmPlexSansArabic(fontSize: 14, height: 1.5, color: const Color(0xFF64748B)),
+          style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 14, height: 1.5, color: const Color(0xFF64748B)),
         ),
         if (steps.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -414,18 +415,22 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: steps.asMap().entries.map((e) {
                 return Padding(
-                  padding: EdgeInsets.only(bottom: e.key == steps.length - 1 ? 0 : 8),
+                  padding: EdgeInsets.only(
+                      bottom: e.key == steps.length - 1 ? 0 : 8),
                   child: Row(
                     children: [
                       Container(
                         width: 22,
                         height: 22,
                         alignment: Alignment.center,
-                        decoration: const BoxDecoration(color: kPrimaryOrange, shape: BoxShape.circle),
+                        decoration: const BoxDecoration(
+                            color: kPrimaryOrange, shape: BoxShape.circle),
                         child: Text(
                           '${e.key + 1}',
                           style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -433,7 +438,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                         child: Text(
                           e.value,
                           textAlign: TextAlign.start,
-                          style: GoogleFonts.ibmPlexSansArabic(fontSize: 13, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -454,8 +460,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                     : _ensureLocationAccess),
             icon: _checkingLocation
                 ? const SizedBox(
-                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(primaryOpensSettings ? Icons.settings_rounded : Icons.location_on_rounded),
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : HomeMirroredIcon(primaryOpensSettings
+                    ? Icons.settings_rounded
+                    : Icons.location_on_rounded),
             label: Text(
               primaryOpensSettings
                   ? (isArabic ? 'فتح إعدادات التطبيق' : 'Open app settings')
@@ -481,29 +491,13 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   AppBar _appBar(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final isHomePage = pageTitle == 'الطلبات الحالية' || pageTitle == 'Current Orders';
+    final isHomePage =
+        pageTitle == 'الطلبات الحالية' || pageTitle == 'Current Orders';
 
     return AppBar(
       elevation: 0,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       titleSpacing: 0,
-      leading: Builder(
-        builder: (ctx) => IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
-                  width: 1),
-            ),
-            child: AppIcon(PhosphorIcons.listBold,
-                size: 20, color: isDark ? Colors.white : kCharcoalDark),
-          ),
-          onPressed: () => Scaffold.of(ctx).openDrawer(),
-        ),
-      ),
       title: isHomePage
           ? Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -515,7 +509,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   errorBuilder: (_, __, ___) => Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(PhosphorIcons.mopedBold, color: kPrimaryOrange, size: 24),
+                      const HomeMirroredIcon(PhosphorIcons.mopedBold,
+                          color: kPrimaryOrange, size: 24),
                       const SizedBox(width: 6),
                       Text(
                         'جيتك',
@@ -530,7 +525,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
                     color: kSurfaceWarm,
                     borderRadius: BorderRadius.circular(6),
@@ -582,9 +578,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   child: ClipOval(
                     child: photo != null && photo.isNotEmpty
                         ? Image.network(
-                            photo.startsWith('http') ? photo : GlobalVar.getImageUrl(photo),
+                            photo.startsWith('http')
+                                ? photo
+                                : GlobalVar.getImageUrl(photo),
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _buildAvatarFallback(user?.fullName),
+                            errorBuilder: (_, __, ___) =>
+                                _buildAvatarFallback(user?.fullName),
                           )
                         : _buildAvatarFallback(user?.fullName),
                   ),
@@ -597,7 +596,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), height: 1),
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+            height: 1),
       ),
     );
   }

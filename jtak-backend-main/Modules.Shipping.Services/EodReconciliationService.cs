@@ -161,10 +161,14 @@ namespace Modules.Accounting.Services
             };
         }
 
-        public async Task<SettlementResultDto> SettleCaptainShiftAsync(SettleCaptainShiftRequest request, Guid handledByAdminId)
+        public Task<SettlementResultDto> SettleCaptainShiftAsync(SettleCaptainShiftRequest request, Guid handledByAdminId) =>
+            InFinancialTransactionAsync(() => SettleCaptainShiftCoreAsync(request, handledByAdminId));
+
+        private async Task<SettlementResultDto> SettleCaptainShiftCoreAsync(SettleCaptainShiftRequest request, Guid handledByAdminId)
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
             if (request.CaptainUserId == Guid.Empty) throw new ArgumentException("CaptainUserId is required.", nameof(request));
+            if (request.PhysicalCashReceived < 0m) throw new ArgumentException("PhysicalCashReceived cannot be negative.", nameof(request));
 
             var currency = (request.Currency ?? "SYP").ToUpperInvariant();
 
@@ -199,9 +203,9 @@ namespace Modules.Accounting.Services
             var floatBal = await _ledgerService.GetAccountBalanceAsync(floatAcc.Id);
             var wagesBal = await _ledgerService.GetAccountBalanceAsync(wagesAcc.Id);
 
-            if (floatBal <= 0 && wagesBal <= 0 && request.PhysicalCashReceived <= 0)
+            if (floatBal <= 0 && wagesBal <= 0)
             {
-                throw new InvalidOperationException($"Captain {captainName} has zero cash float and zero wages balance to settle.");
+                throw new InvalidOperationException($"Captain {captainName} has no unsettled cash or wages balance.");
             }
 
             var wagesToOffset = Math.Min(floatBal, Math.Max(0m, wagesBal));
@@ -375,6 +379,26 @@ namespace Modules.Accounting.Services
                 });
             }
             return result;
+        }
+
+        private async Task<T> InFinancialTransactionAsync<T>(Func<Task<T>> action)
+        {
+            // The in-memory provider used by unit tests does not support transactions.
+            if (!_context.Database.IsRelational())
+                return await action();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
+            {
+                var result = await action();
+                await transaction.CommitAsync();
+                return result;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
     }
 }

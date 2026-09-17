@@ -30,6 +30,7 @@ namespace Modules.Accounting.Services
             var active = await _context.SettlementRequests
                 .Where(x => x.RequestedByUserId == captainUserId &&
                             x.PartyType == SettlementPartyType.Captain &&
+                            x.Currency == currency &&
                             (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved))
                 .SumAsync(x => (decimal?)x.Amount) ?? 0m;
 
@@ -55,6 +56,7 @@ namespace Modules.Accounting.Services
 
             var active = ids.Length == 0 ? 0m : await _context.SettlementRequestMerchantAllocations
                 .Where(x => ids.Contains(x.MerchantId) &&
+                            x.SettlementRequest.Currency == currency &&
                             (x.SettlementRequest.Status == SettlementRequestStatus.Pending ||
                              x.SettlementRequest.Status == SettlementRequestStatus.Approved))
                 .SumAsync(x => (decimal?)x.Amount) ?? 0m;

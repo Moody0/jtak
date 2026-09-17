@@ -50,7 +50,7 @@ namespace Modules.Accounting.Services
             var msg =
 $@"============ Balance Change (Increase) ===============
 {Name} - {Id}
-{balance.Amount} => {balance.Amount + Amount}
+{balance.Amount} => {balance.Amount - Amount}
 =========================================================";
             _logger.LogError(msg);
             balance.Amount += Amount;

@@ -417,14 +417,24 @@ class _MarketPageState extends State<MarketPage> {
       final title = (raw['product'] ?? raw['title'] ?? '').toString().trim();
       if (id == 0 || title.isEmpty) continue;
 
-      final rawPrice =
+      final double rawPrice =
           ((raw['finalPrice'] ?? raw['merchantPrice'] ?? raw['price'] ?? 0)
                   as num)
               .toDouble();
-      final isUsd = (_storeModel?.isUsd ?? false) ||
-          (raw['priceUsd'] != null && (raw['priceUsd'] as num) > 0);
-      final int priceVal =
-          isUsd ? (rawPrice * exchangeRate).round() : rawPrice.round();
+      final double? usdPrice =
+          (raw['priceUsd'] != null && (raw['priceUsd'] as num) > 0)
+              ? (raw['priceUsd'] as num).toDouble()
+              : null;
+      final int priceVal;
+      if (usdPrice != null) {
+        priceVal = (usdPrice * exchangeRate).round();
+      } else if ((_storeModel?.isUsd ?? false) &&
+          rawPrice > 0 &&
+          rawPrice < 1000) {
+        priceVal = (rawPrice * exchangeRate).round();
+      } else {
+        priceVal = rawPrice.round();
+      }
 
       final cleanSub = cleanCategoryText((raw['productCat1'] ?? '').toString());
       final cleanMain =

@@ -7,7 +7,7 @@ class TransactionsProvider extends BaseProvider {
   final SolApi _api = locator<SolApi>();
   BalancesModel balances = BalancesModel();
 
-  Future loadBalances() async {
+  Future<void> loadBalances() async {
     await loadBaseData(loadBody: () async {
       var res = await _api.postRequest('/Balances/Mine', {});
       balances = BalancesModel.fromMap(res);
@@ -15,7 +15,11 @@ class TransactionsProvider extends BaseProvider {
   }
 
   Future<bool> requestSettlement() async {
+    final amount = balances.availableAmount ?? balances.amount ?? 0.0;
+    if (amount <= 0) return false;
+
     final res = await _api.postRequest('/Balances/RequestSettlement', {
+      'amount': amount,
       'method': 'cash_to_admin',
       'notes': 'طلب تسوية كامل العهدة النقدية',
     });

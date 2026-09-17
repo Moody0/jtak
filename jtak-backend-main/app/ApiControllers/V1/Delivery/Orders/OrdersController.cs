@@ -91,12 +91,12 @@ namespace App.ApiControllers.V1.Delivery
             var dtosList = orderDtos?.ToList() ?? new List<OrderDto>();
             if (dtosList.Count == 0) return Array.Empty<DeliveryOrderDto>();
 
+            // Keep terminal detail statuses in the delivery payload. The mobile
+            // client needs them to distinguish completed/canceled history from
+            // an order that is still pending.
             var allDetails = dtosList
                 .Where(x => x.OrderDetails != null)
                 .SelectMany(x => x.OrderDetails)
-                .Where(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
-                            d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
-                            d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
                 .ToArray();
 
             var merchantIds = allDetails.Select(x => x.MerchantId).Distinct().ToArray();
@@ -115,11 +115,7 @@ namespace App.ApiControllers.V1.Delivery
 
             return dtosList.Select(x =>
             {
-                var validDetails = (x.OrderDetails ?? Array.Empty<OrderDetailDto>())
-                    .Where(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
-                                d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
-                                d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
-                    .ToArray();
+                var validDetails = (x.OrderDetails ?? Array.Empty<OrderDetailDto>()).ToArray();
 
                 var groupedMerchants = validDetails
                     .GroupBy(d => d.MerchantId)
@@ -182,8 +178,8 @@ namespace App.ApiControllers.V1.Delivery
         public async Task<ActionResult<TableResponseModel<DeliveryOrderDto>>> PostMine([FromBody] MetronicTable request)
         {
             var uid = User.GetUserId();
-            var timeTurkey = TimeZoneInfo.ConvertTime(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("GTB Standard Time"));
-            var dayStart = timeTurkey.Date.AddDays(-2);
+            if (!uid.HasValue)
+                return Unauthorized();
 
             var orders = await _service.ListMetronicTableQueryable(request,
                 x => new OrderDto
@@ -192,6 +188,7 @@ namespace App.ApiControllers.V1.Delivery
                     UserId = x.UserId,
                     Description = x.Description,
                     Phonenumber = x.Phonenumber,
+                    PaymentMethod = x.PaymentMethod,
                     OrderStatus = x.OrderStatus,
                     PurchaseDate = x.PurchaseDate,
                     CreatedDate = x.CreatedDate,
@@ -199,10 +196,9 @@ namespace App.ApiControllers.V1.Delivery
                     Lat = x.Lat,
                     Lng = x.Lng,
                     Address = x.Address,
-                    OrderDetails = x.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected && d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled && d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).Select(d => d.ToDto()).ToArray()
-                }, x => x.DeliveryId == uid && x.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected && d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled && d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled) &&
-                x.OrderStatus == OrderStatus.Success &&
-                (x.PurchaseDate != null ? x.PurchaseDate > dayStart : x.CreatedDate > dayStart),
+                    OrderDetails = x.OrderDetails.Select(d => d.ToDto()).ToArray()
+                }, x => x.DeliveryId == uid &&
+                x.OrderStatus == OrderStatus.Success,
                 x => x.OrderDetails);
 
             var result = new TableResponseModel<DeliveryOrderDto>()
@@ -232,6 +228,7 @@ namespace App.ApiControllers.V1.Delivery
                     UserId = x.UserId,
                     Description = x.Description,
                     Phonenumber = x.Phonenumber,
+                    PaymentMethod = x.PaymentMethod,
                     OrderStatus = x.OrderStatus,
                     PurchaseDate = x.PurchaseDate,
                     CreatedDate = x.CreatedDate,
@@ -239,7 +236,7 @@ namespace App.ApiControllers.V1.Delivery
                     Lat = x.Lat,
                     Lng = x.Lng,
                     Address = x.Address,
-                    OrderDetails = x.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected && d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled && d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).Select(d => d.ToDto()).ToArray()
+                    OrderDetails = x.OrderDetails.Select(d => d.ToDto()).ToArray()
                 },
                 x => x.DeliveryId == Guid.Empty &&
                      x.OrderStatus == OrderStatus.Success &&
@@ -264,8 +261,6 @@ namespace App.ApiControllers.V1.Delivery
         [Route("Claim/{id}")]
         public async Task<ActionResult<bool>> ClaimOrder(int id)
         {
-            return BadRequest(ApiErr.Create("يتم تعيين المندوب من قبل الإدارة بعد أن يؤكد التاجر أن الطلب جاهز للاستلام."));
-#pragma warning disable CS0162
             var uid = User.GetUserId();
             if (!uid.HasValue)
                 return Unauthorized();
@@ -361,7 +356,6 @@ namespace App.ApiControllers.V1.Delivery
             await _trackingHub.Clients.Group(TrackingHub.FleetDispatchGroup).SendAsync("OnOrderClaimed", new { orderId = id, driverId = uid.Value, driverName = order.DeliveryUser });
 
             return true;
-#pragma warning restore CS0162
         }
 
         [HttpGet]
@@ -389,6 +383,7 @@ namespace App.ApiControllers.V1.Delivery
                 UserId = order.UserId,
                 Description = order.Description,
                 Phonenumber = order.Phonenumber,
+                PaymentMethod = order.PaymentMethod,
                 OrderStatus = order.OrderStatus,
                 PurchaseDate = order.PurchaseDate,
                 CreatedDate = order.CreatedDate,
@@ -396,14 +391,8 @@ namespace App.ApiControllers.V1.Delivery
                 Lat = order.Lat,
                 Lng = order.Lng,
                 Address = order.Address,
-                PaymentMethod = order.PaymentMethod,
                 OrderDetails = order.OrderDetails != null
-                    ? order.OrderDetails
-                        .Where(d => d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
-                                    d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
-                                    d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
-                        .Select(d => d.ToDto())
-                        .ToArray()
+                    ? order.OrderDetails.Select(d => d.ToDto()).ToArray()
                     : Array.Empty<OrderDetailDto>()
             };
 

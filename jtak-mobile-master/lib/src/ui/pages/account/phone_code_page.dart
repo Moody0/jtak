@@ -70,7 +70,8 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
               inAsyncCall: userProvider.isBusy,
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -101,7 +102,8 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                     const SizedBox(height: 6),
                     Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 5),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
@@ -122,11 +124,13 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
 
                     // 2. Verification Code Input Card
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 20),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+                        border: Border.all(
+                            color: const Color(0xFFE2E8F0), width: 1.1),
                       ),
                       child: Column(
                         children: [
@@ -143,7 +147,9 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                           // Discrete OTP Squircles (6 digits)
                           CodeInputWidget(
                             codeLength: 6,
-                            initialValue: _code.isNotEmpty ? _code : (userProvider.lastVerificationCode ?? ''),
+                            initialValue: _code.isNotEmpty
+                                ? _code
+                                : (userProvider.lastVerificationCode ?? ''),
                             onChange: (code) => _code = code,
                             onEnd: (code) {
                               _code = code;
@@ -229,7 +235,8 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(PhosphorIconsRegular.arrowsClockwise, color: kPrimaryOrange, size: 16),
+          const Icon(PhosphorIconsRegular.arrowsClockwise,
+              color: kPrimaryOrange, size: 16),
           const SizedBox(width: 6),
           Text(
             'لم يصلك الرمز؟ إعادة الإرسال',
@@ -259,37 +266,23 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
       await userProvider.loginByPhone(widget.phoneNumber, _code);
       if (!mounted) return;
 
-      final authUser = locator<AuthenticationService>().user;
-      bool isReturningUser = authUser?.fullName != null &&
-          authUser!.fullName!.trim().isNotEmpty &&
-          authUser.fullName != 'مستخدم جيتك' &&
-          authUser.fullName != 'عميل جيتك' &&
-          authUser.fullName != 'مستخدم جتاك' &&
-          authUser.fullName != 'عميل جتاك';
+      final authService = locator<AuthenticationService>();
+      final bool isReturningUser = authService.hasCompletedProfile;
 
       if (!isReturningUser) {
-        final saved = await locator<AuthenticationService>().getSavedUserByPhone(widget.phoneNumber);
-        if (saved?.fullName != null &&
-            saved!.fullName!.trim().isNotEmpty &&
-            saved.fullName != 'مستخدم جيتك' &&
-            saved.fullName != 'عميل جيتك' &&
-            saved.fullName != 'مستخدم جتاك' &&
-            saved.fullName != 'عميل جتاك') {
-          if (authUser != null) {
-            authUser.fullName = saved.fullName;
-            locator<AuthenticationService>().saveUserData(authUser);
-          }
-          isReturningUser = true;
-        } else {
-          await _promptUserNameBottomSheet();
+        await _promptUserNameBottomSheet();
+        if (!authService.hasCompletedProfile) {
+          throw Exception('يرجى إدخال اسمك الكامل لإكمال الحساب.');
         }
       }
 
       await locator<CartProvider>().cartInfo.initData();
 
       if (!mounted) return;
-      final currentUser = locator<AuthenticationService>().user;
-      final String greeting = (isReturningUser && currentUser?.fullName != null && currentUser!.fullName!.isNotEmpty)
+      final currentUser = authService.user;
+      final String greeting = (isReturningUser &&
+              currentUser?.fullName != null &&
+              currentUser!.fullName!.isNotEmpty)
           ? 'أهلاً بك مجدداً، ${currentUser.fullName}'
           : 'تم تسجيل الدخول بنجاح';
 
@@ -351,170 +344,189 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                 } catch (e) {
                   if (sheetCtx.mounted) {
                     setSheetState(() => isSubmitting = false);
+                    final message =
+                        e.toString().replaceAll('Exception: ', '').trim();
+                    showDialog(
+                      context: sheetCtx,
+                      builder: (context) => CustomDialog(
+                        title: 'تعذر حفظ الاسم',
+                        message: message.isEmpty
+                            ? 'تعذر حفظ الاسم، يرجى المحاولة مجدداً.'
+                            : message,
+                      ),
+                    );
                   }
                 }
               }
             }
 
-            return GestureDetector(
-              onTap: () => FocusScope.of(sheetCtx).unfocus(),
-              behavior: HitTestBehavior.translucent,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
-                ),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            return PopScope(
+              canPop: false,
+              child: GestureDetector(
+                onTap: () => FocusScope.of(sheetCtx).unfocus(),
+                behavior: HitTestBehavior.translucent,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
                   ),
-                  child: SafeArea(
-                    top: false,
-                    child: SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                      child: Form(
-                        key: formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Top Drag Handle Indicator
-                            Center(
-                              child: Container(
-                                width: 40,
-                                height: 4,
-                                margin: const EdgeInsets.only(bottom: 20),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE2E8F0),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-
-                            // Icon
-                            Center(
-                              child: Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF0E8),
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    PhosphorIconsFill.user,
-                                    color: kPrimaryOrange,
-                                    size: 28,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(28)),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                        child: Form(
+                          key: formKey,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Top Drag Handle Indicator
+                              Center(
+                                child: Container(
+                                  width: 40,
+                                  height: 4,
+                                  margin: const EdgeInsets.only(bottom: 20),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE2E8F0),
+                                    borderRadius: BorderRadius.circular(2),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
 
-                            // Title & Subtitle
-                            Text(
-                              'أهلاً بك في جيتك!',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w800,
-                                color: kCharcoalDark,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'يرجى إدخال اسمك الكامل لإكمال حسابك وتسهيل التوصيل',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Name Input Field
-                            Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFFE2E8F0),
-                                  width: 1.1,
+                              // Icon
+                              Center(
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF0E8),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      PhosphorIconsFill.user,
+                                      color: kPrimaryOrange,
+                                      size: 28,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: TextFormField(
-                                controller: nameController,
-                                autofocus: true,
-                                textInputAction: TextInputAction.done,
-                                textCapitalization: TextCapitalization.words,
-                                onFieldSubmitted: (_) => submit(),
+                              const SizedBox(height: 16),
+
+                              // Title & Subtitle
+                              Text(
+                                'أهلاً بك في جيتك!',
+                                textAlign: TextAlign.center,
                                 style: GoogleFonts.ibmPlexSansArabic(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
                                   color: kCharcoalDark,
                                 ),
-                                decoration: InputDecoration(
-                                  hintText: 'الاسم الكامل',
-                                  hintStyle: GoogleFonts.ibmPlexSansArabic(
-                                    fontSize: 13.5,
-                                    color: const Color(0xFF94A3B8),
-                                  ),
-                                  border: InputBorder.none,
-                                  icon: const Icon(
-                                    PhosphorIconsRegular.user,
-                                    size: 20,
-                                    color: Color(0xFF64748B),
-                                  ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.trim().length < 2) {
-                                    return 'يرجى إدخال اسم صحيح';
-                                  }
-                                  return null;
-                                },
                               ),
-                            ),
-                            const SizedBox(height: 20),
+                              const SizedBox(height: 6),
+                              Text(
+                                'يرجى إدخال اسمك الكامل لإكمال حسابك وتسهيل التوصيل',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
 
-                            // Submit Button
-                            GestureDetector(
-                              onTap: isSubmitting ? null : submit,
-                              behavior: HitTestBehavior.opaque,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              // Name Input Field
+                              Container(
                                 decoration: BoxDecoration(
-                                  color: isSubmitting
-                                      ? kPrimaryOrange.withValues(alpha: 0.7)
-                                      : kPrimaryOrange,
+                                  color: const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                    width: 1.1,
+                                  ),
                                 ),
-                                child: Center(
-                                  child: isSubmitting
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                    Colors.white),
-                                          ),
-                                        )
-                                      : Text(
-                                          'متابعة إلى التطبيق',
-                                          style: GoogleFonts.ibmPlexSansArabic(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white,
-                                          ),
-                                        ),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: TextFormField(
+                                  controller: nameController,
+                                  autofocus: true,
+                                  textInputAction: TextInputAction.done,
+                                  textCapitalization: TextCapitalization.words,
+                                  onFieldSubmitted: (_) => submit(),
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: kCharcoalDark,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'الاسم الكامل',
+                                    hintStyle: GoogleFonts.ibmPlexSansArabic(
+                                      fontSize: 13.5,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                    border: InputBorder.none,
+                                    icon: const Icon(
+                                      PhosphorIconsRegular.user,
+                                      size: 20,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null ||
+                                        value.trim().length < 2) {
+                                      return 'يرجى إدخال اسم صحيح';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 20),
+
+                              // Submit Button
+                              GestureDetector(
+                                onTap: isSubmitting ? null : submit,
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  decoration: BoxDecoration(
+                                    color: isSubmitting
+                                        ? kPrimaryOrange.withValues(alpha: 0.7)
+                                        : kPrimaryOrange,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Center(
+                                    child: isSubmitting
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                      Colors.white),
+                                            ),
+                                          )
+                                        : Text(
+                                            'متابعة إلى التطبيق',
+                                            style:
+                                                GoogleFonts.ibmPlexSansArabic(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
