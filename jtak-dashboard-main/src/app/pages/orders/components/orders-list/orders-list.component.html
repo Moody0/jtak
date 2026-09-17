@@ -184,7 +184,7 @@
               <th scope="col" style="min-width: 220px;">{{ 'ORDERS_PAGE.COL_ITEMS_STATUS' | translate }}</th>
               <th scope="col" style="width: 120px;">{{ 'ORDERS_PAGE.COL_TOTAL_PRICE' | translate }}</th>
               <th scope="col" style="width: 150px;">{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</th>
-              <th scope="col" style="width: 125px; text-align: center;">{{ 'ORDERS_PAGE.COL_ACTIONS' | translate }}</th>
+              <th scope="col" class="ops-actions-col text-center">{{ 'ORDERS_PAGE.COL_ACTIONS' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -305,24 +305,77 @@
               </td>
 
               <!-- 6. Actions Cluster -->
-              <td>
+              <td class="ops-actions-col text-center">
                 <div class="ops-actions-cluster">
                   <button *ngIf="canApprove(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve"
                     (click)="approve(o)" [title]="'ORDERS_PAGE.APPROVE_TOOLTIP' | translate">
                     <i class="fas fa-check me-1"></i><span>{{ 'ORDERS_PAGE.APPROVE' | translate }}</span>
                   </button>
                   <button *ngIf="canMarkReady(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve"
-                    (click)="markReady(o)" title="Mark ready for courier pickup">
-                    <i class="fas fa-box-check me-1"></i><span>{{ 'جاهز للاستلام' }}</span>
+                    (click)="markReady(o)" title="جاهز للاستلام من المندوب">
+                    <i class="fas fa-box-check me-1"></i><span>جاهز للاستلام</span>
                   </button>
                   <button *ngIf="canLiveTrack(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--radar"
                     (click)="openLiveTrack(o)" [title]="'ORDERS_PAGE.LIVE_RADAR_TOOLTIP' | translate">
                     <i class="fas fa-satellite-dish me-1"></i><span>{{ 'ORDERS_PAGE.LIVE_RADAR' | translate }}</span>
                   </button>
-                  <button *ngIf="canCancel(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--cancel"
-                    (click)="confirmCancel(o)" [title]="'ORDERS_PAGE.CANCEL_TOOLTIP' | translate">
-                    <i class="fas fa-times"></i>
-                  </button>
+
+                  <!-- More Operations Dropdown (Opens Inward Toward Right via Popper container=body) -->
+                  <div class="btn-group" ngbDropdown container="body" [placement]="['bottom-left', 'top-left', 'bottom-right', 'top-right']" dropdownClass="ops-actions-dropdown-wrapper">
+                    <button type="button" class="btn btn-sm ops-btn-act ops-btn-act--more" ngbDropdownToggle title="إجراءات وحالات الطلب" aria-label="إجراءات وحالات الطلب">
+                      <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div ngbDropdownMenu class="dropdown-menu shadow-lg p-2 fs-7 ops-actions-menu">
+                      <button type="button" class="dropdown-item py-2 px-3 text-dark d-flex align-items-center" (click)="openHistoryModal(o)">
+                        <i class="fas fa-history text-primary me-2"></i>
+                        <span>سجل حالات الطلب والتدقيق</span>
+                      </button>
+
+                      <div class="dropdown-divider my-1"></div>
+
+                      <button *ngIf="canAccept(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="acceptOrder(o)">
+                        <i class="fas fa-check text-success me-2"></i>
+                        <span>قبول الطلب وتجهيزه</span>
+                      </button>
+
+                      <button *ngIf="canPrepare(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="startPreparing(o)">
+                        <i class="fas fa-utensils text-info me-2"></i>
+                        <span>بدء التجهيز</span>
+                      </button>
+
+                      <button *ngIf="canMarkReady(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="markReady(o)">
+                        <i class="fas fa-box-open text-primary me-2"></i>
+                        <span>جاهز للاستلام</span>
+                      </button>
+
+                      <button *ngIf="isDeliveryEditable(o) || canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                        <i class="fas fa-motorcycle text-primary me-2"></i>
+                        <span>{{ hasAssignedDriver(o) ? 'تعيين / إعادة تعيين مندوب' : 'تعيين مندوب توصيل' }}</span>
+                      </button>
+
+                      <button *ngIf="canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="confirmPickup(o)">
+                        <i class="fas fa-shipping-fast text-info me-2"></i>
+                        <span>تأكيد استلام المندوب</span>
+                      </button>
+
+                      <button *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
+                        <i class="fas fa-check-double text-success me-2"></i>
+                        <span>تسليم إداري</span>
+                      </button>
+
+                      <div class="dropdown-divider my-1" *ngIf="canReject(o) || canCancel(o)"></div>
+
+                      <button *ngIf="canReject(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="rejectOrder(o)">
+                        <i class="fas fa-times-circle text-danger me-2"></i>
+                        <span>رفض الطلب</span>
+                      </button>
+
+                      <button *ngIf="canCancel(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="confirmCancel(o)">
+                        <i class="fas fa-ban text-danger me-2"></i>
+                        <span>إلغاء الطلب</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>

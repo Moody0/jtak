@@ -138,12 +138,14 @@ class MarketStoreModel {
     String? logoUrl;
     if (photo.startsWith('assets/')) {
       assetPath = photo;
-    } else if (photo.startsWith('http')) {
+    } else if (photo.startsWith('http://') || photo.startsWith('https://')) {
       logoUrl = photo;
     } else if (photo.isNotEmpty && photo.toLowerCase() != 'null') {
       logoUrl = GlobalVar.getImageUrl(photo);
     }
-    assetPath ??= _resolveAssetByName(title);
+    if ((logoUrl == null || logoUrl.isEmpty) && (assetPath == null || assetPath.isEmpty)) {
+      assetPath = _resolveAssetByName(title);
+    }
 
     const bool isUsd = false;
 
@@ -215,6 +217,9 @@ class MarketStoreModel {
   }
 
   MockRestaurantData toRestaurantData() {
+    final effectiveImage = (logoUrl != null && logoUrl!.isNotEmpty)
+        ? logoUrl!
+        : (assetPath ?? '');
     return MockRestaurantData(
       id: id,
       name: name,
@@ -230,8 +235,8 @@ class MarketStoreModel {
       hasOffers: true,
       isFast: true,
       isMarket: true,
-      coverUrl: assetPath ?? logoUrl ?? '',
-      logoUrl: assetPath ?? logoUrl ?? '',
+      coverUrl: effectiveImage,
+      logoUrl: effectiveImage,
       categories: const ['كل الأقسام'],
       menuItems: const [],
     );
@@ -473,9 +478,8 @@ class RestaurantStoreModel {
       minOrder = 25000;
     }
 
-    final resolvedAssets = _resolveRestaurantAssets(title);
-    String coverUrl = resolvedAssets['cover']!;
-    String logoUrl = resolvedAssets['logo']!;
+    String coverUrl = '';
+    String logoUrl = '';
 
     if (photo.contains(',')) {
       final parts = photo
@@ -484,19 +488,28 @@ class RestaurantStoreModel {
           .where((s) => s.isNotEmpty)
           .toList();
       if (parts.isNotEmpty && parts[0].isNotEmpty && parts[0] != 'null') {
-        coverUrl = GlobalVar.getImageUrl(parts[0]);
+        coverUrl = parts[0].startsWith('http') ? parts[0] : (parts[0].startsWith('assets') ? parts[0] : GlobalVar.getImageUrl(parts[0]));
       }
       if (parts.length > 1 && parts[1].isNotEmpty && parts[1] != 'null') {
-        logoUrl = GlobalVar.getImageUrl(parts[1]);
+        logoUrl = parts[1].startsWith('http') ? parts[1] : (parts[1].startsWith('assets') ? parts[1] : GlobalVar.getImageUrl(parts[1]));
       } else {
         logoUrl = coverUrl;
       }
-    } else if (photo.startsWith('http')) {
+    } else if (photo.startsWith('http://') || photo.startsWith('https://')) {
+      logoUrl = photo;
+      coverUrl = photo;
+    } else if (photo.startsWith('assets')) {
       logoUrl = photo;
       coverUrl = photo;
     } else if (photo.isNotEmpty && photo.toLowerCase() != 'null') {
       coverUrl = GlobalVar.getImageUrl(photo);
       logoUrl = coverUrl;
+    }
+
+    if (coverUrl.isEmpty || logoUrl.isEmpty) {
+      final resolvedAssets = _resolveRestaurantAssets(title);
+      if (coverUrl.isEmpty) coverUrl = resolvedAssets['cover']!;
+      if (logoUrl.isEmpty) logoUrl = resolvedAssets['logo']!;
     }
 
     double fee = 5000.0;
@@ -703,9 +716,11 @@ class MarketsProvider extends BaseProvider {
           }
         }
 
-        // The app is configured with ONE flagship supermarket: JTAK Market
-        // containing unified Best Market + Clover Mall inventory.
-        _markets = List.from(_defaultLiveSeededMarkets);
+        if (fetchedMarkets.isNotEmpty) {
+          _markets = fetchedMarkets;
+        } else if (_markets.isEmpty) {
+          _markets = List.from(_defaultLiveSeededMarkets);
+        }
         if (fetchedRestaurants.isNotEmpty) {
           _restaurants = fetchedRestaurants;
         }
@@ -735,6 +750,51 @@ class MarketsProvider extends BaseProvider {
     _isLoading = false;
     notifyListeners();
     loadPopularMeals();
+  }
+
+  /// Fetches single merchant details live from backend by ID and updates local store state
+  Future<MarketStoreModel?> fetchMerchantById(int id) async {
+    try {
+      final userToken = locator<AuthenticationService>().getAccessToken;
+      final url = Uri.parse('https://api.jtak.app/api/v1/Customer/Products/Merchants/$id');
+      final res = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          if (userToken.isNotEmpty) 'Authorization': 'Bearer $userToken',
+        },
+      ).timeout(const Duration(seconds: 6));
+
+      if (res.statusCode == 200) {
+        final item = jsonDecode(res.body);
+        if (item is Map<String, dynamic>) {
+          final merchantKind = int.tryParse((item['merchantKind'] ?? '').toString()) ?? 0;
+          final updatedMarket = MarketStoreModel.fromJson(item);
+          
+          if (merchantKind == 1) {
+            final idx = _markets.indexWhere((m) => m.id == id);
+            if (idx != -1) {
+              _markets[idx] = updatedMarket;
+            } else {
+              _markets.insert(0, updatedMarket);
+            }
+          } else {
+            final updatedRestaurant = RestaurantStoreModel.fromJson(item);
+            final idx = _restaurants.indexWhere((r) => r.id == id);
+            if (idx != -1) {
+              _restaurants[idx] = updatedRestaurant;
+            } else {
+              _restaurants.insert(0, updatedRestaurant);
+            }
+          }
+          notifyListeners();
+          return updatedMarket;
+        }
+      }
+    } catch (e) {
+      debugPrint('MarketsProvider: Error fetching merchant $id: $e');
+    }
+    return null;
   }
 
   /// Loads real popular / most ordered meals from backend with multi-tier resilience

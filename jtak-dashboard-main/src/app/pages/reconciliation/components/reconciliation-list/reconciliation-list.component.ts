@@ -11,6 +11,7 @@ import {
   SettlementPartyType,
 } from '../../models/reconciliation.model';
 import { ReconciliationService } from '../../services/reconciliation.service';
+import { NotificationSummaryService } from 'src/app/_metronic/layout/core/notification-summary.service';
 
 @Component({
   selector: 'app-reconciliation-list',
@@ -63,7 +64,8 @@ export class ReconciliationListComponent implements OnInit {
   constructor(
     private reconciliationService: ReconciliationService,
     private modalService: NgbModal,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private notificationSummaryService: NotificationSummaryService
   ) {}
 
   ngOnInit(): void {
@@ -133,6 +135,7 @@ export class ReconciliationListComponent implements OnInit {
     this.loadSettlementRequests();
     this.loadCaptains();
     this.loadHistory();
+    this.notificationSummaryService.refresh();
   }
 
   private failRequestAction(err: any): void {

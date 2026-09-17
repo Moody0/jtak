@@ -165,7 +165,9 @@ class _ProductMarketplacePageState extends State<ProductMarketplacePage> {
   }
 
   void _openMerchant(MarketStoreModel merchant) {
-    final image = merchant.assetPath ?? merchant.logoUrl;
+    final image = (merchant.logoUrl != null && merchant.logoUrl!.isNotEmpty)
+        ? merchant.logoUrl!
+        : (merchant.assetPath ?? '');
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -464,7 +466,10 @@ class _ProductMarketplacePageState extends State<ProductMarketplacePage> {
               separatorBuilder: (_, __) => const SizedBox(width: 14),
               itemBuilder: (context, index) {
                 final merchant = nearby[index];
-                final image = merchant.assetPath ?? merchant.logoUrl;
+                final image = (merchant.logoUrl != null &&
+                        merchant.logoUrl!.isNotEmpty)
+                    ? merchant.logoUrl!
+                    : (merchant.assetPath ?? '');
                 return GestureDetector(
                   onTap: () => _openMerchant(merchant),
                   child: SizedBox(
@@ -593,7 +598,10 @@ class _ProductMarketplacePageState extends State<ProductMarketplacePage> {
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             final merchant = merchants[index];
-            final image = merchant.assetPath ?? merchant.logoUrl;
+            final image = (merchant.logoUrl != null &&
+                    merchant.logoUrl!.isNotEmpty)
+                ? merchant.logoUrl!
+                : (merchant.assetPath ?? '');
             return InkWell(
               onTap: () => _openMerchant(merchant),
               borderRadius: BorderRadius.circular(18),

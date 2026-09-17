@@ -1,0 +1,60 @@
+<div class="modal-header bg-light py-3">
+  <h4 class="modal-title fw-bolder text-dark d-flex align-items-center gap-2 m-0">
+    <i class="fas fa-history text-primary"></i>
+    <span>سجل تدقيق وتغييرات حالات الطلب #{{ order?.id }}</span>
+  </h4>
+  <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body py-4">
+  <div *ngIf="errorMessage" class="alert alert-danger mb-4">
+    {{ errorMessage }}
+  </div>
+
+  <div *ngIf="isLoading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="text-muted mt-2 fs-7">جاري تحميل سجل الحالات...</div>
+  </div>
+
+  <div *ngIf="!isLoading && history.length === 0" class="text-center py-5 text-muted">
+    <i class="fas fa-clipboard-list fs-1 mb-3 text-gray-300"></i>
+    <p>لا يوجد سجل حالات مسجل لهذا الطلب حتى الآن.</p>
+  </div>
+
+  <div *ngIf="!isLoading && history.length > 0" class="timeline-widget">
+    <div class="timeline timeline-5 mt-3">
+      <div class="timeline-item mb-4" *ngFor="let h of history">
+        <div class="timeline-badge">
+          <i class="fas" [ngClass]="getStatusIcon(h.status)"></i>
+        </div>
+        <div class="timeline-content p-3 rounded bg-light border">
+          <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge" [ngClass]="getStatusBadgeClass(h.status)">
+                {{ h.statusArabic || h.statusName }}
+              </span>
+              <span class="text-muted fs-8">بواسطة: <strong>{{ h.createdBy || 'النظام' }}</strong></span>
+            </div>
+            <div class="text-muted fs-8" dir="ltr">
+              {{ h.createdDate | date:'yyyy-MM-dd HH:mm:ss' }}
+            </div>
+          </div>
+
+          <div *ngIf="h.driverName" class="text-primary fs-8 mt-1">
+            <i class="fas fa-motorcycle me-1"></i>المندوب المرتبط: <strong>{{ h.driverName }}</strong>
+          </div>
+
+          <div *ngIf="h.details" class="text-dark fs-8 mt-2 p-2 bg-white rounded border">
+            <i class="fas fa-sticky-note text-warning me-1"></i>{{ h.details }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer bg-light py-2">
+  <button type="button" class="btn btn-sm btn-secondary" (click)="modal.dismiss()">
+    إغلاق
+  </button>
+</div>

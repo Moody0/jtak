@@ -41,7 +41,7 @@ namespace Modules.Orders.Services
         Task<Order> StartShippingOrder(int orderId, int merchantId, Guid derliveryId);
         Task<bool> CanDeliverOrder(int orderId, Guid derliveryId);
         Task<bool> CanStartShippingOrder(int orderId, int merchantId, Guid derliveryId);
-        Task<Order> DeliverOrder(int orderId, Guid derliveryId, string photoUrl = null, string signature = null, string notes = null);
+        Task<Order> DeliverOrder(int orderId, Guid derliveryId, string photoUrl = null, string signature = null, string notes = null, bool isAdminOverride = false);
         Task<Order> UpdateDeliveryLocation(int orderId, Guid deliveryId, decimal lat, decimal lng);
         void Log(int OrderId,
                      OrderDetailStatus orderDetailsStatus,
@@ -392,10 +392,10 @@ namespace Modules.Orders.Services
                                                 (x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup || x.OrderDetailStatus == OrderDetailStatus.ShippingStarted)));
 
 
-        public async Task<Order> DeliverOrder(int orderId, Guid deliveryId, string photoUrl = null, string signature = null, string notes = null)
+        public async Task<Order> DeliverOrder(int orderId, Guid deliveryId, string photoUrl = null, string signature = null, string notes = null, bool isAdminOverride = false)
         {
             var order = await FindAsync(orderId);
-            if (order == null || order.DeliveryId != deliveryId)
+            if (order == null || (!isAdminOverride && order.DeliveryId != deliveryId))
                 throw new UnauthorizedAccessException("You Cannot Derliver this order!");
 
             var activeDetails = order.OrderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&

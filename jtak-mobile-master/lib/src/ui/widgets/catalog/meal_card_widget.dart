@@ -239,32 +239,8 @@ class JTAKMealCard extends StatelessWidget {
   }
 
   String _resolveMerchantLogo() {
-    if (data.merchantLogoUrl.isNotEmpty &&
-        data.merchantLogoUrl != data.coverUrl &&
-        !data.merchantLogoUrl.contains('_dish.')) {
+    if (data.merchantLogoUrl.isNotEmpty && !data.merchantLogoUrl.contains('_dish.')) {
       return data.merchantLogoUrl;
-    }
-    final name = data.merchantName.toLowerCase();
-    if (name.contains('أنس') || name.contains('شاورما')) {
-      return 'assets/images/restaurants/anas_logo.webp';
-    } else if (name.contains('مشاوي') ||
-        name.contains('كباب') ||
-        name.contains('بوابة دمشق')) {
-      return 'assets/images/restaurants/damascus_logo.webp';
-    } else if (name.contains('بوز الجدي') ||
-        name.contains('فول') ||
-        name.contains('فتات')) {
-      return 'assets/images/restaurants/bouz_logo.webp';
-    } else if (name.contains('بكداش') || name.contains('بوظة')) {
-      return 'assets/images/restaurants/bakdash_logo.webp';
-    } else if (name.contains('النوفرة') || name.contains('نوفرة')) {
-      return 'assets/images/restaurants/noufara_logo.webp';
-    } else if (name.contains('برغر') || name.contains('burger')) {
-      return 'assets/images/restaurants/burger_logo.webp';
-    } else if (name.contains('داوود') || name.contains('مهنا')) {
-      return 'assets/images/restaurants/dawood_logo.webp';
-    } else if (name.contains('أرت') || name.contains('art')) {
-      return 'assets/images/restaurants/art_logo.webp';
     }
     return data.merchantLogoUrl;
   }

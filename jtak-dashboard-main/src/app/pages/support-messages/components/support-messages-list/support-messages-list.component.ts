@@ -15,6 +15,8 @@ import { SupportMessage, SupportMessageStats, SupportMessageStatus } from '../..
 import { SupportMessagesService } from '../../services/support-messages.service';
 import { ViewMessageModalComponent } from '../view-message-modal/view-message-modal.component';
 
+import { NotificationSummaryService } from 'src/app/_metronic/layout/core/notification-summary.service';
+
 @Component({
   selector: 'app-support-messages-list',
   templateUrl: './support-messages-list.component.html',
@@ -43,7 +45,8 @@ export class SupportMessagesListComponent
     private fb: FormBuilder,
     public supportService: SupportMessagesService,
     private modalService: NgbModal,
-    private toastr: ToastrService
+    private toastr: ToastrService,
+    private notificationSummaryService: NotificationSummaryService
   ) {}
 
   ngOnInit(): void {
@@ -61,6 +64,7 @@ export class SupportMessagesListComponent
     this.subs.sink = this.supportService.getStats().subscribe({
       next: (stats) => {
         this.stats = stats;
+        this.notificationSummaryService.refresh();
       },
       error: () => {},
     });

@@ -1,4 +1,4 @@
-﻿using App.BackgroundTasks;
+using App.BackgroundTasks;
 using App.Catalog.Data;
 using App.Data;
 using App.Orders.Data;
@@ -75,6 +75,7 @@ namespace App.Helpers.StartUp
             services.AddScoped<IEodReconciliationService, EodReconciliationService>();
             services.AddScoped<ISettlementRequestService, SettlementRequestService>();
             services.AddScoped<ISupportMessageService, SupportMessageService>();
+            services.AddScoped<IAdminNotificationSummaryService, AdminNotificationSummaryService>();
 
             // Background Service Management
             services.AddHostedService<OrderCheckingService>();

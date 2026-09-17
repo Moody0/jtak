@@ -323,7 +323,9 @@ class _HomePageState extends State<HomePage> {
                       builder: (context) => MarketPage(
                         marketId: store.id,
                         marketName: store.name,
-                        logoUrl: store.assetPath ?? store.logoUrl,
+                        logoUrl: (store.logoUrl != null && store.logoUrl!.isNotEmpty)
+                            ? store.logoUrl
+                            : store.assetPath,
                       ),
                     ),
                   );

@@ -60,3 +60,17 @@ export interface OrderLiveTrack {
     currentStopIsDarkStore: boolean;
     stops: ShippingStopProgress[];
 }
+
+export interface OrderStatusHistoryItem {
+    id: number;
+    orderId: number;
+    status: number;
+    statusName: string;
+    statusArabic: string;
+    createdDate: string;
+    createdBy: string;
+    driverId?: string;
+    driverName?: string;
+    details?: string;
+}
+

@@ -217,6 +217,9 @@ class OrderProvider extends BaseProvider<OrderModel> {
             order!.deliveryLocationUpdatedAt =
                 liveTrack!.locationUpdatedAt!.toIso8601String();
           }
+          if (liveTrack!.deliveryOtp != null && liveTrack!.deliveryOtp!.isNotEmpty) {
+            order!.deliveryOtp = liveTrack!.deliveryOtp;
+          }
         }
 
         notifyListeners();

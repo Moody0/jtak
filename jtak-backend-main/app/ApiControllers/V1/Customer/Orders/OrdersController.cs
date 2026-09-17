@@ -220,7 +220,8 @@ namespace App.ApiControllers.V1.Customer.Orders
                     x.DeliveryLocationUpdatedAt,
                     x.Lat,
                     x.Lng,
-                    x.Address
+                    x.Address,
+                    x.DeliveryOtp
                 })
                 .FirstOrDefaultAsync();
 
@@ -313,6 +314,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                 DestinationLat = order.Lat,
                 DestinationLng = order.Lng,
                 DestinationAddress = order.Address,
+                DeliveryOtp = order.DeliveryOtp,
                 CurrentStopIndex = currentStop?.Index ?? (stops.Count > 0 ? stops.Max(s => s.Index) : 1),
                 CurrentStopTitle = currentStop?.StopTitle ?? "عنوان التوصيل (موقعك)",
                 CurrentStopIsDarkStore = currentStop?.IsDarkStore ?? false,

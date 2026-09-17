@@ -406,6 +406,7 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
+  position: relative !important;
   height: 42px !important;
   min-height: 42px !important;
   max-height: 42px !important;
@@ -451,6 +452,7 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  position: static !important;
   flex: 0 0 26px !important;
   width: 26px !important;
   min-width: 26px !important;
@@ -473,11 +475,68 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
   font-size: 0.9rem !important;
   color: inherit !important;
   max-width: 175px !important;
+  padding-inline-end: 32px !important;
   opacity: 1 !important;
   transform: translateX(0) !important;
   transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
               max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.aside .jtak-nav .menu-item .menu-link .menu-badge,
+.aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  min-width: 20px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: #ffffff !important;
+  background-color: #e53935 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4) !important;
+  border: none !important;
+  z-index: 2 !important;
+  letter-spacing: -0.2px !important;
+  user-select: none !important;
+  pointer-events: none !important;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease !important;
+}
+
+[dir="rtl"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+[dir="rtl"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
+  left: 12px !important;
+  right: auto !important;
+}
+
+[dir="ltr"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+[dir="ltr"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
+  right: 12px !important;
+  left: auto !important;
+}
+
+.aside .jtak-nav .menu-item .menu-link .menu-badge .badge-text--expanded,
+.aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge .badge-text--expanded {
+  display: inline !important;
+}
+
+.aside .jtak-nav .menu-item .menu-link .menu-badge .badge-text--collapsed,
+.aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge .badge-text--collapsed {
+  display: none !important;
+}
+
+.aside .jtak-nav .menu-item .menu-link.active .menu-badge,
+.aside .jtak-nav .menu-item .menu-link.active .menu-icon .menu-badge {
+  background-color: #ffffff !important;
+  color: #d32f2f !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+  font-weight: 800 !important;
 }
 
 /* Minimized Menu Link overrides */
@@ -486,14 +545,17 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link {
   margin: 2px 8px !important;
   padding: 0 14px !important;
   justify-content: flex-start !important;
+  overflow: visible !important;
 }
 
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon,
 html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon {
+  position: relative !important;
   margin-inline-end: 0 !important;
   margin-inline-start: 0 !important;
   flex: 0 0 26px !important;
   width: 26px !important;
+  overflow: visible !important;
 }
 
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-title,
@@ -503,6 +565,69 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-t
   margin: 0 !important;
   transform: translateX(8px) !important;
   pointer-events: none !important;
+}
+
+/* Collapsed Sidebar: compact badge attached to menu icon (NOT display: none) */
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
+  display: inline-flex !important;
+  position: absolute !important;
+  top: -6px !important;
+  transform: none !important;
+  min-width: 17px !important;
+  height: 17px !important;
+  padding: 0 3px !important;
+  font-size: 0.62rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  color: #ffffff !important;
+  background-color: #e53935 !important;
+  border-radius: 9px !important;
+  border: 1.5px solid #1e1e2d !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45) !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
+}
+
+[dir="rtl"] body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+[dir="rtl"] body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge,
+[dir="rtl"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+[dir="rtl"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
+  left: -6px !important;
+  right: auto !important;
+}
+
+[dir="ltr"] body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+[dir="ltr"] body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge,
+[dir="ltr"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
+[dir="ltr"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
+  right: -6px !important;
+  left: auto !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge .badge-text--expanded,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge .badge-text--expanded,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge .badge-text--expanded,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge .badge-text--expanded {
+  display: none !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge .badge-text--collapsed,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge .badge-text--collapsed,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge .badge-text--collapsed,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge .badge-text--collapsed {
+  display: inline !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-badge,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-icon .menu-badge,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-badge,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-icon .menu-badge {
+  background-color: #ffffff !important;
+  color: #d32f2f !important;
+  border-color: #FF5722 !important;
 }
 
 body[data-kt-aside-minimize="on"] .aside .jtak-system-state,

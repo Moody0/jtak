@@ -274,7 +274,15 @@ namespace Modules.Accounting.Services
 
             // 1. Resolve Accounts
             Account settlementAssetAcc;
-            if (request.IsCod)
+            if (request.IsCompanyCash)
+            {
+                settlementAssetAcc = await GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.CompanyMainVault,
+                    "Company Cash Vault (Main Safe)",
+                    AccountType.Asset,
+                    currency);
+            }
+            else if (request.IsCod)
             {
                 settlementAssetAcc = await GetOrCreateUserAccountAsync(
                     request.CaptainUserId,
@@ -292,12 +300,16 @@ namespace Modules.Accounting.Services
                     currency);
             }
 
-            var captainEarningsAcc = await GetOrCreateUserAccountAsync(
-                request.CaptainUserId,
-                AccountType.Liability,
-                SystemAccountCodes.CaptainEarningsPrefix,
-                string.IsNullOrWhiteSpace(request.CaptainName) ? $"Captain Wages {request.CaptainUserId}" : $"Earnings - {request.CaptainName}",
-                currency);
+            Account captainEarningsAcc = null;
+            if (request.CaptainUserId != Guid.Empty)
+            {
+                captainEarningsAcc = await GetOrCreateUserAccountAsync(
+                    request.CaptainUserId,
+                    AccountType.Liability,
+                    SystemAccountCodes.CaptainEarningsPrefix,
+                    string.IsNullOrWhiteSpace(request.CaptainName) ? $"Captain Wages {request.CaptainUserId}" : $"Earnings - {request.CaptainName}",
+                    currency);
+            }
 
             var platformRevenueAcc = await GetOrCreateSystemAccountAsync(
                 SystemAccountCodes.PlatformCommissionRevenue,
@@ -325,9 +337,11 @@ namespace Modules.Accounting.Services
                 Debit = grossCashCollected,
                 Credit = 0m,
                 Currency = currency,
-                Memo = request.IsCod
-                    ? $"Order #{request.OrderId} gross cash in custody (liability to platform)"
-                    : $"Order #{request.OrderId} electronic payment received via gateway"
+                Memo = request.IsCompanyCash
+                    ? $"Order #{request.OrderId} gross cash in company vault"
+                    : (request.IsCod
+                        ? $"Order #{request.OrderId} gross cash in custody (liability to platform)"
+                        : $"Order #{request.OrderId} electronic payment received via gateway")
             });
 
             // 3. Credit each Vendor for product value minus commission
@@ -379,14 +393,33 @@ namespace Modules.Accounting.Services
                 : request.DeliveryFee;
             if (captainEarnings > 0)
             {
-                txnRequest.Entries.Add(new PostLedgerEntryRequest
+                if (captainEarningsAcc != null)
                 {
-                    AccountId = captainEarningsAcc.Id,
-                    Debit = 0m,
-                    Credit = captainEarnings,
-                    Currency = currency,
-                    Memo = $"Order #{request.OrderId} courier delivery wage"
-                });
+                    txnRequest.Entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = captainEarningsAcc.Id,
+                        Debit = 0m,
+                        Credit = captainEarnings,
+                        Currency = currency,
+                        Memo = $"Order #{request.OrderId} courier delivery wage"
+                    });
+                }
+                else
+                {
+                    var platformDeliveryFeeAcc = await GetOrCreateSystemAccountAsync(
+                        SystemAccountCodes.PlatformDeliveryFeeRevenue,
+                        "Platform Delivery Markup Revenue",
+                        AccountType.Revenue,
+                        currency);
+                    txnRequest.Entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = platformDeliveryFeeAcc.Id,
+                        Debit = 0m,
+                        Credit = captainEarnings,
+                        Currency = currency,
+                        Memo = $"Order #{request.OrderId} delivery fee retained by platform (no courier assigned)"
+                    });
+                }
             }
 
             // 5. Credit Platform Revenue for total commissions (or Debit Promotional Discount Expense if negative)

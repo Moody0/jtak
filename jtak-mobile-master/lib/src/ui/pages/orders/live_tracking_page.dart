@@ -74,6 +74,7 @@ class _LiveTrackingPageState extends State<LiveTrackingPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.order.id != null) {
         final p = Provider.of<OrderProvider>(context, listen: false);
+        p.loadOrder(widget.order.id!, silent: true);
         p.loadLiveTrack(widget.order.id!);
         _startLiveSync();
       }
@@ -704,6 +705,57 @@ class _LiveTrackingPageState extends State<LiveTrackingPage>
                   ),
                 );
               },
+            ),
+          ] else if (status != OrderDetailsStatus.delivered &&
+                     status != OrderDetailsStatus.customerCanceled &&
+                     status != OrderDetailsStatus.deliveryCanceled &&
+                     status != OrderDetailsStatus.merchantRejected) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFFEDD5), width: 1.2),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.shield_outlined, color: kPrimaryOrange, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'رمز تأكيد الاستلام:',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryOrange),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'جاري التحميل...',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
 

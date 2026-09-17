@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Shared.Services;
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
@@ -16,6 +16,8 @@ using System.Globalization;
 using Solf.Models;
 using App.Shared.Entities.Enums;
 using App.Shared.Data.App;
+using Modules.Accounting.Entities;
+using Modules.Accounting.Services;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -27,13 +29,27 @@ namespace App.ApiControllers.V1.Admin
     {
         private readonly INotificationService _service;
         private readonly UserManager<AppUser> _userManager;
+        private readonly IAdminNotificationSummaryService _summaryService;
 
-        public NotificationsController(INotificationService service,
-            UserManager<AppUser> userManager)
+        public NotificationsController(
+            INotificationService service,
+            UserManager<AppUser> userManager,
+            IAdminNotificationSummaryService summaryService)
         {
             _userManager = userManager;
             _service = service;
-            _service = service;
+            _summaryService = summaryService;
+        }
+
+        /// <summary>
+        /// Get real-time actionable notification and pending counter summary for admin sidebar
+        /// </summary>
+        [HttpGet]
+        [Route("Summary")]
+        public async Task<ActionResult<AdminNotificationSummaryDto>> Summary()
+        {
+            var summary = await _summaryService.GetSummaryAsync();
+            return Ok(summary);
         }
 
         /// <summary>

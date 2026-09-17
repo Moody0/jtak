@@ -608,6 +608,8 @@ class CartProvider extends BaseProvider<OrderModel> {
           ? storeTitles.join(' + ')
           : 'متجر جيتك';
 
+      final String? serverOtp = response['deliveryOtp']?.toString() ?? response['DeliveryOtp']?.toString();
+
       final placedOrder = OrderModel(
         id: newOrderId,
         purchaseDate: DateTime.now().toIso8601String(),
@@ -618,7 +620,7 @@ class CartProvider extends BaseProvider<OrderModel> {
         paymentMethod: orderPayment.paymentMethod,
         orderStatus: OrderStatus.pending,
         description: orderDescription,
-        deliveryOtp: order.deliveryOtp,
+        deliveryOtp: serverOtp ?? order.deliveryOtp,
         orderDetails: details,
       );
 

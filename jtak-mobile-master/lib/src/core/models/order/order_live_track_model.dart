@@ -75,6 +75,7 @@ class OrderLiveTrackModel {
   final int currentStopIndex;
   final String? currentStopTitle;
   final bool currentStopIsDarkStore;
+  final String? deliveryOtp;
   final List<ShippingStopProgressModel> stops;
 
   OrderLiveTrackModel({
@@ -97,6 +98,7 @@ class OrderLiveTrackModel {
     this.currentStopIndex = 0,
     this.currentStopTitle,
     this.currentStopIsDarkStore = false,
+    this.deliveryOtp,
     this.stops = const [],
   });
 
@@ -162,6 +164,7 @@ class OrderLiveTrackModel {
           : int.tryParse(map['currentStopIndex']?.toString() ?? '0') ?? 0,
       currentStopTitle: map['currentStopTitle']?.toString(),
       currentStopIsDarkStore: map['currentStopIsDarkStore'] == true,
+      deliveryOtp: map['deliveryOtp']?.toString() ?? map['DeliveryOtp']?.toString(),
       stops: parsedStops,
     );
   }

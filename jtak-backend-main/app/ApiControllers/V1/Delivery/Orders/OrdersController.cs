@@ -28,6 +28,7 @@ using App.Orders.Data;
 using Modules.Shipping.Entities;
 using Microsoft.AspNetCore.SignalR;
 using App.Shared.Services.Hubs;
+using Microsoft.Extensions.Logging;
 
 namespace App.ApiControllers.V1.Delivery
 {
@@ -52,6 +53,7 @@ namespace App.ApiControllers.V1.Delivery
         private readonly IProductService _productService;
         private readonly IHubContext<TrackingHub> _trackingHub;
         private readonly IOrdersUnitOfWork _ouow;
+        private readonly ILogger<OrdersController> _logger;
 
         public OrdersController(IAppUnitOfWork unitOfWork,
             IAccountingUnitOfWork auow,
@@ -67,7 +69,8 @@ namespace App.ApiControllers.V1.Delivery
             ILedgerService ledgerService,
             IInventoryBatchService batchService,
             IHubContext<TrackingHub> trackingHub,
-            IMapper mapper)
+            IMapper mapper,
+            ILogger<OrdersController> logger = null)
         {
             _auow = auow;
             _ouow = ouow;
@@ -83,6 +86,7 @@ namespace App.ApiControllers.V1.Delivery
             _ledgerService = ledgerService;
             _batchService = batchService;
             _trackingHub = trackingHub;
+            _logger = logger;
         }
 
 
@@ -684,68 +688,80 @@ namespace App.ApiControllers.V1.Delivery
                 : await _service.DeliverOrder(id, uid.Value, request?.PhotoUrl, request?.Signature, request?.Notes);
 
             // Execute financial operations in an atomic relational transaction
-            using (var transaction = await _auow.Context.Database.BeginTransactionAsync())
+            // CRITICAL: Delivery success idempotency. If primary order delivery has committed,
+            // secondary accounting failures or balance refresh errors MUST NOT cause the endpoint
+            // to return a 500 error that displays a delivery failure to the driver.
+            try
             {
-                try
+                using (var transaction = await _auow.Context.Database.BeginTransactionAsync())
                 {
-                    // Mark merchant bills as due now that delivery is complete
-                    var bills = await _billService.Queryable().Where(x => x.OrderId == id).ToArrayAsync();
-                    foreach (var b in bills)
+                    try
                     {
-                        b.IsAddedToDues = true;
-                        _billService.Update(b);
-                    }
-                    await _auow.SaveChangesAsync();
-
-                    // Double-Entry Ledger Posting: Revenue Split (COD or Electronic/Prepaid)
-                    var isCod = order.PaymentMethod == Modules.Orders.Entities.PaymentMethod.PayOnDelivery;
-                    if (bills.Length > 0)
-                    {
-                        var merchantSplits = new List<MerchantSplitItem>();
+                        // Mark merchant bills as due now that delivery is complete
+                        var bills = await _billService.Queryable().Where(x => x.OrderId == id).ToArrayAsync();
                         foreach (var b in bills)
                         {
-                            var m = await _merchantService.FindAsync(b.MerchantId);
-                            merchantSplits.Add(new MerchantSplitItem
+                            b.IsAddedToDues = true;
+                            _billService.Update(b);
+                        }
+                        await _auow.SaveChangesAsync();
+
+                        // Double-Entry Ledger Posting: Revenue Split (COD or Electronic/Prepaid)
+                        var isCod = order.PaymentMethod == Modules.Orders.Entities.PaymentMethod.PayOnDelivery;
+                        if (bills.Length > 0)
+                        {
+                            var merchantSplits = new List<MerchantSplitItem>();
+                            foreach (var b in bills)
                             {
-                                MerchantId = b.MerchantId,
-                                MerchantTitle = m?.Title ?? $"Merchant #{b.MerchantId}",
-                                TotalAmount = b.TotalAmount,
-                                MerchantAmount = b.MerchantAmount,
-                                PlatformCommission = b.JTakAmount,
-                                IsPlatformOwned = m?.MerchantKind == MerchantKind.DarkStore,
-                                CaptainEarningAmount = b.JTakAdditionalAmount
-                            });
+                                var m = await _merchantService.FindAsync(b.MerchantId);
+                                merchantSplits.Add(new MerchantSplitItem
+                                {
+                                    MerchantId = b.MerchantId,
+                                    MerchantTitle = m?.Title ?? $"Merchant #{b.MerchantId}",
+                                    TotalAmount = b.TotalAmount,
+                                    MerchantAmount = b.MerchantAmount,
+                                    PlatformCommission = b.JTakAmount,
+                                    IsPlatformOwned = m?.MerchantKind == MerchantKind.DarkStore,
+                                    CaptainEarningAmount = b.JTakAdditionalAmount
+                                });
+                            }
+
+                            var splitReq = new OrderDeliveredSplitRequest
+                            {
+                                OrderId = id,
+                                CaptainUserId = uid.Value,
+                                CaptainName = dUser,
+                                DeliveryFee = bills.Sum(x => x.JTakAdditionalAmount),
+                                TotalsIncludeDeliveryFee = true,
+                                Currency = "SYP",
+                                IsCod = isCod,
+                                MerchantSplits = merchantSplits
+                            };
+
+                            await _ledgerService.PostOrderDeliveredSplitAsync(splitReq);
                         }
 
-                        var splitReq = new OrderDeliveredSplitRequest
+                        // Maintain legacy balance for backwards compatibility with legacy mobile views
+                        var recivedAmount = bills.Where(x => x.PaymentMethod == 0).Sum(x => x.TotalAmount);
+                        if (recivedAmount > 0 && !isAlreadyDelivered)
                         {
-                            OrderId = id,
-                            CaptainUserId = uid.Value,
-                            CaptainName = dUser,
-                            DeliveryFee = bills.Sum(x => x.JTakAdditionalAmount),
-                            TotalsIncludeDeliveryFee = true,
-                            Currency = "SYP",
-                            IsCod = isCod,
-                            MerchantSplits = merchantSplits
-                        };
+                            await _balanceService.IncreaseAppBalance(uid.Value, recivedAmount, dUser);
+                        }
 
-                        await _ledgerService.PostOrderDeliveredSplitAsync(splitReq);
+                        await transaction.CommitAsync();
                     }
-
-                    // Maintain legacy balance for backwards compatibility with legacy mobile views
-                    var recivedAmount = bills.Where(x => x.PaymentMethod == 0).Sum(x => x.TotalAmount);
-                    if (recivedAmount > 0 && !isAlreadyDelivered)
+                    catch (Exception ex)
                     {
-                        await _balanceService.IncreaseAppBalance(uid.Value, recivedAmount, dUser);
+                        await transaction.RollbackAsync();
+                        _logger?.LogError(ex, "Secondary accounting/ledger posting failed for delivered order {OrderId}", id);
+                        // Do not rethrow: order delivery has already committed successfully.
+                        // Throwing here would report delivery failure to driver when order was already marked delivered.
                     }
-
-                    await transaction.CommitAsync();
                 }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Secondary financial transaction failure for delivered order {OrderId}", id);
             }
 
             // Remove Customer from delivery task list

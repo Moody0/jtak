@@ -135,6 +135,47 @@ namespace App.ApiControllers.V1.Customer
         }
 
         /// <summary>
+        /// Returns single active merchant details for customer app by ID.
+        /// </summary>
+        [HttpGet]
+        [Route("Merchants/{id}")]
+        [Route("Merchant/{id}")]
+        public async Task<ActionResult<MerchantDto>> GetMerchant(int id)
+        {
+            var merchant = await _merchantService.Queryable()
+                .AsNoTracking()
+                .Where(x => x.Id == id && x.DeletionDate == null && x.Active)
+                .Select(x => new MerchantDto
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    ShortDescription = x.ShortDescription,
+                    Description = x.Description,
+                    Phone1 = x.Phone1,
+                    Phone2 = x.Phone2,
+                    ShippingCoverageInMeters = x.ShippingCoverageInMeters,
+                    Lat = x.Lat,
+                    Lng = x.Lng,
+                    Active = x.Active,
+                    MerchantKind = x.MerchantKind,
+                    DeliveryTime = x.DeliveryTime,
+                    DeliveryFee = x.DeliveryFee,
+                    MinOrderAmount = x.MinOrderAmount,
+                    WorkingHours = x.WorkingHours,
+                    Address = x.Address,
+                    Photo = x.Photo
+                })
+                .FirstOrDefaultAsync();
+
+            if (merchant == null)
+            {
+                return NotFound();
+            }
+
+            return merchant;
+        }
+
+        /// <summary>
         /// Merchants that actually stock something in this category, including
         /// its subcategories. The apps previously inferred this by comparing a
         /// category's name against merchant names and cuisines, so a category

@@ -1,0 +1,95 @@
+<div class="modal-header bg-light-primary py-3">
+  <h4 class="modal-title fw-bolder text-primary d-flex align-items-center gap-2 m-0">
+    <i class="fas fa-check-double text-success"></i>
+    <span>تسليم الطلب إدارياً #{{ order?.id }}</span>
+  </h4>
+  <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body py-4">
+  <div *ngIf="errorMessage" class="alert alert-danger d-flex align-items-center mb-4">
+    <i class="fas fa-exclamation-triangle me-2 fs-4"></i>
+    <div>{{ errorMessage }}</div>
+  </div>
+
+  <div class="card mb-4 bg-light border-0">
+    <div class="card-body py-3 px-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span class="text-muted fs-8 d-block">العميل</span>
+          <strong class="fs-7">{{ order?.user }}</strong>
+        </div>
+        <div>
+          <span class="text-muted fs-8 d-block">المبلغ الإجمالي</span>
+          <strong class="fs-7 text-primary">{{ order?.price | number }} ل.س</strong>
+        </div>
+        <div>
+          <span class="text-muted fs-8 d-block">طريقة الدفع</span>
+          <span class="badge" [ngClass]="isCod() ? 'badge-light-warning' : 'badge-light-success'">
+            {{ isCod() ? 'دفع عند الاستلام (COD)' : 'مدفوع إلكترونياً' }}
+          </span>
+        </div>
+        <div>
+          <span class="text-muted fs-8 d-block">المندوب الحالي</span>
+          <strong class="fs-7">{{ order?.deliveryUser || 'غير معيّن' }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-bold">رمز تأكيد الاستلام (PIN) للعميل:</label>
+    <div class="input-group">
+      <span class="input-group-text"><i class="fas fa-key text-primary"></i></span>
+      <input type="text" class="form-control" placeholder="أدخل رمز PIN المكون من 4 أرقام (إن وجد)"
+        [(ngModel)]="otp" dir="ltr" maxlength="10" />
+    </div>
+    <div class="form-text text-muted fs-8">
+      إذا قدّم العميل رمز PIN للمندوب أو للإدارة، أدخله هنا للتحقق التلقائي.
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-bold">ملاحظات / سبب التسليم الإداري:</label>
+    <textarea class="form-control" rows="3"
+      placeholder="إلزامي في حال عدم توفر رمز PIN (مثال: تم تسليم الطلب يدوياً والتأكد مع العميل هاتفياً)..."
+      [(ngModel)]="notes"></textarea>
+    <div class="form-text text-muted fs-8">
+      سيتم حفظ الملاحظات في سجل التدقيق المالي وحالة الطلب.
+    </div>
+  </div>
+
+  <div *ngIf="isCod()" class="mb-3 p-3 border rounded bg-light-warning">
+    <label class="form-label fw-bold text-dark d-flex align-items-center gap-2 mb-2">
+      <i class="fas fa-coins text-warning"></i>
+      <span>جهة تحصيل المبلغ النقدي (COD):</span>
+    </label>
+    <div class="form-check mb-2" *ngIf="hasAssignedDriver()">
+      <input class="form-check-input" type="radio" name="cashResolutionMode" id="modeDriver"
+        value="DriverCashFloat" [(ngModel)]="cashResolutionMode">
+      <label class="form-check-label" for="modeDriver">
+        <strong>عهدة السائق المعين ({{ order?.deliveryUser }})</strong>
+        <div class="text-muted fs-8">يتم قيد المبلغ النقدي بذمة السائق في نظام المحاسبة والموازنة اليومية.</div>
+      </label>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="radio" name="cashResolutionMode" id="modeCompany"
+        value="CompanyCash" [(ngModel)]="cashResolutionMode">
+      <label class="form-check-label" for="modeCompany">
+        <strong>خزينة الشركة مباشرة (Company Vault)</strong>
+        <div class="text-muted fs-8">المبلغ تم تسليمه مباشرة للشركة / المكتب دون تسجيله في ذمة سائق.</div>
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer bg-light py-2">
+  <button type="button" class="btn btn-sm btn-secondary" (click)="modal.dismiss()" [disabled]="isLoading">
+    إلغاء
+  </button>
+  <button type="button" class="btn btn-sm btn-success" (click)="submit()" [disabled]="isLoading">
+    <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-1"></span>
+    <i *ngIf="!isLoading" class="fas fa-check-double me-1"></i>
+    <span>تأكيد التسليم الإداري</span>
+  </button>
+</div>

@@ -75,7 +75,9 @@ class JtakBigStoresSection extends StatelessWidget {
           builder: (context) => MarketPage(
             marketId: store.id,
             marketName: store.name,
-            logoUrl: store.assetPath ?? store.logoUrl,
+            logoUrl: (store.logoUrl != null && store.logoUrl!.isNotEmpty)
+                ? store.logoUrl
+                : store.assetPath,
           ),
         ),
       );
@@ -272,27 +274,35 @@ class JtakBigStoresSection extends StatelessWidget {
 
   Widget _buildEmblem(BigStoreData store) {
     const double size = 62.0;
+    final bool hasUrl = store.logoUrl != null && store.logoUrl!.isNotEmpty;
     final bool hasAsset =
         store.assetPath != null && store.assetPath!.isNotEmpty;
-    final bool hasUrl = store.logoUrl != null && store.logoUrl!.isNotEmpty;
 
     Widget imageContent;
-    if (hasAsset) {
-      imageContent = Image.asset(
-        store.assetPath!,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildFallbackLogo(store, size),
-      );
-    } else if (hasUrl) {
+    if (hasUrl) {
       imageContent = CachedNetworkImage(
         imageUrl: store.logoUrl!,
         width: size,
         height: size,
         fit: BoxFit.cover,
         placeholder: (_, __) => Container(color: const Color(0xFFF3F4F6)),
-        errorWidget: (_, __, ___) => _buildFallbackLogo(store, size),
+        errorWidget: (_, __, ___) => hasAsset
+            ? Image.asset(
+                store.assetPath!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildFallbackLogo(store, size),
+              )
+            : _buildFallbackLogo(store, size),
+      );
+    } else if (hasAsset) {
+      imageContent = Image.asset(
+        store.assetPath!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackLogo(store, size),
       );
     } else {
       imageContent = _buildFallbackLogo(store, size);

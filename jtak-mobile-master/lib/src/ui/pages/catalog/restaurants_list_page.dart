@@ -315,11 +315,15 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
 
         if (market != null) {
           seenMerchantIds.add(mId);
+          final effectiveImage = (market.logoUrl != null &&
+                  market.logoUrl!.isNotEmpty)
+              ? market.logoUrl!
+              : (market.assetPath ?? '');
           resolvedList.add({
             'id': market.id,
             'name': market.name,
-            'logoUrl': market.logoUrl ?? market.assetPath ?? '',
-            'coverUrl': market.assetPath ?? market.logoUrl ?? '',
+            'logoUrl': effectiveImage,
+            'coverUrl': effectiveImage,
             'isProductMerchant': true,
           });
           continue;
@@ -1872,7 +1876,9 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     Iterable<MarketStoreModel> markets,
   ) {
     return markets.map((market) {
-      final image = market.assetPath ?? market.logoUrl ?? '';
+      final image = (market.logoUrl != null && market.logoUrl!.isNotEmpty)
+          ? market.logoUrl!
+          : (market.assetPath ?? '');
       return _RestaurantListItem(
         id: market.id,
         name: market.name,

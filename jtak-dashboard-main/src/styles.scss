@@ -1549,3 +1549,80 @@ app-auth > div > .flex-center.flex-column-auto { position: relative; background:
 }
 
 /* RTL styles are imported from ./assets/sass/custom-rtl.css at line 4 */
+
+// Global Body-Appended Order Actions Dropdown (RTL & Viewport Safe)
+.ops-actions-dropdown-wrapper {
+  z-index: 1065 !important;
+}
+
+.ops-actions-menu {
+  min-width: 250px !important;
+  max-width: 320px !important;
+  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16), 0 3px 8px rgba(0, 0, 0, 0.08) !important;
+  padding: 8px !important;
+  direction: rtl !important;
+  text-align: right !important;
+  z-index: 1065 !important;
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px !important;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1e293b;
+    white-space: nowrap !important;
+    text-align: right !important;
+    direction: rtl !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    i {
+      width: 20px;
+      font-size: 0.88rem;
+      flex-shrink: 0;
+      margin-left: 8px !important;
+      margin-right: 0 !important;
+      text-align: center;
+    }
+
+    span {
+      white-space: nowrap !important;
+      flex-grow: 1;
+    }
+
+    &:hover, &:focus {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    &.text-success:hover, &.text-success:focus {
+      background-color: #ecfdf5 !important;
+      color: #059669 !important;
+    }
+
+    &.text-info:hover, &.text-info:focus {
+      background-color: #f0f9ff !important;
+      color: #0284c7 !important;
+    }
+
+    &.text-primary:hover, &.text-primary:focus {
+      background-color: #eff6ff !important;
+      color: #2563eb !important;
+    }
+
+    &.text-danger:hover, &.text-danger:focus {
+      background-color: #fef2f2 !important;
+      color: #dc2626 !important;
+    }
+  }
+
+  .dropdown-divider {
+    margin: 6px 0;
+    border-top: 1px solid #f1f5f9;
+  }
+}

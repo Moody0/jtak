@@ -644,13 +644,23 @@
   }
 }
 
-// Col 6: Actions Cluster
+// Col 6: Actions Column & Cluster
+.ops-actions-col {
+  width: 155px;
+  min-width: 145px;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+  text-align: center;
+  position: relative;
+}
+
 .ops-actions-cluster {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
 }
+
 
 .ops-btn-act {
   display: inline-flex;
@@ -697,6 +707,25 @@
       background: #fff1f2;
       border-color: #fda4af;
       color: #be123c !important;
+    }
+  }
+
+  &--more {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #475569 !important;
+    border-radius: 7px;
+
+    &:hover, &:focus {
+      background: #e2e8f0;
+      color: #1e293b !important;
+    }
+
+    &::after {
+      display: none !important;
     }
   }
 }

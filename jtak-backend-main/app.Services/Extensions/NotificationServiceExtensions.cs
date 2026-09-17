@@ -280,6 +280,23 @@ namespace App.Shared.Services.Extentions
             };
             await service.SendPushNotification(n, ids);
         }
+        public static async Task SendCustomerOrderDelivered(this INotificationService service,
+                                                          Guid[] ids,
+                                                          int orderId)
+        {
+            var n = new Notification
+            {
+                TitleAr = $"تم تسليم طلبك بنجاح! #{orderId}",
+                TitleEn = $"Your order was delivered successfully! #{orderId}",
+                TitleTr = $"Siparişiniz başarıyla teslim edildi! #{orderId}",
+                TextAr = "شكراً لاختيارك تطبيق جيتك. نتمنى لك تجربة ممتعة!",
+                TextEn = "Thank you for choosing JTAK. We hope you enjoy it!",
+                TextTr = "JTAK'ı tercih ettiğiniz için teşekkür ederiz!",
+                Url = $"{AppDomainHelper.DashboardUrl}/Orders/Delivered/{orderId}",
+                NotificationType = NotificationType.Order
+            };
+            await service.SendPushNotification(n, ids);
+        }
         public static async Task SendPaymentRecived(this INotificationService service,
                                                           Guid[] ids,
                                                           int paymentId,

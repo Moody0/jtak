@@ -3,7 +3,17 @@
     <div class="menu-content jtak-nav-label" [translate]="group.label"></div>
     <div class="menu-item" *ngFor="let item of group.items">
       <a class="menu-link without-sub" [routerLink]="'/' + item.path" routerLinkActive="active">
-        <span class="menu-icon" aria-hidden="true"><span [class]="item.icon"></span></span>
+        <span class="menu-icon" aria-hidden="true">
+          <span [class]="item.icon"></span>
+          <span
+            class="menu-badge"
+            *ngIf="getBadgeCount(item.path) > 0"
+            [attr.aria-label]="getBadgeCount(item.path) + ' pending items'"
+          >
+            <span class="badge-text badge-text--expanded">{{ getFormattedBadge(item.path) }}</span>
+            <span class="badge-text badge-text--collapsed">{{ getCollapsedBadge(item.path) }}</span>
+          </span>
+        </span>
         <span class="menu-title" [translate]="item.label"></span>
       </a>
     </div>

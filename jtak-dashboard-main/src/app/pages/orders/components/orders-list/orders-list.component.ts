@@ -16,11 +16,15 @@ import { Order } from '../../models/orders.model';
 import { OrderDetailStatus } from '../../models/order-status.enum';
 import { EditDilevry } from './EditDilevry/edit-dilevry.component';
 import { LiveTrackModalComponent } from './LiveTrackModal/live-track-modal.component';
+import { AdminDeliverModalComponent } from './AdminDeliverModal/admin-deliver-modal.component';
+import { OrderStatusHistoryModalComponent } from './OrderStatusHistoryModal/order-status-history-modal.component';
 import { forkJoin, interval } from 'rxjs';
 import { BulkConfirmModalComponent } from 'src/app/modules/shared/components/bulk-confirm-modal/bulk-confirm-modal.component';
 import { DeleteModalComponent } from 'src/app/modules/shared/components/delete-modal/delete-modal.component';
 import { TranslateService } from '@ngx-translate/core';
 
+
+import { NotificationSummaryService } from 'src/app/_metronic/layout/core/notification-summary.service';
 
 @Component({
   selector: 'app-orders-list',
@@ -48,8 +52,10 @@ export class OrdersListComponent
     private fb: FormBuilder,
     public ordersService: OrdersService,
     private modalService: NgbModal,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private notificationSummaryService: NotificationSummaryService
   ) { }
+
 
   setActiveTab(tab: 'ALL' | 'PENDING' | 'READY' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELED' | 'UNASSIGNED') {
     this.activeTab = tab;
@@ -177,6 +183,7 @@ export class OrdersListComponent
   refreshOrders() {
     this.lastUpdated = new Date();
     this.ordersService.fetchPost();
+    this.notificationSummaryService.refresh();
   }
 
 
@@ -269,31 +276,142 @@ export class OrdersListComponent
   }
 
   approve(order: Order): void {
+    this.acceptOrder(order);
+  }
+
+  acceptOrder(order: Order): void {
     const modalRef = this.modalService.open(BulkConfirmModalComponent);
     modalRef.componentInstance.count = 1;
     modalRef.componentInstance.itemLabel = 'order';
-    modalRef.componentInstance.actionLabel = 'Approve order';
-    modalRef.componentInstance.description = `Approve order #${order.id} and start preparation? (Courier assignment occurs once items are ready for pickup)`;
-    modalRef.componentInstance.action = () => this.ordersService.approve(order.id);
+    modalRef.componentInstance.actionLabel = 'قبول وتجهيز الطلب';
+    modalRef.componentInstance.description = `قبول الطلب #${order.id} وبدء تجهيزه؟`;
+    modalRef.componentInstance.action = () => this.ordersService.accept(order.id);
     modalRef.result.then(() => this.ordersService.fetchPost(), () => {});
   }
 
   canApprove(order: Order): boolean {
-    return order.canAdminApprove === true;
+    return order.canAdminApprove === true || this.canAccept(order);
+  }
+
+  canAccept(order: Order): boolean {
+    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    return order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.Pending || d.orderDetailStatus === OrderDetailStatus.CustomerPending);
+  }
+
+  rejectOrder(order: Order): void {
+    if (!order || !this.canReject(order)) {
+      window.alert('لا يمكن رفض هذا الطلب في حالته الحالية.');
+      return;
+    }
+    const reason = window.prompt(`أدخل سبب رفض الطلب #${order.id} (سيظهر للعميل):`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+      window.alert('يجب كتابة سبب واضح لرفض الطلب.');
+      return;
+    }
+    const modalRef = this.modalService.open(DeleteModalComponent);
+    modalRef.componentInstance.title = `رفض الطلب #${order.id}؟`;
+    modalRef.componentInstance.confirmationText = `سيتم رفض الطلب وإلغاء حجز المواد وإشعار العميل بالسبب: "${reason.trim()}"`;
+    modalRef.componentInstance.deletingText = 'جاري رفض الطلب…';
+    modalRef.componentInstance.confirmLabel = 'تأكيد الرفض';
+    this.subs.sink = modalRef.componentInstance.cancelClicked.subscribe(() => modalRef.dismiss());
+    this.subs.sink = modalRef.componentInstance.deleteClicked.subscribe(() => {
+      if (modalRef.componentInstance.isLoading) return;
+      modalRef.componentInstance.isLoading = true;
+      this.ordersService.reject(order.id, reason.trim()).subscribe({
+        next: () => {
+          modalRef.close();
+          this.ordersService.fetchPost();
+        },
+        error: (err: any) => {
+          modalRef.componentInstance.isLoading = false;
+          window.alert(err?.error?.title || err?.error?.detail || err?.message || 'تعذر رفض الطلب.');
+        }
+      });
+    });
+  }
+
+  canReject(order: Order): boolean {
+    return this.canCancel(order);
+  }
+
+  startPreparing(order: Order): void {
+    const modalRef = this.modalService.open(BulkConfirmModalComponent);
+    modalRef.componentInstance.count = 1;
+    modalRef.componentInstance.itemLabel = 'order';
+    modalRef.componentInstance.actionLabel = 'بدء التجهيز';
+    modalRef.componentInstance.description = `نقل الطلب #${order.id} إلى مرحلة التجهيز؟`;
+    modalRef.componentInstance.action = () => this.ordersService.preparing(order.id);
+    modalRef.result.then(() => this.ordersService.fetchPost(), () => {});
+  }
+
+  canPrepare(order: Order): boolean {
+    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    return order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.Pending);
   }
 
   canMarkReady(order: Order): boolean {
-    return order.canAdminMarkReady === true;
+    if (order.canAdminMarkReady === true) return true;
+    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    return order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.MerchantAccepted);
   }
 
   markReady(order: Order): void {
     const modalRef = this.modalService.open(BulkConfirmModalComponent);
     modalRef.componentInstance.count = 1;
     modalRef.componentInstance.itemLabel = 'order';
-    modalRef.componentInstance.actionLabel = 'Mark Ready';
-    modalRef.componentInstance.description = `Mark JTAK Market order #${order.id} as ready for courier pickup?`;
+    modalRef.componentInstance.actionLabel = 'جاهز للاستلام';
+    modalRef.componentInstance.description = `تأكيد جاهزية الطلب #${order.id} للاستلام من قبل مندوب التوصيل؟`;
     modalRef.componentInstance.action = () => this.ordersService.ready(order.id);
     modalRef.result.then(() => this.ordersService.fetchPost(), () => {});
+  }
+
+  confirmPickup(order: Order): void {
+    if (!this.hasAssignedDriver(order)) {
+      window.alert('يجب تعيين مندوب توصيل أولاً قبل تأكيد الاستلام وبدء التوصيل.');
+      return;
+    }
+    const modalRef = this.modalService.open(BulkConfirmModalComponent);
+    modalRef.componentInstance.count = 1;
+    modalRef.componentInstance.itemLabel = 'order';
+    modalRef.componentInstance.actionLabel = 'تأكيد استلام المندوب';
+    modalRef.componentInstance.description = `تأكيد استلام المندوب (${this.getCleanDriverName(order.deliveryUser)}) للطلب #${order.id} وبدء الشحن إلى العميل؟`;
+    modalRef.componentInstance.action = () => this.ordersService.confirmPickup(order.id);
+    modalRef.result.then(() => this.ordersService.fetchPost(), () => {});
+  }
+
+  canConfirmPickup(order: Order): boolean {
+    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    const active = order.orderDetails.filter(d =>
+      d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
+      d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
+      d.orderDetailStatus !== OrderDetailStatus.MerchantRejected);
+    return active.length > 0 && active.some(d => d.orderDetailStatus === OrderDetailStatus.ReadyForPickup);
+  }
+
+  openDeliverModal(order: Order): void {
+    const modalRef = this.modalService.open(AdminDeliverModalComponent, { size: 'lg' });
+    modalRef.componentInstance.order = order;
+    modalRef.result.then(
+      () => this.ordersService.fetchPost(),
+      () => {}
+    );
+  }
+
+  canDeliver(order: Order): boolean {
+    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    const active = order.orderDetails.filter(d =>
+      d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
+      d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
+      d.orderDetailStatus !== OrderDetailStatus.MerchantRejected);
+    if (active.length === 0) return false;
+    if (active.every(d => d.orderDetailStatus === OrderDetailStatus.Delivered)) return false;
+    return active.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted || d.orderDetailStatus === OrderDetailStatus.ReadyForPickup);
+  }
+
+  openHistoryModal(order: Order): void {
+    const modalRef = this.modalService.open(OrderStatusHistoryModalComponent, { size: 'lg', scrollable: true });
+    modalRef.componentInstance.order = order;
   }
 
   bulkCancel(items: Order[]): void {
@@ -342,6 +460,7 @@ export class OrdersListComponent
     this.ordersService.fetchPost();
     this.subs.sink = interval(5000).subscribe(() => this.ordersService.fetchPost());
     this.subs.sink = this.ordersService.isLoading$.subscribe(res => this.isLoading = res);
+    this.subs.sink = this.ordersService.items$.subscribe(() => this.notificationSummaryService.refresh());
     this.sorting = this.ordersService.sorting;
     this.paginator = this.ordersService.paginator;
   }

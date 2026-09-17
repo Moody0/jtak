@@ -267,9 +267,62 @@ namespace App.ApiControllers.V1.Admin
         }
 
         [HttpPost]
+        [Route("Accept/{id}")]
         [Route("Approve/{id}")]
-        public async Task<ActionResult<bool>> Approve(int id)
+        public async Task<ActionResult<bool>> Accept(int id, [FromBody] AdminOrderActionRequestDto dto = null)
         {
+            var currentOrder = await _service.FindAsync(id);
+            if (currentOrder == null)
+                return NotFound();
+
+            var actionableDetails = currentOrder.OrderDetails
+                .Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                            x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                            x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                            x.OrderDetailStatus == OrderDetailStatus.Pending)
+                .ToArray();
+
+            if (dto?.MerchantId.HasValue == true)
+            {
+                actionableDetails = actionableDetails.Where(x => x.MerchantId == dto.MerchantId.Value).ToArray();
+            }
+
+            var merchantIds = actionableDetails.Select(x => x.MerchantId).Distinct().ToArray();
+            if (merchantIds.Length == 0)
+            {
+                var alreadyAccepted = currentOrder.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted);
+                if (alreadyAccepted) return true;
+                return BadRequest(ApiErr.Create("لا توجد عناصر بانتظار الموافقة في هذا الطلب."));
+            }
+
+            await _service.MerchantAccept(id, merchantIds);
+
+            // Notify merchants
+            foreach (var mid in merchantIds)
+            {
+                var ownerId = await _merchantService.GetOwnerId(mid);
+                await _notificationService.SendMerchantNewOrderRecived(new[] { ownerId }, id, actionableDetails.Where(x => x.MerchantId == mid).ToArray());
+            }
+
+            var admins = (await _userManager.GetUsersInRoleAsync(AppRoleName.Admin.ToString())).Where(x => x.IsActive).Select(x => x.Id).ToArray();
+            if (admins.Length > 0)
+                await _notificationService.SendAdminMerchantDecision(admins, id, true, "إدارة جيتك", dto?.Reason);
+
+            if (_trackingHub != null)
+            {
+                await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnOrderAccepted", new { orderId = id });
+            }
+
+            return true;
+        }
+
+        [HttpPost]
+        [Route("Reject/{id}")]
+        public async Task<ActionResult<bool>> Reject(int id, [FromBody] AdminOrderActionRequestDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto?.Reason))
+                return BadRequest(ApiErr.Create("يجب تحديد سبب رفض الطلب."));
+
             var currentOrder = await _service.FindAsync(id);
             if (currentOrder == null)
                 return NotFound();
@@ -279,22 +332,79 @@ namespace App.ApiControllers.V1.Admin
                             x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
                             x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
                 .ToArray();
-            var merchantIds = actionableDetails.Select(x => x.MerchantId).Distinct().ToArray();
-            var externalMerchantIds = await _merchantService.Queryable()
-                .Where(x => merchantIds.Contains(x.Id) && x.MerchantKind != MerchantKind.DarkStore)
-                .Select(x => x.Id)
-                .ToArrayAsync();
-            var hasPendingExternalMerchant = actionableDetails.Any(d => externalMerchantIds.Contains(d.MerchantId) && d.OrderDetailStatus == OrderDetailStatus.Pending);
-            if (hasPendingExternalMerchant)
-                return BadRequest(ApiErr.Create("هذا الطلب من متجر خارجي وبانتظار قرار التاجر. لا يمكن للإدارة قبوله نيابةً عنه."));
 
-            await _service.MerchantAccept(id, merchantIds);
+            if (dto?.MerchantId.HasValue == true)
+            {
+                actionableDetails = actionableDetails.Where(x => x.MerchantId == dto.MerchantId.Value).ToArray();
+            }
+
+            if (actionableDetails.Length == 0)
+            {
+                return BadRequest(ApiErr.Create("تم اتخاذ قرار بشأن هذا الطلب مسبقاً ولا يمكن رفضه الآن."));
+            }
+
+            if (actionableDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered))
+            {
+                return BadRequest(ApiErr.Create("لا يمكن رفض طلب تم تسليمه بالفعل."));
+            }
+
+            // Release reservation for dark store / inventory items
+            foreach (var mod in actionableDetails)
+            {
+                await _batchService.ReleaseReservationAsync(id, mod.Id, reason: dto.Reason);
+            }
+
+            foreach (var mod in actionableDetails)
+            {
+                mod.OrderDetailStatus = OrderDetailStatus.MerchantRejected;
+                mod.Warning = dto.Reason.Trim();
+            }
+            currentOrder.Notes = dto.Reason.Trim();
+
+            _service.Log(id, OrderDetailStatus.MerchantRejected, actionableDetails, currentOrder.DeliveryId);
+            await _ouow.SaveChangesAsync();
+
+            // Notify customer with exact reason
+            await _notificationService.SendCustomerOrderRejected(new[] { currentOrder.UserId }, id, "إدارة جيتك", dto.Reason.Trim());
+
+            var merchantIds = actionableDetails.Select(x => x.MerchantId).Distinct().ToArray();
+            foreach (var mid in merchantIds)
+            {
+                var ownerId = await _merchantService.GetOwnerId(mid);
+                await _notificationService.SendOrderCanceled(new[] { ownerId }, id, actionableDetails.Where(x => x.MerchantId == mid).ToArray());
+            }
+
+            if (_trackingHub != null)
+            {
+                await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnOrderRejected", new { orderId = id, reason = dto.Reason.Trim() });
+            }
+
+            return true;
+        }
+
+        [HttpPost]
+        [Route("Preparing/{id}")]
+        public async Task<ActionResult<bool>> Preparing(int id)
+        {
+            var currentOrder = await _service.FindAsync(id);
+            if (currentOrder == null) return NotFound();
+
+            var pendingDetails = currentOrder.OrderDetails
+                .Where(x => x.OrderDetailStatus == OrderDetailStatus.Pending)
+                .ToArray();
+
+            if (pendingDetails.Length > 0)
+            {
+                var merchantIds = pendingDetails.Select(x => x.MerchantId).Distinct().ToArray();
+                await _service.MerchantAccept(id, merchantIds);
+            }
+
             return true;
         }
 
         [HttpPost]
         [Route("Ready/{id}")]
-        public async Task<ActionResult<bool>> Ready(int id)
+        public async Task<ActionResult<bool>> Ready(int id, [FromQuery] int? merchantId = null)
         {
             var currentOrder = await _service.FindAsync(id);
             if (currentOrder == null)
@@ -303,28 +413,30 @@ namespace App.ApiControllers.V1.Admin
             var actionableDetails = currentOrder.OrderDetails
                 .Where(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted)
                 .ToArray();
+
+            if (merchantId.HasValue)
+            {
+                actionableDetails = actionableDetails.Where(x => x.MerchantId == merchantId.Value).ToArray();
+            }
+
             var merchantIds = actionableDetails.Select(x => x.MerchantId).Distinct().ToArray();
             if (merchantIds.Length == 0)
+            {
+                var alreadyReady = currentOrder.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
+                if (alreadyReady) return true;
                 return BadRequest(ApiErr.Create("لا توجد عناصر مقبولة بانتظار تجهيزها في هذا الطلب."));
-
-            var externalMerchantIds = await _merchantService.Queryable()
-                .Where(x => merchantIds.Contains(x.Id) && x.MerchantKind != MerchantKind.DarkStore)
-                .Select(x => x.Id)
-                .ToArrayAsync();
-            var hasPendingExternalMerchant = actionableDetails.Any(d => externalMerchantIds.Contains(d.MerchantId));
-            if (hasPendingExternalMerchant)
-                return BadRequest(ApiErr.Create("هذا الطلب يتضمن عناصر من متجر خارجي وبانتظار تجهيز التاجر. لا يمكن للإدارة تأكيد الجاهزية نيابةً عنه."));
+            }
 
             var order = await _service.MerchantMarkReady(id, merchantIds);
 
-            // Deduct reserved stock upon readiness only for the dark store merchants being marked ready
+            // Deduct reserved stock upon readiness only for dark store merchants being marked ready
             foreach (var mid in merchantIds)
             {
                 await _batchService.DeductReservedStockAsync(id, merchantId: mid);
             }
 
-            var darkStoreMerchant = merchantIds.Length > 0 ? await _merchantService.FindAsync(merchantIds[0]) : null;
-            var merchantTitle = darkStoreMerchant?.MerchantKind == MerchantKind.DarkStore ? "جيتك ماركت" : (darkStoreMerchant?.Title ?? "جيتك ماركت");
+            var firstMerchant = await _merchantService.FindAsync(merchantIds[0]);
+            var merchantTitle = firstMerchant?.MerchantKind == MerchantKind.DarkStore ? "جيتك ماركت" : (firstMerchant?.Title ?? "جيتك");
 
             if (order.DeliveryId.HasValue)
                 await _notificationService.SendDeliveryOrderReadyForPickup(new[] { order.DeliveryId.Value }, id, merchantTitle);
@@ -343,6 +455,307 @@ namespace App.ApiControllers.V1.Admin
 
             return true;
         }
+
+        [HttpPost]
+        [Route("ConfirmPickup/{id}")]
+        public async Task<ActionResult<bool>> ConfirmPickup(int id, [FromQuery] int? merchantId = null)
+        {
+            var order = await _service.FindAsync(id);
+            if (order == null) return NotFound();
+
+            if (!order.DeliveryId.HasValue)
+                return BadRequest(ApiErr.Create("يجب تعيين مندوب توصيل للطلب أولاً قبل تأكيد الاستلام وبدء الشحن."));
+
+            var readyDetails = order.OrderDetails
+                .Where(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup)
+                .ToArray();
+
+            if (merchantId.HasValue)
+            {
+                readyDetails = readyDetails.Where(x => x.MerchantId == merchantId.Value).ToArray();
+            }
+
+            var targetMerchantIds = readyDetails.Select(x => x.MerchantId).Distinct().ToArray();
+            if (targetMerchantIds.Length == 0)
+            {
+                var alreadyShipping = order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted);
+                if (alreadyShipping) return true;
+                return BadRequest(ApiErr.Create("لا توجد عناصر جاهزة للاستلام حالياً في هذا الطلب."));
+            }
+
+            foreach (var mid in targetMerchantIds)
+            {
+                await _service.StartShippingOrder(id, mid, order.DeliveryId.Value);
+
+                var midDetails = order.OrderDetails.Where(x => x.MerchantId == mid).ToArray();
+                var existingBill = await _billService.Queryable().FirstOrDefaultAsync(x => x.OrderId == id && x.MerchantId == mid);
+                if (existingBill == null)
+                {
+                    var bill = new Bill
+                    {
+                        MerchantId = mid,
+                        OrderId = id,
+                        TotalAmount = midDetails.Sum(d => d.SingleFinalPrice * d.Quantity),
+                        MerchantAmount = midDetails.Sum(d => d.SingleMerchantProfit * d.Quantity),
+                        JTakAmount = midDetails.Sum(d => (d.SingleFinalPrice - d.SingleMerchantProfit) * d.Quantity),
+                        JTakAdditionalAmount = midDetails.Sum(d => d.SingleAdditionalProfit * d.Quantity),
+                        PaymentMethod = (int)order.PaymentMethod,
+                        DueDate = DateTime.UtcNow,
+                        IsAddedToDues = false
+                    };
+                    _billService.Insert(bill);
+                    await _auow.SaveChangesAsync();
+                }
+
+                await _deliveryService.RemoveOrder(order.DeliveryId.Value, id, mid);
+
+                if (_trackingHub != null)
+                {
+                    await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnStopCompleted", new { orderId = id, merchantId = mid, completedAt = DateTime.UtcNow });
+                }
+            }
+
+            await _notificationService.SendShippingStarted(new[] { order.UserId }, id, order.OrderDetails.ToArray());
+
+            if (_trackingHub != null)
+            {
+                await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnShippingStarted", new { orderId = id });
+            }
+
+            return true;
+        }
+
+        [HttpPost]
+        [Route("Deliver/{id}")]
+        public async Task<ActionResult<bool>> Deliver(int id, [FromBody] AdminDeliverOrderRequestDto dto = null)
+        {
+            var currentOrder = await _service.FindAsync(id);
+            if (currentOrder == null) return NotFound();
+
+            var activeDetails = currentOrder.OrderDetails
+                .Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                            x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                            x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
+                .ToArray();
+
+            var isAlreadyDelivered = activeDetails.Length > 0 && activeDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.Delivered);
+            if (isAlreadyDelivered)
+            {
+                return true;
+            }
+
+            var hasInTransit = activeDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted);
+            var allReadyOrShipping = activeDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup || x.OrderDetailStatus == OrderDetailStatus.ShippingStarted);
+            if (!hasInTransit && !allReadyOrShipping)
+            {
+                return BadRequest(ApiErr.Create("لا يمكن تسليم الطلب مباشرة وهو في حالة الانتظار أو التجهيز. يجب تجهيز الطلب وبدء نقله أولاً."));
+            }
+
+            if (currentOrder.DeliveryId.HasValue)
+            {
+                var readyMids = activeDetails.Where(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup).Select(x => x.MerchantId).Distinct().ToArray();
+                foreach (var mid in readyMids)
+                {
+                    await _service.StartShippingOrder(id, mid, currentOrder.DeliveryId.Value);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto?.Otp))
+            {
+                var cleanEnteredOtp = dto.Otp.Trim().Replace(" ", "");
+                cleanEnteredOtp = cleanEnteredOtp
+                    .Replace('\u0660', '0').Replace('\u0661', '1').Replace('\u0662', '2').Replace('\u0663', '3').Replace('\u0664', '4')
+                    .Replace('\u0665', '5').Replace('\u0666', '6').Replace('\u0667', '7').Replace('\u0668', '8').Replace('\u0669', '9')
+                    .Replace('\u06F0', '0').Replace('\u06F1', '1').Replace('\u06F2', '2').Replace('\u06F3', '3').Replace('\u06F4', '4')
+                    .Replace('\u06F5', '5').Replace('\u06F6', '6').Replace('\u06F7', '7').Replace('\u06F8', '8').Replace('\u06F9', '9');
+
+                var cleanOrderOtp = (currentOrder.DeliveryOtp ?? "").Trim().Replace(" ", "");
+                if (!string.Equals(cleanEnteredOtp, cleanOrderOtp, StringComparison.Ordinal))
+                {
+                    return BadRequest(ApiErr.Create("رمز تأكيد الاستلام (PIN) المدخل غير مطابق لرمز الطلب."));
+                }
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(dto?.Notes))
+                {
+                    return BadRequest(ApiErr.Create("في حال التسليم الإداري دون رمز التحقق (PIN)، يجب تدوين ملاحظات/سبب التسليم الإداري."));
+                }
+            }
+
+            var adminUser = await _userManager.GetUserAsync(User);
+            var adminName = adminUser?.FullName ?? User.Identity?.Name ?? "Admin";
+            var deliveryNotes = !string.IsNullOrWhiteSpace(dto?.Notes)
+                ? $"Admin Delivery ({adminName}): {dto.Notes.Trim()}"
+                : $"Admin Delivery ({adminName}) with valid customer PIN";
+
+            var order = await _service.DeliverOrder(id, currentOrder.DeliveryId ?? Guid.Empty, null, null, deliveryNotes, isAdminOverride: true);
+
+            try
+            {
+                using (var transaction = await _auow.Context.Database.BeginTransactionAsync())
+                {
+                    try
+                    {
+                        var bills = await _billService.Queryable().Where(x => x.OrderId == id).ToArrayAsync();
+                        foreach (var b in bills)
+                        {
+                            b.IsAddedToDues = true;
+                            _billService.Update(b);
+                        }
+                        await _auow.SaveChangesAsync();
+
+                        var isCod = order.PaymentMethod == Modules.Orders.Entities.PaymentMethod.PayOnDelivery;
+                        if (bills.Length > 0)
+                        {
+                            bool isCompanyCash = false;
+                            Guid captainUserId = order.DeliveryId ?? Guid.Empty;
+                            string captainName = order.DeliveryUser ?? "Unassigned";
+
+                            if (isCod)
+                            {
+                                if (dto?.CashResolutionMode == "CompanyCash" || dto?.CashResolutionMode == "Office")
+                                {
+                                    isCompanyCash = true;
+                                    captainUserId = Guid.Empty;
+                                    captainName = "Company Cash Vault";
+                                }
+                                else if (order.DeliveryId.HasValue)
+                                {
+                                    isCompanyCash = false;
+                                    captainUserId = order.DeliveryId.Value;
+                                }
+                                else if (dto?.CashCollectedByUserId.HasValue == true)
+                                {
+                                    isCompanyCash = false;
+                                    captainUserId = dto.CashCollectedByUserId.Value;
+                                    var driverUser = await _userManager.FindByIdAsync(captainUserId.ToString());
+                                    captainName = driverUser?.FullName ?? "Courier";
+                                }
+                                else
+                                {
+                                    return BadRequest(ApiErr.Create("يجب تحديد جهة تحصيل المبلغ النقدي (عهدة السائق أو خزينة الشركة) لإتمام تسليم هذا الطلب إدارياً."));
+                                }
+                            }
+
+                            var merchantSplits = new List<MerchantSplitItem>();
+                            foreach (var b in bills)
+                            {
+                                var m = await _merchantService.FindAsync(b.MerchantId);
+                                merchantSplits.Add(new MerchantSplitItem
+                                {
+                                    MerchantId = b.MerchantId,
+                                    MerchantTitle = m?.Title ?? $"Merchant #{b.MerchantId}",
+                                    TotalAmount = b.TotalAmount,
+                                    MerchantAmount = b.MerchantAmount,
+                                    PlatformCommission = b.JTakAmount,
+                                    IsPlatformOwned = m?.MerchantKind == MerchantKind.DarkStore,
+                                    CaptainEarningAmount = b.JTakAdditionalAmount
+                                });
+                            }
+
+                            var splitReq = new OrderDeliveredSplitRequest
+                            {
+                                OrderId = id,
+                                CaptainUserId = captainUserId,
+                                CaptainName = captainName,
+                                DeliveryFee = bills.Sum(x => x.JTakAdditionalAmount),
+                                TotalsIncludeDeliveryFee = true,
+                                Currency = "SYP",
+                                IsCod = isCod,
+                                IsCompanyCash = isCompanyCash,
+                                MerchantSplits = merchantSplits
+                            };
+
+                            await _ledgerService.PostOrderDeliveredSplitAsync(splitReq);
+
+                            if (isCod && !isCompanyCash && captainUserId != Guid.Empty && !isAlreadyDelivered)
+                            {
+                                var recivedAmount = bills.Where(x => x.PaymentMethod == 0).Sum(x => x.TotalAmount);
+                                if (recivedAmount > 0)
+                                {
+                                    await _balanceService.IncreaseAppBalance(captainUserId, recivedAmount, captainName);
+                                }
+                            }
+                        }
+
+                        await transaction.CommitAsync();
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                    }
+                }
+            }
+            catch (Exception) { }
+
+            if (order.DeliveryId.HasValue)
+            {
+                await _deliveryService.RemoveOrder(order.DeliveryId.Value, id);
+            }
+
+            try
+            {
+                await _notificationService.SendCustomerOrderDelivered(new[] { order.UserId }, id);
+            }
+            catch { }
+
+            try
+            {
+                if (_trackingHub != null)
+                {
+                    await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnOrderDelivered", new { orderId = id, deliveredAt = DateTime.UtcNow });
+                }
+            }
+            catch { }
+
+            return true;
+        }
+
+        [HttpGet]
+        [Route("History/{id}")]
+        public async Task<ActionResult<List<OrderStatusHistoryDto>>> GetHistory(int id)
+        {
+            var logs = await _service.GetLogs(id);
+            var result = new List<OrderStatusHistoryDto>();
+            foreach (var l in logs)
+            {
+                string driverName = null;
+                if (l.DriverId.HasValue)
+                {
+                    var driver = await _userManager.FindByIdAsync(l.DriverId.Value.ToString());
+                    driverName = driver?.FullName ?? driver?.UserName;
+                }
+
+                result.Add(new OrderStatusHistoryDto
+                {
+                    Id = l.Id,
+                    OrderId = l.OrderId,
+                    Status = (int)l.OrderDetailStatus,
+                    StatusName = l.OrderDetailStatus.ToString(),
+                    StatusArabic = GetStatusArabic(l.OrderDetailStatus),
+                    CreatedDate = l.CreatedDate,
+                    CreatedBy = l.CreatedBy ?? "System",
+                    DriverId = l.DriverId,
+                    DriverName = driverName,
+                    Details = l.OrdreDetails
+                });
+            }
+            return Ok(result);
+        }
+
+        private static string GetStatusArabic(OrderDetailStatus status) => status switch
+        {
+            OrderDetailStatus.Pending => "بانتظار قرار التاجر",
+            OrderDetailStatus.MerchantAccepted => "قيد التجهيز من التاجر",
+            OrderDetailStatus.ReadyForPickup => "جاهز للاستلام من المندوب",
+            OrderDetailStatus.ShippingStarted => "قيد التوصيل مع المندوب",
+            OrderDetailStatus.Delivered => "تم التسليم بنجاح",
+            OrderDetailStatus.CustomerCanceled => "ملغى من العميل",
+            OrderDetailStatus.DeliveryCanceled => "ملغى من الإدارة / المندوب",
+            OrderDetailStatus.MerchantRejected => "مرفوض من التاجر",
+            _ => status.ToString()
+        };
 
         [HttpPut]
         [Route("UnassignDelivery/{id}")]
@@ -498,7 +911,8 @@ namespace App.ApiControllers.V1.Admin
                     x.DeliveryLocationUpdatedAt,
                     x.Lat,
                     x.Lng,
-                    x.Address
+                    x.Address,
+                    x.DeliveryOtp
                 })
                 .FirstOrDefaultAsync();
 
@@ -579,6 +993,7 @@ namespace App.ApiControllers.V1.Admin
                 DestinationLat = order.Lat,
                 DestinationLng = order.Lng,
                 DestinationAddress = order.Address,
+                DeliveryOtp = order.DeliveryOtp,
                 CurrentStopIndex = currentStop?.Index ?? 0,
                 CurrentStopTitle = currentStop?.StopTitle,
                 CurrentStopIsDarkStore = currentStop?.IsDarkStore ?? false,
@@ -599,5 +1014,28 @@ namespace App.ApiControllers.V1.Admin
     public class AdminOrderActionRequestDto
     {
         public string Reason { get; set; }
+        public int? MerchantId { get; set; }
+    }
+
+    public class AdminDeliverOrderRequestDto
+    {
+        public string Otp { get; set; }
+        public string CashResolutionMode { get; set; } // "DriverCashFloat" | "CompanyCash" | "Waived"
+        public Guid? CashCollectedByUserId { get; set; }
+        public string Notes { get; set; }
+    }
+
+    public class OrderStatusHistoryDto
+    {
+        public Guid Id { get; set; }
+        public int OrderId { get; set; }
+        public int Status { get; set; }
+        public string StatusName { get; set; }
+        public string StatusArabic { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public string CreatedBy { get; set; }
+        public Guid? DriverId { get; set; }
+        public string DriverName { get; set; }
+        public string Details { get; set; }
     }
 }

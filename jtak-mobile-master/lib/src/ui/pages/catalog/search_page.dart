@@ -760,11 +760,15 @@ class _SearchPageState extends State<SearchPage> {
         if (allowedMerchantIds.contains(merchant.id) &&
             (_matchesQuery(merchant.name, query) ||
                 _matchesQuery(merchant.tagline ?? '', query))) {
+          final effectiveImage = (merchant.logoUrl != null &&
+                  merchant.logoUrl!.isNotEmpty)
+              ? merchant.logoUrl!
+              : (merchant.assetPath ?? '');
           merchantResults.add({
             'id': merchant.id,
             'name': merchant.name,
-            'image': merchant.assetPath ?? merchant.logoUrl ?? '',
-            'cover': merchant.assetPath ?? merchant.logoUrl ?? '',
+            'image': effectiveImage,
+            'cover': effectiveImage,
             'description': merchant.tagline ?? widget.catalogScope!.title,
           });
         }
@@ -1026,7 +1030,10 @@ class _SearchPageState extends State<SearchPage> {
           ),
           const SizedBox(height: 10),
           ...matchingMarkets.map((market) {
-            final image = market.assetPath ?? market.logoUrl ?? '';
+            final image = (market.logoUrl != null &&
+                    market.logoUrl!.isNotEmpty)
+                ? market.logoUrl!
+                : (market.assetPath ?? '');
             return _buildStoreResultCard(
               name: market.name,
               subtitle: market.tagline ?? 'سوبرماركت • ${market.eta}',

@@ -199,6 +199,7 @@ namespace Modules.Orders.Entities
         public int CurrentStopIndex { get; set; }
         public string CurrentStopTitle { get; set; }
         public bool CurrentStopIsDarkStore { get; set; }
+        public string DeliveryOtp { get; set; }
         public List<ShippingStopProgressDto> Stops { get; set; } = new List<ShippingStopProgressDto>();
     }
     public class DeliveryOrderDto

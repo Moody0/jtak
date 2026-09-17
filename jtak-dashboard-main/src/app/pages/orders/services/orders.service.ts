@@ -29,12 +29,41 @@ export class OrdersService extends TableService<Order> implements OnDestroy {
   cancel(orderId: number, reason?: string): Observable<boolean> {
     return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Cancel/${orderId}`, { reason: reason || '' });
   }
+
+  accept(orderId: number, merchantId?: number, reason?: string): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Accept/${orderId}`, { merchantId, reason });
+  }
+
   approve(orderId: number): Observable<boolean> {
-    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Approve/${orderId}`, {});
+    return this.accept(orderId);
   }
-  ready(orderId: number): Observable<boolean> {
-    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Ready/${orderId}`, {});
+
+  reject(orderId: number, reason: string, merchantId?: number): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Reject/${orderId}`, { reason, merchantId });
   }
+
+  preparing(orderId: number): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Preparing/${orderId}`, {});
+  }
+
+  ready(orderId: number, merchantId?: number): Observable<boolean> {
+    const url = merchantId ? `${this.BASE_URL}/Admin/Orders/Ready/${orderId}?merchantId=${merchantId}` : `${this.BASE_URL}/Admin/Orders/Ready/${orderId}`;
+    return this.http.post<boolean>(url, {});
+  }
+
+  confirmPickup(orderId: number, merchantId?: number): Observable<boolean> {
+    const url = merchantId ? `${this.BASE_URL}/Admin/Orders/ConfirmPickup/${orderId}?merchantId=${merchantId}` : `${this.BASE_URL}/Admin/Orders/ConfirmPickup/${orderId}`;
+    return this.http.post<boolean>(url, {});
+  }
+
+  deliver(orderId: number, data: { otp?: string; notes?: string; cashResolutionMode?: string; cashCollectedByUserId?: string }): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Deliver/${orderId}`, data);
+  }
+
+  getHistory(orderId: number): Observable<import('../models/orders.model').OrderStatusHistoryItem[]> {
+    return this.http.get<import('../models/orders.model').OrderStatusHistoryItem[]>(`${this.BASE_URL}/Admin/Orders/History/${orderId}`);
+  }
+
   setDelievry(id:number,uid :string):Observable<boolean>
   {
     return this.http.put<boolean>(`${this.BASE_URL}/Admin/Orders/SetDelivery/${id}/${uid}`,{});

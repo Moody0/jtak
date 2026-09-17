@@ -69,6 +69,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             initialStatus == OrderDetailsStatus.deliveryCanceled) {
           locator<CartProvider>().clearCart();
         }
+        // Immediately fetch fresh order details & OTP from backend without 5-second delay
+        if (widget.order.id != null) {
+          prov.loadOrder(widget.order.id!, silent: true);
+        }
         _startLiveBackendSync();
       }
     });

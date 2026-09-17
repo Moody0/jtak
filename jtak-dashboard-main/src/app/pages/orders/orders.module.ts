@@ -4,11 +4,13 @@ import { OrdersListComponent } from './components/orders-list/orders-list.compon
 import { RouterModule } from '@angular/router';
 import { ApplicationRoutes } from 'src/app/_metronic/config/settings';
 import { CRUDTableModule } from 'src/app/_metronic/shared/crud-table';
-import { NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
+import { NgbDropdownModule, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import { SharedModule } from 'src/app/modules/shared/shared.module';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { EditDilevry } from './components/orders-list/EditDilevry/edit-dilevry.component';
 import { LiveTrackModalComponent } from './components/orders-list/LiveTrackModal/live-track-modal.component';
+import { AdminDeliverModalComponent } from './components/orders-list/AdminDeliverModal/admin-deliver-modal.component';
+import { OrderStatusHistoryModalComponent } from './components/orders-list/OrderStatusHistoryModal/order-status-history-modal.component';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { GoogleMapsModule } from '@angular/google-maps';
 
@@ -16,7 +18,9 @@ import { GoogleMapsModule } from '@angular/google-maps';
   declarations: [
     OrdersListComponent,
     EditDilevry,
-    LiveTrackModalComponent
+    LiveTrackModalComponent,
+    AdminDeliverModalComponent,
+    OrderStatusHistoryModalComponent
   ],
   imports: [
     CommonModule,
@@ -27,10 +31,12 @@ import { GoogleMapsModule } from '@angular/google-maps';
         component: OrdersListComponent,
       },
     ]),
+    FormsModule,
     ReactiveFormsModule,
     CommonModule,
     CRUDTableModule,
     NgbModalModule,
+    NgbDropdownModule,
     NgSelectModule,
     GoogleMapsModule
   ]

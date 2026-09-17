@@ -211,6 +211,14 @@ class _MarketPageState extends State<MarketPage> {
     return first?.id ?? 12;
   }
 
+  MarketStoreModel? get _effectiveStoreModel {
+    final int marketId = _effectiveMarketId;
+    final marketsProv = _getMarketsProvider();
+    final live = marketsProv.markets.where((m) => m.id == marketId).firstOrNull;
+    if (live != null) return live;
+    return _storeModel;
+  }
+
   void _initStoreModel() {
     final int marketId = _effectiveMarketId;
     final marketsProv = _getMarketsProvider();
@@ -225,7 +233,10 @@ class _MarketPageState extends State<MarketPage> {
           logoText: 'جيتك',
           logoBoxedText: 'ماركت',
           logoColor: const Color(0xFFFF5C00),
-          assetPath: 'assets/images/markets/jtak_market.webp',
+          logoUrl: widget.logoUrl,
+          assetPath: (widget.logoUrl == null || widget.logoUrl!.isEmpty)
+              ? 'assets/images/markets/jtak_market.webp'
+              : null,
         ),
       );
     } catch (_) {
@@ -1174,26 +1185,31 @@ class _MarketPageState extends State<MarketPage> {
   }
 
   Widget _buildStoreLogoWidget(String marketName, String? logoUrl) {
-    // 1. Explicit network logo URL
-    final candidateLogo = (logoUrl != null && logoUrl.trim().isNotEmpty)
-        ? logoUrl.trim()
-        : (_storeModel?.logoUrl ?? '');
-    if (candidateLogo.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: candidateLogo,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        errorWidget: (_, __, ___) => _buildStoreBrandedBadge(marketName),
-      );
+    final model = _effectiveStoreModel;
+    String candidate = (model?.logoUrl != null && model!.logoUrl!.isNotEmpty)
+        ? model.logoUrl!
+        : (logoUrl?.trim() ?? '');
+
+    if (candidate.isNotEmpty && !candidate.startsWith('assets')) {
+      final networkUrl = candidate.startsWith('http') ? candidate : GlobalVar.getImageUrl(candidate);
+      if (networkUrl.isNotEmpty && networkUrl.startsWith('http')) {
+        return CachedNetworkImage(
+          imageUrl: networkUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          placeholder: (_, __) => const CleanShimmer(
+            child: SizedBox.expand(child: ColoredBox(color: Colors.white)),
+          ),
+          errorWidget: (_, __, ___) => _buildStoreBrandedBadge(marketName),
+        );
+      }
     }
 
-    // 2. Local asset logo (e.g. JTAK Market, Shamsin)
-    final assetPath =
-        _storeModel?.assetPath ?? _resolveMarketAssetByName(marketName);
-    if (assetPath != null && assetPath.isNotEmpty) {
+    final asset = candidate.startsWith('assets') ? candidate : model?.assetPath;
+    if (asset != null && asset.isNotEmpty) {
       return Image.asset(
-        assetPath,
+        asset,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
@@ -1201,37 +1217,7 @@ class _MarketPageState extends State<MarketPage> {
       );
     }
 
-    // 3. Branded identity badge (e.g. Clover Mall emerald green badge, Best Market blue badge)
     return _buildStoreBrandedBadge(marketName);
-  }
-
-  String? _resolveMarketAssetByName(String name) {
-    final n = name.trim().toLowerCase();
-    if (n.contains('best') || n.contains('بست')) {
-      return 'assets/images/markets/best_market.webp';
-    }
-    if (n.contains('clover') || n.contains('كلوفر')) {
-      return 'assets/images/markets/clover_mall.webp';
-    }
-    if (n.contains('جيتك') || n.contains('جتاك') || n.contains('jtak')) {
-      return 'assets/images/markets/jtak_market.webp';
-    }
-    if (n.contains('شمسين')) {
-      return 'assets/images/markets/abnaa_shamsin.webp';
-    }
-    if (n.contains('قاسيون')) {
-      return 'assets/images/markets/qasioun_hypermarket.webp';
-    }
-    if (n.contains('الهدى') || n.contains('هدى')) {
-      return 'assets/images/markets/al_huda.webp';
-    }
-    if (n.contains('البركة') || n.contains('بركة')) {
-      return 'assets/images/markets/al_baraka.webp';
-    }
-    if (n.contains('الدوحة') || n.contains('دوحة')) {
-      return 'assets/images/markets/al_dawha.webp';
-    }
-    return null;
   }
 
   Widget _buildStoreBrandedBadge(String marketName) {

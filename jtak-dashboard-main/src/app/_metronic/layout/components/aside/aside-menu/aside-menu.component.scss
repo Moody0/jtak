@@ -1,0 +1,62 @@
+:host {
+  display: block;
+}
+
+.menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  pointer-events: none;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+
+  .badge-text--expanded {
+    display: inline;
+  }
+
+  .badge-text--collapsed {
+    display: none;
+  }
+}
+
+:host-context([data-kt-aside-minimize="on"]) {
+  .menu-icon {
+    position: relative;
+    overflow: visible;
+  }
+
+  .menu-badge {
+    position: absolute;
+    top: -6px;
+    transform: none;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 3px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    line-height: 1;
+    border-radius: 9px;
+    border: 1.5px solid #1e1e2d;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+    z-index: 5;
+
+    .badge-text--expanded {
+      display: none;
+    }
+
+    .badge-text--collapsed {
+      display: inline;
+    }
+  }
+
+  :host-context([dir="rtl"]) & .menu-badge {
+    left: -6px;
+    right: auto;
+  }
+
+  :host-context([dir="ltr"]) & .menu-badge {
+    right: -6px;
+    left: auto;
+  }
+}
+

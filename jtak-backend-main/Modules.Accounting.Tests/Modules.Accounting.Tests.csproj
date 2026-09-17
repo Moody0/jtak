@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +36,9 @@
     <ProjectReference Include="..\App.Entities\App.Shared.Entities.csproj" />
     <ProjectReference Include="..\App.Data\App.Shared.Data.csproj" />
     <ProjectReference Include="..\App.Services\App.Shared.Services.csproj" />
+    <ProjectReference Include="..\Modules\Orders\Modules.Orders.Entities\Modules.Orders.Entities.csproj" />
+    <ProjectReference Include="..\Modules\Orders\Modules.Orders.Data\Modules.Orders.Data.csproj" />
+    <ProjectReference Include="..\Modules\Orders\Modules.Orders.Services\Modules.Orders.Services.csproj" />
   </ItemGroup>
 
   <ItemGroup>

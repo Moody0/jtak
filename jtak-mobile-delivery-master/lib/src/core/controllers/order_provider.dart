@@ -460,6 +460,20 @@ class OrderProvider extends BaseProvider<OrderModel> {
       return true;
     } catch (e) {
       GlobalVar.log('deliverOrder error: $e');
+      // Idempotent recovery check: If the primary delivery committed despite a secondary exception
+      try {
+        final checkOrder = await _api.getRequest('/Orders/$orderId');
+        if (checkOrder != null && checkOrder is Map) {
+          final status = checkOrder['status'] ?? checkOrder['orderStatus'];
+          final isDelivered = status == 5 || status == 'Delivered' || checkOrder['isDelivered'] == true;
+          if (isDelivered) {
+            await _stopLocationSharing(orderId);
+            await _reloadSingleOrder(orderId);
+            await _silentSyncMine();
+            return true;
+          }
+        }
+      } catch (_) {}
       rethrow;
     } finally {
       _actionInFlightOrderIds.remove(orderId);

@@ -31,6 +31,7 @@ namespace Modules.Accounting.Entities
         public bool TotalsIncludeDeliveryFee { get; set; }
         public string Currency { get; set; } = "SYP";
         public bool IsCod { get; set; } = true;
+        public bool IsCompanyCash { get; set; } = false;
         public List<MerchantSplitItem> MerchantSplits { get; set; } = new List<MerchantSplitItem>();
     }
 
