@@ -81,18 +81,28 @@ export class AppHttpInterceptor implements HttpInterceptor {
               });
             }
           } else if (!req.headers.has('X-Silent-Error') && !req.url.includes('/Batches/Kpis')) {
-            let msg = 'Error';
-            if (err?.error?.errors) {
+            let msg = '';
+            if (typeof err?.error === 'string' && err.error.trim().length > 0) {
+              msg = err.error.trim();
+            } else if (err?.error?.errors) {
               if (Array.isArray(err.error.errors)) {
-                msg = err.error.errors.join('').replace(/\n/g, '<br/>');
+                msg = err.error.errors.join('<br/>').replace(/\n/g, '<br/>');
               } else if (typeof err.error.errors === 'object') {
                 const errorLists: any[] = Object.keys(err.error.errors).map(k => (err.error.errors as any)[k]);
                 msg = ([] as string[]).concat(...errorLists).join('<br/>');
               }
             } else if (err?.error?.message) {
               msg = err.error.message;
+            } else if (err?.error?.title) {
+              msg = err.error.title;
+            } else if (err?.statusText && err.statusText !== 'Unknown Error') {
+              msg = `${err.status}: ${err.statusText}`;
+            } else {
+              msg = 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.';
             }
-            this.toasterService.error(msg);
+            if (msg) {
+              this.toasterService.error(msg);
+            }
           }
         }
         return throwError(() => err);

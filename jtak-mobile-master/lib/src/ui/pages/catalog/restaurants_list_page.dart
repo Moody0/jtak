@@ -1832,28 +1832,9 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
 
     if (locator.isRegistered<MarketsProvider>()) {
       final marketsProv = locator<MarketsProvider>();
-      if (marketsProv.restaurants.isNotEmpty) {
-        return _buildProviderMerchants(marketsProv);
-      }
+      return _buildProviderMerchants(marketsProv);
     }
-    return MockCatalogData.restaurants.map((r) {
-      return _RestaurantListItem(
-        id: r.id,
-        name: r.name,
-        cuisine: r.cuisine,
-        categoryTag: r.categoryTag,
-        rating: r.rating,
-        ratingCount: r.ratingCount,
-        eta: r.eta,
-        distance: r.distance,
-        deliveryFee: r.deliveryFee,
-        hasOffers: r.hasOffers,
-        isFast: r.isFast,
-        coverUrl: r.coverUrl,
-        logoUrl: r.logoUrl,
-        isProductMerchant: r.isMarket,
-      );
-    }).toList();
+    return const [];
   }
 
   List<_RestaurantListItem> _buildProviderMerchants(

@@ -92,13 +92,24 @@ class JtakNearbyRestaurantsSection extends StatelessWidget {
                 if (marketsProv.isLoading && marketsProv.restaurants.isEmpty) {
                   return _buildLoadingCards();
                 }
-                final restaurants = marketsProv.restaurants.isNotEmpty
-                    ? marketsProv.restaurants
-                        .map((r) => r.toRestaurantItemData())
-                        .toList()
-                    : MockCatalogData.restaurants
-                        .map((r) => r.toRestaurantItemData())
-                        .toList();
+                final restaurants = marketsProv.restaurants
+                    .map((r) => r.toRestaurantItemData())
+                    .toList();
+                if (restaurants.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        'لا توجد مطاعم متاحة حالياً',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ),
+                  );
+                }
                 return ListView.separated(
                   physics: const ClampingScrollPhysics(),
                   scrollDirection: Axis.horizontal,

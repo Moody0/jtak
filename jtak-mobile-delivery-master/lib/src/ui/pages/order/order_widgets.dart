@@ -1,12 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../config/constants/constants.dart';
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/order_provider.dart';
 import '../../../core/enums/order_details_status_enum.dart';
@@ -14,801 +13,618 @@ import '../../../core/models/merchant_order_details.dart';
 import '../../../core/models/order_details_model.dart';
 import '../../../core/models/order_model.dart';
 import '../../../ui/widgets/app_widgets.dart';
-import '../../../ui/widgets/price_widgets.dart';
+import '../../../ui/widgets/quick_chat_sheet.dart';
 import '../../../utils/custom_widgets/image_widgets.dart';
-import '../../../utils/custom_widgets/messages.dart';
 import '../../../utils/utilities/global_var.dart';
+import '../../../utils/utilities/phone_helper.dart';
+import 'order_details_page.dart';
 
-class OrderSingleItem extends StatelessWidget {
-  final OrderModel item;
-  const OrderSingleItem(this.item, {Key? key}) : super(key: key);
+// -----------------------------------------------------------------------------
+// 1. Proof of Delivery (PoD) Verification Dialog
+// -----------------------------------------------------------------------------
+class PoDVerificationDialog extends StatefulWidget {
+  final OrderModel order;
+
+  const PoDVerificationDialog({required this.order, Key? key}) : super(key: key);
+
+  static Future<bool?> show(BuildContext context, OrderModel order) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PoDVerificationDialog(order: order),
+    );
+  }
+
+  @override
+  State<PoDVerificationDialog> createState() => _PoDVerificationDialogState();
+}
+
+class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
+  final TextEditingController _otpController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+
+  bool _isPhotoMode = false;
+  XFile? _capturedPhoto;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _otpController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleOtpSubmit(OrderProvider orderProv, bool isArabic) async {
+    final clean = PhoneHelper.cleanDigits(_otpController.text).replaceAll('+', '');
+    if (clean.length < 4) {
+      setState(() {
+        _errorMessage = isArabic
+            ? 'يرجى إدخال رمز التحقق المكون من 4 أرقام'
+            : 'Please enter the 4-digit verification code';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final success = await orderProv.deliverOrder(widget.order.id!, otp: clean);
+      if (!mounted) return;
+      if (success) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArabic
+                  ? 'تم تأكيد تسليم الطلب #${widget.order.id} بنجاح ✓'
+                  : 'Order #${widget.order.id} delivered successfully ✓',
+              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+            ),
+            backgroundColor: kGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '').replaceAll('Error: ', '').trim();
+      });
+    }
+  }
+
+  Future<void> _handlePhotoSubmit(OrderProvider orderProv, bool isArabic) async {
+    if (_capturedPhoto == null) {
+      setState(() {
+        _errorMessage = isArabic
+            ? 'يرجى التقاط صورة لتوثيق تسليم الطلب أولاً'
+            : 'Please capture a photo first to document delivery';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final photoUrl = await orderProv.uploadPoDPhoto(_capturedPhoto!);
+      if (photoUrl == null || photoUrl.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _isSubmitting = false;
+          _errorMessage = isArabic
+              ? 'فشل رفع صورة التسليم، يرجى المحاولة ثانية'
+              : 'Failed to upload photo, please try again';
+        });
+        return;
+      }
+
+      final notesText = _notesController.text.trim();
+      final finalNotes = notesText.isNotEmpty
+          ? notesText
+          : (isArabic ? 'توثيق التسليم عبر الصورة (PoD)' : 'Proof of delivery via photo');
+
+      final success = await orderProv.deliverOrder(
+        widget.order.id!,
+        photoUrl: photoUrl,
+        notes: finalNotes,
+      );
+
+      if (!mounted) return;
+      if (success) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArabic
+                  ? 'تم توثيق وتسليم الطلب #${widget.order.id} بالصورة بنجاح ✓'
+                  : 'Order #${widget.order.id} delivered with photo PoD ✓',
+              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+            ),
+            backgroundColor: kGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '').replaceAll('Error: ', '').trim();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final orderProvider = Provider.of<OrderProvider>(context);
-    final status = orderProvider.getOrderStatus(item);
-    final isDelivered = status == OrderDetailsStatus.delivered;
+    final orderProv = Provider.of<OrderProvider>(context, listen: false);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDelivered
-              ? (isDark ? const Color(0xFF334155) : kBorderColor)
-              : (isDark ? const Color(0xFF475569) : kPrimaryOrange.withValues(alpha: 0.25)),
-          width: isDelivered ? 1 : 1.4,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      title: Row(
         children: [
-          // 1. Order Header (ID + Date + Price + Status Pill)
-          _buildHeader(context, status, isDark, isArabic),
-
-          Divider(height: 1, color: isDark ? const Color(0xFF334155) : kBorderColor),
-
-          // 2. Merchant Store & Pickup Details
-          if (item.orderDetails != null && item.orderDetails!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: item.orderDetails!
-                    .map((merchant) => MerchentOrderDetails(merchant, item.id!))
-                    .toList(),
-              ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: kGreenLight,
+              borderRadius: BorderRadius.circular(10),
             ),
-
-          Divider(height: 1, color: isDark ? const Color(0xFF334155) : kBorderColor),
-
-          // 3. Customer Destination & Action Section
-          _buildCustomerSection(context, status, isDark, isArabic),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, OrderDetailsStatus status, bool isDark, bool isArabic) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Order Number Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF334155) : kSurfaceWarm,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const AppIcon(PhosphorIcons.hashBold, size: 14, color: kPrimaryOrange),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${item.id}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: kPrimaryOrange,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Status Pill
-              _buildStatusPill(status, isDark, isArabic),
-            ],
+            child: const AppIcon(PhosphorIcons.shieldCheckBold, color: kGreen, size: 22),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Timestamp
-              Row(
-                children: [
-                  AppIcon(PhosphorIcons.clockBold, size: 14, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
-                  const SizedBox(width: 4),
-                  Text(
-                    GlobalVar.dateForamt(item.purchaseDate, kDateTimeFormat) ?? '',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Price
-              PriceTextWidget.small(
-                price: item.price,
-                currencyString: isArabic ? 'ل.س' : 'SYP',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusPill(OrderDetailsStatus status, bool isDark, bool isArabic) {
-    Color bg;
-    Color fg;
-    String text;
-    IconData icon;
-
-    switch (status) {
-      case OrderDetailsStatus.delivered:
-        bg = isDark ? const Color(0xFF064E3B) : kGreenLight;
-        fg = isDark ? const Color(0xFF34D399) : kGreen;
-        text = isArabic ? 'تم التسليم بنجاح' : 'Delivered';
-        icon = PhosphorIcons.checkCircleBold;
-        break;
-      case OrderDetailsStatus.shipping:
-        bg = isDark ? const Color(0xFF334155) : kSurfaceWarm;
-        fg = kPrimaryOrange;
-        text = isArabic ? 'قيد التوصيل للعميل' : 'Out for Delivery';
-        icon = PhosphorIcons.mopedBold;
-        break;
-      case OrderDetailsStatus.merchantAccepted:
-      case OrderDetailsStatus.readyForPickup:
-        bg = isDark ? const Color(0xFF1E3A8A) : kBlueLight;
-        fg = isDark ? const Color(0xFF60A5FA) : kBlue;
-        text = isArabic ? 'جاهز للاستلام من المتجر' : 'Ready for Pickup';
-        icon = PhosphorIcons.storefrontBold;
-        break;
-      default:
-        bg = isDark ? const Color(0xFF334155) : kGreyBackground;
-        fg = isDark ? Colors.white : kCharcoalDark;
-        text = status.value;
-        icon = PhosphorIcons.infoBold;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppIcon(icon, size: 13, color: fg),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: fg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomerSection(BuildContext context, OrderDetailsStatus status, bool isDark, bool isArabic) {
-    final isDelivered = status == OrderDetailsStatus.delivered;
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Customer Details Header
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : kGreyBackground,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const AppIcon(PhosphorIcons.mapPinBold, size: 18, color: kPrimaryOrange),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.user ?? (isArabic ? 'العميل' : 'Customer'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : kCharcoalDark,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.address ?? (isArabic ? 'لا يوجد عنوان محدد' : 'No specified address'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isDelivered && GlobalVar.checkString(item.phonenumber))
-                InkWell(
-                  onTap: () => launchUrl(Uri.parse('tel:${item.phonenumber}')),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF064E3B) : kGreenLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF047857) : kGreen.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: AppIcon(
-                      PhosphorIcons.phoneCallBold,
-                      size: 18,
-                      color: isDark ? const Color(0xFF34D399) : kGreen,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
-          if (!isDelivered) ...[
-            const SizedBox(height: 14),
-            Builder(
-              builder: (ctx) {
-                final navUrl = GlobalVar.getCustomerNavigationUrl(
-                  lat: item.lat,
-                  lng: item.lng,
-                  address: item.address,
-                );
-
-                return Row(
-                  children: [
-                    // 1. Open Google Maps Navigation Button
-                    if (navUrl != null)
-                      Expanded(
-                        flex: 4,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            try {
-                              launchUrl(Uri.parse(navUrl), mode: LaunchMode.externalApplication);
-                            } catch (err) {
-                              showDialog(context: context, builder: (ctx) => CustomDialog(message: err.toString()));
-                            }
-                          },
-                          icon: const AppIcon(PhosphorIcons.navigationArrowBold, size: 16),
-                          label: Text(isArabic ? 'تتبع الخريطة' : 'Navigation'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: kPrimaryOrange,
-                            side: const BorderSide(color: kPrimaryOrange, width: 1.2),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(vertical: 11),
-                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-
-                    if (navUrl != null) const SizedBox(width: 10),
-
-                    // 2. Deliver to Customer Action Button
-                    Expanded(
-                      flex: navUrl != null ? 6 : 10,
-                      child: ElevatedButton.icon(
-                        onPressed: status == OrderDetailsStatus.shipping
-                            ? () => _confirmDelivery(context, isArabic)
-                            : null,
-                        icon: const AppIcon(PhosphorIcons.checkCircleBold, size: 18),
-                        label: Text(isArabic ? 'تأكيد التسليم' : 'Confirm Delivery'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kGreen,
-                          disabledBackgroundColor: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  static String _cleanOtp(String raw) {
-    String text = raw.replaceAll(RegExp(r'[\s\-_]'), '');
-    const arabicIndic = '٠١٢٣٤٥٦٧٨٩';
-    const easternArabic = '۰۱۲۳۴۵۶۷۸۹';
-    for (int i = 0; i < 10; i++) {
-      text = text.replaceAll(arabicIndic[i], i.toString());
-      text = text.replaceAll(easternArabic[i], i.toString());
-    }
-    return text.replaceAll(RegExp(r'[^0-9]'), '');
-  }
-
-  void _confirmDelivery(BuildContext context, bool isArabic) {
-    final TextEditingController otpController = TextEditingController();
-    final TextEditingController notesController = TextEditingController();
-    final ImagePicker picker = ImagePicker();
-
-    bool isPhotoMode = false;
-    XFile? capturedPhoto;
-    bool isSubmitting = false;
-    String? errorMessage;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-            title: Row(
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const AppIcon(PhosphorIcons.shieldCheckBold, color: kGreen, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    isArabic ? 'توثيق التسليم (PoD)' : 'Proof of Delivery (PoD)',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                Text(
+                  isArabic ? 'تأكيد تسليم الطلب' : 'Confirm Delivery',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  '#${widget.order.id}',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: kPrimaryOrange,
                   ),
                 ),
               ],
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Mode Switcher Tabs
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
                 children: [
-                  // Verification Mode Switcher
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : kPageBackground,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isDark ? const Color(0xFF334155) : kBorderColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: isSubmitting ? null : () => setModalState(() => isPhotoMode = false),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: !isPhotoMode ? (isDark ? const Color(0xFF334155) : Colors.white) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: !isPhotoMode
-                                    ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                                    : null,
-                              ),
-                              child: Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    AppIcon(PhosphorIcons.keyBold, size: 14, color: !isPhotoMode ? kPrimaryOrange : kCharcoalMuted),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      isArabic ? 'رمز العميل (OTP)' : 'Customer OTP',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: !isPhotoMode ? (isDark ? Colors.white : kCharcoalDark) : kCharcoalMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _isSubmitting ? null : () => setState(() => _isPhotoMode = false),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: !_isPhotoMode
+                              ? (isDark ? const Color(0xFF334155) : Colors.white)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: !_isPhotoMode
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
                         ),
-                        Expanded(
-                          child: InkWell(
-                            onTap: isSubmitting ? null : () => setModalState(() => isPhotoMode = true),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isPhotoMode ? (isDark ? const Color(0xFF334155) : Colors.white) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: isPhotoMode
-                                    ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                                    : null,
-                              ),
-                              child: Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    AppIcon(PhosphorIcons.cameraBold, size: 14, color: isPhotoMode ? kPrimaryOrange : kCharcoalMuted),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      isArabic ? 'صورة التسليم' : 'Photo PoD',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: isPhotoMode ? (isDark ? Colors.white : kCharcoalDark) : kCharcoalMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  if (errorMessage != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: kRed.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        errorMessage!,
-                        style: const TextStyle(color: kRed, fontSize: 12, fontWeight: FontWeight.w600),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-
-                  if (!isPhotoMode) ...[
-                    // 1. Customer OTP Mode
-                    Text(
-                      isArabic
-                          ? 'لتأكيد تسليم الطلب #${item.id}، يرجى إدخال رمز التحقق المستلم من العميل (4 أرقام):'
-                          : 'To confirm delivery for order #${item.id}, enter the 4-digit PIN received from customer:',
-                      style: const TextStyle(fontSize: 12.5, color: kCharcoalMuted),
-                    ),
-                    const SizedBox(height: 14),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: TextField(
-                        controller: otpController,
-                        keyboardType: TextInputType.number,
-                        textDirection: TextDirection.ltr,
-                        maxLength: 10,
-                        textAlign: TextAlign.center,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩۰-۹\s\-]')),
-                        ],
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 8,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: '----',
-                          hintStyle: const TextStyle(letterSpacing: 8, color: Color(0xFFCBD5E1)),
-                          counterText: '',
-                          filled: true,
-                          fillColor: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.paste_rounded, color: kPrimaryOrange, size: 20),
-                            tooltip: isArabic ? 'لصق الرمز' : 'Paste PIN',
-                            onPressed: () async {
-                              final data = await Clipboard.getData(Clipboard.kTextPlain);
-                              if (data != null && data.text != null) {
-                                String clean = _cleanOtp(data.text!);
-                                if (clean.isNotEmpty) {
-                                  otpController.text = clean;
-                                  setModalState(() {});
-                                }
-                              }
-                            },
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: kPrimaryOrange, width: 1.5),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: kPrimaryOrange, width: 2),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    // 2. Photo PoD Mode
-                    Text(
-                      isArabic
-                          ? 'في حال تعذر استلام رمز OTP أو التسليم غير التلامسي، التقط صورة للطلب عند الباب:'
-                          : 'For contactless or absent customer delivery, capture a photo of the package at doorstep:',
-                      style: const TextStyle(fontSize: 12.5, color: kCharcoalMuted),
-                    ),
-                    const SizedBox(height: 12),
-
-                    if (capturedPhoto == null) ...[
-                      InkWell(
-                        onTap: isSubmitting
-                            ? null
-                            : () async {
-                                try {
-                                  final photo = await picker.pickImage(
-                                    source: ImageSource.camera,
-                                    imageQuality: 75,
-                                    maxWidth: 1280,
-                                    maxHeight: 1280,
-                                  );
-                                  if (photo != null) {
-                                    setModalState(() {
-                                      capturedPhoto = photo;
-                                      errorMessage = null;
-                                    });
-                                  }
-                                } catch (e) {
-                                  setModalState(() => errorMessage = e.toString());
-                                }
-                              },
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          height: 110,
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: kPrimaryOrange, width: 1.2),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const AppIcon(PhosphorIcons.cameraBold, size: 32, color: kPrimaryOrange),
-                              const SizedBox(height: 6),
+                              AppIcon(
+                                PhosphorIcons.keyBold,
+                                size: 14,
+                                color: !_isPhotoMode ? kPrimaryOrange : kCharcoalMuted,
+                              ),
+                              const SizedBox(width: 6),
                               Text(
-                                isArabic ? 'اضغط لفتح الكاميرا والتقاط صورة' : 'Tap to open camera & take photo',
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: kPrimaryOrange),
+                                isArabic ? 'رمز التحقق (OTP)' : 'Customer OTP',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: !_isPhotoMode
+                                      ? (isDark ? Colors.white : kCharcoalDark)
+                                      : kCharcoalMuted,
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ] else ...[
-                      Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.file(
-                              File(capturedPhoto!.path),
-                              height: 130,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: Colors.black.withValues(alpha: 0.6),
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                                onPressed: isSubmitting
-                                    ? null
-                                    : () async {
-                                        final photo = await picker.pickImage(
-                                          source: ImageSource.camera,
-                                          imageQuality: 75,
-                                        );
-                                        if (photo != null) {
-                                          setModalState(() => capturedPhoto = photo);
-                                        }
-                                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _isSubmitting ? null : () => setState(() => _isPhotoMode = true),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _isPhotoMode
+                              ? (isDark ? const Color(0xFF334155) : Colors.white)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _isPhotoMode
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIcon(
+                                PhosphorIcons.cameraBold,
+                                size: 14,
+                                color: _isPhotoMode ? kPrimaryOrange : kCharcoalMuted,
                               ),
-                            ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isArabic ? 'صورة التسليم' : 'Photo PoD',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: _isPhotoMode
+                                      ? (isDark ? Colors.white : kCharcoalDark)
+                                      : kCharcoalMuted,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: notesController,
-                      decoration: InputDecoration(
-                        hintText: isArabic
-                            ? 'ملاحظات التسليم (مثال: تم ترك الطلب عند الباب بطلب العميل)'
-                            : 'Delivery notes (e.g. Left at door as requested)',
-                        hintStyle: const TextStyle(fontSize: 12),
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : kPageBackground,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                child: Text(
-                  isArabic ? 'إلغاء' : 'Cancel',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+
+            const SizedBox(height: 16),
+
+            if (_errorMessage != null) ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: kRedLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kRed.withValues(alpha: 0.3)),
                 ),
-                onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kGreen,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                ),
-                onPressed: isSubmitting
-                    ? null
-                    : () async {
-                        final orderProv = Provider.of<OrderProvider>(context, listen: false);
-
-                        if (!isPhotoMode) {
-                          // OTP Mode
-                          final otp = _cleanOtp(otpController.text);
-                          if (otp.length < 4) {
-                            setModalState(() {
-                              errorMessage = isArabic
-                                  ? 'يرجى إدخال رمز التحقق (4 أرقام)'
-                                  : 'Please enter the 4-digit verification PIN';
-                            });
-                            return;
-                          }
-
-                          setModalState(() {
-                            isSubmitting = true;
-                            errorMessage = null;
-                          });
-
-                          try {
-                            await orderProv.deliverOrder(item.id!, otp: otp);
-                            if (dialogCtx.mounted) {
-                              Navigator.pop(dialogCtx);
-                            }
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(isArabic ? 'تم تأكيد تسليم الطلب بنجاح ✓' : 'Order delivered successfully ✓')),
-                              );
-                            }
-                          } catch (err) {
-                            setModalState(() {
-                              isSubmitting = false;
-                              errorMessage = err.toString().replaceAll('Exception: ', '').replaceAll('Error: ', '').trim();
-                            });
-                          }
-                        } else {
-                          // Photo PoD Mode
-                          if (capturedPhoto == null) {
-                            setModalState(() {
-                              errorMessage = isArabic
-                                  ? 'يرجى التقاط صورة للطلب أولاً لتوثيق التسليم'
-                                  : 'Please capture a photo first to document delivery';
-                            });
-                            return;
-                          }
-
-                          setModalState(() {
-                            isSubmitting = true;
-                            errorMessage = null;
-                          });
-
-                          try {
-                            final uploadedUrl = await orderProv.uploadPoDPhoto(capturedPhoto!);
-                            if (uploadedUrl == null || uploadedUrl.isEmpty) {
-                              setModalState(() {
-                                isSubmitting = false;
-                                errorMessage = isArabic
-                                    ? 'فشل رفع صورة التسليم، يرجى المحاولة ثانية'
-                                    : 'Failed to upload photo, please try again';
-                              });
-                              return;
-                            }
-
-                            await orderProv.deliverOrder(
-                              item.id!,
-                              notes: notesController.text.trim().isNotEmpty
-                                  ? notesController.text.trim()
-                                  : (isArabic ? 'توثيق التسليم عبر الصورة (PoD)' : 'Proof of delivery via photo'),
-                              photoUrl: uploadedUrl,
-                            );
-                            if (dialogCtx.mounted) {
-                              Navigator.pop(dialogCtx);
-                            }
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(isArabic ? 'تم توثيق وتسليم الطلب بالصورة بنجاح ✓' : 'Order delivered with photo PoD ✓')),
-                              );
-                            }
-                          } catch (err) {
-                            setModalState(() {
-                              isSubmitting = false;
-                              errorMessage = err.toString().replaceAll('Exception: ', '').replaceAll('Error: ', '').trim();
-                            });
-                          }
-                        }
-                      },
-                child: isSubmitting
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(
-                        isArabic ? 'تأكيد وإتمام التسليم' : 'Verify & Deliver',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline_rounded, color: kRed, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          color: kRed,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                    ),
+                  ],
+                ),
               ),
             ],
-          );
-        },
+
+            if (!_isPhotoMode) ...[
+              // OTP Mode
+              Text(
+                isArabic
+                    ? 'اطلب رمز تأكيد الاستلام من العميل (4 أرقام):'
+                    : 'Ask the customer for the 4-digit confirmation code:',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 12.5,
+                  color: kCharcoalMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: TextField(
+                  controller: _otpController,
+                  keyboardType: TextInputType.number,
+                  textDirection: TextDirection.ltr,
+                  maxLength: 8,
+                  textAlign: TextAlign.center,
+                  enabled: !_isSubmitting,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩۰-۹\s\-]')),
+                  ],
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 8,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '----',
+                    hintStyle: const TextStyle(letterSpacing: 8, color: Color(0xFFCBD5E1)),
+                    counterText: '',
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.paste_rounded, color: kPrimaryOrange, size: 20),
+                      tooltip: isArabic ? 'لصق الرمز' : 'Paste Code',
+                      onPressed: _isSubmitting
+                          ? null
+                          : () async {
+                              final data = await Clipboard.getData(Clipboard.kTextPlain);
+                              if (data != null && data.text != null) {
+                                final clean = PhoneHelper.cleanDigits(data.text);
+                                if (clean.isNotEmpty) {
+                                  setState(() => _otpController.text = clean);
+                                }
+                              }
+                            },
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: kPrimaryOrange, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: kPrimaryOrange, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Photo Mode
+              Text(
+                isArabic
+                    ? 'في حال تعذر استلام رمز OTP، التقط صورة واضحة للطلب عند باب العميل:'
+                    : 'Capture a clear photo of the delivered package at the door:',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 12.5,
+                  color: kCharcoalMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_capturedPhoto == null) ...[
+                InkWell(
+                  onTap: _isSubmitting
+                      ? null
+                      : () async {
+                          try {
+                            final photo = await _picker.pickImage(
+                              source: ImageSource.camera,
+                              imageQuality: 75,
+                              maxWidth: 1280,
+                              maxHeight: 1280,
+                            );
+                            if (photo != null) {
+                              setState(() {
+                                _capturedPhoto = photo;
+                                _errorMessage = null;
+                              });
+                            }
+                          } catch (e) {
+                            setState(() => _errorMessage = e.toString());
+                          }
+                        },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    height: 110,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: kPrimaryOrange, width: 1.2),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const AppIcon(PhosphorIcons.cameraBold, size: 32, color: kPrimaryOrange),
+                        const SizedBox(height: 6),
+                        Text(
+                          isArabic ? 'اضغط لفتح الكاميرا والتقاط صورة' : 'Tap to open camera & take photo',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: kPrimaryOrange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.file(
+                        File(_capturedPhoto!.path),
+                        height: 130,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.black.withValues(alpha: 0.6),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
+                          onPressed: _isSubmitting
+                              ? null
+                              : () async {
+                                  final photo = await _picker.pickImage(
+                                    source: ImageSource.camera,
+                                    imageQuality: 75,
+                                  );
+                                  if (photo != null) {
+                                    setState(() => _capturedPhoto = photo);
+                                  }
+                                },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _notesController,
+                enabled: !_isSubmitting,
+                decoration: InputDecoration(
+                  hintText: isArabic
+                      ? 'ملاحظات إضافية (اختياري: مثال: تم الاستلام باليد)'
+                      : 'Additional notes (optional)',
+                  hintStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 12),
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : kPageBackground,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),
+          child: Text(
+            isArabic ? 'إلغاء' : 'Cancel',
+            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kGreen,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          ),
+          onPressed: _isSubmitting
+              ? null
+              : () => _isPhotoMode
+                  ? _handlePhotoSubmit(orderProv, isArabic)
+                  : _handleOtpSubmit(orderProv, isArabic),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : Text(
+                  isArabic ? 'تأكيد التسليم' : 'Confirm Delivery',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }
 
-class MerchentOrderDetails extends StatelessWidget {
+// -----------------------------------------------------------------------------
+// 2. Merchant Order Details Card (Pickup Stop)
+// -----------------------------------------------------------------------------
+class MerchentOrderDetailsCard extends StatelessWidget {
   final MerchentOrderDetailsModel item;
   final int orderId;
-  const MerchentOrderDetails(this.item, this.orderId, {Key? key}) : super(key: key);
+  final bool showPickupAction;
+
+  const MerchentOrderDetailsCard({
+    required this.item,
+    required this.orderId,
+    this.showPickupAction = true,
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final isAccepted = item.orderDetailStatus == OrderDetailsStatus.readyForPickup;
+    final orderProv = Provider.of<OrderProvider>(context);
+    final isActionInFlight = orderProv.isActionInFlight(orderId);
     final isPickedUp = item.orderDetailStatus == OrderDetailsStatus.shipping ||
         item.orderDetailStatus == OrderDetailsStatus.delivered;
+    final isReadyForPickup = item.orderDetailStatus == OrderDetailsStatus.readyForPickup;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isDarkStore = item.isDarkStore;
-    final hasCoords = item.lat != null && item.lng != null && item.lat != 0 && item.lng != 0;
-    final mapNavUrl = hasCoords ? 'https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}' : null;
+
+    final navUrl = GlobalVar.getMerchantNavigationUrl(
+      lat: item.lat,
+      lng: item.lng,
+      address: item.merchantAddress,
+    );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isDarkStore
-              ? (isDark ? const Color(0xFF6366F1) : const Color(0xFF818CF8).withValues(alpha: 0.6))
-              : (isDark ? const Color(0xFF334155) : kBorderColor),
+              ? const Color(0xFF6366F1).withValues(alpha: 0.6)
+              : (isDark ? const Color(0xFF334155) : kCardBorderColor),
           width: isDarkStore ? 1.5 : 1,
         ),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Store Identity Header (Logo, Name, Address, Status Badge)
+          // Store Header Row
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Restaurant Logo or Store Icon
               ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: GlobalVar.checkString(GlobalVar.getMerchantLogo(item.merchantLogo))
                     ? ImageView(
                         GlobalVar.getMerchantLogo(item.merchantLogo),
@@ -821,9 +637,9 @@ class MerchentOrderDetails extends StatelessWidget {
                         height: 44,
                         decoration: BoxDecoration(
                           color: isDarkStore
-                              ? (isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF))
-                              : (isDark ? const Color(0xFF334155) : kSurfaceWarm),
-                          borderRadius: BorderRadius.circular(10),
+                              ? const Color(0xFFEEF2FF)
+                              : kSurfaceWarm,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
                           child: AppIcon(
@@ -834,49 +650,53 @@ class MerchentOrderDetails extends StatelessWidget {
                         ),
                       ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      GlobalVar.checkString(item.merchantTitle)
-                          ? item.merchantTitle!
-                          : (isArabic ? 'مطعم / متجر #${item.merchantId ?? ""}' : 'Restaurant #${item.merchantId ?? ""}'),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : kCharcoalDark,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            GlobalVar.checkString(item.merchantTitle)
+                                ? item.merchantTitle!
+                                : (isArabic ? 'متجر #${item.merchantId ?? ""}' : 'Store #${item.merchantId ?? ""}'),
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : kCharcoalDark,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                     if (isDarkStore)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           isArabic ? '🏢 مستودع جيتك المركزي' : '🏢 Jitak Dark Store',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF6366F1),
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF6366F1),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     if (GlobalVar.checkString(item.merchantAddress))
                       Padding(
-                        padding: const EdgeInsets.only(top: 2),
+                        padding: const EdgeInsets.only(top: 3),
                         child: Row(
                           children: [
-                            AppIcon(PhosphorIcons.mapPinBold, size: 12, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
+                            const AppIcon(PhosphorIcons.mapPinBold, size: 12, color: kCharcoalMuted),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 item.merchantAddress!,
-                                style: TextStyle(
-                                  fontSize: 11,
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  fontSize: 12,
                                   color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                                 ),
                                 maxLines: 1,
@@ -889,150 +709,152 @@ class MerchentOrderDetails extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isPickedUp) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF064E3B) : kGreenLight,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    isArabic ? 'تم الاستلام ✓' : 'Picked Up ✓',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? const Color(0xFF34D399) : kGreen,
-                    ),
-                  ),
-                ),
-              ] else if (item.orderDetailStatus == OrderDetailsStatus.merchantAccepted) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    isArabic ? 'قيد التجهيز' : 'Preparing',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? const Color(0xFFFBBF24) : const Color(0xFF92400E),
-                    ),
-                  ),
-                ),
-              ],
+              const SizedBox(width: 8),
+              _buildMerchantStatusPill(item.orderDetailStatus, isDark, isArabic),
             ],
           ),
 
-          // Action Buttons Bar (Call, Map, Pickup Button)
-          if (GlobalVar.checkString(item.merchantPhone) || mapNavUrl != null || isAccepted) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                // Call merchant button (if phone exists)
-                if (GlobalVar.checkString(item.merchantPhone))
-                  InkWell(
-                    onTap: () => launchUrl(Uri.parse('tel:${item.merchantPhone}')),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF064E3B) : kGreenLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const AppIcon(PhosphorIcons.phoneCallBold, size: 14, color: kGreen),
-                          const SizedBox(width: 4),
-                          Text(
-                            isArabic ? 'اتصال' : 'Call',
-                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: kGreen),
-                          ),
-                        ],
-                      ),
+          const SizedBox(height: 12),
+
+          // Action Buttons (Call, WhatsApp, Maps)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (PhoneHelper.isValidPhone(item.merchantPhone)) ...[
+                OutlinedButton.icon(
+                  onPressed: () => PhoneHelper.launchCall(context, item.merchantPhone),
+                  icon: const AppIcon(PhosphorIcons.phoneCallBold, size: 14, color: kGreen),
+                  label: Text(
+                    isArabic ? 'اتصال بالمتجر' : 'Call Store',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kGreen,
                     ),
                   ),
-                // Map navigation to merchant button (if coords exist)
-                if (mapNavUrl != null)
-                  InkWell(
-                    onTap: () async {
-                      try {
-                        await launchUrl(Uri.parse(mapNavUrl), mode: LaunchMode.externalApplication);
-                      } catch (err) {
-                        showDialog(context: context, builder: (ctx) => CustomDialog(message: err.toString()));
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const AppIcon(PhosphorIcons.navigationArrowBold, size: 14, color: Color(0xFF2563EB)),
-                          const SizedBox(width: 4),
-                          Text(
-                            isArabic ? 'الخريطة' : 'Map',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                        ],
-                      ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: kGreen.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => PhoneHelper.launchWhatsApp(context, item.merchantPhone),
+                  icon: const AppIcon(PhosphorIcons.whatsappLogoBold, size: 14, color: Color(0xFF25D366)),
+                  label: Text(
+                    'واتساب',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF25D366),
                     ),
                   ),
-                // Pickup status action button
-                if (isAccepted)
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkStore ? const Color(0xFF6366F1) : kPrimaryOrange,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const AppIcon(PhosphorIcons.checkCircleBold, size: 14, color: Colors.white),
-                        const SizedBox(width: 5),
-                        Text(
-                          isArabic ? 'استلام الطلب' : 'Pickup Order',
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                    onPressed: () async {
-                      try {
-                        await Provider.of<OrderProvider>(context, listen: false).startShipping(orderId, item.merchantId!);
-                      } catch (err) {
-                        showDialog(context: context, builder: (ctx) => CustomDialog(message: err.toString()));
-                      }
-                    },
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: const Color(0xFF25D366).withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
+                ),
               ],
+              if (navUrl != null)
+                OutlinedButton.icon(
+                  onPressed: () => GlobalVar.launchNavigationUrl(navUrl),
+                  icon: const AppIcon(PhosphorIcons.navigationArrowBold, size: 14, color: kBlue),
+                  label: Text(
+                    isArabic ? 'خريطة المتجر' : 'Store Map',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kBlue,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: kBlue.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+            ],
+          ),
+
+          // In-card Pickup Button (If Ready for Pickup)
+          if (showPickupAction && isReadyForPickup && !isPickedUp) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 42,
+              child: ElevatedButton.icon(
+                onPressed: isActionInFlight
+                    ? null
+                    : () async {
+                        try {
+                          await orderProv.startShipping(orderId, item.merchantId!);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isArabic
+                                      ? 'تم تأكيد استلام الطلب من المتجر بنجاح ✓'
+                                      : 'Pickup confirmed successfully ✓',
+                                  style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+                                ),
+                                backgroundColor: kGreen,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  e.toString().replaceAll('Exception: ', '').trim(),
+                                  style: GoogleFonts.ibmPlexSansArabic(),
+                                ),
+                                backgroundColor: kRed,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                icon: isActionInFlight
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const AppIcon(PhosphorIcons.checkCircleBold, size: 16, color: Colors.white),
+                label: Text(
+                  isActionInFlight
+                      ? (isArabic ? 'جاري التأكيد...' : 'Confirming...')
+                      : (isArabic ? 'تأكيد استلام الطلب من هذا المتجر' : 'Confirm Pickup from Store'),
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkStore ? const Color(0xFF6366F1) : kPrimaryOrange,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+              ),
             ),
           ],
 
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: kBorderColor),
           const SizedBox(height: 10),
-          Divider(height: 1, color: isDark ? const Color(0xFF1E293B) : kBorderColor.withValues(alpha: 0.5)),
-          const SizedBox(height: 8),
 
-          // Items inside this merchant order
+          // Items List inside this merchant
           if (item.orderDetails != null && item.orderDetails!.isNotEmpty)
             Column(
               children: item.orderDetails!
@@ -1043,8 +865,268 @@ class MerchentOrderDetails extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildMerchantStatusPill(OrderDetailsStatus? status, bool isDark, bool isArabic) {
+    Color bg;
+    Color fg;
+    String text;
+
+    switch (status) {
+      case OrderDetailsStatus.delivered:
+      case OrderDetailsStatus.shipping:
+        bg = isDark ? const Color(0xFF064E3B) : kGreenLight;
+        fg = isDark ? const Color(0xFF34D399) : kGreen;
+        text = isArabic ? 'تم الاستلام ✓' : 'Picked Up ✓';
+        break;
+      case OrderDetailsStatus.readyForPickup:
+        bg = isDark ? const Color(0xFF1E3A8A) : kBlueLight;
+        fg = isDark ? const Color(0xFF60A5FA) : kBlue;
+        text = isArabic ? 'جاهز للاستلام' : 'Ready for Pickup';
+        break;
+      case OrderDetailsStatus.merchantAccepted:
+        bg = isDark ? const Color(0xFF78350F) : kAmberLight;
+        fg = isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+        text = isArabic ? 'قيد التجهيز' : 'Preparing';
+        break;
+      default:
+        bg = isDark ? const Color(0xFF334155) : kGreyBackground;
+        fg = isDark ? Colors.white : kCharcoalDark;
+        text = status?.value ?? '';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.ibmPlexSansArabic(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+    );
+  }
 }
 
+// -----------------------------------------------------------------------------
+// 3. Customer Order Details Card (Dropoff Destination)
+// -----------------------------------------------------------------------------
+class CustomerOrderDetailsCard extends StatelessWidget {
+  final OrderModel order;
+
+  const CustomerOrderDetailsCard({required this.order, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final navUrl = GlobalVar.getCustomerNavigationUrl(
+      lat: order.lat,
+      lng: order.lng,
+      address: order.address,
+    );
+
+    final customerName = GlobalVar.checkString(order.user)
+        ? order.user!
+        : (isArabic ? 'العميل' : 'Customer');
+
+    final customerPhone = order.phonenumber;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : kCardBorderColor),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: AppIcon(PhosphorIcons.userBold, size: 20, color: kGreen),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customerName,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : kCharcoalDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      order.address ?? (isArabic ? 'العنوان غير محدد' : 'Address not specified'),
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 12.5,
+                        color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          if (GlobalVar.checkString(order.description)) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AppIcon(PhosphorIcons.notepadBold, size: 14, color: kPrimaryOrange),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      order.description!,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 12,
+                        color: kCharcoalDark,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Quick Contact & Navigation Buttons
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (PhoneHelper.isValidPhone(customerPhone)) ...[
+                OutlinedButton.icon(
+                  onPressed: () => PhoneHelper.launchCall(context, customerPhone),
+                  icon: const AppIcon(PhosphorIcons.phoneCallBold, size: 14, color: kGreen),
+                  label: Text(
+                    isArabic ? 'اتصال بالعميل' : 'Call Customer',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kGreen,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: kGreen.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => PhoneHelper.launchWhatsApp(context, customerPhone),
+                  icon: const AppIcon(PhosphorIcons.whatsappLogoBold, size: 14, color: Color(0xFF25D366)),
+                  label: Text(
+                    'واتساب',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF25D366),
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: const Color(0xFF25D366).withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => QuickChatSheet.show(
+                    context,
+                    customerPhone: customerPhone!,
+                    customerName: customerName,
+                  ),
+                  icon: const AppIcon(PhosphorIcons.chatTeardropDotsBold, size: 14, color: kPrimaryOrange),
+                  label: Text(
+                    isArabic ? 'رسائل سريعة' : 'Quick Chat',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimaryOrange,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: kPrimaryOrange.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+              if (navUrl != null)
+                OutlinedButton.icon(
+                  onPressed: () => GlobalVar.launchNavigationUrl(navUrl),
+                  icon: const AppIcon(PhosphorIcons.navigationArrowBold, size: 14, color: kPrimaryOrange),
+                  label: Text(
+                    isArabic ? 'خريطة العميل' : 'Customer Map',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimaryOrange,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: kPrimaryOrange.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 4. Product Item Component
+// -----------------------------------------------------------------------------
 class OrderDetailsSingleItem extends StatelessWidget {
   final OrderDetailsModel item;
   const OrderDetailsSingleItem(this.item, {Key? key}) : super(key: key);
@@ -1057,7 +1139,6 @@ class OrderDetailsSingleItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          // Product Thumbnail
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: _image(isDark),
@@ -1068,8 +1149,10 @@ class OrderDetailsSingleItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  GlobalVar.checkString(item.productTitle) ? item.productTitle! : 'Item #${item.productId ?? ""}',
-                  style: TextStyle(
+                  GlobalVar.checkString(item.productTitle)
+                      ? item.productTitle!
+                      : 'صنف #${item.productId ?? ""}',
+                  style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : kCharcoalDark,
@@ -1082,7 +1165,7 @@ class OrderDetailsSingleItem extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 1),
                     child: Text(
                       item.productUnit!,
-                      style: TextStyle(
+                      style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 11,
                         color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                       ),
@@ -1091,7 +1174,6 @@ class OrderDetailsSingleItem extends StatelessWidget {
               ],
             ),
           ),
-          // Quantity Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -1101,7 +1183,7 @@ class OrderDetailsSingleItem extends StatelessWidget {
             ),
             child: Text(
               '${item.quantity ?? 1} ×',
-              style: const TextStyle(
+              style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: kPrimaryOrange,
@@ -1114,7 +1196,7 @@ class OrderDetailsSingleItem extends StatelessWidget {
   }
 
   Widget _image(bool isDark) {
-    const double size = 44;
+    const double size = 40;
     final img = GlobalVar.getFirstPhoto(item.productImage);
     if (GlobalVar.checkString(img)) {
       return ImageView(img, height: size, width: size, fit: BoxFit.cover);
@@ -1129,7 +1211,7 @@ class OrderDetailsSingleItem extends StatelessWidget {
       child: Center(
         child: AppIcon(
           PhosphorIcons.forkKnifeBold,
-          size: 20,
+          size: 18,
           color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
         ),
       ),
@@ -1137,454 +1219,394 @@ class OrderDetailsSingleItem extends StatelessWidget {
   }
 }
 
-class AvailableOrderCard extends StatefulWidget {
-  final OrderModel item;
-  final VoidCallback onClaimed;
+// -----------------------------------------------------------------------------
+// 5. Active Order Card for OrdersPage List
+// -----------------------------------------------------------------------------
+class DeliveryOrderCard extends StatelessWidget {
+  final OrderModel order;
+  final double? distanceKm;
 
-  const AvailableOrderCard({
+  const DeliveryOrderCard({
+    required this.order,
+    this.distanceKm,
     Key? key,
-    required this.item,
-    required this.onClaimed,
   }) : super(key: key);
 
   @override
-  State<AvailableOrderCard> createState() => _AvailableOrderCardState();
-}
-
-class _AvailableOrderCardState extends State<AvailableOrderCard> {
-  bool _isClaiming = false;
-
-  Future<void> _handleClaim(BuildContext context) async {
-    final provider = Provider.of<OrderProvider>(context, listen: false);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    if (!provider.isOnline) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isArabic
-                ? 'يجب بدء الوردية (الوضع متاح) أولاً لتتمكن من استلام الطلب.'
-                : 'Please start your shift (go online) first to claim orders.',
-          ),
-          backgroundColor: kRed,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isClaiming = true);
-
-    try {
-      await provider.claimOrder(widget.item.id!);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isArabic
-                      ? 'تم استلام الطلب #${widget.item.id} بنجاح! تم نقله إلى قائمة طلباتي.'
-                      : 'Order #${widget.item.id} claimed successfully!',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: kGreen,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      widget.onClaimed();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isArabic
-                ? 'تعذر استلام الطلب: ربما تم استلامه من قبل كابتن آخر.'
-                : 'Failed to claim order: May have already been taken.',
-          ),
-          backgroundColor: kRed,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isClaiming = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final item = widget.item;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.35) : const Color(0xFF3B82F6).withValues(alpha: 0.25),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    final status = order.deliveryStatus;
+    final isShipping = order.canDeliverToCustomer;
+    final isReadyForPickup = status == OrderDetailsStatus.readyForPickup;
+
+    final merchantTitle = order.primaryMerchantTitle;
+    final customerAddress = order.address ?? (isArabic ? 'العنوان غير محدد' : 'Address not specified');
+    final timeFormatted = GlobalVar.dateForamt(order.purchaseDate, 'HH:mm') ?? '--:--';
+    final priceFormatted = GlobalVar.priceForamt(order.price);
+
+    final distanceFormatted = distanceKm != null
+        ? '${distanceKm!.toStringAsFixed(1)} ${isArabic ? 'كم' : 'km'}'
+        : null;
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => OrderDetailsPage(order)),
+        );
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isShipping
+                ? kPrimaryOrange.withValues(alpha: 0.4)
+                : (isReadyForPickup ? kBlue.withValues(alpha: 0.3) : kCardBorderColor),
+            width: isShipping ? 1.4 : 1.0,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header: Order ID + Status pill ("متاح للاستلام")
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Header: Order ID + Status Pill
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFEFF6FF),
+                        color: kSurfaceWarm,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const AppIcon(PhosphorIcons.hashBold, size: 14, color: Color(0xFF2563EB)),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${item.id}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF064E3B) : kGreenLight,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const AppIcon(PhosphorIcons.mopedBold, size: 13, color: kGreen),
-                          const SizedBox(width: 4),
-                          Text(
-                            isArabic ? 'متاح للاستلام' : 'Available',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: kGreen,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        AppIcon(PhosphorIcons.clockBold, size: 14, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
-                        const SizedBox(width: 4),
-                        Text(
-                          GlobalVar.dateForamt(item.purchaseDate, kDateTimeFormat) ?? '',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      child: Text(
+                        '#${order.id}',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: kPrimaryOrange,
                         ),
-                      ],
+                      ),
                     ),
-                    PriceTextWidget.small(
-                      price: item.price,
-                      currencyString: isArabic ? 'ل.س' : 'SYP',
+                    const SizedBox(width: 8),
+                    // Payment Pill (COD vs Electronic)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: order.isCod ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: order.isCod ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
+                        ),
+                      ),
+                      child: Text(
+                        order.isCod
+                            ? (isArabic ? 'تحصيل نقدي (COD)' : 'Cash on Delivery')
+                            : (isArabic ? 'مدفوع إلكترونياً' : 'Prepaid'),
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: order.isCod ? const Color(0xFFB45309) : const Color(0xFF047857),
+                        ),
+                      ),
                     ),
                   ],
                 ),
+                _buildStatusBadge(status, isDark, isArabic),
               ],
             ),
-          ),
 
-          Divider(height: 1, color: isDark ? const Color(0xFF334155) : kBorderColor),
+            const SizedBox(height: 12),
 
-          // Merchant & Delivery Details
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+            // Middle: Pickup Store & Customer Destination
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Pickup store(s)
-                if (item.orderDetails != null && item.orderDetails!.isNotEmpty)
-                  ...item.orderDetails!.map((merchant) {
-                    final hasMerchantCoords = merchant.lat != null && merchant.lng != null && merchant.lat != 0 && merchant.lng != 0;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : kSurfaceWarm.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : kBorderColor, width: 1),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Restaurant Logo or Storefront Icon
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: GlobalVar.checkString(GlobalVar.getMerchantLogo(merchant.merchantLogo))
-                                    ? ImageView(
-                                        GlobalVar.getMerchantLogo(merchant.merchantLogo),
-                                        width: 36,
-                                        height: 36,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: BoxDecoration(
-                                          color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFDBEAFE),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: const Center(
-                                          child: AppIcon(PhosphorIcons.storefrontBold, size: 18, color: Color(0xFF2563EB)),
-                                        ),
-                                      ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      isArabic ? 'المطعم / نقطة الاستلام' : 'Restaurant / Pickup',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
-                                      ),
-                                    ),
-                                    Text(
-                                      GlobalVar.checkString(merchant.merchantTitle)
-                                          ? merchant.merchantTitle!
-                                          : (isArabic ? 'مطعم #${merchant.merchantId ?? ""}' : 'Restaurant #${merchant.merchantId ?? ""}'),
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark ? Colors.white : kCharcoalDark,
-                                      ),
-                                    ),
-                                    if (GlobalVar.checkString(merchant.merchantAddress))
-                                      Text(
-                                        merchant.merchantAddress!,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              if (hasMerchantCoords)
-                                InkWell(
-                                  onTap: () => launchUrl(
-                                    Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${merchant.lat},${merchant.lng}'),
-                                    mode: LaunchMode.externalApplication,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const AppIcon(PhosphorIcons.navigationArrowBold, size: 13, color: Color(0xFF2563EB)),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          isArabic ? 'الخريطة' : 'Map',
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          // Items Preview in this store
-                          if (merchant.orderDetails != null && merchant.orderDetails!.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            ...merchant.orderDetails!.map((product) => Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Row(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: GlobalVar.checkString(product.productImage)
-                                        ? ImageView(product.productImage!.split(',').first.trim(), height: 26, width: 26, fit: BoxFit.cover)
-                                        : Container(
-                                            width: 26,
-                                            height: 26,
-                                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                                            child: AppIcon(PhosphorIcons.forkKnifeBold, size: 13, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-                                          ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      product.productTitle ?? '',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? Colors.white70 : kCharcoalDark,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${product.quantity ?? 1} ×',
-                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: kPrimaryOrange),
-                                  ),
-                                ],
-                              ),
-                            )),
-                          ],
-                        ],
-                      ),
-                    );
-                  }).toList(),
-
-                // Dropoff destination
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // Icon column
+                Column(
                   children: [
                     Container(
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF064E3B) : const Color(0xFFDCFCE7),
+                        color: isDarkStore(order) ? const Color(0xFFEEF2FF) : kSurfaceWarm,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const AppIcon(PhosphorIcons.mapPinBold, size: 16, color: kGreen),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isArabic ? 'وجهة التسليم (العميل)' : 'Dropoff Destination',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item.address ?? (isArabic ? 'لا يوجد عنوان محدد' : 'No specified address'),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : kCharcoalDark,
-                            ),
-                          ),
-                        ],
+                      child: Center(
+                        child: AppIcon(
+                          isDarkStore(order) ? PhosphorIcons.packageBold : PhosphorIcons.storefrontBold,
+                          size: 16,
+                          color: isDarkStore(order) ? const Color(0xFF6366F1) : kPrimaryOrange,
+                        ),
                       ),
                     ),
-                    if (item.lat != null && item.lng != null && item.lat != 0 && item.lng != 0)
-                      InkWell(
-                        onTap: () => launchUrl(
-                          Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}'),
-                          mode: LaunchMode.externalApplication,
-                        ),
+                    Container(
+                      width: 2,
+                      height: 24,
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF064E3B) : const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: kGreen.withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const AppIcon(PhosphorIcons.navigationArrowBold, size: 13, color: kGreen),
-                              const SizedBox(width: 4),
-                              Text(
-                                isArabic ? 'الخريطة' : 'Map',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
+                      child: const Center(
+                        child: AppIcon(PhosphorIcons.mapPinBold, size: 16, color: kGreen),
+                      ),
+                    ),
                   ],
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Pickup from Store
+                      Text(
+                        isArabic ? 'الاستلام:' : 'Pickup:',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: kCharcoalMuted,
+                        ),
+                      ),
+                      Text(
+                        merchantTitle,
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : kCharcoalDark,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 10),
+                      // Dropoff to Customer
+                      Text(
+                        isArabic ? 'التسليم:' : 'Dropoff:',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: kCharcoalMuted,
+                        ),
+                      ),
+                      Text(
+                        customerAddress,
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : kCharcoalDark,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
 
-          Divider(height: 1, color: isDark ? const Color(0xFF334155) : kBorderColor),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: kBorderColor),
+            const SizedBox(height: 10),
 
-          // Big Claim Button
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _isClaiming ? null : () => _handleClaim(context),
-                icon: _isClaiming
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const AppIcon(PhosphorIcons.handGrabbingBold, size: 20, color: Colors.white),
-                label: Text(
-                  _isClaiming
-                      ? (isArabic ? 'جاري الاستلام...' : 'Claiming...')
-                      : (isArabic ? 'استلام هذا الطلب والتوصيل' : 'Accept & Claim Delivery'),
-                  style: const TextStyle(
-                    fontSize: 14,
+            // Info Bar: Time, Distance, Cash to Collect
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const AppIcon(PhosphorIcons.clockBold, size: 14, color: kCharcoalMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      timeFormatted,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kCharcoalDark,
+                      ),
+                    ),
+                    if (distanceFormatted != null) ...[
+                      const SizedBox(width: 12),
+                      const AppIcon(PhosphorIcons.mapPinBold, size: 14, color: kCharcoalMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        distanceFormatted,
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kCharcoalDark,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  order.isCod
+                      ? '$priceFormatted ${isArabic ? 'ل.س نقداً' : 'SYP cash'}'
+                      : (isArabic ? 'مدفوع إلكترونياً' : 'Prepaid'),
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: order.isCod ? kPrimaryOrange : kGreen,
                   ),
                 ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Primary Workflow Action Button
+            SizedBox(
+              height: 42,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => OrderDetailsPage(order)),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kGreen,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: isShipping
+                      ? kGreen
+                      : (isReadyForPickup ? kPrimaryOrange : const Color(0xFFFFF0E8)),
+                  foregroundColor: (isShipping || isReadyForPickup) ? Colors.white : kPrimaryOrange,
                   elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AppIcon(
+                      isShipping
+                          ? PhosphorIcons.shieldCheckBold
+                          : (isReadyForPickup ? PhosphorIcons.storefrontBold : PhosphorIcons.arrowRightBold),
+                      size: 16,
+                      color: (isShipping || isReadyForPickup) ? Colors.white : kPrimaryOrange,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _primaryButtonLabel(order, isArabic),
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: (isShipping || isReadyForPickup) ? Colors.white : kPrimaryOrange,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool isDarkStore(OrderModel o) {
+    if (o.orderDetails != null && o.orderDetails!.isNotEmpty) {
+      return o.orderDetails!.first.isDarkStore;
+    }
+    return false;
+  }
+
+  String _primaryButtonLabel(OrderModel o, bool isArabic) {
+    if (o.isDelivered) {
+      return isArabic ? 'عرض تفاصيل الطلب (مكتمل)' : 'View Details (Delivered)';
+    }
+    if (o.canDeliverToCustomer) {
+      return isArabic ? 'تأكيد تسليم الطلب للعميل' : 'Confirm Delivery to Customer';
+    }
+    if (o.hasPendingPickups) {
+      final next = o.nextPendingMerchant;
+      if (next != null && GlobalVar.checkString(next.merchantTitle)) {
+        return isArabic ? 'استلام الطلب من ${next.merchantTitle}' : 'Pickup from Store';
+      }
+      return isArabic ? 'استلام الطلب من المتجر' : 'Pickup from Store';
+    }
+    return isArabic ? 'عرض تفاصيل الطلب' : 'View Order Details';
+  }
+
+  Widget _buildStatusBadge(OrderDetailsStatus status, bool isDark, bool isArabic) {
+    Color bg;
+    Color fg;
+    String text;
+    IconData icon;
+
+    switch (status) {
+      case OrderDetailsStatus.delivered:
+        bg = isDark ? const Color(0xFF064E3B) : kGreenLight;
+        fg = isDark ? const Color(0xFF34D399) : kGreen;
+        text = isArabic ? 'تم التسليم بنجاح ✓' : 'Delivered ✓';
+        icon = PhosphorIcons.checkCircleBold;
+        break;
+      case OrderDetailsStatus.shipping:
+        bg = isDark ? const Color(0xFF334155) : kSurfaceWarm;
+        fg = kPrimaryOrange;
+        text = isArabic ? 'قيد التوصيل للعميل' : 'Out for Delivery';
+        icon = PhosphorIcons.mopedBold;
+        break;
+      case OrderDetailsStatus.readyForPickup:
+        bg = isDark ? const Color(0xFF1E3A8A) : kBlueLight;
+        fg = isDark ? const Color(0xFF60A5FA) : kBlue;
+        text = isArabic ? 'جاهز للاستلام' : 'Ready for Pickup';
+        icon = PhosphorIcons.storefrontBold;
+        break;
+      case OrderDetailsStatus.merchantAccepted:
+        bg = isDark ? const Color(0xFF78350F) : kAmberLight;
+        fg = isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+        text = isArabic ? 'قيد التجهيز' : 'Preparing';
+        icon = PhosphorIcons.clockBold;
+        break;
+      case OrderDetailsStatus.deliveryCanceled:
+      case OrderDetailsStatus.customerCanceled:
+      case OrderDetailsStatus.merchantRejected:
+        bg = isDark ? const Color(0xFF450A0A) : kRedLight;
+        fg = isDark ? const Color(0xFFF87171) : kRed;
+        text = isArabic ? 'ملغي' : 'Canceled';
+        icon = PhosphorIcons.xCircleBold;
+        break;
+      default:
+        bg = isDark ? const Color(0xFF334155) : kGreyBackground;
+        fg = isDark ? Colors.white : kCharcoalDark;
+        text = status.value;
+        icon = PhosphorIcons.infoBold;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppIcon(icon, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fg,
             ),
           ),
         ],

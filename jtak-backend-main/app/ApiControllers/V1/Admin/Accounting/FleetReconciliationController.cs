@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Extensions;
 using App.Shared.Entities;
 using App.Shared.Entities.Enums;
@@ -59,8 +59,20 @@ namespace App.ApiControllers.V1.Admin
         [HttpPost("Settle")]
         public async Task<ActionResult<SettlementResultDto>> SettleShift([FromBody] SettleCaptainShiftRequest request)
         {
-            await Task.CompletedTask;
-            return BadRequest(ApiErr.Create("يجب أن يرسل المندوب طلب تسوية أولاً، ثم يتم قبوله من قائمة طلبات التسوية."));
+            var adminId = User.GetUserId();
+            if (!adminId.HasValue) return Unauthorized();
+            if (request == null || request.CaptainUserId == Guid.Empty)
+                return BadRequest(ApiErr.Create("يجب تحديد الكابتن والمبلغ المستلم."));
+
+            try
+            {
+                var result = await _reconciliationService.SettleCaptainShiftAsync(request, adminId.Value);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ApiErr.Create(ex.Message));
+            }
         }
 
         /// <summary>

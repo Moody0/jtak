@@ -233,11 +233,15 @@ export class OrdersListComponent
     modalRef.componentInstance.confirmLabel = 'Cancel order';
     this.subs.sink = modalRef.componentInstance.cancelClicked.subscribe(() => modalRef.dismiss());
     this.subs.sink = modalRef.componentInstance.deleteClicked.subscribe(() => {
+      if (modalRef.componentInstance.isLoading) return;
       modalRef.componentInstance.isLoading = true;
-      this.ordersService.cancel(orderId, reason.trim()).subscribe(res => {
-        if (res === true) {
+      this.ordersService.cancel(orderId, reason.trim()).subscribe({
+        next: (res) => {
           modalRef.close();
           this.ordersService.fetchPost();
+        },
+        error: () => {
+          modalRef.componentInstance.isLoading = false;
         }
       });
     });

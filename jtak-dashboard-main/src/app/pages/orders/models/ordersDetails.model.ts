@@ -8,4 +8,5 @@ export interface OrdersDetails extends BaseModel {
     productTitle: string;
     merchantId: number;
     merchantTitle?: string;
+    warning?: string;
 }

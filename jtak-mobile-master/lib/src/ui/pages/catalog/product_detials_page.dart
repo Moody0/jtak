@@ -187,15 +187,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (provider.product.price != null && provider.product.finalPrice != null && provider.product.price != provider.product.finalPrice) ...[
+          if (provider.product.hasAuthoritativeDiscount) ...[
             DiscountWidget(
-              price: provider.product.price,
+              price: provider.product.originalPrice,
               textStyle: AppTheme.discountCurrencyStyle.copyWith(fontSize: 20, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
             ),
             context.addWidth(16),
           ],
           PriceTextWidget.large(
-            price: provider.product.finalPrice,
+            price: provider.product.canonicalSellingPrice,
             textStyle: AppTheme.currencyIntegerStyleLarg.copyWith(fontSize: 30),
           ),
         ],

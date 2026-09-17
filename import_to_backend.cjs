@@ -243,6 +243,7 @@ async function run() {
               assignedProducts.push({
                 productId: productId,
                 merchantPrice: price,
+                priceUsd: price > 0 ? price : null,
                 originalPrice: origPrice,
                 discount: discount,
                 profitOutOfMerchantPricePercent: 0,

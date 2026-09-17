@@ -21,8 +21,8 @@ class AboutAppPage extends StatelessWidget {
 
   static const String appVersion = '1.0.3';
   static const String appBuild = '15';
-  static const String supportPhone = '+963987654321';
-  static const String supportWhatsApp = 'https://wa.me/963987654321';
+  static const String supportPhone = '0985615705';
+  static const String supportWhatsApp = 'https://wa.me/963985615705';
   static const String officialWebsite = 'https://jtak.sy';
 
   void _openUrl(BuildContext context, String url) async {
@@ -256,6 +256,18 @@ class AboutAppPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
+
+                // Phone Support
+                _buildContactTile(
+                  icon: PhosphorIconsFill.phoneCall,
+                  iconColor: kPrimaryOrange,
+                  iconBg: const Color(0xFFFFF3EB),
+                  title: 'الاتصال الهاتفي المباشر',
+                  subtitle: supportPhone,
+                  onTap: () => _openUrl(context, 'tel:$supportPhone'),
+                ),
+
+                const Divider(height: 1, indent: 48, color: Color(0xFFF1F5F9)),
 
                 // WhatsApp Support
                 _buildContactTile(

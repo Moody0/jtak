@@ -31,6 +31,7 @@
       type="button"
       class="btn btn-light btn-elevate"
       (click)="onCancelClicked()"
+      [disabled]="isLoading"
     >
       {{ 'COMMON.CANCEL' | translate }}
     </button>&nbsp;
@@ -38,6 +39,7 @@
       type="button"
       class="btn btn-danger btn-elevate"
       (click)="onDeleteClicked()"
+      [disabled]="isLoading"
     >
       {{ (confirmLabel === 'Delete' ? 'COMMON.DELETE' : confirmLabel) | translate }}
     </button>

@@ -1,30 +1,22 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility that Flutter provides. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:jtek_app/main.dart';
+import 'package:jtek_app/src/utils/utilities/global_var.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('GlobalVar Image URL Normalization', () {
+    test('Handles empty and null strings safely', () {
+      expect(GlobalVar.getImageUrl(''), equals(''));
+      expect(GlobalVar.getImageUrl('null'), equals(''));
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('Normalizes backslashes and leading slashes in paths', () {
+      final url = GlobalVar.getImageUrl(r'\Uploads\products\item1.jpg');
+      expect(url.contains(r'\'), isFalse);
+      expect(url.contains('Uploads/products/item1.jpg'), isTrue);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('Preserves full HTTP/HTTPS and assets URLs', () {
+      expect(GlobalVar.getImageUrl('https://example.com/pic.png'), equals('https://example.com/pic.png'));
+      expect(GlobalVar.getImageUrl('assets/images/logo.png'), equals('assets/images/logo.png'));
+    });
   });
 }

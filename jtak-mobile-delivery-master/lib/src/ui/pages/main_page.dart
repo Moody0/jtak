@@ -12,6 +12,9 @@ import '../../core/services/locator.dart';
 import '../../utils/utilities/global_var.dart';
 import '../pages/account/profile_page.dart';
 import '../pages/order/orders_page.dart';
+import '../pages/setting_page.dart';
+import '../pages/transaction/transaction_page.dart';
+import '../sections/delivery_bottom_navigation.dart';
 import '../sections/drawer.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/incoming_order_modal.dart';
@@ -33,10 +36,47 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   String? _locationError;
   LocationAccessIssue? _locationIssue;
 
+  int _currentNavIndex = 0;
+
+  void _onBottomNavChange(int index) {
+    if (_currentNavIndex == index) return;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    setState(() {
+      _currentNavIndex = index;
+      switch (index) {
+        case 0:
+          homeBody = const OrdersPage();
+          pageTitle = isArabic ? 'الطلبات الحالية' : 'Current Orders';
+          break;
+        case 1:
+          homeBody = const TransactionPage();
+          pageTitle = isArabic ? 'سجل الحركات المالية' : 'Transactions';
+          break;
+        case 2:
+          homeBody = const ProfilePage();
+          pageTitle = isArabic ? 'الملف الشخصي' : 'Profile';
+          break;
+        case 3:
+          homeBody = const SettingPage();
+          pageTitle = isArabic ? 'الإعدادات' : 'Settings';
+          break;
+      }
+    });
+  }
+
   void drawerHandler(Widget page, String title) {
+    int index = 0;
+    if (page is TransactionPage) {
+      index = 1;
+    } else if (page is ProfilePage) {
+      index = 2;
+    } else if (page is SettingPage) {
+      index = 3;
+    }
     setState(() {
       homeBody = page;
       pageTitle = title;
+      _currentNavIndex = index;
     });
   }
 
@@ -134,16 +174,13 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       });
     }
 
-    final isHome = pageTitle == 'الطلبات الحالية' || pageTitle == 'Current Orders';
+    final isHome = _currentNavIndex == 0;
     return PopScope(
       canPop: isHome,
       onPopInvokedWithResult: (didPop, dynamic _) {
         if (didPop) return;
         if (!isHome) {
-          setState(() {
-            homeBody = const OrdersPage();
-            pageTitle = 'الطلبات الحالية';
-          });
+          _onBottomNavChange(0);
         }
       },
       child: Scaffold(
@@ -155,6 +192,10 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           ),
         ),
         drawer: HomeDrawer(drawerHandler, currentPage: pageTitle),
+        bottomNavigationBar: DeliveryBottomNavigation(
+          currentIndex: _currentNavIndex,
+          onChange: _onBottomNavChange,
+        ),
       ),
     );
   }

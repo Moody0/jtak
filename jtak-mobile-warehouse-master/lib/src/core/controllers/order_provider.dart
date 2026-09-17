@@ -33,9 +33,11 @@ class OrderProvider extends BaseProvider<OrderModel> {
   bool get isSilentRefreshing => _isSilentRefreshing;
   DateTime? get lastSyncTime => _lastSyncTime;
 
+  Future<void>? _loadPickedFuture;
+
   OrderProvider() {
     _loadStoredDeadlines();
-    _loadStoredPickedItems();
+    _loadPickedFuture = _loadStoredPickedItems();
   }
 
   Future<void> _loadStoredDeadlines() async {
@@ -310,6 +312,7 @@ class OrderProvider extends BaseProvider<OrderModel> {
             .where((item) => !previousPendingIds.contains(item.id))
             .toList();
 
+        await _loadPickedFuture;
         _applyPickedStatesToOrders(newItems);
         dataList = newItems;
         _lastSyncTime = DateTime.now();
@@ -351,6 +354,7 @@ class OrderProvider extends BaseProvider<OrderModel> {
         var res = await _api.postRequest('/Orders/Mine', body);
         List data = res['items'];
         final list = data.map((e) => OrderModel.fromMap(e)).toList();
+        await _loadPickedFuture;
         _applyPickedStatesToOrders(list);
         return list;
       },

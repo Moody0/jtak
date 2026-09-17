@@ -138,6 +138,7 @@ async function run() {
     return {
       productId: p.id,
       merchantPrice: price,
+      priceUsd: price > 0 ? price : null,
       originalPrice: origPrice,
       discount: discount,
       profitOutOfMerchantPricePercent: 0,
@@ -155,6 +156,7 @@ async function run() {
     return {
       productId: p.id,
       merchantPrice: price,
+      priceUsd: price > 0 ? price : null,
       originalPrice: origPrice,
       discount: discount,
       profitOutOfMerchantPricePercent: 0,

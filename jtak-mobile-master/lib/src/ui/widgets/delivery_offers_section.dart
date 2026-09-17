@@ -200,10 +200,23 @@ class JtakDeliveryOffersSection extends StatelessWidget {
                   );
                 }
 
-                final allMeals = marketsProv.popularMeals.isNotEmpty
-                    ? marketsProv.popularMeals
-                    : MockCatalogData.allDeliveryMeals;
+                final allMeals = marketsProv.popularMeals;
                 final meals = allMeals.where((m) => !m.isMarket).toList();
+                if (meals.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        'لا توجد وجبات متاحة حالياً',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ),
+                  );
+                }
                 return ListView.separated(
                   physics: const ClampingScrollPhysics(),
                   scrollDirection: Axis.horizontal,

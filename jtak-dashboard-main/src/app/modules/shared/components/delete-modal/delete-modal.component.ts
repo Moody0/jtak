@@ -36,6 +36,7 @@ export class DeleteModalComponent {
   }
 
   onDeleteClicked() {
+    if (this.isLoading) return;
     this.deleteClicked.emit();
   }
 

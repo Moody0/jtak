@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../config/themes/colors.dart';
+import '../../core/controllers/catalog/markets_provider.dart';
 import '../../core/models/catalog/restaurant_category_model.dart';
 import '../../core/services/locator.dart';
 import '../../utils/providers/sol_api.dart';
@@ -79,11 +80,37 @@ class _JtakVariousCuisinesSectionState extends State<JtakVariousCuisinesSection>
         final config =
             RestaurantCategoriesConfigModel.fromMap(Map<String, dynamic>.from(res));
         if (!mounted) return;
+
+        var sectionTitle = config.homeSectionTitle.trim();
+        if (sectionTitle.isEmpty ||
+            sectionTitle == 'مطابخ متنوعة' ||
+            sectionTitle == 'أصناف متنوعة') {
+          sectionTitle = 'أنواع المطاعم';
+        }
+
+        final activeRestaurants = locator.isRegistered<MarketsProvider>()
+            ? locator<MarketsProvider>().restaurants
+            : <RestaurantStoreModel>[];
+
+        final validItems = config.homeItems.where((cat) {
+          // If backend reported merchantCount > 0, it has active restaurants
+          if (cat.merchantCount > 0) return true;
+          // If productCategoryId is null, verify against live active restaurants
+          if (cat.productCategoryId == null && activeRestaurants.isNotEmpty) {
+            final q = cat.filterTag.isNotEmpty
+                ? cat.filterTag.toLowerCase()
+                : cat.title.toLowerCase();
+            return activeRestaurants.any((r) =>
+                r.cuisine.toLowerCase().contains(q) ||
+                r.categoryTag.toLowerCase().contains(q) ||
+                r.name.toLowerCase().contains(q));
+          }
+          return false;
+        }).map(CuisineCategoryItem.fromCategory).toList();
+
         setState(() {
-          _title = config.homeSectionTitle;
-          _items = config.showOnHome && config.enabled
-              ? config.homeItems.map(CuisineCategoryItem.fromCategory).toList()
-              : const [];
+          _title = sectionTitle;
+          _items = (config.showOnHome && config.enabled) ? validItems : const [];
           _loaded = true;
         });
         return;

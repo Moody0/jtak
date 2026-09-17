@@ -84,8 +84,8 @@ namespace App.ApiControllers.V1.Customer.Catalog
             {
                 SectionTitle = config.SectionTitle ?? "كل المطاعم",
                 SectionTitleEn = config.SectionTitleEn ?? "All Restaurants",
-                HomeSectionTitle = config.HomeSectionTitle ?? "أصناف متنوعة",
-                HomeSectionTitleEn = config.HomeSectionTitleEn ?? "Browse by kind",
+                HomeSectionTitle = config.HomeSectionTitle ?? "أنواع المطاعم",
+                HomeSectionTitleEn = config.HomeSectionTitleEn ?? "Restaurant Types",
                 Enabled = config.Enabled,
                 ShowOnHome = config.ShowOnHome,
                 Items = await ResolveItems(config)

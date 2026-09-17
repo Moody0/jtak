@@ -15,7 +15,10 @@ class GlobalVar {
   static String getImageUrl(String imageName, {int width = 300, int height = 200, bool crop = true}) {
     final raw = getString(imageName).trim();
     if (raw.isEmpty) return '';
-    final clean = raw.split(',').first.trim();
+    var clean = raw.split(',').first.trim().replaceAll(r'\', '/');
+    while (clean.startsWith('/')) {
+      clean = clean.substring(1);
+    }
     if (clean.isEmpty || clean == 'null') return '';
     if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('assets/')) {
       return clean;

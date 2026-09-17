@@ -21,6 +21,7 @@ export interface Merchant extends BaseModel {
   minOrderAmount?: number;
   workingHours?: string;
   ownerId: string;
+  ownerName?: string;
   owner: string;
   photo: string;
 }

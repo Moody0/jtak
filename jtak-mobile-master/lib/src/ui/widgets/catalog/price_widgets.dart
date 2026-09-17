@@ -46,7 +46,7 @@ class DiscountWidget extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    if (price == null) return const SizedBox();
+    if (price == null || price! <= 0) return const SizedBox.shrink();
     var price1 = GlobalVar.currencyForamt(price ?? 0);
     return Text('$price1$currencyString', style: textStyle ?? AppTheme.discountCurrencyStyle);
   }

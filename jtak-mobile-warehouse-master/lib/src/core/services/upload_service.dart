@@ -87,7 +87,10 @@ class UploadService {
     if (fileId == null || fileId.isEmpty || fileId.toLowerCase() == 'null') {
       return '';
     }
-    final clean = fileId.split(',').first.trim();
+    var clean = fileId.split(',').first.trim().replaceAll(r'\', '/');
+    while (clean.startsWith('/')) {
+      clean = clean.substring(1);
+    }
     if (clean.isEmpty || clean == 'null') return '';
     if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('assets/')) {
       return clean;

@@ -686,7 +686,7 @@ class OrderSingleItem extends StatelessWidget {
                 Text(
                   item.address!,
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
@@ -797,7 +797,7 @@ class OrderSingleItem extends StatelessWidget {
                           decoration: (isPreparing && detail.isPicked) ? TextDecoration.lineThrough : null,
                           color: (isPreparing && detail.isPicked) ? Colors.grey : Colors.black87,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),

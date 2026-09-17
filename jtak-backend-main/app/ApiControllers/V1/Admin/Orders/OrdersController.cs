@@ -24,6 +24,7 @@ using App.Extensions;
 using Modules.Shipping.Services;
 using Modules.Accounting.Data;
 using Modules.Accounting.Services;
+using Modules.Accounting.Entities;
 using Microsoft.Extensions.Logging;
 using Modules.Shipping.Entities;
 using App.Orders.Data;
@@ -209,6 +210,11 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create("يجب تحديد سبب رفض الطلب."));
             var order = await _service.FindAsync(id);
             if (order == null) return NotFound();
+            if (order.OrderDetails != null && order.OrderDetails.All(x =>
+                x.OrderDetailStatus == OrderDetailStatus.DeliveryCanceled ||
+                x.OrderDetailStatus == OrderDetailStatus.MerchantRejected ||
+                x.OrderDetailStatus == OrderDetailStatus.CustomerCanceled))
+                return true;
             var hadDelivered = order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered);
             if (hadDelivered)
                 return BadRequest(ApiErr.Create("لا يمكن رفض طلب تم تسليمه. استخدم مسار المرتجعات أو التصحيح المالي."));
@@ -397,6 +403,32 @@ namespace App.ApiControllers.V1.Admin
             var bestDelivery = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == uid);
             if (bestDelivery == null || !await _userManager.IsInRoleAsync(bestDelivery, AppRoleName.Delivery.ToString()))
                 return BadRequest(ApiErr.Create("The selected user is not a delivery driver."));
+
+            // Enforce Driver COD Cash Custody Limit (#27: 5,000 SYP limit)
+            var floatAcc = await _auow.Context.Accounts.FirstOrDefaultAsync(a =>
+                a.OwnerUserId == bestDelivery.Id &&
+                a.Type == AccountType.Asset &&
+                a.AccountCode.StartsWith(SystemAccountCodes.CaptainCashFloatPrefix));
+            decimal currentFloat = 0m;
+            if (floatAcc != null)
+            {
+                currentFloat = await _ledgerService.GetAccountBalanceAsync(floatAcc.Id);
+            }
+
+            decimal projectedCod = 0m;
+            if (order.PaymentMethod == Modules.Orders.Entities.PaymentMethod.PayOnDelivery)
+            {
+                projectedCod = activeDetails.Sum(x => x.Quantity * x.SingleFinalPrice);
+            }
+
+            if (currentFloat + projectedCod > 5000m)
+            {
+                if (projectedCod > 5000m)
+                {
+                    return BadRequest(ApiErr.Create($"قيمة الطلب النقدية ({projectedCod:N0} ل.س) تتجاوز الحد الأقصى للعهدة النقدية للمندوب (5,000 ل.س). لا يمكن إسناد هذا الطلب لأي سائق."));
+                }
+                return BadRequest(ApiErr.Create($"إسناد هذا الطلب سيتجاوز الحد الأقصى للعهدة النقدية للسائق (5,000 ل.س). العهدة الحالية: {currentFloat:N0} ل.س، قيمة الطلب: {projectedCod:N0} ل.س."));
+            }
 
             if (order.DeliveryId.HasValue)
             {

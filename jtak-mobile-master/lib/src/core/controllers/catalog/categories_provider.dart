@@ -87,8 +87,6 @@ class CategoriesProvider extends BaseProvider<CategoryModel> {
     CategoryModel(id: 110, title: 'البقالة', icon: '2026_9_9_b025b708c360481487f839e5f7d5151d.webp', order: 2),
     CategoryModel(id: 122, title: 'حلويات ومخابز', icon: '2026_9_10_edb3d6717f7946e09ffe536866a5d15b.jpg', order: 3),
     CategoryModel(id: 140, title: 'قهوة ومشروبات', icon: '2026_9_9_7849ac5d25364622bb5f05bdefe1d4e9.webp', order: 4),
-    CategoryModel(id: 107, title: 'خضار وفواكه', icon: '2026_9_9_100a77725ce74b7ab7090c4d00e8197c.webp', order: 5),
-    CategoryModel(id: 167, title: 'لحوم ودواجن', icon: '2026_9_9_bcebb1f48db84e23a93aa322f481216b.webp', order: 6),
   ];
 
   CategoriesProvider() {
@@ -140,6 +138,8 @@ class CategoriesProvider extends BaseProvider<CategoryModel> {
           final cat = CategoryModel.fromMap(element);
           final t = (cat.title ?? '').trim();
           if (t.contains('صيدلي') || t == 'المتاجر' || t == 'متاجر') continue;
+          // Canonical #38: Subcategories must not be scattered as top-level homepage cards
+          if (cat.parentId != null && cat.parentId! > 0) continue;
           items.add(cat);
         }
         setCategories(items);

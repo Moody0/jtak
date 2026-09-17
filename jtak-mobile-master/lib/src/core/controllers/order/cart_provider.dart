@@ -59,8 +59,9 @@ class CartProvider extends BaseProvider<OrderModel> {
     if (order.price != null && order.price! > 0) {
       return order.price!;
     }
-    return localCartItems.fold(
-        0.0, (sum, item) => sum + (item.singleFinalPrice * item.quantity));
+    return localCartItems.fold(0.0, (sum, item) {
+      return sum + (item.singleFinalPrice * item.quantity);
+    });
   }
 
   List<OrderDetailsModel> get effectiveOrderDetails {
@@ -148,7 +149,9 @@ class CartProvider extends BaseProvider<OrderModel> {
   double getSubtotalForMerchant(int merchantId) {
     return localCartItems
         .where((item) => item.merchantId == merchantId)
-        .fold(0.0, (sum, item) => sum + (item.singleFinalPrice * item.quantity));
+        .fold(0.0, (sum, item) {
+      return sum + (item.singleFinalPrice * item.quantity);
+    });
   }
 
   int getMinOrderForMerchant(int merchantId) {
@@ -399,10 +402,11 @@ class CartProvider extends BaseProvider<OrderModel> {
         title: title, imageUrl: imageUrl);
   }
 
-  int getProductQuantity(int? productId) {
+  int getProductQuantity(int? productId, [int? merchantId]) {
     if (productId == null) return 0;
     for (final item in localCartItems) {
-      if (item.productId == productId) {
+      if (item.productId == productId &&
+          (merchantId == null || merchantId <= 0 || item.merchantId == merchantId)) {
         return item.quantity;
       }
     }
@@ -698,7 +702,10 @@ class CartProvider extends BaseProvider<OrderModel> {
   void _enrichOrderDetails(OrderModel o) {
     if (o.orderDetails == null) return;
     for (final d in o.orderDetails!) {
-      final local = localCartItems.where((l) => l.productId == d.productId).firstOrNull;
+      final local = localCartItems.where((l) =>
+          l.productId == d.productId &&
+          (d.merchantId == null || d.merchantId == 0 || l.merchantId == d.merchantId)
+      ).firstOrNull;
       final mock = MockCatalogData.getMenuItemById(d.productId ?? 0);
       if (d.productImage == null || d.productImage!.trim().isEmpty) {
         d.productImage = (local?.productImage != null && local!.productImage!.trim().isNotEmpty)
@@ -710,6 +717,18 @@ class CartProvider extends BaseProvider<OrderModel> {
             ? local.productTitle
             : (mock?.title ?? 'وجبة خاصة');
       }
+      if (local != null && local.singleFinalPrice > 0) {
+        d.singleFinalPrice = local.singleFinalPrice;
+        d.singlePrice = local.singleFinalPrice;
+      }
+    }
+    final calculatedTotal = o.orderDetails!.where((x) =>
+        x.orderDetailStatus != OrderDetailsStatus.merchantRejected &&
+        x.orderDetailStatus != OrderDetailsStatus.customerCanceled &&
+        x.orderDetailStatus != OrderDetailsStatus.deliveryCanceled
+    ).fold<double>(0.0, (sum, x) => sum + ((x.singleFinalPrice ?? 0.0) * (x.quantity ?? 1)));
+    if (calculatedTotal > 0 && (o.price == null || o.price! <= 0)) {
+      o.price = calculatedTotal;
     }
   }
 
@@ -835,8 +854,7 @@ class CartProvider extends BaseProvider<OrderModel> {
       }
     } else {
       localCartItems.removeWhere((element) =>
-          element.productId == productId &&
-          (merchantId <= 0 || element.merchantId == merchantId));
+          element.productId == productId && element.merchantId == merchantId);
     }
     count = localCartItems.length;
     _saveLocalItems(localCartItems);
@@ -873,8 +891,7 @@ class CartProvider extends BaseProvider<OrderModel> {
   LocalCartItem? _findInLocalCart(
       List<LocalCartItem> cartItems, int productId, int merchantId) {
     for (final item in cartItems) {
-      if (item.productId == productId &&
-          (merchantId <= 0 || item.merchantId == merchantId)) {
+      if (item.productId == productId && item.merchantId == merchantId) {
         return item;
       }
     }

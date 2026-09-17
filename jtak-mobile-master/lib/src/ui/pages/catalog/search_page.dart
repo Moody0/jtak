@@ -588,12 +588,13 @@ class _SearchPageState extends State<SearchPage> {
 
   // Section E: Popular Meals Showcase Carousel
   Widget _buildPopularMealsShowcase(ProductsProvider provider) {
-    List<MealItemData> meals = MockCatalogData.allDeliveryMeals;
+    List<MealItemData> meals = [];
     if (locator.isRegistered<MarketsProvider>()) {
       final prov = locator<MarketsProvider>();
-      if (prov.popularMeals.isNotEmpty) {
-        meals = prov.popularMeals;
-      }
+      meals = prov.popularMeals;
+    }
+    if (meals.isEmpty) {
+      return const SizedBox.shrink();
     }
     return SizedBox(
       height: 230,

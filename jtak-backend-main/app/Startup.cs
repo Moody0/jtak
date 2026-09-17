@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -224,12 +225,13 @@ namespace App
 
             using (var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>().CreateScope())
             {
-                try { serviceScope.ServiceProvider.GetService<AppDbContext>()?.Database.Migrate(); } catch { }
-                try { serviceScope.ServiceProvider.GetService<CatalogDbContext>()?.Database.Migrate(); } catch { }
-                try { serviceScope.ServiceProvider.GetService<OrdersDbContext>()?.Database.Migrate(); } catch { }
-                try { serviceScope.ServiceProvider.GetService<AccountingDbContext>()?.Database.Migrate(); } catch { }
-                try { serviceScope.ServiceProvider.GetService<ShippingDbContext>()?.Database.Migrate(); } catch { }
-                try { serviceScope.ServiceProvider.EnsureSeedData().Wait(); } catch { }
+                var logger = serviceScope.ServiceProvider.GetService<ILogger<Startup>>();
+                try { serviceScope.ServiceProvider.GetService<AppDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate AppDbContext"); }
+                try { serviceScope.ServiceProvider.GetService<CatalogDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate CatalogDbContext"); }
+                try { serviceScope.ServiceProvider.GetService<OrdersDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate OrdersDbContext"); }
+                try { serviceScope.ServiceProvider.GetService<AccountingDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate AccountingDbContext"); }
+                try { serviceScope.ServiceProvider.GetService<ShippingDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate ShippingDbContext"); }
+                try { serviceScope.ServiceProvider.EnsureSeedData().Wait(); } catch (Exception ex) { logger?.LogError(ex, "Failed to execute EnsureSeedData"); }
             }
 
             app.UseHttpsRedirection();

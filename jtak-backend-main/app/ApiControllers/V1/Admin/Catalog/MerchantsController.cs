@@ -1,3 +1,4 @@
+using System;
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -71,6 +72,8 @@ namespace App.ApiControllers.V1.Admin
                 Lat = x.Lat,
                 Lng = x.Lng,
                 OwnerId = x.OwnerId,
+                OwnerName = x.OwnerName ?? "",
+                Owner = x.OwnerName ?? "",
                 Active = x.Active,
                 MerchantKind = x.MerchantKind,
                 DeliveryTime = x.DeliveryTime,
@@ -98,6 +101,7 @@ namespace App.ApiControllers.V1.Admin
                 ShortDescription = item.ShortDescription,
                 Description = item.Description,
                 Photo = item.Photo,
+                OwnerName = !string.IsNullOrWhiteSpace(item.OwnerName) ? item.OwnerName : item.Owner,
                 IBAN1Title = item.IBAN1Title,
                 IBAN1 = item.IBAN1,
                 Phone1 = item.Phone1,
@@ -113,7 +117,7 @@ namespace App.ApiControllers.V1.Admin
                 DeliveryFee = item.DeliveryFee >= 0 ? item.DeliveryFee : 5000m,
                 MinOrderAmount = item.MinOrderAmount >= 0 ? item.MinOrderAmount : 15000m,
                 WorkingHours = !string.IsNullOrWhiteSpace(item.WorkingHours) ? item.WorkingHours : "حتى 3 ص",
-                OwnerId = item.OwnerId
+                OwnerId = item.OwnerId != Guid.Empty ? item.OwnerId : Guid.NewGuid()
             };
             _service.Insert(entity);
             await _uow.SaveChangesAsync();
@@ -141,7 +145,8 @@ namespace App.ApiControllers.V1.Admin
             entity.ShortDescription = item.ShortDescription;
             entity.Description = item.Description;
             entity.Photo = item.Photo;
-            entity.IBAN1Title = item.IBAN1Title;
+            entity.OwnerName = !string.IsNullOrWhiteSpace(item.OwnerName) ? item.OwnerName : (item.Owner ?? entity.OwnerName);
+            entity.IBAN1Title = item.IBAN1Title ?? entity.IBAN1Title;
             entity.IBAN1 = item.IBAN1;
             entity.Phone1 = item.Phone1;
             entity.Phone2 = item.Phone2;
@@ -156,7 +161,10 @@ namespace App.ApiControllers.V1.Admin
             entity.DeliveryFee = item.DeliveryFee;
             entity.MinOrderAmount = item.MinOrderAmount;
             entity.WorkingHours = !string.IsNullOrWhiteSpace(item.WorkingHours) ? item.WorkingHours : (entity.WorkingHours ?? "حتى 3 ص");
-            entity.OwnerId = item.OwnerId;
+            if (item.OwnerId != Guid.Empty)
+            {
+                entity.OwnerId = item.OwnerId;
+            }
 
             await _uow.SaveChangesAsync();
 

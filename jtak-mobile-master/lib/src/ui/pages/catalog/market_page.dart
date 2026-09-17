@@ -421,8 +421,8 @@ class _MarketPageState extends State<MarketPage> {
           ((raw['finalPrice'] ?? raw['merchantPrice'] ?? raw['price'] ?? 0)
                   as num)
               .toDouble();
-      final isUsd =
-          (_storeModel?.isUsd ?? false) || (rawPrice > 0 && rawPrice < 500);
+      final isUsd = (_storeModel?.isUsd ?? false) ||
+          (raw['priceUsd'] != null && (raw['priceUsd'] as num) > 0);
       final int priceVal =
           isUsd ? (rawPrice * exchangeRate).round() : rawPrice.round();
 

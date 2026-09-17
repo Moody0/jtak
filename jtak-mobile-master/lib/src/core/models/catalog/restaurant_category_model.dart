@@ -75,20 +75,19 @@ class RestaurantCategoriesConfigModel {
   RestaurantCategoriesConfigModel({
     this.sectionTitle = 'كل المطاعم',
     this.sectionTitleEn = 'All Restaurants',
-    this.homeSectionTitle = 'أصناف متنوعة',
-    this.homeSectionTitleEn = 'Browse by kind',
+    this.homeSectionTitle = 'أنواع المطاعم',
+    this.homeSectionTitleEn = 'Restaurant Types',
     this.enabled = true,
     this.showOnHome = true,
     required this.items,
   });
 
-  /// Entries worth showing on Home: active, and known to have merchants behind
-  /// them. An entry with none can only open an empty list.
+  /// Entries worth showing on Home: active, and confirmed to have at least one active merchant (Canonical #40).
   List<RestaurantCategoryModel> get homeItems => items
       .where((item) =>
           item.active &&
           item.title.isNotEmpty &&
-          (item.productCategoryId == null || item.merchantCount > 0))
+          item.merchantCount > 0)
       .toList()
     ..sort((a, b) => a.order.compareTo(b.order));
 

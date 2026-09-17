@@ -121,7 +121,6 @@ class SolApi {
       if (response.statusCode == 401) throw FetchDataException('يرجى تسجيل الدخول مجدداً');
       if (response.statusCode == 403) throw FetchDataException('هذا الحساب ليس لديه صلاحيات مندوب توصيل');
       if (response.statusCode == 404) throw NotFoundException('المورد المطلوب غير موجود');
-      if (response.statusCode >= 500) throw FetchDataException(str.msg.errConnectionServer);
 
       if (response.body.isNotEmpty) {
         try {
@@ -133,11 +132,20 @@ class SolApi {
             if (errStr.trim().isNotEmpty) {
               throw FetchDataException(errStr.trim());
             }
+            if (decoded['message'] != null && decoded['message'].toString().trim().isNotEmpty) {
+              throw FetchDataException(decoded['message'].toString().trim());
+            }
+          } else if (decoded is String && decoded.trim().isNotEmpty) {
+            throw FetchDataException(decoded.trim());
           }
-        } catch (_) {}
+        } catch (e) {
+          if (e is FetchDataException) rethrow;
+        }
       }
 
-      throw FetchDataException(response.body.isNotEmpty ? response.body : str.msg.errConnectionServer);
+      if (response.statusCode >= 500) throw FetchDataException(str.msg.errConnectionServer);
+
+      throw FetchDataException(response.body.isNotEmpty && !response.body.trim().startsWith('<') ? response.body.trim() : str.msg.errConnectionServer);
     } on FormatException catch (e) {
       debugPrint('SolApi FormatException: $e');
       throw FetchDataException(str.msg.errConnectionServer);

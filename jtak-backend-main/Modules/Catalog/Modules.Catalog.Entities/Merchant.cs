@@ -21,6 +21,8 @@ namespace Modules.Catalog.Entities
         public string ShortDescription { get; set; }
 
         public string Description { get; set; }
+        [StringLength(128)]
+        public string OwnerName { get; set; }
         //public string Facebook { get; set; }
         //public string Instagram { get; set; }
         //public string Twitter { get; set; }
@@ -94,7 +96,9 @@ namespace Modules.Catalog.Entities
 
         [ForeignKey("Owner")]
         public Guid OwnerId { get; set; }
-        public string Owner { get; set; }
+        [StringLength(128)]
+        public string OwnerName { get; set; }
+        public string Owner { get => OwnerName; set => OwnerName = value; }
 
         public string Photo { get; set; }
         //public ProductCategoryDto[] ProductCategories { get; set; }

@@ -284,6 +284,36 @@ namespace App.ApiControllers.V1.Delivery
             if (courier == null)
                 return BadRequest(ApiErr.Create("بيانات السائق غير متوفرة."));
 
+            // Enforce Driver COD Cash Custody Limit (#27: 5,000 SYP limit)
+            var floatAcc = await _auow.Context.Accounts.FirstOrDefaultAsync(a =>
+                a.OwnerUserId == uid.Value &&
+                a.Type == AccountType.Asset &&
+                a.AccountCode.StartsWith(SystemAccountCodes.CaptainCashFloatPrefix));
+            decimal currentFloat = 0m;
+            if (floatAcc != null)
+            {
+                currentFloat = await _ledgerService.GetAccountBalanceAsync(floatAcc.Id);
+            }
+
+            decimal projectedCod = 0m;
+            if (order.PaymentMethod == Modules.Orders.Entities.PaymentMethod.PayOnDelivery)
+            {
+                var details = await _ouow.Context.OrderDetails.Where(x => x.OrderId == id &&
+                    x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                    x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                    x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).ToListAsync();
+                projectedCod = details.Sum(x => x.Quantity * x.SingleFinalPrice);
+            }
+
+            if (currentFloat + projectedCod > 5000m)
+            {
+                if (projectedCod > 5000m)
+                {
+                    return BadRequest(ApiErr.Create($"قيمة الطلب النقدية ({projectedCod:N0} ل.س) تتجاوز سقف العهدة النقدية المسموح به (5,000 ل.س)."));
+                }
+                return BadRequest(ApiErr.Create($"استلام هذا الطلب سيتجاوز الحد الأقصى للعهدة النقدية المسموح بها (5,000 ل.س). عهدتك الحالية: {currentFloat:N0} ل.س، قيمة الطلب: {projectedCod:N0} ل.س."));
+            }
+
             order.DeliveryId = uid.Value;
             order.DeliveryUser = courier.FullName ?? courier.UserName ?? "Delivery Courier";
             order.DeliveryLat = null;
@@ -640,11 +670,8 @@ namespace App.ApiControllers.V1.Delivery
 
                 var cleanSubmitted = NormalizeOtp(submittedOtp);
                 var cleanDb = NormalizeOtp(currentOrder.DeliveryOtp);
-                var cleanDbReversed = new string(cleanDb.Reverse().ToArray());
 
-                bool otpValid = !string.IsNullOrEmpty(cleanSubmitted) &&
-                    (cleanSubmitted == cleanDb
-                     || cleanSubmitted == cleanDbReversed);
+                bool otpValid = !string.IsNullOrEmpty(cleanSubmitted) && cleanSubmitted == cleanDb;
 
                 if (!otpValid && !hasValidPhoto)
                 {

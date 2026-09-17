@@ -42,82 +42,22 @@
                 </app-input-container>
               </div>
 
-              <!-- Owner -->
-              <div class="col-12">
-                <label for="ownerId" class="form-label fw-bold mb-2 d-flex justify-content-between align-items-center">
-                  <span class="d-flex align-items-center gap-2">
-                    <i class="fas fa-user-shield text-primary fs-7"></i>
-                    <span>{{ 'MERCHANT_WORKSPACE.OWNER' | translate }} (مالك الحساب)</span>
-                  </span>
-                  <span class="badge bg-light-primary text-primary fs-8 py-1 px-2.5 rounded-pill" *ngIf="formGroup.get('ownerId')?.value && formGroup.get('ownerId')?.value !== '-'">
-                    <i class="fas fa-check-circle me-1 text-primary"></i> تم التعيين
-                  </span>
+              <!-- Merchant Owner Name Input -->
+              <div class="col-md-6 col-12">
+                <label for="ownerName" class="form-label fw-bold d-flex justify-content-between align-items-center mb-2">
+                  <span>{{ 'MERCHANT_WORKSPACE.OWNER' | translate }} (اسم مالك المتجر)</span>
                 </label>
-                <ng-select
-                  id="ownerId"
-                  class="merchant-owner-select"
-                  formControlName="ownerId"
-                  [items]="merchantUsers"
-                  bindValue="id"
-                  bindLabel="fullName"
-                  [searchFn]="userSearchFn"
-                  [loading]="loadingUsers"
-                  loadingText="جاري تحميل المستخدمين..."
-                  placeholder="ابحث بالاسم أو برقم الهاتف (مثال: 0980906630)..."
-                  [clearable]="true"
-                >
-                  <!-- Selected Item Display -->
-                  <ng-template ng-label-tmp let-item="item">
-                    <div class="owner-selected-chip">
-                      <span class="owner-avatar">
-                        <i class="fas fa-user-check"></i>
-                      </span>
-                      <span class="owner-name text-truncate">{{ item.fullName || 'بدون اسم' }}</span>
-                      <span *ngIf="item.phoneNumber" class="owner-phone-badge" dir="ltr">
-                        <i class="fas fa-phone-alt me-1"></i>{{ item.phoneNumber }}
-                      </span>
-                    </div>
-                  </ng-template>
-
-                  <!-- Dropdown Option Display -->
-                  <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
-                    <div class="owner-option-item">
-                      <div class="owner-option-avatar">
-                        <i class="fas fa-user"></i>
-                      </div>
-                      <div class="owner-option-details">
-                        <div class="owner-option-name">{{ item.fullName || 'بدون اسم' }}</div>
-                        <div class="owner-option-phone font-monospace" *ngIf="item.phoneNumber" dir="ltr">
-                          <i class="fas fa-phone-alt me-1"></i>{{ item.phoneNumber }}
-                        </div>
-                      </div>
-                      <div class="owner-option-status" *ngIf="formGroup.get('ownerId')?.value === item.id">
-                        <i class="fas fa-check-circle text-primary"></i>
-                      </div>
-                    </div>
-                  </ng-template>
-
-                  <!-- Empty State / No Search Results -->
-                  <ng-template ng-notfound-tmp let-searchTerm="searchTerm">
-                    <div class="p-4 text-center">
-                      <div class="mb-2">
-                        <i class="fas fa-search text-muted opacity-50" style="font-size: 2rem;"></i>
-                      </div>
-                      <div class="fw-bold text-gray-700 fs-6" *ngIf="searchTerm">
-                        لا يوجد مستخدم مطابق لـ "{{ searchTerm }}"
-                      </div>
-                      <div class="fw-bold text-gray-700 fs-6" *ngIf="!searchTerm">
-                        لا يوجد مستخدمين مسجلين في النظام
-                      </div>
-                      <p class="text-muted fs-7 mt-1 mb-0">
-                        تأكد من كتابة الاسم أو رقم الهاتف بالصيغة الصحيحة (مثل 0980906630 أو +963...)
-                      </p>
-                    </div>
-                  </ng-template>
-                </ng-select>
+                <app-input-container [control]="formGroup.controls.ownerName">
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="ownerName"
+                    id="ownerName"
+                    placeholder="أدخل اسم مالك المتجر (مثال: أحمد الحلبي)"
+                  />
+                </app-input-container>
                 <small class="text-muted d-block mt-1">
-                  <i class="fas fa-info-circle me-1 text-primary"></i>
-                  ابحث بالاسم أو رقم الهاتف لتعيين مالك المتجر ليتمكن من تسجيل الدخول بتطبيق التاجر.
+                  الاسم الكامل لمالك أو مدير المتجر المسؤول.
                 </small>
               </div>
 

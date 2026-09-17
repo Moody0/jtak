@@ -144,7 +144,14 @@ def read_rows(path: Path):
             "mainCategory": text(values[index.get("القسم الرئيسي", -1)]) if "القسم الرئيسي" in index else "عام",
             "subCategory": text(values[index.get("القسم الفرعي", -1)]) if "القسم الفرعي" in index else "",
             "price": price_value(values[index["السعر"]], row_number),
+            "origPrice": price_value(values[index["السعر قبل الخصم"]], row_number) if "السعر قبل الخصم" in index and values[index["السعر قبل الخصم"]] is not None else 0.0,
         }
+        # If price is 0 but an original price was provided, recover price from original price
+        if item["price"] == 0 and item["origPrice"] > 0:
+            item["price"] = item["origPrice"]
+            item["origPrice"] = 0.0
+
+        item["discount"] = round(item["origPrice"] - item["price"], 4) if item["origPrice"] > item["price"] else 0.0
         item["description"] = item["description"] or title
         item["descriptionEn"] = item["descriptionEn"] or item["titleEn"]
         item["unit"] = item["unit"] or "قطعة"
@@ -194,7 +201,7 @@ def main():
     rows, duplicates = read_rows(args.workbook)
     print(f"Workbook: {args.workbook}")
     print(f"Rows: {len(rows)}; duplicate barcode groups: {len(duplicates)}; duplicate rows: {sum(v - 1 for v in duplicates.values())}")
-    print("Price source: السعر only; السعر قبل الخصم is not imported")
+    print("Price sources: السعر and السعر قبل الخصم (discounts preserved)")
     print("Product ownership: every row creates a new Product record; no existing ProductId is reused")
     if duplicates:
         print("Warning: duplicate barcodes are preserved as separate workbook rows")
@@ -270,7 +277,18 @@ def main():
             list(pool.map(lambda pid: request("DELETE", f"/api/v1/Admin/Products/{pid}", token)[0], product_ids))
         raise
 
-    assignments = [{"productId": pid, "merchantPrice": item["price"], "profitOutOfMerchantPricePercent": 0, "additionalProfitPercent": 0, "discount": 0} for pid, item in zip(product_ids, rows)]
+    assignments = [
+        {
+            "productId": pid,
+            "merchantPrice": item["price"],
+            "priceUsd": item["price"] if item["price"] > 0 else None,
+            "originalPrice": item["origPrice"] if item["origPrice"] > 0 else None,
+            "discount": item["discount"],
+            "profitOutOfMerchantPricePercent": 0,
+            "additionalProfitPercent": 0,
+        }
+        for pid, item in zip(product_ids, rows)
+    ]
     status, result = request("PUT", f"/api/v1/Admin/Merchants/Products/{args.merchant_id}", token, assignments)
     if status != 200:
         raise RuntimeError(f"merchant replacement failed with HTTP {status}: {result}")

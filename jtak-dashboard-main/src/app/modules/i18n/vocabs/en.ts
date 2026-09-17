@@ -83,7 +83,7 @@ export const locale = {
       VIEW_ORDERS: 'View Orders',
       STORE_CONFIG: 'Store & Pricing Configuration',
       EXCHANGE_RATE_TITLE: 'USD to SYP Official Store Exchange Rate',
-      EXCHANGE_RATE_DESC: 'Used for automated dynamic pricing calculations across Best Market and Clover Mall.',
+      EXCHANGE_RATE_DESC: 'Used for automated dynamic pricing calculations across JTAK Market and application stores.',
       ONE_USD_EQUALS: '1 USD equals',
       SYP: 'SYP',
       SAVING: 'Saving...',

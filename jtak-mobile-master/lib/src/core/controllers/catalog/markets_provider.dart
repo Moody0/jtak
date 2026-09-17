@@ -573,6 +573,12 @@ class MarketsProvider extends BaseProvider {
   // USD to SYP Exchange Rate (defaults to 15,000, dynamically updated from Admin Settings)
   double _exchangeRate = 15000.0;
   double get exchangeRate => _exchangeRate;
+  set exchangeRate(double val) {
+    if (val > 0 && val != _exchangeRate) {
+      _exchangeRate = val;
+      notifyListeners();
+    }
+  }
 
   MarketsProvider() {
     loadMarkets();
@@ -903,11 +909,7 @@ class MarketsProvider extends BaseProvider {
           'MarketsProvider: Error aggregating fallback live popular meals: $e');
     }
 
-    // 3. Fallback to mock meals if offline (restaurants only)
-    if (_popularMeals.isEmpty) {
-      _popularMeals =
-          MockCatalogData.allDeliveryMeals.where((m) => !m.isMarket).toList();
-    }
+    // 3. Keep empty state if no backend meals available (Canonical #35)
     _isLoadingPopularMeals = false;
     notifyListeners();
   }

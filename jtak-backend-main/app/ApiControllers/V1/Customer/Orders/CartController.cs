@@ -259,6 +259,7 @@ namespace App.ApiControllers.V1.Customer.Orders
         private async Task<List<OrderDetail>> GetOrderDetails(CartItem[] items, decimal lat, decimal lng)
         {
             var orderDetails = new List<OrderDetail>();
+            var usdRate = await _merchantService.GetUsdRate();
 
             foreach (var item in items ?? Array.Empty<CartItem>())
             {

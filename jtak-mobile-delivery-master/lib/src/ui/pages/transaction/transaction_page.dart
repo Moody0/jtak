@@ -100,7 +100,7 @@ class _TransactionPageState extends State<TransactionPage> {
 
   Widget _buildBalanceHero(BuildContext context, bool isDark, bool isArabic) {
     final balance = provider.balances.amount ?? 0.0;
-    final double maxCashFloat = provider.balances.maxCashFloat ?? 5000.0; // 5k SYP max ceiling
+    final double maxCashFloat = provider.balances.maxCashFloat ?? 5000.0; // 5k SYP custody limit (#27)
     final rawRatio = maxCashFloat > 0 ? (balance.abs() / maxCashFloat) : 0.0;
     final floatRatio = rawRatio.clamp(0.0, 1.0);
     final percent = (rawRatio * 100).toInt();

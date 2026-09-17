@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:jtek_app/src/config/themes/colors.dart';
 import 'package:jtek_app/src/core/controllers/app_parameters_provider.dart';
 import 'package:jtek_app/src/core/controllers/order/cart_provider.dart';
@@ -22,8 +23,8 @@ class AddToCartButton extends StatefulWidget {
   final AddToCartType _type;
   final bool showSuccessMessage;
 
-  const AddToCartButton.labelLarge(this.item, {this.showSuccessMessage = false}) : _type = AddToCartType.labelLarge;
-  const AddToCartButton.circular(this.item, {this.showSuccessMessage = false}) : _type = AddToCartType.circular;
+  const AddToCartButton.labelLarge(this.item, {super.key, this.showSuccessMessage = false}) : _type = AddToCartType.labelLarge;
+  const AddToCartButton.circular(this.item, {super.key, this.showSuccessMessage = false}) : _type = AddToCartType.circular;
 
   @override
   State<AddToCartButton> createState() => _AddToCartButtonState();
@@ -41,7 +42,9 @@ class _AddToCartButtonState extends State<AddToCartButton> {
   @override
   Widget build(BuildContext context) {
     cartProvider = Provider.of<CartProvider>(context);
-    cartItem = cartProvider.findItme(widget.item.id!, widget.item.merchantId ?? 0);
+    final mid = widget.item.merchantId ?? 0;
+    cartItem = cartProvider.findItme(widget.item.id!, mid);
+
     switch (widget._type) {
       case AddToCartType.labelLarge:
         return _buttonWidget(context);
@@ -51,12 +54,62 @@ class _AddToCartButtonState extends State<AddToCartButton> {
   }
 
   Widget _buttonWidget(BuildContext context) {
-    String btnTitle = cartItem != null ? '${str.app.addedToCart}  ( ${cartItem!.quantity} ) ${widget.item.unit}' : str.app.addToCart;
+    if (cartItem != null && cartItem!.quantity > 0) {
+      return Align(
+        alignment: Alignment.center,
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: kPrimaryOrange,
+            borderRadius: const BorderRadiusDirectional.only(
+              topEnd: Radius.circular(24),
+              bottomStart: Radius.circular(24),
+              topStart: Radius.circular(8),
+              bottomEnd: Radius.circular(8),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: kPrimaryOrange.withOpacity(0.3),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                key: const ValueKey('label_stepper_decrement_btn'),
+                icon: const Icon(Icons.remove_rounded, color: Colors.white),
+                onPressed: () => _onDecrement(context),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  '${_addedToCartText()}  ( ${cartItem!.quantity} ) ${widget.item.unit ?? ''}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('label_stepper_increment_btn'),
+                icon: const Icon(Icons.add_rounded, color: Colors.white),
+                onPressed: () => _onIncrement(context),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Align(
       alignment: Alignment.center,
       child: ElevatedButton.icon(
         icon: const Icon(Icons.shopping_cart_rounded),
-        label: Text('   $btnTitle   '),
+        label: Text('   ${_addToCartText()}   '),
         style: ElevatedButton.styleFrom(
           shape: const ContinuousRectangleBorder(
             borderRadius: BorderRadiusDirectional.only(
@@ -71,65 +124,171 @@ class _AddToCartButtonState extends State<AddToCartButton> {
   }
 
   Widget _circularWidget(BuildContext context) {
-    double turns = 0;
-    IconData icon = Icons.add;
-    Color color = Colors.white;
-    Color iconColor = kAccentColor;
-    if (cartItem != null) {
-      turns = 0.13;
-      color = kAccentColor;
-      iconColor = Colors.white;
-    }
+    final inCart = cartItem != null && cartItem!.quantity > 0;
+    final quantity = inCart ? cartItem!.quantity : 0;
 
-    double btnDimention = 50;
-
-    return AnimatedRotation(
-      turns: turns,
-      duration: const Duration(milliseconds: 250),
-
-      child: SizedBox(
-        width: btnDimention,
-        height: btnDimention,
-        child: Material(
-          type: MaterialType.circle,
-          clipBehavior: Clip.antiAlias,
-          color: Colors.transparent,
-          child: InkWell(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Material(
-                elevation: 2,
-                type: MaterialType.circle,
-                clipBehavior: Clip.antiAlias,
-                color: color,
-                child: Icon(icon, size: 20, color: iconColor),
-              ),
+    return GestureDetector(
+      onTap: () {}, // Prevent tap bubbling to parent product card
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.85, end: 1.0).animate(animation),
+              child: child,
             ),
-            onTap: () async {
-              if (cartItem != null) {
-                await cartProvider.removeFromCart(widget.item.id!, widget.item.merchantId!);
-              } else {
-                await addToCartFun(context, widget.item);
-              }
-              setState(() {});
-            },
+          );
+        },
+        child: inCart
+            ? _buildStepper(context, quantity)
+            : _buildInitialAddButton(context),
+      ),
+    );
+  }
+
+  Widget _buildInitialAddButton(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('initial_add_btn'),
+      width: 34,
+      height: 34,
+      child: Material(
+        color: kPrimaryOrange,
+        shape: const CircleBorder(),
+        elevation: 1.5,
+        shadowColor: kPrimaryOrange.withOpacity(0.35),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const ValueKey('circular_add_tap_target'),
+          onTap: () async {
+            HapticFeedback.lightImpact();
+            await addToCartFun(context, widget.item);
+          },
+          child: const Center(
+            child: Icon(
+              Icons.add_rounded,
+              size: 20,
+              color: Colors.white,
+            ),
           ),
         ),
       ),
-      // child: CircularButton(
-      //   child: Icon(icon, size: 20, color: iconColor),
-      //   color: color,
-      //   dimension: 30,
-      //   onTap: () async {
-      //     if (inCart) {
-      //       await cartProvider.removeFromCart(widget.item.id!, widget.item.merchantId!);
-      //     } else {
-      //       await addToCartFun(context, widget.item);
-      //     }
-      //     setState(() {});
-      //   },
-      // ),
     );
+  }
+
+  Widget _buildStepper(BuildContext context, int quantity) {
+    return Container(
+      key: const ValueKey('quantity_stepper'),
+      height: 34,
+      constraints: const BoxConstraints(minWidth: 88, maxWidth: 96),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: kPrimaryOrange, width: 1.3),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimaryOrange.withOpacity(0.12),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Decrement button [-]
+            Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                key: const ValueKey('stepper_decrement_btn'),
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(17)),
+                onTap: () => _onDecrement(context),
+                child: const SizedBox(
+                  width: 28,
+                  height: 34,
+                  child: Center(
+                    child: Icon(
+                      Icons.remove_rounded,
+                      size: 18,
+                      color: kPrimaryOrange,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Quantity text
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                '$quantity',
+                key: ValueKey('stepper_qty_$quantity'),
+                style: const TextStyle(
+                  color: kCharcoalDark,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'IBMPlexSansArabic',
+                ),
+              ),
+            ),
+            // Increment button [+]
+            Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                key: const ValueKey('stepper_increment_btn'),
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(17)),
+                onTap: () => _onIncrement(context),
+                child: const SizedBox(
+                  width: 28,
+                  height: 34,
+                  child: Center(
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 18,
+                      color: kPrimaryOrange,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onIncrement(BuildContext context) async {
+    HapticFeedback.lightImpact();
+    final mid = widget.item.merchantId ?? (cartItem?.merchantId ?? 0);
+    await cartProvider.addToCart(
+      widget.item.id!,
+      mid,
+      widget.item.canonicalSellingPrice,
+      quantity: 1,
+      title: widget.item.title,
+      imageUrl: widget.item.photos?.firstOrNull,
+    );
+  }
+
+  Future<void> _onDecrement(BuildContext context) async {
+    HapticFeedback.lightImpact();
+    if (cartItem == null) return;
+    final mid = widget.item.merchantId ?? (cartItem?.merchantId ?? 0);
+    if (cartItem!.quantity > 1) {
+      await cartProvider.setToCart(
+        widget.item.id!,
+        mid,
+        widget.item.canonicalSellingPrice,
+        cartItem!.quantity - 1,
+        title: widget.item.title,
+        imageUrl: widget.item.photos?.firstOrNull,
+      );
+    } else {
+      await cartProvider.removeFromCart(widget.item.id!, mid);
+    }
   }
 
   Future addToCartFun(BuildContext context, ProductModel product) async {
@@ -138,7 +297,7 @@ class _AddToCartButtonState extends State<AddToCartButton> {
       if (mainAddressService.isAddressEmpty()) {
         locator<AddressProvider>().address = mainAddressService.mainAddress;
 
-        await showDialog(context: context, builder: (context) => CustomDialog(message: str.msg.chooseLocationFirst));
+        await showDialog(context: context, builder: (context) => CustomDialog(message: _chooseLocationFirstText()));
         if (!context.mounted) return;
         await context.navigatePage(const AddAddressPage());
         if (!context.mounted) return;
@@ -157,7 +316,7 @@ class _AddToCartButtonState extends State<AddToCartButton> {
           await cartProvider.replaceCartWithItem(
             product.id!,
             mid,
-            product.finalPrice ?? 0.0,
+            product.canonicalSellingPrice,
             1,
             title: product.title,
             imageUrl: product.photos?.firstOrNull,
@@ -165,7 +324,7 @@ class _AddToCartButtonState extends State<AddToCartButton> {
           if (widget.showSuccessMessage && context.mounted) {
             ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(str.msg.addedToCartSuccessfully, style: const TextStyle(fontWeight: FontWeight.bold)),
+              content: Text(_addedSuccessText(), style: const TextStyle(fontWeight: FontWeight.bold)),
               duration: const Duration(milliseconds: 2500),
               action: SnackBarAction(label: 'السلة', onPressed: () => context.navigateName(CartPage.routeName)),
             ));
@@ -176,12 +335,14 @@ class _AddToCartButtonState extends State<AddToCartButton> {
         await cartProvider.addToCart(
           product.id!,
           mid,
-          product.finalPrice ?? 0.0,
+          product.canonicalSellingPrice,
+          title: product.title,
+          imageUrl: product.photos?.firstOrNull,
         );
         if (widget.showSuccessMessage && context.mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(str.msg.addedToCartSuccessfully, style: const TextStyle(fontWeight: FontWeight.bold)),
+            content: Text(_addedSuccessText(), style: const TextStyle(fontWeight: FontWeight.bold)),
             duration: const Duration(milliseconds: 2500),
             action: SnackBarAction(label: 'السلة', onPressed: () => context.navigateName(CartPage.routeName)),
           ));
@@ -191,6 +352,38 @@ class _AddToCartButtonState extends State<AddToCartButton> {
       if (context.mounted) {
         showDialog(context: context, builder: (context) => CustomDialog(message: err.toString()));
       }
+    }
+  }
+
+  String _addedToCartText() {
+    try {
+      return str.app.addedToCart;
+    } catch (_) {
+      return 'تمت الإضافة إلى السلة';
+    }
+  }
+
+  String _addToCartText() {
+    try {
+      return str.app.addToCart;
+    } catch (_) {
+      return 'إضافة إلى السلة';
+    }
+  }
+
+  String _chooseLocationFirstText() {
+    try {
+      return str.msg.chooseLocationFirst;
+    } catch (_) {
+      return 'يرجى تحديد موقع التوصيل أولاً';
+    }
+  }
+
+  String _addedSuccessText() {
+    try {
+      return str.msg.addedToCartSuccessfully;
+    } catch (_) {
+      return 'تمت إضافة المنتج إلى السلة بنجاح';
     }
   }
 }

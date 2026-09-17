@@ -19,140 +19,17 @@
     </div>
   </div>
 
-  <div class="ops-orders-card mb-4">
-    <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
-      <div>
-        <h3 class="mb-1">طلبات التسوية مع المندوبين والتجار</h3>
-        <div class="text-muted fs-8">لا تتحرك الأموال إلا بعد اعتماد الخطوة المناسبة وتسجيلها في دفتر القيود.</div>
-      </div>
-      <button class="btn btn-sm ops-btn-refresh" type="button" (click)="loadSettlementRequests()" [disabled]="isLoadingRequests">
-        <i class="fas fa-sync-alt" [class.fa-spin]="isLoadingRequests"></i> تحديث
-      </button>
-    </div>
-    <div class="table-responsive">
-      <table class="table ops-orders-table align-middle mb-0">
-        <thead>
-          <tr class="ops-table-header text-muted fs-8">
-            <th>رقم الطلب</th><th>الطرف</th><th>المبلغ</th><th>طريقة التسوية</th><th>الحالة</th><th>التاريخ</th><th class="text-center">الإجراء</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngIf="isLoadingRequests"><td colspan="7" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i></td></tr>
-          <tr *ngIf="!isLoadingRequests && settlementRequests.length === 0"><td colspan="7" class="text-center text-muted py-4">لا توجد طلبات تسوية حتى الآن.</td></tr>
-          <tr *ngFor="let request of settlementRequests">
-            <td><strong>{{ request.requestNumber }}</strong></td>
-            <td>
-              <span class="badge" [ngClass]="request.partyType === partyType.Captain ? 'badge-light-primary' : 'badge-light-info'">
-                {{ request.partyType === partyType.Captain ? 'مندوب توصيل' : 'تاجر' }}
-              </span>
-              <div class="fw-bold mt-1">{{ request.requestedByName }}</div>
-              <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
-            </td>
-            <td><strong>{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
-            <td>
-              <div>{{ request.method || 'نقدي' }}</div>
-              <small class="text-muted">{{ request.accountDetails }}</small>
-            </td>
-            <td>
-              <span class="badge" [ngClass]="{
-                'badge-light-warning': request.status === requestStatus.Pending,
-                'badge-light-primary': request.status === requestStatus.Approved,
-                'badge-light-danger': request.status === requestStatus.Rejected,
-                'badge-light-success': request.status === requestStatus.Completed
-              }">{{ requestStatusLabel(request.status) }}</span>
-              <div *ngIf="request.rejectionReason" class="text-danger small mt-1">{{ request.rejectionReason }}</div>
-            </td>
-            <td>{{ request.createdDate | date:'short' }}</td>
-            <td class="text-center">
-              <ng-container *ngIf="request.status === requestStatus.Pending">
-                <button class="btn btn-sm btn-success me-1" (click)="acceptSettlementRequest(request)" [disabled]="processingRequestId === request.id">
-                  <i class="fas fa-check"></i> قبول
-                </button>
-                <button class="btn btn-sm btn-light-danger" (click)="rejectSettlementRequest(request)" [disabled]="processingRequestId === request.id">
-                  <i class="fas fa-times"></i> رفض
-                </button>
-              </ng-container>
-              <button *ngIf="request.partyType === partyType.Merchant && request.status === requestStatus.Approved"
-                class="btn btn-sm btn-primary" (click)="completeMerchantSettlement(request)" [disabled]="processingRequestId === request.id">
-                <i class="fas fa-handshake"></i> تأكيد استلام التاجر
-              </button>
-              <i *ngIf="request.status === requestStatus.Completed" class="fas fa-check-circle text-success fs-4"></i>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- 2. Financial KPI Metric Cards -->
-  <div class="row g-3 mb-4">
-    <div class="col-xl-3 col-md-6">
-      <div class="ops-kpi-card ops-kpi-card--primary">
-        <div class="ops-kpi-card-header">
-          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.GROSS_CASH' | translate }}</span>
-          <div class="ops-kpi-card-icon ops-kpi-card-icon--primary">
-            <i class="fas fa-hand-holding-usd"></i>
-          </div>
-        </div>
-        <div class="ops-kpi-card-value text-primary">
-          {{ totalFloatInField | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
-        </div>
-        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.GROSS_CASH_HINT' | translate }}</div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="ops-kpi-card ops-kpi-card--info">
-        <div class="ops-kpi-card-header">
-          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.EARNED_WAGES' | translate }}</span>
-          <div class="ops-kpi-card-icon ops-kpi-card-icon--info">
-            <i class="fas fa-coins"></i>
-          </div>
-        </div>
-        <div class="ops-kpi-card-value text-info">
-          {{ totalWagesEarned | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
-        </div>
-        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.EARNED_WAGES_HINT' | translate }}</div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="ops-kpi-card ops-kpi-card--warning">
-        <div class="ops-kpi-card-header">
-          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE' | translate }}</span>
-          <div class="ops-kpi-card-icon ops-kpi-card-icon--warning">
-            <i class="fas fa-cash-register"></i>
-          </div>
-        </div>
-        <div class="ops-kpi-card-value text-warning">
-          {{ totalNetDue | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
-        </div>
-        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE_HINT' | translate }}</div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="ops-kpi-card ops-kpi-card--success">
-        <div class="ops-kpi-card-header">
-          <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS' | translate }}</span>
-          <div class="ops-kpi-card-icon ops-kpi-card-icon--success">
-            <i class="fas fa-motorcycle"></i>
-          </div>
-        </div>
-        <div class="ops-kpi-card-value text-success">
-          {{ activeFleetCount }}
-        </div>
-        <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS_HINT' | translate }}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3. Navigation Filter Tabs & Search Box -->
+  <!-- Navigation Filter Tabs -->
   <div class="ops-tabs-toolbar mb-4">
     <nav class="ops-status-tabs" aria-label="Reconciliation Navigation">
+      <button type="button" class="ops-status-tab" [class.active]="activeTab === 'merchants'" (click)="activeTab = 'merchants'">
+        <i class="fas fa-store me-2 text-warning"></i>
+        <span>طابور تسويات التجار (Merchant Queue)</span>
+        <span class="ops-status-tab-count ops-status-tab-count--orange" *ngIf="pendingMerchantRequestsCount > 0">{{ pendingMerchantRequestsCount }}</span>
+      </button>
       <button type="button" class="ops-status-tab" [class.active]="activeTab === 'couriers'" (click)="activeTab = 'couriers'">
         <i class="fas fa-motorcycle me-2 text-primary"></i>
-        <span>{{ 'RECONCILIATION_PAGE.TAB_ACTIVE_SHIFTS' | translate }}</span>
+        <span>تسويات المناديب والأسطول (Fleet Reconciliations)</span>
         <span class="ops-status-tab-count">{{ filteredCaptains.length }}</span>
       </button>
       <button type="button" class="ops-status-tab" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">
@@ -171,6 +48,201 @@
       </button>
     </div>
   </div>
+
+  <!-- TAB 1: DEDICATED MERCHANT SETTLEMENTS QUEUE -->
+  <div class="ops-orders-card mb-4" *ngIf="activeTab === 'merchants'">
+    <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+      <div>
+        <h3 class="mb-1">طابور طلبات تسوية مستحقات التجار (Merchant Settlements Queue)</h3>
+        <div class="text-muted fs-8">
+          دورة حياة التسوية: طلب التاجر ➔ قيد المراجعة (حجز المبلغ دون تحريك أموال) ➔ قبول الطلب ➔ صرف المستحقات ➔ تسجيل القيد في دفتر الحسابات.
+        </div>
+      </div>
+      <button class="btn btn-sm ops-btn-refresh" type="button" (click)="loadSettlementRequests()" [disabled]="isLoadingRequests">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoadingRequests"></i> تحديث
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table ops-orders-table align-middle mb-0">
+        <thead>
+          <tr class="ops-table-header text-muted fs-8">
+            <th>رقم الطلب</th>
+            <th>التاجر والمتاجر التابعة</th>
+            <th>المبلغ المطلوب</th>
+            <th>طريقة الصرف المقترحة وبيانات الحساب</th>
+            <th>الحالة</th>
+            <th>تاريخ الطلب</th>
+            <th class="text-center">الإجراء الإداري</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="isLoadingRequests"><td colspan="7" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i></td></tr>
+          <tr *ngIf="!isLoadingRequests && merchantRequests.length === 0">
+            <td colspan="7" class="text-center text-muted py-4">لا توجد طلبات تسوية تجار حالياً.</td>
+          </tr>
+          <tr *ngFor="let request of merchantRequests">
+            <td><strong>{{ request.requestNumber }}</strong></td>
+            <td>
+              <div class="fw-bold">{{ request.requestedByName }}</div>
+              <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
+              <div *ngIf="request.merchantAllocations && request.merchantAllocations.length > 0" class="small text-muted mt-1">
+                <span *ngFor="let alloc of request.merchantAllocations" class="badge badge-light me-1">
+                  {{ alloc.merchantTitle }}: {{ alloc.amount | number:'1.0-0' }} ل.س
+                </span>
+              </div>
+            </td>
+            <td><strong class="text-success fs-6">{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
+            <td>
+              <div class="fw-bold">{{ request.method || 'حوالة / نقدي' }}</div>
+              <small class="text-muted d-block">{{ request.accountDetails }}</small>
+              <small *ngIf="request.notes" class="text-primary d-block mt-1">ملاحظات: {{ request.notes }}</small>
+            </td>
+            <td>
+              <span class="badge" [ngClass]="{
+                'badge-light-warning': request.status === requestStatus.Pending,
+                'badge-light-primary': request.status === requestStatus.Approved,
+                'badge-light-danger': request.status === requestStatus.Rejected,
+                'badge-light-success': request.status === requestStatus.Completed
+              }">{{ requestStatusLabel(request.status) }}</span>
+              <div *ngIf="request.rejectionReason" class="text-danger small mt-1">{{ request.rejectionReason }}</div>
+            </td>
+            <td>{{ request.createdDate | date:'short' }}</td>
+            <td class="text-center">
+              <ng-container *ngIf="request.status === requestStatus.Pending">
+                <button class="btn btn-sm btn-success me-1" (click)="acceptSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                  <i class="fas fa-check"></i> قبول واعتماد
+                </button>
+                <button class="btn btn-sm btn-light-danger" (click)="rejectSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                  <i class="fas fa-times"></i> رفض
+                </button>
+              </ng-container>
+              <button *ngIf="request.status === requestStatus.Approved"
+                class="btn btn-sm btn-primary" (click)="completeMerchantSettlement(request)" [disabled]="processingRequestId === request.id">
+                <i class="fas fa-handshake"></i> تأكيد صرف واستلام المستحقات
+              </button>
+              <span *ngIf="request.status === requestStatus.Completed" class="text-success fw-bold">
+                <i class="fas fa-check-circle me-1"></i> تم الصرف وإغلاق القيد
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: COURIER / FLEET RECONCILIATION & ACTIVE SHIFTS -->
+  <ng-container *ngIf="activeTab === 'couriers'">
+    <!-- Courier Float Handover Requests Queue -->
+    <div class="ops-orders-card mb-4" *ngIf="courierRequests.length > 0">
+      <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+        <div>
+          <h4 class="mb-1">طلبات توريد عهدة المناديب (Captain Float Deposits)</h4>
+          <div class="text-muted fs-8">توريد مبالغ العهدة النقدية المحصلة من الكباتن إلى خزنة الشركة.</div>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table ops-orders-table align-middle mb-0">
+          <thead>
+            <tr class="ops-table-header text-muted fs-8">
+              <th>رقم الطلب</th><th>المندوب</th><th>المبلغ المحول للخزنة</th><th>الحالة</th><th>التاريخ</th><th class="text-center">الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let request of courierRequests">
+              <td><strong>{{ request.requestNumber }}</strong></td>
+              <td>
+                <div class="fw-bold">{{ request.requestedByName }}</div>
+                <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
+              </td>
+              <td><strong>{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
+              <td>
+                <span class="badge" [ngClass]="{
+                  'badge-light-warning': request.status === requestStatus.Pending,
+                  'badge-light-danger': request.status === requestStatus.Rejected,
+                  'badge-light-success': request.status === requestStatus.Completed
+                }">{{ requestStatusLabel(request.status) }}</span>
+              </td>
+              <td>{{ request.createdDate | date:'short' }}</td>
+              <td class="text-center">
+                <ng-container *ngIf="request.status === requestStatus.Pending">
+                  <button class="btn btn-sm btn-success me-1" (click)="acceptSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                    <i class="fas fa-check"></i> استلام وتوريد للخزنة
+                  </button>
+                  <button class="btn btn-sm btn-light-danger" (click)="rejectSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                    <i class="fas fa-times"></i> رفض
+                  </button>
+                </ng-container>
+                <i *ngIf="request.status === requestStatus.Completed" class="fas fa-check-circle text-success fs-4"></i>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2. Financial KPI Metric Cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-xl-3 col-md-6">
+        <div class="ops-kpi-card ops-kpi-card--primary">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.GROSS_CASH' | translate }}</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--primary">
+              <i class="fas fa-hand-holding-usd"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-primary">
+            {{ totalFloatInField | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+          </div>
+          <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.GROSS_CASH_HINT' | translate }}</div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-md-6">
+        <div class="ops-kpi-card ops-kpi-card--info">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.EARNED_WAGES' | translate }}</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--info">
+              <i class="fas fa-coins"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-info">
+            {{ totalWagesEarned | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+          </div>
+          <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.EARNED_WAGES_HINT' | translate }}</div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-md-6">
+        <div class="ops-kpi-card ops-kpi-card--warning">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE' | translate }}</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--warning">
+              <i class="fas fa-cash-register"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-warning">
+            {{ totalNetDue | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+          </div>
+          <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE_HINT' | translate }}</div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-md-6">
+        <div class="ops-kpi-card ops-kpi-card--success">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS' | translate }}</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--success">
+              <i class="fas fa-motorcycle"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-success">
+            {{ activeFleetCount }}
+          </div>
+          <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS_HINT' | translate }}</div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
 
   <!-- TAB 1: COURIER ACTIVE RECONCILIATION -->
   <div class="ops-orders-card" *ngIf="activeTab === 'couriers'">

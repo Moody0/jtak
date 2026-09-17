@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'dart:developer' as developer;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../generated/locale_base.dart';
 import '../providers/sol_api.dart';
@@ -63,6 +64,31 @@ class GlobalVar {
       return 'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address.trim())}';
     }
     return null;
+  }
+
+  /// Builds direct Google Maps navigation URL to the merchant pickup point.
+  static String? getMerchantNavigationUrl({double? lat, double? lng, String? address}) {
+    if (lat != null && lng != null && lat != 0 && lng != 0) {
+      return 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng';
+    }
+    if (address != null && address.trim().isNotEmpty && address.trim() != 'null') {
+      return 'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address.trim())}';
+    }
+    return null;
+  }
+
+  /// Safely launches a navigation URL in an external maps application.
+  static Future<bool> launchNavigationUrl(String? url) async {
+    if (url == null || url.trim().isEmpty) return false;
+    try {
+      final uri = Uri.parse(url.trim());
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   static String getDownloadUrl(String subUrl) => SolApi.downloadUrl + GlobalVar.getString(subUrl);

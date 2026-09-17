@@ -212,10 +212,12 @@ namespace App.ApiControllers.V1.Authorization
                         return ForbidInactive();
 
                     var isCodeValid = false;
+#if DEBUG
                     if (request.Code == "123456" || request.Code == "1234")
                     {
                         isCodeValid = true;
                     }
+#endif
 
                     if (!isCodeValid)
                     {

@@ -18,7 +18,7 @@ import { ReconciliationService } from '../../services/reconciliation.service';
   styleUrls: ['./reconciliation-list.component.scss'],
 })
 export class ReconciliationListComponent implements OnInit {
-  activeTab: 'couriers' | 'history' = 'couriers';
+  activeTab: 'merchants' | 'couriers' | 'history' = 'merchants';
   captains: CaptainSettlementSummary[] = [];
   filteredCaptains: CaptainSettlementSummary[] = [];
   history: DailySettlementBatch[] = [];
@@ -27,6 +27,22 @@ export class ReconciliationListComponent implements OnInit {
   processingRequestId: string | null = null;
   readonly requestStatus = SettlementRequestStatus;
   readonly partyType = SettlementPartyType;
+
+  get merchantRequests(): SettlementRequestItem[] {
+    return this.settlementRequests.filter(r => r.partyType === SettlementPartyType.Merchant);
+  }
+
+  get pendingMerchantRequestsCount(): number {
+    return this.merchantRequests.filter(r => r.status === SettlementRequestStatus.Pending).length;
+  }
+
+  get courierRequests(): SettlementRequestItem[] {
+    return this.settlementRequests.filter(r => r.partyType === SettlementPartyType.Captain);
+  }
+
+  get pendingCourierRequestsCount(): number {
+    return this.courierRequests.filter(r => r.status === SettlementRequestStatus.Pending).length;
+  }
 
   isLoading: boolean = false;
   searchTerm: string = '';

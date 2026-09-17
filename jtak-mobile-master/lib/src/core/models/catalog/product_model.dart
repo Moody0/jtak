@@ -6,6 +6,8 @@ import 'package:jtek_app/src/core/models/order/order_details_model.dart';
 import 'dynamic_field_values.dart';
 import 'review_model.dart';
 import 'tag_model.dart';
+import '../../services/locator.dart';
+import '../../controllers/catalog/markets_provider.dart';
 
 class ProductModel {
   int? id;
@@ -19,6 +21,8 @@ class ProductModel {
   double? price;
   double? discount;
   double? finalPrice;
+  double? originalPrice;
+  double? priceUsd;
   int? currency;
   String? currencyString;
   bool? active;
@@ -50,6 +54,8 @@ class ProductModel {
     this.price,
     this.discount,
     this.finalPrice,
+    this.originalPrice,
+    this.priceUsd,
     this.currency,
     this.currencyString,
     this.active,
@@ -71,6 +77,47 @@ class ProductModel {
     this.dynamicFieldValues,
   });
 
+  double canonicalSellingPriceWithRate([double? exchangeRate]) {
+    final rate = exchangeRate ?? _resolveExchangeRate();
+    if (priceUsd != null && priceUsd! > 0) {
+      return (priceUsd! * rate).roundToDouble();
+    }
+    final raw = finalPrice ?? price ?? 0.0;
+    final isExplicitUsd = (currency == 840 || currency == 2) ||
+        (currencyString != null &&
+            (currencyString!.toUpperCase() == 'USD' ||
+                currencyString == 'دولار أمريكي'));
+    if (isExplicitUsd && raw > 0) {
+      return (raw * rate).roundToDouble();
+    }
+    return raw;
+  }
+
+  static double _resolveExchangeRate() {
+    try {
+      if (locator.isRegistered<MarketsProvider>()) {
+        final r = locator<MarketsProvider>().exchangeRate;
+        if (r > 0) return r;
+      }
+    } catch (_) {}
+    return 15000.0;
+  }
+
+  double get canonicalSellingPrice => canonicalSellingPriceWithRate();
+
+  /// Whether this product has an authoritative promotional discount to display.
+  /// Business Rule:
+  /// 1. discount must be > 0
+  /// 2. originalPrice must be != null and > canonicalSellingPrice
+  ///
+  /// If discount == 0 or originalPrice == null, NO discount/old price is shown.
+  bool get hasAuthoritativeDiscount {
+    if (discount == null || discount! <= 0) return false;
+    if (originalPrice == null || originalPrice! <= 0) return false;
+    final selling = canonicalSellingPrice;
+    return originalPrice! > selling;
+  }
+
   ProductModel copyWith({
     int? id,
     String? title,
@@ -83,6 +130,8 @@ class ProductModel {
     double? price,
     double? discount,
     double? finalPrice,
+    double? originalPrice,
+    double? priceUsd,
     int? currency,
     String? currencyString,
     bool? active,
@@ -115,6 +164,8 @@ class ProductModel {
       price: price ?? this.price,
       discount: discount ?? this.discount,
       finalPrice: finalPrice ?? this.finalPrice,
+      originalPrice: originalPrice ?? this.originalPrice,
+      priceUsd: priceUsd ?? this.priceUsd,
       currency: currency ?? this.currency,
       currencyString: currencyString ?? this.currencyString,
       active: active ?? this.active,
@@ -150,6 +201,8 @@ class ProductModel {
       'price': price,
       'discount': discount,
       'finalPrice': finalPrice,
+      'originalPrice': originalPrice,
+      'priceUsd': priceUsd,
       'currency': currency,
       'currencyString': currencyString,
       'active': active,
@@ -183,8 +236,14 @@ class ProductModel {
       availableCount: map['availableCount'],
       unit: map['unit'],
       price: map['price']?.toDouble() ?? 0.0,
-      discount: map['discount']?.toDouble() ?? 0.0,
+      discount: (map['discount'] ?? map['Discount'])?.toDouble() ?? 0.0,
       finalPrice: map['finalPrice']?.toDouble() ?? 0.0,
+      originalPrice: (map['originalPrice'] ?? map['OriginalPrice']) != null
+          ? ((map['originalPrice'] ?? map['OriginalPrice']) as num).toDouble()
+          : null,
+      priceUsd: (map['priceUsd'] ?? map['PriceUsd']) != null
+          ? ((map['priceUsd'] ?? map['PriceUsd']) as num).toDouble()
+          : null,
       currency: map['currency'],
       currencyString: map['currencyString'],
       active: map['active'],
@@ -194,7 +253,7 @@ class ProductModel {
       rateCount: map['rateCount'],
       myReview: map['myReview'] != null ? ReviewModel.fromMap(map['myReview']) : null,
       canReview: map['canReview'],
-      merchantId: map['merchantId'],
+      merchantId: map['merchantId'] ?? map['MerchantId'],
       merchant: map['merchant'],
       merchantOwnerId: map['merchantOwnerId'],
       shippingCost: map['shippingCost']?.toDouble() ?? 0.0,
@@ -217,6 +276,7 @@ class ProductModel {
       unit: item.productUnit,
       price: item.singlePrice ?? 0.0,
       finalPrice: item.singleFinalPrice ?? 0.0,
+      priceUsd: (item.currency == 840 || item.currency == 2) ? item.singlePrice : null,
       currency: item.currency,
       currencyString: item.currencyString,
       merchantId: item.merchantId,
@@ -231,7 +291,6 @@ class ProductModel {
   @override
   String toString() {
     return title ?? '';
-    // return 'ProductModel(id: $id, title: $title, description: $description, photos: $photos, totalCount: $totalCount, soldCount: $soldCount, availableCount: $availableCount, unit: $unit, price: $price, discount: $discount, finalPrice: $finalPrice, currency: $currency, currencyString: $currencyString, active: $active, expiryDate: $expiryDate, isFeatured: $isFeatured, rate: $rate, rateCount: $rateCount, myReview: $myReview, canReview: $canReview, merchantId: $merchantId, merchant: $merchant, merchantOwnerId: $merchantOwnerId, shippingCost: $shippingCost, shopMinOrder: $shopMinOrder, productCategoryId: $productCategoryId, productCategory: $productCategory, createdDate: $createdDate, tags: $tags, dynamicFieldValues: $dynamicFieldValues)';
   }
 
   @override
@@ -250,6 +309,8 @@ class ProductModel {
         other.price == price &&
         other.discount == discount &&
         other.finalPrice == finalPrice &&
+        other.originalPrice == originalPrice &&
+        other.priceUsd == priceUsd &&
         other.currency == currency &&
         other.currencyString == currencyString &&
         other.active == active &&
@@ -284,6 +345,8 @@ class ProductModel {
         price.hashCode ^
         discount.hashCode ^
         finalPrice.hashCode ^
+        originalPrice.hashCode ^
+        priceUsd.hashCode ^
         currency.hashCode ^
         currencyString.hashCode ^
         active.hashCode ^

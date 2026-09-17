@@ -24,6 +24,8 @@ export interface Order extends BaseModel {
     canAdminApprove?: boolean;
     canAdminMarkReady?: boolean;
     adminFlowMessage?: string;
+    notes?: string;
+    warning?: string;
 }
 
 export interface ShippingStopProgress {

@@ -333,9 +333,10 @@ class _HomePageState extends State<HomePage> {
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
               const SliverJtakDontMissSection(),
 
-              // 8. Various Cuisines & Categories (مطابخ متنوعة)
+              // 8. Various Cuisines & Categories (أنواع المطاعم - Canonical #40)
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
               SliverJtakVariousCuisinesSection(
+                title: 'أنواع المطاعم',
                 onCategoryTap: (item) {
                   // The category id is the real association, so prefer it. The
                   // keyword filter is only for entries the admin has not linked

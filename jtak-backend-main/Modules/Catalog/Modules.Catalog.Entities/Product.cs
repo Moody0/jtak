@@ -85,6 +85,9 @@ namespace Modules.Catalog.Entities
         public string Unit { get; set; }
         public decimal Price { get; set; }
         public decimal FinalPrice { get; set; }
+        public decimal? OriginalPrice { get; set; }
+        public decimal Discount { get; set; }
+        public decimal? PriceUsd { get; set; }
         public int? MerchantId { get; set; }
         public Currency Currency { get; set; }
         public string CurrencyString => Currency.ToLocalizedName();
@@ -133,6 +136,9 @@ namespace Modules.Catalog.Entities
         //public double Rate { get; set; }
         //public int RateCount { get; set; }
         public int MerchantId { get; set; }
+        public decimal? PriceUsd { get; set; }
+        public decimal? OriginalPrice { get; set; }
+        public decimal Discount { get; set; }
     }
 
     public class PopularProductDto

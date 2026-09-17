@@ -4,6 +4,7 @@ import 'package:jtek_app/src/ui/pages/cart/order_confirmation_page.dart';
 import 'package:jtek_app/src/core/models/order/order_model.dart';
 import '../../ui/pages/account/login_page.dart';
 import '../../ui/pages/account/profile_page.dart';
+import '../../ui/pages/account/notification_settings_page.dart';
 import '../../ui/pages/app_notifications_page.dart';
 import '../../ui/pages/cart/cart_page.dart';
 import '../../ui/pages/cart/check_out_page.dart';
@@ -28,6 +29,7 @@ final Map<String, Widget Function(BuildContext)> appRoutes = {
   // user pages
   LoginPage.routeName: (ctx) => const LoginPage(),
   ProfilePage.routeName: (ctx) => ProfilePage(),
+  NotificationSettingsPage.routeName: (ctx) => const NotificationSettingsPage(),
 
   // cart Pages
   CartPage.routeName: (ctx) => CartPage(),

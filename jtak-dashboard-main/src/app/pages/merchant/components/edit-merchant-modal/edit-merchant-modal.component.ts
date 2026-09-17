@@ -255,6 +255,8 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       minOrderAmount: [this.item.minOrderAmount !== undefined && this.item.minOrderAmount !== null ? this.item.minOrderAmount : 15000, [Validators.required, Validators.min(0)]],
       workingHours: [this.item.workingHours || 'حتى 3 ص'],
       active: [this.item.active ?? true],
+      ownerName: [this.item.ownerName || this.item.owner || ''],
+      owner: [this.item.ownerName || this.item.owner || ''],
       ownerId: [this.item.ownerId],
       photo: [this.item.photo || '']
     });
@@ -346,12 +348,16 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
     }
     formValues.shortDescription = desc;
 
-    // Synchronize owner display title
-    const selectedUser = this.merchantUsers.find((u) => u.id === formValues.ownerId);
-    if (selectedUser) {
-      formValues.owner = selectedUser.fullName;
-    } else if (!formValues.ownerId || formValues.ownerId === '-') {
-      formValues.owner = '';
+    // Set owner human-readable name from text input (Canonical #1)
+    const ownerName = (this.formGroup.get('ownerName')?.value || this.formGroup.get('owner')?.value || '').toString().trim();
+    formValues.ownerName = ownerName;
+    formValues.owner = ownerName;
+    if (!ownerName && formValues.ownerId && formValues.ownerId !== '-') {
+      const selectedUser = this.merchantUsers.find((u) => u.id === formValues.ownerId);
+      if (selectedUser) {
+        formValues.ownerName = selectedUser.fullName;
+        formValues.owner = selectedUser.fullName;
+      }
     }
 
     if (this.item.id) {

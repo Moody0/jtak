@@ -42,7 +42,11 @@ class CartSingleItem extends StatelessWidget {
     final title = item.productTitle?.isNotEmpty == true
         ? item.productTitle!
         : (mockItem?.title ?? 'وجبة خاصة');
-    final singlePrice = item.singleFinalPrice ?? (mockItem?.basePriceValue.toDouble() ?? 0.0);
+    final localItem = locator<CartProvider>().findItme(item.productId ?? 0, item.merchantId ?? 0);
+    double singlePrice = item.singleFinalPrice ?? (mockItem?.basePriceValue.toDouble() ?? 0.0);
+    if (localItem != null && localItem.singleFinalPrice > 0) {
+      singlePrice = localItem.singleFinalPrice;
+    }
     final quantity = item.quantity ?? 1;
     final totalPrice = singlePrice * quantity;
 

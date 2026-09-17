@@ -18,6 +18,7 @@ import '../address/address_page.dart';
 import '../pages/app_page.dart';
 import 'login_page.dart';
 import 'profile_page.dart';
+import 'notification_settings_page.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Modern Account & Profile Hub Page (حسابي - Flat Minimalist UI)
@@ -344,6 +345,17 @@ class AccountPage extends StatelessWidget {
                 return;
               }
               Navigator.pushNamed(context, AddressPage.routeName);
+            },
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: PhosphorIconsFill.bell,
+            iconColor: const Color(0xFF8B5CF6),
+            iconBg: const Color(0xFFF5F3FF),
+            title: 'إعدادات الإشعارات والتنبيهات',
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.pushNamed(context, NotificationSettingsPage.routeName);
             },
           ),
         ],

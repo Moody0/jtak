@@ -46,9 +46,10 @@ class ProductSingleItem extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const SizedBox(),
-                              DiscountWidget(price: item.discount),
-                              PriceTextWidget.small(price: item.finalPrice),
-                              AddToCartButton.circular(item),
+                              if (item.hasAuthoritativeDiscount)
+                                DiscountWidget(price: item.originalPrice),
+                              PriceTextWidget.small(price: item.canonicalSellingPrice),
+                              AddToCartButton.circular(item, key: ValueKey('cart_btn_${item.id}')),
                             ],
                           )
                         ],
@@ -127,8 +128,8 @@ class ProductGridSingleItem extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    PriceTextWidget.small(price: item.finalPrice),
-                    AddToCartButton.circular(item),
+                    Flexible(child: PriceTextWidget.small(price: item.canonicalSellingPrice)),
+                    AddToCartButton.circular(item, key: ValueKey('cart_grid_btn_${item.id}')),
                   ],
                 ),
               )
@@ -219,9 +220,9 @@ class ProductMiniSingleItem extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (item.price != null && item.finalPrice != null && item.price != item.finalPrice)
-          Expanded(flex: 1, child: DiscountWidget(price: item.discount)),
-        Expanded(flex: 2, child: PriceTextWidget.small(price: item.finalPrice)),
+        if (item.hasAuthoritativeDiscount)
+          Expanded(flex: 1, child: DiscountWidget(price: item.originalPrice)),
+        Expanded(flex: 2, child: PriceTextWidget.small(price: item.canonicalSellingPrice)),
       ],
     );
   }

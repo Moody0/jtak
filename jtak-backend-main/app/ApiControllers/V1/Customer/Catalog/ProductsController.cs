@@ -278,6 +278,9 @@ namespace App.ApiControllers.V1.Customer
                     model.Price = mp.Price;
                     model.FinalPrice = mp.FinalPrice;
                     model.MerchantId = mp.MerchantId;
+                    model.PriceUsd = mp.PriceUsd;
+                    model.OriginalPrice = mp.OriginalPrice;
+                    model.Discount = mp.Discount;
                 }
             }
             else
@@ -288,6 +291,9 @@ namespace App.ApiControllers.V1.Customer
                     model.Price = mp.Price;
                     model.FinalPrice = mp.FinalPrice;
                     model.MerchantId = mp.MerchantId;
+                    model.PriceUsd = mp.PriceUsd;
+                    model.OriginalPrice = mp.OriginalPrice;
+                    model.Discount = mp.Discount;
                 }
             }
 
@@ -299,6 +305,18 @@ namespace App.ApiControllers.V1.Customer
                     model.Price = fallbackMp.MerchantPrice;
                     model.FinalPrice = fallbackMp.MerchantPrice;
                     model.MerchantId = fallbackMp.MerchantId;
+                    model.PriceUsd = fallbackMp.PriceUsd;
+                    model.OriginalPrice = fallbackMp.OriginalPrice;
+                    model.Discount = fallbackMp.Discount;
+                    if (fallbackMp.PriceUsd.HasValue && fallbackMp.PriceUsd.Value > 0)
+                    {
+                        var usdRate = await _merchantService.GetUsdRate();
+                        if (usdRate > 0)
+                        {
+                            model.Price = Math.Round(fallbackMp.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
+                            model.FinalPrice = model.Price;
+                        }
+                    }
                 }
             }
 
@@ -389,6 +407,9 @@ namespace App.ApiControllers.V1.Customer
                     product.MerchantId = mp.MerchantId;
                     product.Price = mp.Price;
                     product.FinalPrice = mp.FinalPrice;
+                    product.PriceUsd = mp.PriceUsd;
+                    product.OriginalPrice = mp.OriginalPrice;
+                    product.Discount = mp.Discount;
                 }
             }
 
@@ -483,6 +504,9 @@ namespace App.ApiControllers.V1.Customer
                     product.MerchantId = mp.MerchantId;
                     product.Price = mp.Price;
                     product.FinalPrice = mp.FinalPrice;
+                    product.PriceUsd = mp.PriceUsd;
+                    product.OriginalPrice = mp.OriginalPrice;
+                    product.Discount = mp.Discount;
                 }
             }
 
@@ -713,8 +737,25 @@ namespace App.ApiControllers.V1.Customer
                     var fallbackPrice = p.MerchantProducts?.FirstOrDefault(m => m.MerchantId == mid);
                     if (fallbackPrice != null && fallbackPrice.MerchantPrice > 0)
                     {
-                        price = fallbackPrice.MerchantPrice;
-                        finalPrice = fallbackPrice.MerchantPrice;
+                        if (fallbackPrice.PriceUsd.HasValue && fallbackPrice.PriceUsd.Value > 0)
+                        {
+                            var usdRate = await _merchantService.GetUsdRate();
+                            if (usdRate > 0)
+                            {
+                                price = Math.Round(fallbackPrice.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
+                                finalPrice = price;
+                            }
+                            else
+                            {
+                                price = fallbackPrice.MerchantPrice;
+                                finalPrice = fallbackPrice.MerchantPrice;
+                            }
+                        }
+                        else
+                        {
+                            price = fallbackPrice.MerchantPrice;
+                            finalPrice = fallbackPrice.MerchantPrice;
+                        }
                     }
                 }
 

@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
@@ -59,7 +59,7 @@ namespace App.ApiControllers.V1.Delivery
                 pendingAmount = balance.PendingAmount,
                 availableAmount = balance.AvailableAmount,
                 hasPendingSettlement = balance.HasPendingRequest,
-                maxCashFloat = 500000m,
+                maxCashFloat = 5000m,
                 currency = balance.Currency
             });
         }

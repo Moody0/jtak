@@ -17,10 +17,9 @@ import '../../../core/services/location_service.dart';
 import '../../../utils/extensions/context_extension.dart';
 import '../../../ui/pages/account/login_page.dart';
 import '../../../ui/pages/account/profile_page.dart';
-import '../../../ui/pages/order/order_details_page.dart';
 import '../../../ui/pages/setting_page.dart';
 import '../../../ui/pages/transaction/transaction_page.dart';
-import '../../../utils/utilities/global_var.dart';
+import 'order_widgets.dart';
 
 class OrdersPage extends StatefulWidget {
   static const String routeName = '/OrdersPage';
@@ -33,6 +32,7 @@ class OrdersPage extends StatefulWidget {
 class _OrdersPageState extends State<OrdersPage> {
   Timer? _refreshTimer;
   LatLng? _driverLocation;
+  int _selectedOrdersTab = 0; // 0 = Active, 1 = Completed
 
   @override
   void initState() {
@@ -222,10 +222,10 @@ class _OrdersPageState extends State<OrdersPage> {
                 isArabic ? 'الاتصال المباشر بالدعم' : 'Call Support',
                 style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
               ),
-              subtitle: Text('+963 11 9876543', style: GoogleFonts.ibmPlexSansArabic(color: kCharcoalMuted)),
+              subtitle: Text('0985615705', style: GoogleFonts.ibmPlexSansArabic(color: kCharcoalMuted)),
               onTap: () async {
                 Navigator.pop(ctx);
-                final uri = Uri.parse('tel:+963119876543');
+                final uri = Uri.parse('tel:0985615705');
                 if (await canLaunchUrl(uri)) await launchUrl(uri);
               },
             ),
@@ -305,36 +305,6 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
-  Widget _buildStoreIcon(OrderModel order) {
-    final merchantTitle = (order.orderDetails != null && order.orderDetails!.isNotEmpty)
-        ? (order.orderDetails!.first.merchantTitle ?? '').toLowerCase()
-        : '';
-
-    IconData iconData = PhosphorIcons.shoppingBagBold;
-
-    if (merchantTitle.contains('حلويات') ||
-        merchantTitle.contains('كافيه') ||
-        merchantTitle.contains('قهوة') ||
-        merchantTitle.contains('sweet')) {
-      iconData = PhosphorIcons.coffeeBold;
-    } else if (merchantTitle.contains('مطعم') ||
-        merchantTitle.contains('شاورما') ||
-        merchantTitle.contains('برغر') ||
-        merchantTitle.contains('food')) {
-      iconData = PhosphorIcons.forkKnifeBold;
-    }
-
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: kPrimaryOrange,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Icon(iconData, color: Colors.white, size: 22),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final orderProv = Provider.of<OrderProvider>(context);
@@ -347,7 +317,9 @@ class _OrdersPageState extends State<OrdersPage> {
     final fullName = user?.fullName?.trim() ?? '';
     final firstName = fullName.isNotEmpty ? fullName.split(' ').first : (isArabic ? 'السائق' : 'Driver');
 
-    final activeOrders = orderProv.dataList;
+    final activeOrders = orderProv.activeOrders;
+    final completedOrders = orderProv.completedOrders;
+    final displayOrders = _selectedOrdersTab == 0 ? activeOrders : completedOrders;
     final balanceAmount = transProv.balances.amount ?? 0.0;
 
     return Scaffold(
@@ -373,13 +345,13 @@ class _OrdersPageState extends State<OrdersPage> {
 
               const SizedBox(height: 24),
 
-              // 3. Active Deliveries Header ("الطلبات الحالية")
-              _buildActiveOrdersHeader(context, isArabic, activeOrders.length),
+              // 3. Active vs Completed Deliveries Header Tabs
+              _buildActiveOrdersHeader(context, isArabic, activeOrders.length, completedOrders.length),
 
               const SizedBox(height: 12),
 
-              // 4. Active Deliveries List or Clean Empty State
-              _buildActiveOrdersContent(context, activeOrders, isArabic, isDark),
+              // 4. Deliveries List or Clean Empty State
+              _buildActiveOrdersContent(context, displayOrders, isArabic, isDark),
 
               const SizedBox(height: 24),
 
@@ -600,48 +572,41 @@ class _OrdersPageState extends State<OrdersPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. Active Deliveries Header Row
+  // 3. Active & Completed Deliveries Header Tabs
   // ---------------------------------------------------------------------------
   Widget _buildActiveOrdersHeader(
     BuildContext context,
     bool isArabic,
-    int count,
+    int activeCount,
+    int completedCount,
   ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            Text(
-              isArabic ? 'الطلبات الحالية' : 'Current Orders',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: kCharcoalDark,
-              ),
+            _buildOrderTabPill(
+              title: isArabic ? 'الطلبات الحالية' : 'Current',
+              count: activeCount,
+              isSelected: _selectedOrdersTab == 0,
+              onTap: () {
+                setState(() => _selectedOrdersTab = 0);
+              },
             ),
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF0E8),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFFD4C0), width: 1),
-              ),
-              child: Text(
-                '$count',
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: kPrimaryOrange,
-                ),
-              ),
+            _buildOrderTabPill(
+              title: isArabic ? 'السجل المكتمل' : 'Completed',
+              count: completedCount,
+              isSelected: _selectedOrdersTab == 1,
+              onTap: () {
+                setState(() => _selectedOrdersTab = 1);
+              },
             ),
           ],
         ),
         TextButton(
           onPressed: () {
-            // Refresh / view all
+            // Refresh
             Provider.of<OrderProvider>(context, listen: false).refreshData();
           },
           style: TextButton.styleFrom(
@@ -650,7 +615,7 @@ class _OrdersPageState extends State<OrdersPage> {
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           child: Text(
-            isArabic ? 'عرض الكل' : 'View All',
+            isArabic ? 'تحديث' : 'Refresh',
             style: GoogleFonts.ibmPlexSansArabic(
               fontSize: 13.5,
               fontWeight: FontWeight.w700,
@@ -659,6 +624,59 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOrderTabPill({
+    required String title,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? kPrimaryOrange : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? kPrimaryOrange : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? Colors.white : kCharcoalDark,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? Colors.white : kCharcoalMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -672,42 +690,52 @@ class _OrdersPageState extends State<OrdersPage> {
     bool isDark,
   ) {
     if (orders.isEmpty) {
+      final isCompletedTab = _selectedOrdersTab == 1;
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1.0,
+          ),
         ),
         child: Column(
           children: [
             Container(
               width: 60,
               height: 60,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFF0E8),
+              decoration: BoxDecoration(
+                color: isCompletedTab ? const Color(0xFFECFDF5) : const Color(0xFFFFF0E8),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                PhosphorIcons.mopedBold,
-                color: kPrimaryOrange,
+              child: Icon(
+                isCompletedTab ? PhosphorIcons.checkCircleBold : PhosphorIcons.mopedBold,
+                color: isCompletedTab ? const Color(0xFF059669) : kPrimaryOrange,
                 size: 30,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              isArabic ? 'لا توجد طلبات جارية حالياً' : 'No active deliveries right now',
+              isCompletedTab
+                  ? (isArabic ? 'لا توجد طلبات مكتملة حتى الآن' : 'No completed deliveries yet')
+                  : (isArabic ? 'لا توجد طلبات جارية حالياً' : 'No active deliveries right now'),
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: kCharcoalDark,
+                color: isDark ? Colors.white : kCharcoalDark,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              isArabic
-                  ? 'سيتم إسناد الطلبات الجديدة إليك فور تأكيدها وتجهيزها.'
-                  : 'New orders will appear here automatically when assigned.',
+              isCompletedTab
+                  ? (isArabic
+                      ? 'الطلبات التي تقوم بتسليمها بنجاح ستظهر في هذا السجل.'
+                      : 'Orders you successfully deliver will appear in this history.')
+                  : (isArabic
+                      ? 'سيتم إسناد الطلبات الجديدة إليك من الإدارة فور تجهيزها.'
+                      : 'New orders will appear here automatically when assigned.'),
               textAlign: TextAlign.center,
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 12.5,
@@ -720,184 +748,11 @@ class _OrdersPageState extends State<OrdersPage> {
     }
 
     return Column(
-      children: orders.asMap().entries.map((entry) {
-        final index = entry.key;
-        final order = entry.value;
-        final isPrimaryAction = index == 0;
-
-        final merchantTitle = (order.orderDetails != null && order.orderDetails!.isNotEmpty)
-            ? (order.orderDetails!.first.merchantTitle ?? '')
-            : '';
-        final merchantTitleDisplay =
-            merchantTitle.isNotEmpty ? merchantTitle : (isArabic ? 'متجر غير معروف' : 'Unknown merchant');
-
-        final streetAddress = (order.orderDetails != null && order.orderDetails!.isNotEmpty)
-            ? (order.orderDetails!.first.merchantAddress ?? order.address ?? '')
-            : (order.address ?? '');
-        final streetAddressDisplay =
-            streetAddress.isNotEmpty ? streetAddress : (isArabic ? 'العنوان غير متوفر' : 'Address unavailable');
-
-        final timeFormatted = GlobalVar.dateForamt(order.purchaseDate, 'HH:mm') ?? '--:--';
-        final priceFormatted = _formatCurrency(order.price);
+      children: orders.map((order) {
         final distanceKm = _distanceToOrderKm(order);
-        final distanceFormatted = distanceKm != null
-            ? '${distanceKm.toStringAsFixed(1)} ${isArabic ? 'كم' : 'km'}'
-            : '-- ${isArabic ? 'كم' : 'km'}';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isPrimaryAction ? const Color(0xFFFFD4C0) : const Color(0xFFE2E8F0),
-              width: isPrimaryAction ? 1.2 : 1.0,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x08000000),
-                blurRadius: 10,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Top Row: Store Icon + Info on Right, Time/Distance/Price on Left
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Store Category Icon Squircle
-                  _buildStoreIcon(order),
-
-                  const SizedBox(width: 12),
-
-                  // Store Info & Order ID
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          order.id != null ? '#${order.id}' : '',
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: kPrimaryOrange,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          merchantTitleDisplay,
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: kCharcoalDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          streetAddressDisplay,
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: kCharcoalMuted,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  // Time, Distance, Price Column
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            timeFormatted,
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: kCharcoalDark,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(PhosphorIcons.clockBold, size: 14, color: kCharcoalMuted),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            distanceFormatted,
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: kCharcoalMuted,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(PhosphorIcons.mapPinBold, size: 14, color: kCharcoalMuted),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$priceFormatted ${isArabic ? 'ل.س' : 'SYP'}',
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: kPrimaryOrange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 14),
-
-              // Action Button: "ابدأ التوصيل"
-              SizedBox(
-                height: 42,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OrderDetailsPage(order),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isPrimaryAction ? kPrimaryOrange : const Color(0xFFFFF0E8),
-                    foregroundColor: isPrimaryAction ? Colors.white : kPrimaryOrange,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    isArabic ? 'ابدأ التوصيل' : 'Start Delivery',
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      color: isPrimaryAction ? Colors.white : kPrimaryOrange,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        return DeliveryOrderCard(
+          order: order,
+          distanceKm: distanceKm,
         );
       }).toList(),
     );

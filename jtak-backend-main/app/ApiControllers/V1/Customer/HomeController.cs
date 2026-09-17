@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Shared.Entities.Domain;
 using App.Shared.Services;
 using App.Shared.Services.Domain;
@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using Modules.Catalog.Services;
+using Modules.Catalog.Entities;
 using Microsoft.AspNetCore.Authorization;
 using OpenIddict.Validation.AspNetCore;
 using Microsoft.AspNetCore.Identity;
@@ -141,6 +142,33 @@ namespace App.ApiControllers.V1.Customer
                 FeaturedCategories = featuredCategories,
                 HomeCategories = homeCategories
             };
+        }
+
+        /// <summary>
+        /// Public settings including current USD to SYP exchange rate
+        /// </summary>
+        [HttpGet, Route("Settings"), AllowAnonymous]
+        public async Task<ActionResult<object>> Settings()
+        {
+            var rateSetting = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
+            decimal rate = 15000m;
+            if (rateSetting != null && rateSetting.Rate > 0)
+            {
+                rate = rateSetting.Rate;
+            }
+            else
+            {
+                var settings = await _genericSetting.GetValue<SettingsVm>(nameof(SettingsVm), "ar");
+                if (settings != null && settings.UsdToSypExchangeRate > 0)
+                {
+                    rate = settings.UsdToSypExchangeRate;
+                }
+            }
+
+            return Ok(new
+            {
+                usdToSypExchangeRate = rate
+            });
         }
     }
 }
