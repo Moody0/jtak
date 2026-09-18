@@ -41,13 +41,18 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
   merchantSearchFn = (term: string, item: Merchant) => {
     if (!term) return true;
     term = term.trim().toLowerCase();
-    const cleanTerm = term.startsWith('#') ? term.substring(1) : term;
+    const cleanTerm = term.startsWith('#') ? term.substring(1).trim() : term;
     const title = (item.title || '').toLowerCase();
-    const desc = (item.shortDescription || item.description || '').toLowerCase();
+    const shortDesc = (item.shortDescription || '').toLowerCase();
+    const desc = (item.description || '').toLowerCase();
     const id = String(item.id || '');
     return (
       title.includes(term) ||
+      title.includes(cleanTerm) ||
+      shortDesc.includes(term) ||
+      shortDesc.includes(cleanTerm) ||
       desc.includes(term) ||
+      desc.includes(cleanTerm) ||
       id === term ||
       id === cleanTerm ||
       `#${id}` === term ||
@@ -82,9 +87,38 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
     this.loadingMerchants = true;
     this.subs.sink = this.merchantsService.getAllMerchants().subscribe({
       next: (items) => {
-        this.merchants = (items || []).filter((m) => m.active !== false);
-        this.restaurants = this.merchants.filter((m) => Number(m.merchantKind) === 0);
-        this.markets = this.merchants.filter((m) => Number(m.merchantKind) > 0);
+        const all = items || [];
+        this.merchants = all;
+        const currentTargetId = Number(this.formGroup?.get('targetMerchantId')?.value);
+
+        this.restaurants = all.filter(
+          (m) =>
+            Number(m.merchantKind) === 0 &&
+            (m.active !== false || Number(m.id) === currentTargetId)
+        );
+
+        this.markets = all.filter(
+          (m) =>
+            Number(m.merchantKind) > 0 &&
+            (m.active !== false || Number(m.id) === currentTargetId)
+        );
+
+        // Ensure JTAK Market (#12) is always present in markets
+        if (!this.markets.some((m) => Number(m.id) === 12)) {
+          const m12 = all.find((m) => Number(m.id) === 12);
+          if (m12) {
+            this.markets.unshift(m12);
+          } else {
+            this.markets.unshift({
+              id: 12,
+              title: 'جيتك ماركت - JTAK Market',
+              shortDescription: 'سوبرماركت • توصيل فوري فائق السرعة • 15-20 دقيقة',
+              active: true,
+              merchantKind: 1,
+            } as Merchant);
+          }
+        }
+
         this.loadingMerchants = false;
         this.cdr.detectChanges();
       },
@@ -99,7 +133,16 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
     if (!id) return '';
     const numId = Number(id);
     const m = this.merchants.find((x) => Number(x.id) === numId);
-    return m ? m.title : '';
+    if (m?.title) return m.title;
+    if (numId === 12) return 'جيتك ماركت - JTAK Market';
+    return `#${numId}`;
+  }
+
+  isMerchantInactive(id: any): boolean {
+    if (!id) return false;
+    const numId = Number(id);
+    const m = this.merchants.find((x) => Number(x.id) === numId);
+    return m ? m.active === false : false;
   }
 
   loadForm(): void {
@@ -145,6 +188,19 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
       targetExternalUrl = cleanUrl;
     } else {
       targetType = 'none';
+    }
+
+    // Pre-seed known JTAK Market entry for instantaneous hydration if selected
+    if (targetType === 'market' && targetMerchantId === 12 && this.markets.length === 0) {
+      this.markets = [
+        {
+          id: 12,
+          title: 'جيتك ماركت - JTAK Market',
+          shortDescription: 'سوبرماركت • توصيل فوري فائق السرعة • 15-20 دقيقة',
+          active: true,
+          merchantKind: 1,
+        } as Merchant,
+      ];
     }
 
     this.formGroup = this.fb.group({

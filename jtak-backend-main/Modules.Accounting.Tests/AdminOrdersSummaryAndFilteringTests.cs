@@ -402,5 +402,80 @@ namespace Modules.Accounting.Tests
             var allResults = FilterByStatus(allPlacedOrders, "ALL");
             Assert.Equal(globalSummary.Total, allResults.Count);
         }
+
+        [Fact]
+        public async Task DataTable_QueryExecution_DoesNotIncludeNonNavigationUserProperty_AndFiltersArchivedCorrectly()
+        {
+            using var context = CreateInMemoryOrdersContext();
+
+            // Seed active and archived orders
+            context.Orders.AddRange(
+                new Order
+                {
+                    Id = 101,
+                    OrderStatus = OrderStatus.Success,
+                    User = "Active Customer 1",
+                    Phonenumber = "+963911111111",
+                    CreatedDate = DateTime.UtcNow,
+                    DeletionDate = null,
+                    OrderDetails = new List<OrderDetail>
+                    {
+                        new OrderDetail { Id = 1, OrderDetailStatus = OrderDetailStatus.Pending, Quantity = 2, SinglePrice = 1000, SingleFinalPrice = 1000 }
+                    }
+                },
+                new Order
+                {
+                    Id = 102,
+                    OrderStatus = OrderStatus.Success,
+                    User = "Active Customer 2",
+                    Phonenumber = "+963922222222",
+                    CreatedDate = DateTime.UtcNow,
+                    DeletionDate = null,
+                    OrderDetails = new List<OrderDetail>
+                    {
+                        new OrderDetail { Id = 2, OrderDetailStatus = OrderDetailStatus.Delivered, Quantity = 1, SinglePrice = 2500, SingleFinalPrice = 2500 }
+                    }
+                },
+                new Order
+                {
+                    Id = 103,
+                    OrderStatus = OrderStatus.Success,
+                    User = "Archived Customer 3",
+                    Phonenumber = "+963933333333",
+                    CreatedDate = DateTime.UtcNow.AddDays(-5),
+                    DeletionDate = DateTime.UtcNow.AddDays(-1),
+                    DeleteReason = "Duplicate test order",
+                    OrderDetails = new List<OrderDetail>
+                    {
+                        new OrderDetail { Id = 3, OrderDetailStatus = OrderDetailStatus.CustomerCanceled, Quantity = 1, SinglePrice = 500, SingleFinalPrice = 500 }
+                    }
+                }
+            );
+            await context.SaveChangesAsync();
+
+            // 1. Normal (non-archived) query with Include(OrderDetails) executes cleanly without throwing InvalidOperationException
+            var activeQuery = context.Orders
+                .AsNoTracking()
+                .Include(x => x.OrderDetails)
+                .Where(x => x.OrderStatus == OrderStatus.Success && x.DeletionDate == null);
+
+            var activeOrders = await activeQuery.ToListAsync();
+            Assert.Equal(2, activeOrders.Count);
+            Assert.All(activeOrders, o => Assert.Null(o.DeletionDate));
+            Assert.Contains(activeOrders, o => o.Id == 101 && o.User == "Active Customer 1");
+            Assert.Contains(activeOrders, o => o.Id == 102 && o.User == "Active Customer 2");
+
+            // 2. Archived query returns only soft-deleted orders
+            var archivedQuery = context.Orders
+                .AsNoTracking()
+                .Include(x => x.OrderDetails)
+                .Where(x => x.OrderStatus == OrderStatus.Success && x.DeletionDate != null);
+
+            var archivedOrders = await archivedQuery.ToListAsync();
+            Assert.Single(archivedOrders);
+            Assert.Equal(103, archivedOrders[0].Id);
+            Assert.Equal("Duplicate test order", archivedOrders[0].DeleteReason);
+            Assert.NotNull(archivedOrders[0].DeletionDate);
+        }
     }
 }

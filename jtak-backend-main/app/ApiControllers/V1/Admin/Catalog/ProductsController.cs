@@ -12,6 +12,7 @@ using Modules.Catalog.Services;
 using Modules.Catalog.Entities;
 using App.Catalog.Data;
 using Solf.Models;
+using App.ApiModels;
 using App.ApiModels.Admin;
 using System.IO;
 using OfficeOpenXml;
@@ -20,6 +21,7 @@ using App.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using URF.Core.Abstractions.Trackable;
+using App.Shared.Data.MultiContext;
 using App.Shared.Services;
 
 namespace App.ApiControllers.V1.Admin
@@ -32,7 +34,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IProductService _service;
         private readonly IProductCategoryService _productCategoryService;
         private readonly ITagService _tagService;
-        private readonly ITrackableRepository<MerchantProduct> _merchantProductRepo;
+        private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepo;
         private readonly ICatalogUnitOfWork _uow;
         private readonly IMemoryCache _cache;
         private readonly ILogger _logger;
@@ -43,7 +45,7 @@ namespace App.ApiControllers.V1.Admin
         public ProductsController(IProductService service,
             IProductCategoryService productCategoryService,
             ITagService tagService,
-            ITrackableRepository<MerchantProduct> merchantProductRepo,
+            ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepo,
             ICatalogUnitOfWork uow,
             IMemoryCache cache,
             IMapper mapper,
@@ -93,7 +95,8 @@ namespace App.ApiControllers.V1.Admin
                 Merchant = x.MerchantProducts.Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty).FirstOrDefault(),
                 MerchantTitle = x.MerchantProducts.Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty).FirstOrDefault(),
                 Price = x.MerchantProducts.Select(mp => mp.MerchantPrice).FirstOrDefault(),
-                PriceUsd = x.MerchantProducts.Select(mp => mp.PriceUsd).FirstOrDefault()
+                PriceUsd = x.MerchantProducts.Select(mp => mp.PriceUsd).FirstOrDefault(),
+                Discount = x.MerchantProducts.Select(mp => mp.Discount).FirstOrDefault()
             }, x => x.DeletionDate == null, x => x.ProductCategory, x => x.MerchantProducts);
             return list;
         }
@@ -185,15 +188,40 @@ namespace App.ApiControllers.V1.Admin
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         public async Task<ActionResult<int>> Create(ProductDto item)
         {
+            if (string.IsNullOrWhiteSpace(item?.Title))
+            {
+                return BadRequest(ApiErr.Create("اسم المنتج مطلوب."));
+            }
+
+            if (!item.ProductCategoryId.HasValue || item.ProductCategoryId.Value <= 0)
+            {
+                return BadRequest(ApiErr.Create("يرجى اختيار تصنيف صالح للمنتج."));
+            }
+
+            if (item.Price < 0)
+            {
+                return BadRequest(ApiErr.Create("سعر البيع غير صالح."));
+            }
+
+            if (item.Discount < 0)
+            {
+                return BadRequest(ApiErr.Create("قيمة الخصم غير صالحة."));
+            }
+
+            if (item.Discount > item.Price)
+            {
+                return BadRequest(ApiErr.Create("قيمة الخصم لا يمكن أن تتجاوز سعر المنتج."));
+            }
+
             var entity = new Product
             {
-                Title = item.Title,
-                TitleEn = item.TitleEn,
-                Barcode = item.Barcode,
-                Brand = item.Brand,
-                Description = item.Description,
-                DescriptionEn = item.DescriptionEn,
-                Unit = item.Unit,
+                Title = item.Title.Trim(),
+                TitleEn = item.TitleEn?.Trim(),
+                Barcode = item.Barcode?.Trim(),
+                Brand = item.Brand?.Trim(),
+                Description = item.Description?.Trim(),
+                DescriptionEn = item.DescriptionEn?.Trim(),
+                Unit = !string.IsNullOrWhiteSpace(item.Unit) ? item.Unit.Trim() : "قطعة",
                 Photos = item.Photos != null ? string.Join(",", item.Photos.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) : null,
                 ProductCategoryId = item.ProductCategoryId,
                 Active = item.Active,
@@ -205,13 +233,16 @@ namespace App.ApiControllers.V1.Admin
 
             if (item.MerchantId.HasValue && item.MerchantId.Value > 0)
             {
+                var price = item.Price > 0 ? item.Price : 0m;
+                var discount = item.Discount > 0 ? item.Discount : 0m;
+
                 _merchantProductRepo.Insert(new MerchantProduct
                 {
                     MerchantId = item.MerchantId.Value,
                     ProductId = entity.Id,
-                    MerchantPrice = item.Price > 0 ? item.Price : 0,
+                    MerchantPrice = price,
                     PriceUsd = item.PriceUsd,
-                    Discount = item.Discount
+                    Discount = discount
                 });
                 await _uow.SaveChangesAsync();
 
@@ -222,6 +253,7 @@ namespace App.ApiControllers.V1.Admin
 
             _cache.Remove($"ProductPrices_{entity.Id}");
             _cache.Remove("ProductCategoriesTree");
+            _cache.Remove("ProductCategories");
 
             await _tagService.SetTags(entity.Id, item.Tags?.Select(x => x.Id).ToArray() ?? Array.Empty<int>());
             _logger.LogInformation("Created New {0} #{1}", entity.GetType().Name, entity.Id);
@@ -243,6 +275,7 @@ namespace App.ApiControllers.V1.Admin
                         entity.ProductCategoryId,
                         item.Price,
                         item.PriceUsd,
+                        item.Discount,
                         item.MerchantId,
                         entity.Active
                     }
@@ -265,6 +298,31 @@ namespace App.ApiControllers.V1.Admin
             if (entity == null)
                 return NotFound();
 
+            if (string.IsNullOrWhiteSpace(item?.Title))
+            {
+                return BadRequest(ApiErr.Create("اسم المنتج مطلوب."));
+            }
+
+            if (!item.ProductCategoryId.HasValue || item.ProductCategoryId.Value <= 0)
+            {
+                return BadRequest(ApiErr.Create("يرجى اختيار تصنيف صالح للمنتج."));
+            }
+
+            if (item.Price < 0)
+            {
+                return BadRequest(ApiErr.Create("سعر البيع غير صالح."));
+            }
+
+            if (item.Discount < 0)
+            {
+                return BadRequest(ApiErr.Create("قيمة الخصم غير صالحة."));
+            }
+
+            if (item.Discount > item.Price)
+            {
+                return BadRequest(ApiErr.Create("قيمة الخصم لا يمكن أن تتجاوز سعر المنتج."));
+            }
+
             var existingMps = await _merchantProductRepo.Queryable().Where(mp => mp.ProductId == entity.Id).ToListAsync();
             var primaryMp = existingMps.FirstOrDefault();
             var beforeState = new
@@ -279,13 +337,13 @@ namespace App.ApiControllers.V1.Admin
                 entity.Active
             };
 
-            entity.Title = item.Title;
-            entity.TitleEn = item.TitleEn;
-            entity.Barcode = item.Barcode;
-            entity.Brand = item.Brand;
-            entity.Description = item.Description;
-            entity.DescriptionEn = item.DescriptionEn;
-            entity.Unit = item.Unit;
+            entity.Title = item.Title.Trim();
+            entity.TitleEn = item.TitleEn?.Trim();
+            entity.Barcode = item.Barcode?.Trim();
+            entity.Brand = item.Brand?.Trim();
+            entity.Description = item.Description?.Trim();
+            entity.DescriptionEn = item.DescriptionEn?.Trim();
+            entity.Unit = !string.IsNullOrWhiteSpace(item.Unit) ? item.Unit.Trim() : "قطعة";
             entity.Photos = item.Photos != null ? string.Join(",", item.Photos.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) : null;
             entity.ProductCategoryId = item.ProductCategoryId;
             entity.Active = item.Active;
@@ -295,12 +353,15 @@ namespace App.ApiControllers.V1.Admin
             // Update MerchantProduct linkage & pricing
             if (item.MerchantId.HasValue && item.MerchantId.Value > 0)
             {
+                var price = item.Price > 0 ? item.Price : 0m;
+                var discount = item.Discount > 0 ? item.Discount : 0m;
+
                 var targetMp = existingMps.FirstOrDefault(mp => mp.MerchantId == item.MerchantId.Value);
                 if (targetMp != null)
                 {
-                    targetMp.MerchantPrice = item.Price;
+                    targetMp.MerchantPrice = price;
                     targetMp.PriceUsd = item.PriceUsd;
-                    targetMp.Discount = item.Discount;
+                    targetMp.Discount = discount;
                     _merchantProductRepo.Update(targetMp);
 
                     // Clean up any extraneous merchant links if product is uniquely assigned
@@ -326,9 +387,9 @@ namespace App.ApiControllers.V1.Admin
                     {
                         MerchantId = item.MerchantId.Value,
                         ProductId = entity.Id,
-                        MerchantPrice = item.Price > 0 ? item.Price : 0,
+                        MerchantPrice = price,
                         PriceUsd = item.PriceUsd,
-                        Discount = item.Discount
+                        Discount = discount
                     });
                 }
 
@@ -350,6 +411,7 @@ namespace App.ApiControllers.V1.Admin
 
             _cache.Remove($"ProductPrices_{entity.Id}");
             _cache.Remove("ProductCategoriesTree");
+            _cache.Remove("ProductCategories");
 
             await _tagService.SetTags(entity.Id, item.Tags?.Select(x => x.Id).ToArray() ?? Array.Empty<int>());
 
@@ -504,6 +566,7 @@ namespace App.ApiControllers.V1.Admin
             var item = await _service.FindAsync(id);
             if (item == null) return NotFound();
             item.Active = true;
+            _service.Update(item);
             await _uow.SaveChangesAsync();
 
             var mps = await _merchantProductRepo.Queryable().Where(mp => mp.ProductId == id).ToListAsync();
@@ -514,7 +577,9 @@ namespace App.ApiControllers.V1.Admin
                 _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
             }
             _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
             _cache.Remove("ProductCategoriesTree");
+            _cache.Remove("ProductCategories");
 
             if (_auditService != null)
             {
@@ -543,6 +608,7 @@ namespace App.ApiControllers.V1.Admin
             var item = await _service.FindAsync(id);
             if (item == null) return NotFound();
             item.Active = false;
+            _service.Update(item);
             await _uow.SaveChangesAsync();
 
             var mps = await _merchantProductRepo.Queryable().Where(mp => mp.ProductId == id).ToListAsync();
@@ -553,7 +619,9 @@ namespace App.ApiControllers.V1.Admin
                 _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
             }
             _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
             _cache.Remove("ProductCategoriesTree");
+            _cache.Remove("ProductCategories");
 
             if (_auditService != null)
             {
@@ -569,6 +637,51 @@ namespace App.ApiControllers.V1.Admin
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Toggle Featured / Most Ordered status of a Product
+        /// </summary>
+        /// <returns></returns>
+        [HttpPut]
+        [Route("{id}/ToggleFeatured")]
+        public async Task<ActionResult<bool>> ToggleFeatured(int id, [FromQuery] bool? isFeatured = null)
+        {
+            var item = await _service.FindAsync(id);
+            if (item == null) return NotFound();
+
+            var newFeatured = isFeatured ?? !item.IsFeatured;
+            item.IsFeatured = newFeatured;
+            _service.Update(item);
+            await _uow.SaveChangesAsync();
+
+            var mps = await _merchantProductRepo.Queryable().Where(mp => mp.ProductId == id).ToListAsync();
+            foreach (var mp in mps)
+            {
+                _cache.Remove($"ActiveMerchantPrices_{mp.MerchantId}");
+                _cache.Remove($"AllMerchantPrices_{mp.MerchantId}");
+                _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
+            }
+            _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
+            _cache.Remove("ProductCategoriesTree");
+            _cache.Remove("ProductCategories");
+            _cache.Remove("PopularProductsCache");
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Products",
+                    Action = newFeatured ? "Feature" : "Unfeature",
+                    EntityType = "Product",
+                    EntityId = id.ToString(),
+                    Description = $"{(newFeatured ? "تمييز" : "إلغاء تمييز")} المنتج (الأكثر طلباً): {item.Title}",
+                    Result = "Success"
+                });
+            }
+
+            return item.IsFeatured;
         }
     }
 }

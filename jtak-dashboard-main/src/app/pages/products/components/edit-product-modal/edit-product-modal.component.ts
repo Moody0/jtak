@@ -244,15 +244,48 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     this.toasterService.info('تم تعيين الصورة كصورة رئيسية للمنتج');
   }
 
+  private normalizeNumber(val: any, defaultVal: number | null = null): number | null {
+    if (val === null || val === undefined) return defaultVal;
+    if (typeof val === 'number') {
+      return isNaN(val) ? defaultVal : val;
+    }
+    const str = String(val).trim().replace(/,/g, '.');
+    if (str === '') return defaultVal;
+    const parsed = Number(str);
+    return isNaN(parsed) ? defaultVal : parsed;
+  }
+
   save(): void {
     if (this.formGroup.invalid) {
       this.formGroup.markAllAsTouched();
       return;
     }
 
-    const formValues = { ...this.formGroup.value };
-    const photosArray = formValues.photos || [];
-    formValues.photos = photosArray.join(',');
+    const raw = this.formGroup.value;
+    const photosArray = raw.photos || [];
+    const photosStr = Array.isArray(photosArray) ? photosArray.join(',') : (photosArray || '');
+
+    const price = this.normalizeNumber(raw.price, 0);
+    const priceUsd = this.normalizeNumber(raw.priceUsd, null);
+    const discount = this.normalizeNumber(raw.discount, 0);
+    const catId = this.normalizeNumber(raw.productCategoryId, null);
+    const merchantId = this.normalizeNumber(raw.merchantId, null);
+
+    const formValues: Product = {
+      ...this.item,
+      ...raw,
+      title: (raw.title || '').trim(),
+      description: (raw.description || '').trim(),
+      unit: (raw.unit || 'قطعة').trim(),
+      photos: photosStr,
+      productCategoryId: catId || this.item.productCategoryId,
+      merchantId: merchantId ? Number(merchantId) : undefined,
+      price: price !== null ? price : 0,
+      priceUsd: priceUsd,
+      discount: discount !== null ? discount : 0,
+      active: !!raw.active,
+      isFeatured: !!raw.isFeatured,
+    };
 
     if (this.item.id) {
       this.edit(formValues);

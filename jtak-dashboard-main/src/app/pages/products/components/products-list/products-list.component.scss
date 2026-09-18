@@ -714,6 +714,30 @@
     color: #ea580c;
   }
 
+  &.btn-flame-active {
+    color: #ea580c !important;
+    background: #fff7ed !important;
+    border-color: #fed7aa !important;
+
+    &:hover:not(:disabled) {
+      border-color: #fdba74 !important;
+      background: #ffedd5 !important;
+      color: #c2410c !important;
+    }
+  }
+
+  &.btn-flame-inactive {
+    color: #94a3b8 !important;
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+
+    &:hover:not(:disabled) {
+      border-color: #cbd5e1 !important;
+      background: #f1f5f9 !important;
+      color: #64748b !important;
+    }
+  }
+
   &.btn-status-active,
   &.btn-toggle-active {
     color: #059669;

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
 import { FormBuilder, FormGroup } from '@angular/forms';
@@ -38,7 +38,7 @@ export interface CategoryBadgeDisplay {
   parent: string;
   sub: string;
   isRootOnly: boolean;
-  isSuggested: boolean;
+  isSuggested?: boolean;
 }
 
 export interface MerchantDisplayInfo {
@@ -92,6 +92,16 @@ export class ProductsListComponent
 
   paginator: PaginatorState;
   sorting: SortState;
+  statusUpdatingIds = new Set<number>();
+  featuredUpdatingIds = new Set<number>();
+
+  isUpdatingStatus(id: number): boolean {
+    return this.statusUpdatingIds.has(id);
+  }
+
+  isUpdatingFeatured(id: number): boolean {
+    return this.featuredUpdatingIds.has(id);
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -102,7 +112,8 @@ export class ProductsListComponent
     private batchService: InventoryBatchService,
     private popularService: PopularProductsService,
     private modalService: NgbModal,
-    private toaster: ToastrService
+    private toaster: ToastrService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -451,12 +462,19 @@ export class ProductsListComponent
   }
 
   changeStatus(isActive: boolean, id: number): void {
+    if (this.statusUpdatingIds.has(id)) {
+      return;
+    }
+    this.statusUpdatingIds.add(id);
+
     this.service.changeStatus(isActive, id).subscribe({
       next: () => {
+        this.statusUpdatingIds.delete(id);
         this.toaster.success(isActive ? 'تم تعطيل المنتج بنجاح' : 'تم تفعيل المنتج بنجاح');
         this.service.fetchPost();
       },
       error: () => {
+        this.statusUpdatingIds.delete(id);
         this.toaster.error('تعذر تحديث حالة المنتج من الخادم، تمت استعادة الحالة الأصلية');
         this.service.fetchPost();
       }
@@ -511,12 +529,35 @@ export class ProductsListComponent
   }
 
   togglePopular(product: Product): void {
-    this.popularService.toggleItem(product.id).subscribe({
-      next: () => {
-        this.toaster.success('تم تحديث حالة المنتج في قسم الأكثر طلباً بالصفحة الرئيسية');
+    if (this.featuredUpdatingIds.has(product.id)) {
+      return;
+    }
+    this.featuredUpdatingIds.add(product.id);
+    const prevVal = !!product.isFeatured;
+    const targetState = !prevVal;
+
+    // Optimistic visual feedback for immediate responsiveness
+    product.isFeatured = targetState;
+    this.cdr.detectChanges();
+
+    this.service.toggleFeatured(targetState, product.id).subscribe({
+      next: (serverState: boolean) => {
+        this.featuredUpdatingIds.delete(product.id);
+        // Authoritative server state assigned on successful response
+        product.isFeatured = typeof serverState === 'boolean' ? serverState : targetState;
+        this.toaster.success(
+          product.isFeatured
+            ? 'تم تمييز المنتج وإضافته للأكثر طلباً بنجاح'
+            : 'تم إلغاء تمييز المنتج من الأكثر طلباً بنجاح'
+        );
+        this.cdr.detectChanges();
       },
       error: () => {
-        this.toaster.error('تعذر تحديث حالة الأكثر طلباً');
+        this.featuredUpdatingIds.delete(product.id);
+        // Restore prevVal exactly once on error
+        product.isFeatured = prevVal;
+        this.toaster.error('تعذر تحديث حالة الأكثر طلباً من الخادم');
+        this.cdr.detectChanges();
       },
     });
   }

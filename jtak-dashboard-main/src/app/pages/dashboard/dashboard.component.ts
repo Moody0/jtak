@@ -127,15 +127,24 @@ driverSearchGroup: FormGroup;
   private featuredCategoryIds: number[] = [];
   private hasSavedFeaturedCategorySelection = false;
 
-  loadExchangeRate() {
-    this.service.getSettings().subscribe({
+  loadSettings() {
+    this.subs.sink = this.service.getSettings().subscribe({
       next: (settings: any) => {
         if (settings && settings.usdToSypExchangeRate) {
           this.exchangeRate = settings.usdToSypExchangeRate;
-          this.cdr.detectChanges();
         }
+        this.hasSavedFeaturedCategorySelection = Array.isArray(settings?.homeFeaturedCategoryIds)
+          && settings.homeFeaturedCategoryIds.length > 0;
+        this.featuredCategoryIds = Array.isArray(settings?.homeFeaturedCategoryIds)
+          ? settings.homeFeaturedCategoryIds.map((id: any) => Number(id)).filter((id: number) => id > 0)
+          : [];
+        this.rebuildFeaturedCategories();
+        this.cdr.detectChanges();
       },
-      error: () => {}
+      error: () => {
+        this.featuredCategoryIds = [];
+        this.rebuildFeaturedCategories();
+      }
     });
   }
 
@@ -150,20 +159,6 @@ driverSearchGroup: FormGroup;
         this.catalogCategories = [];
         this.featuredCategoriesLoading = false;
         this.cdr.detectChanges();
-      }
-    });
-    this.subs.sink = this.service.getSettings().subscribe({
-      next: (settings: any) => {
-        this.hasSavedFeaturedCategorySelection = Array.isArray(settings?.homeFeaturedCategoryIds)
-          && settings.homeFeaturedCategoryIds.length > 0;
-        this.featuredCategoryIds = Array.isArray(settings?.homeFeaturedCategoryIds)
-          ? settings.homeFeaturedCategoryIds.map((id: any) => Number(id)).filter((id: number) => id > 0)
-          : [];
-        this.rebuildFeaturedCategories();
-      },
-      error: () => {
-        this.featuredCategoryIds = [];
-        this.rebuildFeaturedCategories();
       }
     });
   }
@@ -365,15 +360,13 @@ driverSearchGroup: FormGroup;
   }
 
   ngOnInit(): void {
-    this.refreshDashboard();
     this.service.setDefaults();
     this.driverBalancesService.setDefaults();
+    this.ordersService.setDefaults();
     this.searchForm();
-    this.loadExchangeRate();
+    this.loadSettings();
     this.loadFeaturedCategories();
-    this.service.fetchPost();
-    this.driverBalancesService.fetchPost();
-    this.ordersService.fetchPost();
+    this.refreshDashboard();
     this.subs.sink = this.service.isLoading$.subscribe(res => this.isLoading = res);
     this.subs.sink = this.driverBalancesService.isLoading$.subscribe(res => this.isDriverLoading = res);
     this.sorting = this.service.sorting;

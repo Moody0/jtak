@@ -384,12 +384,12 @@
             <i class="fas fa-motorcycle" aria-hidden="true"></i>
           </div>
           <div>
-            <span class="ops-section-kicker">{{ 'DASHBOARD.LOGISTICS' | translate }}</span>
+            <span class="ops-section-kicker">{{ 'DASHBOARD.SETTLEMENTS' | translate }}</span>
             <h3 id="driver-balances-heading" class="ops-card-title">{{ 'DASHBOARD.DRIVER_BALANCES' | translate }}</h3>
           </div>
         </div>
-        <a routerLink="/users" class="ops-header-link">
-          <span>{{ 'DASHBOARD.DRIVERS' | translate }}</span>
+        <a routerLink="/payments" class="ops-header-link">
+          <span>{{ 'DASHBOARD.PAYMENTS' | translate }}</span>
           <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i>
         </a>
       </div>
@@ -441,7 +441,7 @@
                     </div>
                   </td>
                 </tr>
-                <tr *ngIf="!drivers.length">
+                <tr *ngIf="!drivers.length && !isDriverLoading">
                   <td colspan="2">
                     <div class="ops-empty-state py-4">
                       <div class="ops-empty-icon">

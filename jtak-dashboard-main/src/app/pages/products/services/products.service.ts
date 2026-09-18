@@ -41,6 +41,21 @@ export class ProductsService extends TableService<Product> implements OnDestroy 
       );
   }
 
+  toggleFeatured(targetFeatured: boolean, id: number) {
+    this._isLoading$.next(true);
+    return this.http
+      .put<boolean>(
+        `${this.BASE_URL}/${this.GET_ONE_URL}/${id}/ToggleFeatured`,
+        {},
+        { params: { isFeatured: targetFeatured.toString() } }
+      )
+      .pipe(
+        finalize(() => {
+          this._isLoading$.next(false);
+        })
+      );
+  }
+
   deleteSelected(ids: number[]) {
     this._isLoading$.next(true);
     return this.http

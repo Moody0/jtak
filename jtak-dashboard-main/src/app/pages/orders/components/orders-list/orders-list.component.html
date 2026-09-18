@@ -149,8 +149,8 @@
     <!-- 5. Modern High-Density Orders Table Card -->
     <div class="ops-orders-card">
       <!-- Desktop Table View (>= lg) -->
-      <div class="table-responsive d-none d-lg-block">
-        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0" *ngIf="items.length > 0; else noOrdersState">
+      <div class="table-responsive d-none d-lg-block" *ngIf="items.length > 0">
+        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
           <thead>
             <tr class="ops-table-header text-muted fs-8">
               <th scope="col" style="width: 40px;" class="text-center">
@@ -389,7 +389,7 @@
       </div>
 
       <!-- Mobile & Tablet Responsive Stacked Cards View (< lg) -->
-      <div class="d-lg-none p-3 d-flex flex-column gap-3" *ngIf="items.length > 0; else noOrdersState">
+      <div class="d-lg-none p-3 d-flex flex-column gap-3" *ngIf="items.length > 0">
         <div *ngFor="let o of items" class="card border border-gray-200 shadow-none rounded-3 p-3 bg-white"
           [class.border-primary]="selection.isSelected(o)">
           <!-- Top Row: ID, Status Badge, Kebab Menu -->
@@ -553,19 +553,25 @@
         </div>
       </div>
 
-      <!-- Empty State inside table -->
-      <ng-template #noOrdersState>
-        <div class="ops-empty-state py-5">
-          <div class="ops-empty-icon">
-            <i class="fas fa-search"></i>
-          </div>
-          <strong class="fs-5">{{ 'ORDERS_PAGE.NO_MATCHING_ORDERS' | translate }}</strong>
-          <span class="text-muted fs-7 mt-1">{{ 'ORDERS_PAGE.NO_MATCHING_DESC' | translate }}</span>
-          <button type="button" class="btn btn-sm ops-btn-primary mt-3" (click)="resetFilters()">
-            <i class="fas fa-undo me-1"></i>{{ 'ORDERS_PAGE.RESET_FILTERS' | translate }}
-          </button>
+      <!-- Loading State when initially fetching -->
+      <div class="ops-loading-state py-5 text-center" *ngIf="isLoading && items.length === 0">
+        <div class="spinner-border text-primary mb-3" role="status">
+          <span class="visually-hidden">Loading...</span>
         </div>
-      </ng-template>
+        <div class="text-muted fs-7">{{ 'ORDERS_PAGE.LOADING' | translate }}</div>
+      </div>
+
+      <!-- Single Empty State (shown ONLY when items is genuinely empty and not actively loading) -->
+      <div class="ops-empty-state py-5" *ngIf="items.length === 0 && !isLoading">
+        <div class="ops-empty-icon">
+          <i class="fas fa-search"></i>
+        </div>
+        <strong class="fs-5">{{ 'ORDERS_PAGE.NO_MATCHING_ORDERS' | translate }}</strong>
+        <span class="text-muted fs-7 mt-1">{{ 'ORDERS_PAGE.NO_MATCHING_DESC' | translate }}</span>
+        <button type="button" class="btn btn-sm ops-btn-primary mt-3" (click)="resetFilters()">
+          <i class="fas fa-undo me-1"></i>{{ 'ORDERS_PAGE.RESET_FILTERS' | translate }}
+        </button>
+      </div>
 
       <!-- Pagination -->
       <app-paginator class="ops-paginator px-4 py-3 d-flex justify-content-between align-items-center flex-wrap"

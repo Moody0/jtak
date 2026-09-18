@@ -150,9 +150,21 @@ namespace App.ApiControllers.V1.Admin
         [Route("Drivers/DataTable")]
         public async Task<ActionResult<TableResponseModel<BalanceDto>>> DriversDataTable([FromBody] MetronicTable request)
         {
-            var deliveryRole = await _roleManager.FindByNameAsync("Delivery");
+            var driverRoleIds = await _roleManager.Roles.AsNoTracking()
+                .Where(r => r.NormalizedName == "DELIVERY" || r.NormalizedName == "DRIVER" || r.NormalizedName == "CAPTAIN")
+                .Select(r => r.Id)
+                .ToListAsync();
 
-            if (deliveryRole == null)
+            if (!driverRoleIds.Any())
+            {
+                var deliveryRole = await _roleManager.FindByNameAsync("Delivery");
+                if (deliveryRole != null)
+                {
+                    driverRoleIds.Add(deliveryRole.Id);
+                }
+            }
+
+            if (!driverRoleIds.Any())
             {
                 return new TableResponseModel<BalanceDto>
                 {
@@ -161,10 +173,23 @@ namespace App.ApiControllers.V1.Admin
                 };
             }
 
-            var query = from ur in _userRoleRepo.Queryable().AsNoTracking()
-                        join u in _userManager.Users.AsNoTracking() on ur.UserId equals u.Id
-                        where ur.RoleId == deliveryRole.Id && u.DeletionDate == null && u.IsActive
-                        select u;
+            var allDriverUserIds = await _userRoleRepo.Queryable().AsNoTracking()
+                .Where(ur => driverRoleIds.Contains(ur.RoleId))
+                .Select(ur => ur.UserId)
+                .Distinct()
+                .ToListAsync();
+
+            if (!allDriverUserIds.Any())
+            {
+                return new TableResponseModel<BalanceDto>
+                {
+                    Items = Array.Empty<BalanceDto>(),
+                    TotalRecords = 0
+                };
+            }
+
+            var query = _userManager.Users.AsNoTracking()
+                .Where(u => allDriverUserIds.Contains(u.Id) && u.DeletionDate == null && u.IsActive);
 
             if (!string.IsNullOrWhiteSpace(request?.Search))
             {
@@ -190,12 +215,12 @@ namespace App.ApiControllers.V1.Admin
                 .Take(pageSize)
                 .ToListAsync();
 
-            var driverUserIds = drivers.Select(d => d.Id).ToList();
+            var pagedDriverUserIds = drivers.Select(d => d.Id).ToList();
 
             // Captain Cash Float accounts (1010-CAP-): Asset account, Normal balance = Debit - Credit
             var floatBalances = await _auow.Context.Accounts.AsNoTracking()
                 .Where(a => a.OwnerUserId != null &&
-                            driverUserIds.Contains(a.OwnerUserId.Value) &&
+                            pagedDriverUserIds.Contains(a.OwnerUserId.Value) &&
                             a.Type == AccountType.Asset &&
                             a.AccountCode.StartsWith(SystemAccountCodes.CaptainCashFloatPrefix))
                 .Select(a => new
@@ -208,7 +233,7 @@ namespace App.ApiControllers.V1.Admin
             // Captain Earnings / Wages accounts (2020-CAP-): Liability account, Normal balance = Credit - Debit
             var wageBalances = await _auow.Context.Accounts.AsNoTracking()
                 .Where(a => a.OwnerUserId != null &&
-                            driverUserIds.Contains(a.OwnerUserId.Value) &&
+                            pagedDriverUserIds.Contains(a.OwnerUserId.Value) &&
                             a.Type == AccountType.Liability &&
                             a.AccountCode.StartsWith(SystemAccountCodes.CaptainEarningsPrefix))
                 .Select(a => new

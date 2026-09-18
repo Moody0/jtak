@@ -186,7 +186,7 @@
               </div>
 
               <!-- Selling Price (SYP) -->
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <label for="productPrice" class="form-label fw-bold mb-2">
                   سعر البيع (ل.س)
                   <span class="text-danger" *ngIf="formGroup.get('merchantId')?.value">*</span>
@@ -203,11 +203,11 @@
                   />
                   <span class="input-group-text bg-light text-muted">ل.س</span>
                 </div>
-                <div class="form-text fs-9 text-muted">السعر الأساسي المعتمد في المتجر وتطبيق الزبائن.</div>
+                <div class="form-text fs-9 text-muted">السعر الأساسي المعتمد في المتجر.</div>
               </div>
 
               <!-- Selling Price (USD - Optional) -->
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <label for="productPriceUsd" class="form-label fw-bold mb-2">
                   سعر البيع بالدولار ($)
                 </label>
@@ -223,7 +223,27 @@
                   />
                   <span class="input-group-text bg-light text-muted">$</span>
                 </div>
-                <div class="form-text fs-9 text-muted">اختياري — يُحسب تلقائياً من سعر الصرف إذا تُرك فارغاً.</div>
+                <div class="form-text fs-9 text-muted">اختياري — يُحسب تلقائياً من الصرف.</div>
+              </div>
+
+              <!-- Discount Amount (SYP - Optional) -->
+              <div class="col-md-4">
+                <label for="productDiscount" class="form-label fw-bold mb-2">
+                  قيمة الخصم (ل.س)
+                </label>
+                <div class="input-group">
+                  <input
+                    id="productDiscount"
+                    type="number"
+                    min="0"
+                    step="500"
+                    class="form-control"
+                    formControlName="discount"
+                    placeholder="مثال: 0"
+                  />
+                  <span class="input-group-text bg-light text-muted">ل.س</span>
+                </div>
+                <div class="form-text fs-9 text-muted">اختياري — خصم تسويقي للمنتج.</div>
               </div>
 
               <!-- Publication Rule Guidance Banner -->

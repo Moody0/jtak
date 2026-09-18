@@ -82,24 +82,46 @@ export class AppHttpInterceptor implements HttpInterceptor {
             }
           } else if (!req.headers.has('X-Silent-Error') && !req.url.includes('/Batches/Kpis')) {
             let msg = '';
-            if (typeof err?.error === 'string' && err.error.trim().length > 0) {
+            const isTechnicalError = (text: string) =>
+              /context instance|entity framework|sql|exception|nullreference|invalidoperation|stacktrace|inner exception|table '|column '|linq/i.test(text);
+
+            if (err.status >= 500) {
+              msg = 'حدث خطأ في الخادم أثناء معالجة الطلب. يرجى المحاولة لاحقاً.';
+            } else if (typeof err?.error === 'string' && err.error.trim().length > 0 && !isTechnicalError(err.error)) {
               msg = err.error.trim();
             } else if (err?.error?.errors) {
               if (Array.isArray(err.error.errors)) {
-                msg = err.error.errors.join('<br/>').replace(/\n/g, '<br/>');
+                const safeErrors = err.error.errors.filter((e: any) => typeof e === 'string' && !isTechnicalError(e));
+                if (safeErrors.length > 0) {
+                  msg = safeErrors.join('<br/>').replace(/\n/g, '<br/>');
+                }
               } else if (typeof err.error.errors === 'object') {
-                const errorLists: any[] = Object.keys(err.error.errors).map(k => (err.error.errors as any)[k]);
-                msg = ([] as string[]).concat(...errorLists).join('<br/>');
+                const errorLists: any[] = Object.keys(err.error.errors)
+                  .map(k => (err.error.errors as any)[k]);
+                const flattened = ([] as any[]).concat(...errorLists)
+                  .filter((e: any) => typeof e === 'string' && !isTechnicalError(e));
+                if (flattened.length > 0) {
+                  msg = flattened.join('<br/>');
+                }
               }
-            } else if (err?.error?.message) {
+            } else if (err?.error?.message && !isTechnicalError(err.error.message)) {
               msg = err.error.message;
-            } else if (err?.error?.title) {
+            } else if (err?.error?.title && !isTechnicalError(err.error.title)) {
               msg = err.error.title;
-            } else if (err?.statusText && err.statusText !== 'Unknown Error') {
-              msg = `${err.status}: ${err.statusText}`;
-            } else {
-              msg = 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.';
             }
+
+            if (!msg) {
+              if (err.status === 404) {
+                msg = 'العنصر المطلوب غير موجود.';
+              } else if (err.status === 403) {
+                msg = 'ليس لديك الصلاحية لتنفيذ هذا الإجراء.';
+              } else if (err.status === 400) {
+                msg = 'بيانات الطلب غير صالحة. يرجى التحقق وإعادة المحاولة.';
+              } else {
+                msg = 'حدث خطأ أثناء معالجة الطلب. يرجى المحاولة لاحقاً.';
+              }
+            }
+
             if (msg) {
               this.toasterService.error(msg);
             }

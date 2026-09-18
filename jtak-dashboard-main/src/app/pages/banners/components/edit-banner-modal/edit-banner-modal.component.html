@@ -135,14 +135,20 @@
                   >
                     <ng-template ng-label-tmp let-item="item">
                       <div class="d-flex align-items-center justify-content-between w-100">
-                        <span class="fw-bold text-dark">🍽️ {{ item.title }}</span>
-                        <span class="badge badge-light-primary fs-8">#{{ item.id }}</span>
+                        <span class="fw-bold text-dark">
+                          🍽️ {{ item?.title || getMerchantName(item?.id || formGroup.get('targetMerchantId')?.value) }}
+                          <span *ngIf="isMerchantInactive(item?.id || formGroup.get('targetMerchantId')?.value)" class="badge badge-light-danger fs-9 ms-1">معطل</span>
+                        </span>
+                        <span class="badge badge-light-primary fs-8">#{{ item?.id || formGroup.get('targetMerchantId')?.value }}</span>
                       </div>
                     </ng-template>
                     <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
                       <div class="d-flex align-items-center justify-content-between py-1">
                         <div>
-                          <div class="fw-bold text-dark">🍽️ {{ item.title }}</div>
+                          <div class="fw-bold text-dark">
+                            🍽️ {{ item.title }}
+                            <span *ngIf="item.active === false" class="badge badge-light-danger fs-9 ms-1">معطل</span>
+                          </div>
                           <div class="text-muted fs-8" *ngIf="item.shortDescription">{{ item.shortDescription }}</div>
                         </div>
                         <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
@@ -176,14 +182,20 @@
                   >
                     <ng-template ng-label-tmp let-item="item">
                       <div class="d-flex align-items-center justify-content-between w-100">
-                        <span class="fw-bold text-dark">🛒 {{ item.title }}</span>
-                        <span class="badge badge-light-primary fs-8">#{{ item.id }}</span>
+                        <span class="fw-bold text-dark">
+                          🛒 {{ item?.title || getMerchantName(item?.id || formGroup.get('targetMerchantId')?.value) }}
+                          <span *ngIf="isMerchantInactive(item?.id || formGroup.get('targetMerchantId')?.value)" class="badge badge-light-danger fs-9 ms-1">معطل</span>
+                        </span>
+                        <span class="badge badge-light-primary fs-8">#{{ item?.id || formGroup.get('targetMerchantId')?.value }}</span>
                       </div>
                     </ng-template>
                     <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
                       <div class="d-flex align-items-center justify-content-between py-1">
                         <div>
-                          <div class="fw-bold text-dark">🛒 {{ item.title }}</div>
+                          <div class="fw-bold text-dark">
+                            🛒 {{ item.title }}
+                            <span *ngIf="item.active === false" class="badge badge-light-danger fs-9 ms-1">معطل</span>
+                          </div>
                           <div class="text-muted fs-8" *ngIf="item.shortDescription">{{ item.shortDescription }}</div>
                         </div>
                         <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>

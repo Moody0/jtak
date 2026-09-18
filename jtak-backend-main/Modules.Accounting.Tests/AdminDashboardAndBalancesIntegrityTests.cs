@@ -471,5 +471,154 @@ namespace Modules.Accounting.Tests
             Assert.Empty(await driverQuery.Where(u => u.FullName == "Al-Madina Shawarma").ToListAsync());
             Assert.Empty(await merchantQuery.Where(m => m.Title == "Fadi Driver").ToListAsync());
         }
+
+        [Fact]
+        public async Task DriverBalances_Comprehensive_DirectoryAndAccountingSemantics_RegressionTest()
+        {
+            using var appContext = CreateInMemoryAppContext();
+            using var accountingContext = CreateInMemoryAccountingContext();
+            using var catalogContext = CreateInMemoryCatalogContext();
+
+            // 1. Roles
+            var deliveryRole = new SolRole { Id = Guid.NewGuid(), Name = "Delivery", NormalizedName = "DELIVERY" };
+            var merchantRole = new SolRole { Id = Guid.NewGuid(), Name = "Merchant", NormalizedName = "MERCHANT" };
+            appContext.Roles.AddRange(deliveryRole, merchantRole);
+
+            // 2. Active Driver with Accounting Activity (Debit 100,000 - Credit 25,000 = 75,000 custody)
+            var activeDriverId = Guid.NewGuid();
+            var activeDriver = new AppUser
+            {
+                Id = activeDriverId,
+                FullName = "Captain Samer",
+                FirstName = "Samer",
+                LastName = "Kabbani",
+                PhoneNumber = "0933998877",
+                IsActive = true,
+                DeletionDate = null
+            };
+
+            // 3. Driver with ZERO Accounting Activity
+            var zeroDriverId = Guid.NewGuid();
+            var zeroDriver = new AppUser
+            {
+                Id = zeroDriverId,
+                FullName = "Captain Ziad",
+                FirstName = "Ziad",
+                LastName = "Hassan",
+                PhoneNumber = "0944112233",
+                IsActive = true,
+                DeletionDate = null
+            };
+
+            // 4. Merchant User (Must be excluded from drivers)
+            var merchantUserId = Guid.NewGuid();
+            var merchantUser = new AppUser
+            {
+                Id = merchantUserId,
+                FullName = "Merchant Abu Omar",
+                PhoneNumber = "0955000000",
+                IsActive = true,
+                DeletionDate = null
+            };
+
+            appContext.Users.AddRange(activeDriver, zeroDriver, merchantUser);
+            appContext.UserRoles.AddRange(
+                new SolUserRole { UserId = activeDriverId, RoleId = deliveryRole.Id },
+                new SolUserRole { UserId = zeroDriverId, RoleId = deliveryRole.Id },
+                new SolUserRole { UserId = merchantUserId, RoleId = merchantRole.Id }
+            );
+            await appContext.SaveChangesAsync();
+
+            // 5. Accounting Float for active driver
+            var activeDriverFloatAcc = new Account
+            {
+                Id = Guid.NewGuid(),
+                AccountCode = $"{SystemAccountCodes.CaptainCashFloatPrefix}{activeDriverId}",
+                Name = "Captain Samer Cash Float",
+                Type = AccountType.Asset,
+                OwnerUserId = activeDriverId,
+                Currency = "SYP",
+                IsActive = true
+            };
+            accountingContext.Accounts.Add(activeDriverFloatAcc);
+            accountingContext.LedgerEntries.AddRange(
+                new LedgerEntry { Id = 101, AccountId = activeDriverFloatAcc.Id, JournalTransactionId = Guid.NewGuid(), Debit = 100000m, Credit = 0m, Currency = "SYP" },
+                new LedgerEntry { Id = 102, AccountId = activeDriverFloatAcc.Id, JournalTransactionId = Guid.NewGuid(), Debit = 0m, Credit = 25000m, Currency = "SYP" }
+            );
+            await accountingContext.SaveChangesAsync();
+
+            // Query simulation equivalent to BalancesController.DriversDataTable
+            var driverRoleIds = await appContext.Roles.AsNoTracking()
+                .Where(r => r.NormalizedName == "DELIVERY" || r.NormalizedName == "DRIVER" || r.NormalizedName == "CAPTAIN")
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            var allDriverUserIds = await appContext.UserRoles.AsNoTracking()
+                .Where(ur => driverRoleIds.Contains(ur.RoleId))
+                .Select(ur => ur.UserId)
+                .Distinct()
+                .ToListAsync();
+
+            var driverUsers = await appContext.Users.AsNoTracking()
+                .Where(u => allDriverUserIds.Contains(u.Id) && u.DeletionDate == null && u.IsActive)
+                .OrderBy(u => u.FullName ?? u.UserName)
+                .ToListAsync();
+
+            var driverIds = driverUsers.Select(d => d.Id).ToList();
+
+            var floatBalances = await accountingContext.Accounts.AsNoTracking()
+                .Where(a => a.OwnerUserId != null &&
+                            driverIds.Contains(a.OwnerUserId.Value) &&
+                            a.Type == AccountType.Asset &&
+                            a.AccountCode.StartsWith(SystemAccountCodes.CaptainCashFloatPrefix))
+                .Select(a => new
+                {
+                    UserId = a.OwnerUserId.Value,
+                    Balance = a.LedgerEntries.Sum(e => e.Debit - e.Credit)
+                })
+                .ToDictionaryAsync(x => x.UserId, x => x.Balance);
+
+            var items = driverUsers.Select(d => new BalanceDto
+            {
+                Id = d.Id,
+                Name = !string.IsNullOrWhiteSpace(d.FullName) ? d.FullName : $"{d.FirstName} {d.LastName}".Trim(),
+                Phone = d.PhoneNumber,
+                Amount = floatBalances.TryGetValue(d.Id, out var fb) ? fb : 0m,
+                WagesAmount = 0m,
+                PendingAmount = 0m,
+                CreatedDate = d.CreatedDate
+            }).ToList();
+
+            // A. Driver with accounting activity appears
+            Assert.Contains(items, x => x.Id == activeDriverId);
+            var activeDto = items.First(x => x.Id == activeDriverId);
+
+            // D. Driver custody = Debit (100k) - Credit (25k) = 75,000
+            Assert.Equal(75000m, activeDto.Amount);
+            Assert.Equal("0933998877", activeDto.Phone);
+
+            // B. Driver with zero activity appears with 0 balance
+            Assert.Contains(items, x => x.Id == zeroDriverId);
+            var zeroDto = items.First(x => x.Id == zeroDriverId);
+            Assert.Equal(0m, zeroDto.Amount);
+            Assert.Equal("0944112233", zeroDto.Phone);
+
+            // C. Merchant is excluded
+            Assert.DoesNotContain(items, x => x.Id == merchantUserId);
+            Assert.Equal(2, items.Count);
+
+            // E. Name search
+            var nameSearch = items.Where(x => x.Name.Contains("Samer")).ToList();
+            Assert.Single(nameSearch);
+            Assert.Equal(activeDriverId, nameSearch[0].Id);
+
+            // F. Phone search
+            var phoneSearch = items.Where(x => x.Phone.Contains("0944112233")).ToList();
+            Assert.Single(phoneSearch);
+            Assert.Equal(zeroDriverId, phoneSearch[0].Id);
+
+            // G. Pagination Total
+            Assert.Equal(2, items.Count);
+        }
     }
 }

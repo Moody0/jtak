@@ -398,11 +398,13 @@
                   <button
                     type="button"
                     class="ops-btn-action"
-                    style="color: #ea580c; background: #fff7ed; border-color: #fed7aa;"
+                    [ngClass]="product.isFeatured ? 'btn-flame-active' : 'btn-flame-inactive'"
+                    [disabled]="isUpdatingFeatured(product.id)"
                     (click)="togglePopular(product)"
-                    title="تبديل التواجد في قسم الأكثر طلباً بالصفحة الرئيسية"
+                    [title]="product.isFeatured ? 'مميز (الأكثر طلباً) — اضغط للإلغاء' : 'غير مميز — اضغط للتمييز (الأكثر طلباً)'"
+                    [attr.aria-label]="product.isFeatured ? 'مميز الأكثر طلباً' : 'غير مميز'"
                   >
-                    <i class="fas fa-fire-alt"></i>
+                    <i class="fas" [ngClass]="isUpdatingFeatured(product.id) ? 'fa-spinner fa-spin' : 'fa-fire-alt'"></i>
                   </button>
 
                   <!-- Toggle Active / Disabled -->
@@ -410,11 +412,12 @@
                     type="button"
                     class="ops-btn-action"
                     [ngClass]="product.active ? 'btn-status-active' : 'btn-status-disabled'"
+                    [disabled]="isUpdatingStatus(product.id)"
                     (click)="changeStatus(product.active, product.id)"
                     [title]="product.active ? 'نشط — اضغط للتعطيل' : 'غير نشط — اضغط للتفعيل'"
                     [attr.aria-label]="product.active ? 'نشط — اضغط للتعطيل' : 'غير نشط — اضغط للتفعيل'"
                   >
-                    <i class="fas" [ngClass]="product.active ? 'fa-check' : 'fa-ban'"></i>
+                    <i class="fas" [ngClass]="isUpdatingStatus(product.id) ? 'fa-spinner fa-spin' : (product.active ? 'fa-check' : 'fa-ban')"></i>
                   </button>
 
                   <!-- Delete Product Row Action -->

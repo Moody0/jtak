@@ -193,7 +193,6 @@ namespace App.ApiControllers.V1.Admin
             var query = _service.Queryable()
                 .AsNoTracking()
                 .Include(x => x.OrderDetails)
-                .Include(x => x.User)
                 .Where(x => x.OrderStatus == OrderStatus.Success);
 
             if (isArchivedQuery)

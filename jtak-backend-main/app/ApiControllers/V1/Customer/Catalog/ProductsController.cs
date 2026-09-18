@@ -501,9 +501,11 @@ namespace App.ApiControllers.V1.Customer
             var q = _service.Queryable()
                             .Include(x => x.MerchantProducts)
                             .Include(x => x.ProductCategory)
-                            .Where(x => !vm.ProductCategoryId.HasValue || x.ProductCategory.ParentId == vm.ProductCategoryId)
+                            .Where(x => !vm.ProductCategoryId.HasValue ||
+                                x.ProductCategoryId == vm.ProductCategoryId ||
+                                x.ProductCategory.ParentId == vm.ProductCategoryId)
                             .Where(x => !doSearch || x.Title.ToLower().Contains(vm.q))
-                            .Where(x => x.DeletionDate == null && x.ProductCategory.Active && x.Active);
+                            .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active) && x.Active);
 
             int[] mids = null;
             // Restaurants are limited to their delivery coverage, markets are not.
