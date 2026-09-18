@@ -46,7 +46,7 @@ class MarketStoreModel {
     this.lng,
     this.shippingCoverageInMeters = 25000,
     this.minOrderAmount = 0,
-    this.deliveryFeeAmount = 5000.0,
+    this.deliveryFeeAmount = 50.0,
     this.isUsd = false,
     this.merchantKind = 1,
   });
@@ -143,7 +143,8 @@ class MarketStoreModel {
     } else if (photo.isNotEmpty && photo.toLowerCase() != 'null') {
       logoUrl = GlobalVar.getImageUrl(photo);
     }
-    if ((logoUrl == null || logoUrl.isEmpty) && (assetPath == null || assetPath.isEmpty)) {
+    if ((logoUrl == null || logoUrl.isEmpty) &&
+        (assetPath == null || assetPath.isEmpty)) {
       assetPath = _resolveAssetByName(title);
     }
 
@@ -217,9 +218,8 @@ class MarketStoreModel {
   }
 
   MockRestaurantData toRestaurantData() {
-    final effectiveImage = (logoUrl != null && logoUrl!.isNotEmpty)
-        ? logoUrl!
-        : (assetPath ?? '');
+    final effectiveImage =
+        (logoUrl != null && logoUrl!.isNotEmpty) ? logoUrl! : (assetPath ?? '');
     return MockRestaurantData(
       id: id,
       name: name,
@@ -277,9 +277,9 @@ class RestaurantStoreModel {
     this.ratingCount = 120,
     required this.eta,
     this.distance = '2.5 كم',
-    this.deliveryFee = '5,000 ل.س',
-    this.deliveryFeeAmount = 5000.0,
-    this.minOrderAmount = 15000,
+    this.deliveryFee = '50 ل.س',
+    this.deliveryFeeAmount = 50.0,
+    this.minOrderAmount = 150,
     this.workingHours = 'حتى 3 ص',
     this.hasOffers = false,
     this.isFast = true,
@@ -409,9 +409,11 @@ class RestaurantStoreModel {
 
     String cuisine = 'مطاعم وسريع';
     String eta = '20-30 دقيقة';
-    if (json['deliveryTime'] != null && json['deliveryTime'].toString().trim().isNotEmpty) {
+    if (json['deliveryTime'] != null &&
+        json['deliveryTime'].toString().trim().isNotEmpty) {
       eta = json['deliveryTime'].toString().trim();
-    } else if (json['eta'] != null && json['eta'].toString().trim().isNotEmpty) {
+    } else if (json['eta'] != null &&
+        json['eta'].toString().trim().isNotEmpty) {
       eta = json['eta'].toString().trim();
     } else if (shortDesc.contains('•')) {
       final parts = shortDesc.split('•');
@@ -488,10 +490,18 @@ class RestaurantStoreModel {
           .where((s) => s.isNotEmpty)
           .toList();
       if (parts.isNotEmpty && parts[0].isNotEmpty && parts[0] != 'null') {
-        coverUrl = parts[0].startsWith('http') ? parts[0] : (parts[0].startsWith('assets') ? parts[0] : GlobalVar.getImageUrl(parts[0]));
+        coverUrl = parts[0].startsWith('http')
+            ? parts[0]
+            : (parts[0].startsWith('assets')
+                ? parts[0]
+                : GlobalVar.getImageUrl(parts[0]));
       }
       if (parts.length > 1 && parts[1].isNotEmpty && parts[1] != 'null') {
-        logoUrl = parts[1].startsWith('http') ? parts[1] : (parts[1].startsWith('assets') ? parts[1] : GlobalVar.getImageUrl(parts[1]));
+        logoUrl = parts[1].startsWith('http')
+            ? parts[1]
+            : (parts[1].startsWith('assets')
+                ? parts[1]
+                : GlobalVar.getImageUrl(parts[1]));
       } else {
         logoUrl = coverUrl;
       }
@@ -520,9 +530,11 @@ class RestaurantStoreModel {
     }
 
     String workingHours = 'حتى 3 ص';
-    if (json['workingHours'] != null && json['workingHours'].toString().trim().isNotEmpty) {
+    if (json['workingHours'] != null &&
+        json['workingHours'].toString().trim().isNotEmpty) {
       workingHours = json['workingHours'].toString().trim();
-    } else if (json['openUntil'] != null && json['openUntil'].toString().trim().isNotEmpty) {
+    } else if (json['openUntil'] != null &&
+        json['openUntil'].toString().trim().isNotEmpty) {
       workingHours = json['openUntil'].toString().trim();
     }
 
@@ -631,7 +643,8 @@ class MarketsProvider extends BaseProvider {
   Future<void> fetchExchangeRate() async {
     try {
       final userToken = locator<AuthenticationService>().getAccessToken;
-      final url = Uri.parse('https://api.jtak.app/api/v1/Customer/Home/Settings');
+      final url =
+          Uri.parse('https://api.jtak.app/api/v1/Customer/Home/Settings');
       final res = await http.get(
         url,
         headers: {
@@ -719,7 +732,10 @@ class MarketsProvider extends BaseProvider {
               shortDescLower.contains('market') ||
               shortDescLower.contains('mart') ||
               shortDescLower.contains('grocery');
-          final isMarket = hasExplicitKind ? merchantKind == 1 : legacyIsMarket;
+          // Every non-restaurant merchant belongs in the product-merchant
+          // collection. Restricting this to kind 1 silently dropped
+          // pharmacies (2), general stores (3), and dark stores (4).
+          final isMarket = hasExplicitKind ? merchantKind != 0 : legacyIsMarket;
           final isRestaurant =
               hasExplicitKind ? merchantKind == 0 : !legacyIsMarket;
 
@@ -776,7 +792,8 @@ class MarketsProvider extends BaseProvider {
   Future<MarketStoreModel?> fetchMerchantById(int id) async {
     try {
       final userToken = locator<AuthenticationService>().getAccessToken;
-      final url = Uri.parse('https://api.jtak.app/api/v1/Customer/Products/Merchants/$id');
+      final url = Uri.parse(
+          'https://api.jtak.app/api/v1/Customer/Products/Merchants/$id');
       final res = await http.get(
         url,
         headers: {
@@ -788,10 +805,11 @@ class MarketsProvider extends BaseProvider {
       if (res.statusCode == 200) {
         final item = jsonDecode(res.body);
         if (item is Map<String, dynamic>) {
-          final merchantKind = int.tryParse((item['merchantKind'] ?? '').toString()) ?? 0;
+          final merchantKind =
+              int.tryParse((item['merchantKind'] ?? '').toString()) ?? 0;
           final updatedMarket = MarketStoreModel.fromJson(item);
-          
-          if (merchantKind == 1) {
+
+          if (merchantKind != 0) {
             final idx = _markets.indexWhere((m) => m.id == id);
             if (idx != -1) {
               _markets[idx] = updatedMarket;
@@ -828,8 +846,8 @@ class MarketsProvider extends BaseProvider {
 
     try {
       final userToken = locator<AuthenticationService>().getAccessToken;
-      final url =
-          Uri.parse('https://api.jtak.app/api/v1/Customer/Products/Popular?take=$take');
+      final url = Uri.parse(
+          'https://api.jtak.app/api/v1/Customer/Products/Popular?take=$take');
       final client = _httpClient ?? http.Client();
       final res = await client.get(
         url,
@@ -849,8 +867,7 @@ class MarketsProvider extends BaseProvider {
             final title = (item['title'] ?? '').toString().trim();
             final numPrice = (item['finalPrice'] ?? item['price'] ?? 0) as num;
             final photo = (item['photos'] ?? '').toString().trim();
-            final merchantLogo =
-                (item['merchantLogo'] ?? '').toString().trim();
+            final merchantLogo = (item['merchantLogo'] ?? '').toString().trim();
             final merchantTitle =
                 (item['merchantTitle'] ?? '').toString().trim();
             final eta = (item['eta'] ?? '15-25 دقيقة').toString();
@@ -906,7 +923,8 @@ class MarketsProvider extends BaseProvider {
 
       _popularMealsError = 'HTTP ${res.statusCode}';
     } catch (e) {
-      debugPrint('MarketsProvider: Error fetching /Customer/Products/Popular: $e');
+      debugPrint(
+          'MarketsProvider: Error fetching /Customer/Products/Popular: $e');
       _popularMealsError = e.toString();
     }
 
@@ -942,7 +960,8 @@ class MarketsProvider extends BaseProvider {
         return list;
       }
     } catch (e) {
-      debugPrint('MarketsProvider: Error fetching customer market products: $e');
+      debugPrint(
+          'MarketsProvider: Error fetching customer market products: $e');
     }
 
     return _marketProductsCache[marketId] ?? const [];
@@ -997,7 +1016,9 @@ class MarketsProvider extends BaseProvider {
       return cached;
     }
     final localFallback = _markets
-        .where((m) => m.merchantKind == merchantKind || (merchantKind == 0 && m.merchantKind == 0))
+        .where((m) =>
+            m.merchantKind == merchantKind ||
+            (merchantKind == 0 && m.merchantKind == 0))
         .toList();
     if (localFallback.isNotEmpty) {
       return localFallback;
@@ -1096,7 +1117,8 @@ class MarketsProvider extends BaseProvider {
           price: meal.price,
           basePriceValue: meal.numericPrice > 0
               ? meal.numericPrice.toInt()
-              : (int.tryParse(meal.price.replaceAll(RegExp(r'[^\d]'), '')) ?? 0),
+              : (int.tryParse(meal.price.replaceAll(RegExp(r'[^\d]'), '')) ??
+                  0),
           imageUrl: meal.coverUrl,
           category: 'وجبات',
           eta: meal.eta,
@@ -1130,13 +1152,11 @@ class MarketsProvider extends BaseProvider {
           }
 
           String merchantName = 'جيتك ماركت';
-          final rest =
-              restaurants.where((r) => r.id == merchantId).firstOrNull;
+          final rest = restaurants.where((r) => r.id == merchantId).firstOrNull;
           if (rest != null) {
             merchantName = rest.name;
           } else {
-            final mkt =
-                markets.where((m) => m.id == merchantId).firstOrNull;
+            final mkt = markets.where((m) => m.id == merchantId).firstOrNull;
             if (mkt != null) merchantName = mkt.name;
           }
 
@@ -1149,8 +1169,8 @@ class MarketsProvider extends BaseProvider {
             price: '${_formatNumber(intPrice)} ل.س',
             basePriceValue: intPrice,
             imageUrl: imageUrl,
-            category:
-                (p['productCat1'] ?? p['category'] ?? 'قائمة الطعام').toString(),
+            category: (p['productCat1'] ?? p['category'] ?? 'قائمة الطعام')
+                .toString(),
           );
         }
       }

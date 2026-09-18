@@ -92,13 +92,13 @@ void main() {
       expect(coffee.searchHint, equals('ابحث عن مقهى أو مشروب'));
       expect(coffee.allSectionTitle, equals('كل المقاهي والمشروبات'));
       expect(coffee.categorySelectorTitle, equals('المشروبات'));
-      expect(coffee.merchantKind, equals(2));
+      expect(coffee.merchantKind, equals(0));
 
       final pharmacy = CatalogScope.forPharmacy();
       expect(pharmacy.searchHint, equals('ابحث عن صيدلية أو منتج صحي'));
       expect(pharmacy.allSectionTitle, equals('كل الصيدليات'));
       expect(pharmacy.categorySelectorTitle, equals('الأقسام'));
-      expect(pharmacy.merchantKind, equals(3));
+      expect(pharmacy.merchantKind, equals(2));
     });
 
     test('CatalogScope provides scoped child category defaults with strict separation', () {

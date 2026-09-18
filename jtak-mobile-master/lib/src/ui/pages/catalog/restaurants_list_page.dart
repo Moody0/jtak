@@ -119,12 +119,73 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     }
     if (widget.catalogScope != null) {
       unawaited(_loadScopedMerchants());
+    } else if (widget.merchantKind != null) {
+      unawaited(_loadMerchantKindMerchants());
     }
     _initBanners();
     if (widget.catalogScope == null) {
       unawaited(_initRestaurantCategories());
     }
     unawaited(_initOrderAgain());
+  }
+
+  Future<void> _loadMerchantKindMerchants() async {
+    final kind = widget.merchantKind;
+    if (kind == null || !locator.isRegistered<SolApi>()) return;
+
+    setState(() => _isLoadingScopedMerchants = true);
+    try {
+      final response =
+          await locator<SolApi>().getRequest('/Products/MerchantsByKind/$kind');
+      final items = response is List ? response : const [];
+      final merchants = <_RestaurantListItem>[];
+
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final map = Map<String, dynamic>.from(raw);
+        final returnedKind =
+            int.tryParse('${map['merchantKind'] ?? ''}') ?? kind;
+        if (returnedKind != kind) continue;
+
+        if (kind == 0) {
+          final restaurant = RestaurantStoreModel.fromJson(map);
+          merchants.add(_RestaurantListItem(
+            id: restaurant.id,
+            name: restaurant.name,
+            cuisine: restaurant.cuisine,
+            categoryTag: restaurant.categoryTag,
+            rating: restaurant.rating,
+            ratingCount: restaurant.ratingCount,
+            eta: restaurant.eta,
+            distance: restaurant.distance,
+            deliveryFee: restaurant.deliveryFee,
+            hasOffers: restaurant.hasOffers,
+            isFast: restaurant.isFast,
+            coverUrl: restaurant.coverUrl,
+            logoUrl: restaurant.logoUrl,
+            isProductMerchant: false,
+          ));
+        } else {
+          merchants.addAll(
+            _buildMarketMerchants([MarketStoreModel.fromJson(map)]),
+          );
+        }
+      }
+
+      final seen = <int>{};
+      if (!mounted) return;
+      setState(() {
+        _scopedMerchants = merchants.where((m) => seen.add(m.id)).toList();
+        _isLoadingScopedMerchants = false;
+      });
+    } catch (error) {
+      debugPrint('Error fetching merchants for kind $kind: $error');
+      if (!mounted) return;
+      setState(() {
+        _scopedMerchants = const [];
+        _isLoadingScopedMerchants = false;
+      });
+    }
   }
 
   Future<void> _initRestaurantCategories() async {
@@ -314,10 +375,10 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
 
         if (market != null) {
           seenMerchantIds.add(mId);
-          final effectiveImage = (market.logoUrl != null &&
-                  market.logoUrl!.isNotEmpty)
-              ? market.logoUrl!
-              : (market.assetPath ?? '');
+          final effectiveImage =
+              (market.logoUrl != null && market.logoUrl!.isNotEmpty)
+                  ? market.logoUrl!
+                  : (market.assetPath ?? '');
           resolvedList.add({
             'id': market.id,
             'name': market.name,
@@ -386,7 +447,8 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
           );
           final parentTitle = (product['productCat2'] ?? '').toString().trim();
           final childId = int.tryParse(
-            (product['productCategoryId'] ?? product['productCat1Id'] ?? '').toString(),
+            (product['productCategoryId'] ?? product['productCat1Id'] ?? '')
+                .toString(),
           );
           final childTitle = (product['productCat1'] ?? '').toString().trim();
           final matchesParent = parentId == scope.categoryId ||
@@ -402,8 +464,8 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
                 !normChild.contains('برجر') &&
                 !normChild.contains('مشاوي') &&
                 !normChild.contains('بيتزا')) {
-              final canonicalChild =
-                  CanonicalCategoryRegistry.canonicalizeName(childId, childTitle);
+              final canonicalChild = CanonicalCategoryRegistry.canonicalizeName(
+                  childId, childTitle);
               categories.add(canonicalChild);
               categories.add(childTitle);
               _scopeCategoryImages.putIfAbsent(
@@ -423,7 +485,8 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
       // Seed fallback grocery categories if API has not returned them yet
       if (_scopeCategoryImages.isEmpty) {
         for (final def in scope.defaultChildCategories) {
-          _scopeCategoryImages[def] = _getScopeAssetForCategory(def, scope.fallbackImage);
+          _scopeCategoryImages[def] =
+              _getScopeAssetForCategory(def, scope.fallbackImage);
         }
       }
 
@@ -462,22 +525,24 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
             q.contains('art') ||
             q.contains('cafe');
       }).toList();
-      final list = cafes.map((r) => _RestaurantListItem(
-            id: r.id,
-            name: r.name,
-            cuisine: r.cuisine,
-            categoryTag: r.categoryTag,
-            rating: r.rating,
-            ratingCount: r.ratingCount,
-            eta: r.eta,
-            distance: r.distance,
-            deliveryFee: r.deliveryFee,
-            hasOffers: r.hasOffers,
-            isFast: r.isFast,
-            coverUrl: r.coverUrl,
-            logoUrl: r.logoUrl,
-            isProductMerchant: false,
-          )).toList();
+      final list = cafes
+          .map((r) => _RestaurantListItem(
+                id: r.id,
+                name: r.name,
+                cuisine: r.cuisine,
+                categoryTag: r.categoryTag,
+                rating: r.rating,
+                ratingCount: r.ratingCount,
+                eta: r.eta,
+                distance: r.distance,
+                deliveryFee: r.deliveryFee,
+                hasOffers: r.hasOffers,
+                isFast: r.isFast,
+                coverUrl: r.coverUrl,
+                logoUrl: r.logoUrl,
+                isProductMerchant: false,
+              ))
+          .toList();
       if (!mounted) return;
       setState(() {
         _scopedMerchants = list;
@@ -487,29 +552,13 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     }
 
     if (scope.kind == CatalogScopeKind.pharmacy) {
-      final pharmacies = provider.markets
-          .where((m) => m.merchantKind == 3 || m.name.contains('صيدل'))
-          .toList();
-      final list = pharmacies.isNotEmpty
-          ? _buildMarketMerchants(pharmacies)
-          : [
-              const _RestaurantListItem(
-                id: 15,
-                name: 'صيدلية جيتك المركزية - JTAK Pharmacy',
-                cuisine: 'أدوية، فيتامينات ومستحضرات عناية طبية',
-                categoryTag: 'صيدلية',
-                rating: 4.9,
-                ratingCount: 320,
-                eta: '15-20 دقيقة',
-                distance: '1.5 كم',
-                deliveryFee: 'مجاني',
-                hasOffers: true,
-                isFast: true,
-                coverUrl: 'assets/images/categories/cat_grocery.webp',
-                logoUrl: 'assets/images/categories/cat_grocery.webp',
-                isProductMerchant: true,
-              ),
-            ];
+      final pharmacies = await provider.fetchMerchantsForCategory(
+        scope.categoryId,
+        2,
+      );
+      final list = _buildMarketMerchants(
+        pharmacies.where((m) => m.merchantKind == 2),
+      );
       if (!mounted) return;
       setState(() {
         _scopedMerchants = list;
@@ -522,7 +571,8 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   }
 
   bool _sameCategory(String first, String second) {
-    return CanonicalCategoryRegistry.areSameCategory(name1: first, name2: second);
+    return CanonicalCategoryRegistry.areSameCategory(
+        name1: first, name2: second);
   }
 
   String? _firstProductImage(Map<String, dynamic> product) {
@@ -539,11 +589,16 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
       return bucket.fallbackImage;
     }
     final t = title.trim().toLowerCase();
-    if (t.contains('خضار') || t.contains('فواكه')) return 'assets/images/categories/cat_vegetables.webp';
-    if (t.contains('لحوم') || t.contains('دواجن') || t.contains('دجاج')) return 'assets/images/categories/cat_meat.webp';
-    if (t.contains('حلويات') || t.contains('مخبوزات') || t.contains('كيك')) return 'assets/images/categories/cat_sweets.jpg';
-    if (t.contains('قهوة') || t.contains('مشروبات') || t.contains('عصير')) return 'assets/images/categories/cat_drinks.webp';
-    if (t.contains('ألبان') || t.contains('أجبان') || t.contains('جبن')) return 'assets/images/categories/cat_grocery.webp';
+    if (t.contains('خضار') || t.contains('فواكه'))
+      return 'assets/images/categories/cat_vegetables.webp';
+    if (t.contains('لحوم') || t.contains('دواجن') || t.contains('دجاج'))
+      return 'assets/images/categories/cat_meat.webp';
+    if (t.contains('حلويات') || t.contains('مخبوزات') || t.contains('كيك'))
+      return 'assets/images/categories/cat_sweets.jpg';
+    if (t.contains('قهوة') || t.contains('مشروبات') || t.contains('عصير'))
+      return 'assets/images/categories/cat_drinks.webp';
+    if (t.contains('ألبان') || t.contains('أجبان') || t.contains('جبن'))
+      return 'assets/images/categories/cat_grocery.webp';
     return fallback;
   }
 
@@ -601,75 +656,140 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   bool _matchesCategory(_RestaurantListItem r, String category) {
     if (category == 'الكل' || category.trim().isEmpty) return true;
 
-    final normTarget = category.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
-    final normTag = r.categoryTag.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
-    final normCuisine = r.cuisine.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
-    final normName = r.name.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
+    final normTarget =
+        category.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
+    final normTag =
+        r.categoryTag.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
+    final normCuisine =
+        r.cuisine.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
+    final normName =
+        r.name.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
 
     // Direct equality or substring match
-    if (normTag == normTarget || normCuisine == normTarget || normName == normTarget) return true;
-    if (normTag.contains(normTarget) || normTarget.contains(normTag)) return true;
-    if (normCuisine.contains(normTarget) || normTarget.contains(normCuisine)) return true;
+    if (normTag == normTarget ||
+        normCuisine == normTarget ||
+        normName == normTarget) return true;
+    if (normTag.contains(normTarget) || normTarget.contains(normTag))
+      return true;
+    if (normCuisine.contains(normTarget) || normTarget.contains(normCuisine))
+      return true;
     if (normName.contains(normTarget)) return true;
 
     // 1. Burgers
-    if (normTarget.contains('برجر') || normTarget.contains('برغر') || normTarget.contains('burger')) {
-      return normTag.contains('برغر') || normTag.contains('برجر') ||
-          normCuisine.contains('برغر') || normCuisine.contains('برجر') ||
-          normName.contains('burger') || normName.contains('برغر') || normName.contains('برجر') || normName.contains('كلاسيك');
+    if (normTarget.contains('برجر') ||
+        normTarget.contains('برغر') ||
+        normTarget.contains('burger')) {
+      return normTag.contains('برغر') ||
+          normTag.contains('برجر') ||
+          normCuisine.contains('برغر') ||
+          normCuisine.contains('برجر') ||
+          normName.contains('burger') ||
+          normName.contains('برغر') ||
+          normName.contains('برجر') ||
+          normName.contains('كلاسيك');
     }
 
     // 2. Shawarma
     if (normTarget.contains('شاورما') || normTarget.contains('shawarma')) {
-      return normTag.contains('شاورما') || normCuisine.contains('شاورما') ||
-          normName.contains('شاورما') || normName.contains('أنس') || normName.contains('anas');
+      return normTag.contains('شاورما') ||
+          normCuisine.contains('شاورما') ||
+          normName.contains('شاورما') ||
+          normName.contains('أنس') ||
+          normName.contains('anas');
     }
 
     // 3. Grills & Barbecue
-    if (normTarget.contains('مشاوي') || normTarget.contains('مشويات') || normTarget.contains('كباب') || normTarget.contains('grill')) {
-      return normTag.contains('مشاوي') || normTag.contains('مشويات') ||
-          normCuisine.contains('مشاوي') || normCuisine.contains('مشويات') ||
-          normCuisine.contains('كباب') || normName.contains('بوابة دمشق') || normName.contains('مشاوي');
+    if (normTarget.contains('مشاوي') ||
+        normTarget.contains('مشويات') ||
+        normTarget.contains('كباب') ||
+        normTarget.contains('grill')) {
+      return normTag.contains('مشاوي') ||
+          normTag.contains('مشويات') ||
+          normCuisine.contains('مشاوي') ||
+          normCuisine.contains('مشويات') ||
+          normCuisine.contains('كباب') ||
+          normName.contains('بوابة دمشق') ||
+          normName.contains('مشاوي');
     }
 
     // 4. Popular Breakfast / Falafel & Foul
-    if (normTarget.contains('فلافل') || normTarget.contains('فول') || normTarget.contains('فطور') || normTarget.contains('فتات')) {
-      return normTag.contains('فطور') || normTag.contains('فلافل') || normTag.contains('فول') ||
-          normCuisine.contains('فطور') || normCuisine.contains('تساقي') ||
-          normName.contains('بوز الجدي') || normName.contains('فلافل');
+    if (normTarget.contains('فلافل') ||
+        normTarget.contains('فول') ||
+        normTarget.contains('فطور') ||
+        normTarget.contains('فتات')) {
+      return normTag.contains('فطور') ||
+          normTag.contains('فلافل') ||
+          normTag.contains('فول') ||
+          normCuisine.contains('فطور') ||
+          normCuisine.contains('تساقي') ||
+          normName.contains('بوز الجدي') ||
+          normName.contains('فلافل');
     }
 
     // 5. Sweets & Desserts
-    if (normTarget.contains('حلويات') || normTarget.contains('حلى') || normTarget.contains('sweet') || normTarget.contains('dessert') || normTarget.contains('بوظة')) {
-      return normTag.contains('حلويات') || normTag.contains('حلى') ||
-          normCuisine.contains('حلويات') || normCuisine.contains('حلى') ||
-          normCuisine.contains('بوظة') || normName.contains('بكداش') || normName.contains('داوود') || normName.contains('مهنا');
+    if (normTarget.contains('حلويات') ||
+        normTarget.contains('حلى') ||
+        normTarget.contains('sweet') ||
+        normTarget.contains('dessert') ||
+        normTarget.contains('بوظة')) {
+      return normTag.contains('حلويات') ||
+          normTag.contains('حلى') ||
+          normCuisine.contains('حلويات') ||
+          normCuisine.contains('حلى') ||
+          normCuisine.contains('بوظة') ||
+          normName.contains('بكداش') ||
+          normName.contains('داوود') ||
+          normName.contains('مهنا');
     }
 
     // 6. Bakery & Pastries
-    if (normTarget.contains('مخبوزات') || normTarget.contains('مخبز') || normTarget.contains('فطاير') || normTarget.contains('معجنات')) {
-      return normTag.contains('مخبوزات') || normTag.contains('فطاير') ||
-          normCuisine.contains('معجنات') || normCuisine.contains('فطاير') ||
+    if (normTarget.contains('مخبوزات') ||
+        normTarget.contains('مخبز') ||
+        normTarget.contains('فطاير') ||
+        normTarget.contains('معجنات')) {
+      return normTag.contains('مخبوزات') ||
+          normTag.contains('فطاير') ||
+          normCuisine.contains('معجنات') ||
+          normCuisine.contains('فطاير') ||
           normName.contains('بوز الجدي');
     }
 
     // 7. Drinks & Coffee
-    if (normTarget.contains('مشروبات') || normTarget.contains('كافيه') || normTarget.contains('قهوة') || normTarget.contains('cafe') || normTarget.contains('coffee')) {
-      return normTag.contains('كافيه') || normTag.contains('مشروبات') || normTag.contains('قهوة') ||
-          normCuisine.contains('كافيه') || normCuisine.contains('مشروبات') || normCuisine.contains('قهوة') ||
-          normName.contains('نوفرة') || normName.contains('أرت') || normName.contains('art');
+    if (normTarget.contains('مشروبات') ||
+        normTarget.contains('كافيه') ||
+        normTarget.contains('قهوة') ||
+        normTarget.contains('cafe') ||
+        normTarget.contains('coffee')) {
+      return normTag.contains('كافيه') ||
+          normTag.contains('مشروبات') ||
+          normTag.contains('قهوة') ||
+          normCuisine.contains('كافيه') ||
+          normCuisine.contains('مشروبات') ||
+          normCuisine.contains('قهوة') ||
+          normName.contains('نوفرة') ||
+          normName.contains('أرت') ||
+          normName.contains('art');
     }
 
     // 8. Syrian / Shami Cuisine
-    if (normTarget.contains('سوري') || normTarget.contains('شامي') || normTarget.contains('دمشقي')) {
-      return normTag.contains('شامي') || normTag.contains('سوري') ||
-          normCuisine.contains('شامي') || normCuisine.contains('سوري') ||
-          normCuisine.contains('شعبي') || normName.contains('شام') || normName.contains('دمشق');
+    if (normTarget.contains('سوري') ||
+        normTarget.contains('شامي') ||
+        normTarget.contains('دمشقي')) {
+      return normTag.contains('شامي') ||
+          normTag.contains('سوري') ||
+          normCuisine.contains('شامي') ||
+          normCuisine.contains('سوري') ||
+          normCuisine.contains('شعبي') ||
+          normName.contains('شام') ||
+          normName.contains('دمشق');
     }
 
     // 9. Pizza
     if (normTarget.contains('بيتزا') || normTarget.contains('pizza')) {
-      return normTag.contains('بيتزا') || normCuisine.contains('بيتزا') || normName.contains('بيتزا') || normName.contains('pizza');
+      return normTag.contains('بيتزا') ||
+          normCuisine.contains('بيتزا') ||
+          normName.contains('بيتزا') ||
+          normName.contains('pizza');
     }
 
     return false;
@@ -688,7 +808,8 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
             if (!hasCategory && !_matchesCategory(r, _selectedCategory)) {
               if (r.id != 12) return false;
             }
-          } else if (!_matchesCategory(r, _categoryFilterTag(_selectedCategory))) {
+          } else if (!_matchesCategory(
+              r, _categoryFilterTag(_selectedCategory))) {
             return false;
           }
         }
@@ -1201,7 +1322,8 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
         return [
           {
             'title': 'شاورما',
-            'image': 'assets/images/products/Arabic Chicken Shawarma Platter.webp',
+            'image':
+                'assets/images/products/Arabic Chicken Shawarma Platter.webp',
           },
           {
             'title': 'مشاوي',
@@ -1641,7 +1763,10 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
 
   void _openCuisinesBottomSheet() {
     final rawList = _resolveSectionCategories();
-    final List<String> cuisineList = ['الكل', ...rawList.map((c) => c['title']!)];
+    final List<String> cuisineList = [
+      'الكل',
+      ...rawList.map((c) => c['title']!)
+    ];
 
     showModalBottomSheet(
       context: context,
@@ -2032,32 +2157,12 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
         }
         if (scope.kind == CatalogScopeKind.pharmacy) {
           final pharmacies = marketsProv.markets
-              .where((m) => m.merchantKind == 3 || m.name.contains('صيدل'))
+              .where((m) => m.merchantKind == 2 || m.name.contains('صيدل'))
               .toList();
           if (pharmacies.isNotEmpty) {
             return _buildMarketMerchants(pharmacies);
           }
         }
-      }
-      if (scope.kind == CatalogScopeKind.pharmacy) {
-        return [
-          const _RestaurantListItem(
-            id: 15,
-            name: 'صيدلية جيتك المركزية - JTAK Pharmacy',
-            cuisine: 'أدوية، فيتامينات ومستحضرات عناية طبية',
-            categoryTag: 'صيدلية',
-            rating: 4.9,
-            ratingCount: 320,
-            eta: '15-20 دقيقة',
-            distance: '1.5 كم',
-            deliveryFee: 'مجاني',
-            hasOffers: true,
-            isFast: true,
-            coverUrl: 'assets/images/categories/cat_grocery.webp',
-            logoUrl: 'assets/images/categories/cat_grocery.webp',
-            isProductMerchant: true,
-          ),
-        ];
       }
       return _scopedMerchants ?? const [];
     }
@@ -2065,14 +2170,10 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     // A tile pointing at a merchant kind lists exactly those merchants. The
     // provider already splits the backend feed by its merchantKind field, so
     // restaurants are kind 0 and every other kind lands in markets.
-    if (widget.merchantKind != null && locator.isRegistered<MarketsProvider>()) {
-      final marketsProv = locator<MarketsProvider>();
-      final ofKind = widget.merchantKind == 0
-          ? _buildProviderMerchants(marketsProv)
-          : _buildMarketMerchants(marketsProv.markets
-              .where((m) => m.merchantKind == widget.merchantKind));
-      final seen = <int>{};
-      return ofKind.where((m) => seen.add(m.id)).toList();
+    if (widget.merchantKind != null) {
+      // An empty response is authoritative. Do not fall back to unrelated
+      // merchants merely to fill the screen.
+      return _scopedMerchants ?? const [];
     }
 
     if (locator.isRegistered<MarketsProvider>()) {

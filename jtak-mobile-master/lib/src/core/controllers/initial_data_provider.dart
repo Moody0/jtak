@@ -84,6 +84,7 @@ class InitialDataProvider extends BaseProvider {
             enabled: homeCategoriesEnabled,
             maxItems: homeCategoriesMaxItems,
             title: homeCategoriesTitle,
+            authoritative: true,
           );
         } else if (context.mounted) {
           Provider.of<CategoriesProvider>(context, listen: false).setHomeCategoryTiles(
@@ -91,6 +92,7 @@ class InitialDataProvider extends BaseProvider {
             enabled: homeCategoriesEnabled,
             maxItems: homeCategoriesMaxItems,
             title: homeCategoriesTitle,
+            authoritative: true,
           );
         }
       } else {
@@ -100,6 +102,7 @@ class InitialDataProvider extends BaseProvider {
             enabled: homeCategoriesEnabled,
             maxItems: homeCategoriesMaxItems,
             title: homeCategoriesTitle,
+            authoritative: false,
           );
         } else if (context.mounted) {
           Provider.of<CategoriesProvider>(context, listen: false).setHomeCategoryTiles(
@@ -107,6 +110,7 @@ class InitialDataProvider extends BaseProvider {
             enabled: homeCategoriesEnabled,
             maxItems: homeCategoriesMaxItems,
             title: homeCategoriesTitle,
+            authoritative: false,
           );
         }
       }

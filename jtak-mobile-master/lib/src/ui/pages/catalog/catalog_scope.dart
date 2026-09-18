@@ -198,9 +198,11 @@ class CatalogScope {
       case CatalogScopeKind.restaurants:
         return 0;
       case CatalogScopeKind.coffee:
-        return 2;
+        // Cafes are currently restaurant merchants. Coffee product
+        // collections are routed as product categories by the dashboard.
+        return 0;
       case CatalogScopeKind.pharmacy:
-        return 3;
+        return 2;
     }
   }
 

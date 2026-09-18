@@ -9,6 +9,7 @@ import '../../../core/data/mock_catalog_data.dart';
 import '../../../utils/custom_widgets/custom_scroll_behavior.dart';
 import '../../sections/bottom_navigation.dart';
 import '../../widgets/catalog/restaurant_card_widget.dart';
+import '../../widgets/catalog/product_widgets.dart';
 import '../../widgets/clean_shimmer_skeletons.dart';
 import 'market_page.dart';
 import 'restaurant_menu_page.dart';
@@ -33,7 +34,8 @@ class CategoryProductsWidget extends StatefulWidget {
 }
 
 class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
-  String _selectedMerchantFilter = 'الكل'; // 'الكل', 'مطاعم فقط', 'متاجر وسوبرماركت', 'توصيل مجاني', 'الأعلى تقييماً'
+  String _selectedMerchantFilter =
+      'الكل'; // 'الكل', 'مطاعم فقط', 'متاجر وسوبرماركت', 'توصيل مجاني', 'الأعلى تقييماً'
 
   void _handleMerchantTap(BuildContext context, MockRestaurantData merchant) {
     HapticFeedback.lightImpact();
@@ -64,7 +66,8 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
     }
   }
 
-  List<MockRestaurantData> _getFilteredMerchants(List<MockRestaurantData> allMerchants) {
+  List<MockRestaurantData> _getFilteredMerchants(
+      List<MockRestaurantData> allMerchants) {
     if (_selectedMerchantFilter == 'مطاعم فقط') {
       return allMerchants.where((m) => !m.isMarket).toList();
     }
@@ -87,6 +90,8 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
     final provider = Provider.of<CategoryProductsProvider>(context);
 
     final merchants = provider.matchedMerchants;
+    final productGroups =
+        provider.dataList.where((group) => group.products.isNotEmpty).toList();
 
     return ScrollConfiguration(
       behavior: CustomScrollBehavior(),
@@ -99,14 +104,21 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
             // 1. Large Bold Category Title Header (الفطور)
             _buildCategoryHeroBanner(widget.categoryTitle),
 
-            // 2. Dedicated Merchants & Category Content Feed with Filter Chips
-            if (provider.isBusy && merchants.isEmpty)
+            // 2. Products are the primary content of a product-category tile.
+            // Merchants carrying the category are shown beneath them.
+            if (provider.isBusy && merchants.isEmpty && productGroups.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 20),
                 child: RestaurantsListSkeleton(count: 3),
               )
-            else
-              _buildDedicatedMerchantsView(context, merchants),
+            else if (productGroups.isEmpty && merchants.isEmpty)
+              _buildEmptyCategory()
+            else ...[
+              if (productGroups.isNotEmpty)
+                _buildProductsView(context, productGroups),
+              if (merchants.isNotEmpty)
+                _buildDedicatedMerchantsView(context, merchants),
+            ],
 
             const SizedBox(height: BottomNavigation.height + 24),
           ],
@@ -124,7 +136,8 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1.0)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1.0)),
       ),
       child: Text(
         title,
@@ -139,15 +152,105 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Dedicated Merchants Tab View (Filter Chips & Restaurant Cards)
+  // 2. Product results grouped by their real backend category
   // ---------------------------------------------------------------------------
-  Widget _buildDedicatedMerchantsView(BuildContext context, List<MockRestaurantData> allMerchants) {
-    final filterOptions = ['الكل', 'مطاعم فقط', 'متاجر وسوبرماركت', 'توصيل مجاني', 'الأعلى تقييماً'];
+  Widget _buildProductsView(BuildContext context, List<ShopModel> groups) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groups.map((group) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  group.category.title ?? widget.categoryTitle,
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    color: kCharcoalDark,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                itemCount: group.products.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 6,
+                  childAspectRatio:
+                      ProductMiniSingleItem.getAspectRatio(context),
+                ),
+                itemBuilder: (_, index) =>
+                    ProductMiniSingleItem(item: group.products[index]),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildEmptyCategory() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+              color: Color(0xFF94A3B8),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'لا توجد منتجات أو متاجر متاحة في هذا القسم حالياً',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.ibmPlexSansArabic(
+                color: const Color(0xFF64748B),
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. Merchants that carry products from this category
+  // ---------------------------------------------------------------------------
+  Widget _buildDedicatedMerchantsView(
+      BuildContext context, List<MockRestaurantData> allMerchants) {
+    final filterOptions = [
+      'الكل',
+      'مطاعم فقط',
+      'متاجر وسوبرماركت',
+      'توصيل مجاني',
+      'الأعلى تقييماً'
+    ];
     final filteredMerchants = _getFilteredMerchants(allMerchants);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+          child: Text(
+            'المتاجر المتاحة',
+            style: GoogleFonts.ibmPlexSansArabic(
+              color: kCharcoalDark,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
         // Sub-filter chips row
         Container(
           height: 42,
@@ -177,16 +280,19 @@ class _CategoryProductsWidgetState extends State<CategoryProductsWidget> {
                     color: isSelected ? const Color(0xFFFFF0E8) : Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isSelected ? kPrimaryOrange : const Color(0xFFE5E7EB),
+                      color:
+                          isSelected ? kPrimaryOrange : const Color(0xFFE5E7EB),
                       width: isSelected ? 1.4 : 1.0,
                     ),
                   ),
                   child: Text(
                     opt,
                     style: GoogleFonts.ibmPlexSansArabic(
-                      color: isSelected ? kPrimaryOrange : const Color(0xFF4B5563),
+                      color:
+                          isSelected ? kPrimaryOrange : const Color(0xFF4B5563),
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
                     ),
                   ),
                 ),

@@ -110,5 +110,16 @@ namespace Modules.Catalog.Entities
         /// the dashboard instead of silently opening the wrong screen.
         /// </summary>
         public bool TargetExists { get; set; } = true;
+
+        /// <summary>
+        /// Whether the resolved destination currently contains something a
+        /// customer can open (stocked products or active merchants).
+        /// Empty destinations remain visible in Admin but are withheld from
+        /// the customer Home response.
+        /// </summary>
+        public bool HasAvailableContent { get; set; } = true;
+        public int AvailableProductCount { get; set; }
+        public int AvailableMerchantCount { get; set; }
+        public string AvailabilityMessage { get; set; }
     }
 }

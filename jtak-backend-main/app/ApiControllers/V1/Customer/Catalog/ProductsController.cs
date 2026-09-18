@@ -28,6 +28,7 @@ namespace App.ApiControllers.V1.Customer
     {
         private readonly IMerchantService _merchantService;
         private readonly IProductService _service;
+        private readonly IProductCategoryService _categoryService;
         private readonly UserManager<AppUser> _userManager;
         private readonly ICatalogUnitOfWork _unitOfWork;
         private readonly IOrderDetailService _orderDetailsService;
@@ -37,6 +38,7 @@ namespace App.ApiControllers.V1.Customer
 
         public ProductsController(
             IProductService service,
+            IProductCategoryService categoryService,
             IMerchantService merchantService,
             UserManager<AppUser> userManager,
             ICatalogUnitOfWork unitOfWork,
@@ -46,6 +48,7 @@ namespace App.ApiControllers.V1.Customer
             IOrderDetailService orderDetailsService = null)
         {
             _service = service;
+            _categoryService = categoryService;
             _merchantService = merchantService;
             _userManager = userManager;
             _unitOfWork = unitOfWork;
@@ -188,13 +191,20 @@ namespace App.ApiControllers.V1.Customer
                                                                            [FromQuery] decimal? lat = null,
                                                                            [FromQuery] decimal? lng = null)
         {
+            var categoryIds = await GetActiveCategoryTreeIds(categoryId);
+            if (!categoryIds.Any())
+                return Array.Empty<MerchantDto>();
+
             var offers = _service.Queryable().AsNoTracking()
                                  .Where(x => x.DeletionDate == null && x.Active &&
                                              x.ProductCategory.Active &&
-                                             (x.ProductCategoryId == categoryId ||
-                                              x.ProductCategory.ParentId == categoryId))
+                                             x.ProductCategoryId.HasValue &&
+                                             categoryIds.Contains(x.ProductCategoryId.Value))
                                  .SelectMany(x => x.MerchantProducts)
-                                 .Where(m => m.MerchantPrice > 0);
+                                 .Where(m => (m.MerchantPrice > 0 ||
+                                              (m.PriceUsd.HasValue && m.PriceUsd.Value > 0)) &&
+                                             m.Merchant.DeletionDate == null &&
+                                             m.Merchant.Active);
 
             // Honour delivery coverage when the caller knows where it is, using
             // the same rule search uses so the two can never disagree.
@@ -497,13 +507,16 @@ namespace App.ApiControllers.V1.Customer
         {
             vm.q = vm.q?.Trim().ToLower();
             var doSearch = !string.IsNullOrEmpty(vm.q);
+            var categoryIds = vm.ProductCategoryId.HasValue
+                ? await GetActiveCategoryTreeIds(vm.ProductCategoryId.Value)
+                : Array.Empty<int>();
 
             var q = _service.Queryable()
                             .Include(x => x.MerchantProducts)
                             .Include(x => x.ProductCategory)
                             .Where(x => !vm.ProductCategoryId.HasValue ||
-                                x.ProductCategoryId == vm.ProductCategoryId ||
-                                x.ProductCategory.ParentId == vm.ProductCategoryId)
+                                (x.ProductCategoryId.HasValue &&
+                                 categoryIds.Contains(x.ProductCategoryId.Value)))
                             .Where(x => !doSearch || x.Title.ToLower().Contains(vm.q))
                             .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active) && x.Active);
 
@@ -573,6 +586,36 @@ namespace App.ApiControllers.V1.Customer
             //return products.Where(x => x.MerchantId != 0 && x.FinalPrice != 0).ToArray();
         }
 
+        private async Task<int[]> GetActiveCategoryTreeIds(int rootId)
+        {
+            var categories = await _categoryService.Queryable()
+                .AsNoTracking()
+                .Where(x => x.DeletionDate == null && x.Active)
+                .Select(x => new { x.Id, x.ParentId })
+                .ToArrayAsync();
+
+            if (!categories.Any(x => x.Id == rootId))
+                return Array.Empty<int>();
+
+            var ids = new HashSet<int> { rootId };
+            var added = true;
+            while (added)
+            {
+                added = false;
+                foreach (var category in categories)
+                {
+                    if (category.ParentId.HasValue &&
+                        ids.Contains(category.ParentId.Value) &&
+                        ids.Add(category.Id))
+                    {
+                        added = true;
+                    }
+                }
+            }
+
+            return ids.ToArray();
+        }
+
         /// <summary>
         /// Customer-facing: Returns most popular / ordered products for Home page
         /// Fully controlled by Admin through Dashboard (Manual, Hybrid, or Auto mode)
@@ -607,20 +650,23 @@ namespace App.ApiControllers.V1.Customer
                 .OrderBy(x => x.Order)
                 .ToList() ?? new List<PopularProductItemConfig>();
 
-            // Strictly filter merchants to restaurants only
+            // Popular products can come from any active merchant type.
+            // The admin dashboard supports restaurants, groceries, pharmacies,
+            // and other stores, so restricting this section to restaurants
+            // silently removes valid products from the customer app.
             var merchants = await _merchantService.Queryable()
                 .AsNoTracking()
-                .Where(x => x.DeletionDate == null && x.Active && x.MerchantKind == MerchantKind.Restaurant)
+                .Where(x => x.DeletionDate == null && x.Active)
                 .ToDictionaryAsync(x => x.Id, x => x);
 
-            var restaurantMerchantIds = merchants.Keys.ToList();
+            var activeMerchantIds = merchants.Keys.ToList();
 
             var productsQuery = _service.Queryable()
                 .AsNoTracking()
                 .Include(x => x.MerchantProducts)
                 .Include(x => x.ProductCategory)
                 .Where(x => x.DeletionDate == null && x.Active && (x.ProductCategory == null || x.ProductCategory.Active))
-                .Where(x => x.MerchantProducts.Any(m => restaurantMerchantIds.Contains(m.MerchantId)));
+                .Where(x => x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId)));
 
             var candidateProducts = new System.Collections.Generic.List<Product>();
 
@@ -695,7 +741,11 @@ namespace App.ApiControllers.V1.Customer
                             .Where(x => topProductIds.Contains(x.Id))
                             .ToListAsync();
 
-                        candidateProducts.AddRange(topProds);
+                        var topProductsById = topProds.ToDictionary(x => x.Id);
+                        candidateProducts.AddRange(
+                            topProductIds
+                                .Where(id => topProductsById.ContainsKey(id))
+                                .Select(id => topProductsById[id]));
                     }
 
                     if (candidateProducts.Count < take)
@@ -704,7 +754,7 @@ namespace App.ApiControllers.V1.Customer
                         var supplementProducts = await productsQuery
                             .Where(x => !currentIds.Contains(x.Id))
                             .OrderByDescending(x => x.IsFeatured)
-                            .ThenBy(x => x.ProductCategory.Order)
+                            .ThenBy(x => x.Title)
                             .Take(take - candidateProducts.Count)
                             .ToListAsync();
                         candidateProducts.AddRange(supplementProducts);
@@ -742,9 +792,14 @@ namespace App.ApiControllers.V1.Customer
                 var topProductIds = topOrderedStats.Select(x => x.ProductId).ToList();
                 if (topProductIds.Any())
                 {
-                    candidateProducts = await productsQuery
+                    var topProds = await productsQuery
                         .Where(x => topProductIds.Contains(x.Id))
                         .ToListAsync();
+                    var topProductsById = topProds.ToDictionary(x => x.Id);
+                    candidateProducts = topProductIds
+                        .Where(id => topProductsById.ContainsKey(id))
+                        .Select(id => topProductsById[id])
+                        .ToList();
                 }
 
                 if (candidateProducts.Count < take)
@@ -753,7 +808,7 @@ namespace App.ApiControllers.V1.Customer
                     var supplementProducts = await productsQuery
                         .Where(x => !existingIds.Contains(x.Id))
                         .OrderByDescending(x => x.IsFeatured)
-                        .ThenBy(x => x.ProductCategory.Order)
+                        .ThenBy(x => x.Title)
                         .Take(take - candidateProducts.Count)
                         .ToListAsync();
                     candidateProducts.AddRange(supplementProducts);

@@ -58,6 +58,10 @@ export interface HomeCategoriesConfig {
 export interface ResolvedHomeCategoryTile extends HomeCategoryTile {
   targetLabel?: string | null;
   targetExists: boolean;
+  hasAvailableContent: boolean;
+  availableProductCount: number;
+  availableMerchantCount: number;
+  availabilityMessage?: string | null;
 }
 
 export interface HomeCategoryTarget {
@@ -66,6 +70,8 @@ export interface HomeCategoryTarget {
   icon?: string | null;
   parentId?: number | null;
   parentTitle?: string | null;
+  productCount: number;
+  merchantCount: number;
 }
 
 export interface HomeCategoryMerchant {
@@ -73,11 +79,13 @@ export interface HomeCategoryMerchant {
   title: string;
   photo?: string | null;
   merchantKind: number;
+  productCount: number;
 }
 
 export interface HomeCategoryMerchantKind {
   value: number;
   name: string;
+  merchantCount: number;
 }
 
 export interface HomeCategoriesAdminVm {

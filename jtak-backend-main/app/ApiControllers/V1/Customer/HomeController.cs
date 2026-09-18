@@ -126,7 +126,7 @@ namespace App.ApiControllers.V1.Customer
             else
             {
                 var tiles = (await _homeCategoriesService.GetTiles(activeOnly: true))
-                    .Where(tile => tile.TargetExists);
+                    .Where(tile => tile.TargetExists && tile.HasAvailableContent);
                 if (homeCategoriesMaxItems > 0)
                 {
                     tiles = tiles.Take(homeCategoriesMaxItems);

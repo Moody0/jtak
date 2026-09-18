@@ -59,6 +59,9 @@
         <span *ngIf="invalidCount > 0" class="text-danger">
           <strong>{{ invalidCount }}</strong> غير مكتملة
         </span>
+        <span *ngIf="unavailableCount > 0" class="text-warning">
+          <strong>{{ unavailableCount }}</strong> لن تظهر لعدم توفر محتوى
+        </span>
       </div>
 
       <div *ngIf="!config.tiles.length" class="text-center py-10 text-muted">
@@ -70,6 +73,7 @@
         *ngFor="let tile of config.tiles; let i = index; trackBy: trackByIndex"
         class="border rounded p-4 mb-4"
         [class.border-danger]="tileProblem(tile)"
+        [class.border-warning]="!tileProblem(tile) && tileAvailabilityProblem(tile)"
       >
         <div class="d-flex align-items-center mb-3">
           <span class="badge badge-light-primary me-3">{{ i + 1 }}</span>
@@ -149,7 +153,7 @@
                 <select class="form-select" [(ngModel)]="tile.merchantKind" (ngModelChange)="onTargetChange(tile)">
                   <option [ngValue]="null">— اختر نوعاً —</option>
                   <option *ngFor="let kind of merchantKinds" [ngValue]="kind.value">
-                    {{ merchantKindLabel(kind.value) }}
+                    {{ merchantKindOptionLabel(kind) }}
                   </option>
                 </select>
               </div>
@@ -159,7 +163,7 @@
                 <select class="form-select" [(ngModel)]="tile.merchantId" (ngModelChange)="onTargetChange(tile)">
                   <option [ngValue]="null">— اختر متجراً —</option>
                   <option *ngFor="let merchant of merchants" [ngValue]="merchant.id">
-                    {{ merchant.title }} ({{ merchantKindLabel(merchant.merchantKind) }})
+                    {{ merchantOptionLabel(merchant) }}
                   </option>
                 </select>
               </div>
@@ -174,6 +178,9 @@
 
         <div *ngIf="tileProblem(tile)" class="text-danger fs-8 mt-3">
           <i class="fas fa-exclamation-circle me-1"></i> {{ tileProblem(tile) }}
+        </div>
+        <div *ngIf="tileAvailabilityProblem(tile)" class="text-warning fw-semibold fs-8 mt-3">
+          <i class="fas fa-eye-slash me-1"></i> {{ tileAvailabilityProblem(tile) }}
         </div>
       </div>
     </ng-container>

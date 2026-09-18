@@ -164,7 +164,47 @@ export class HomeCategoriesListComponent implements OnInit {
   }
 
   categoryLabel(category: HomeCategoryTarget): string {
-    return category.parentTitle ? `${category.parentTitle} ← ${category.title}` : category.title;
+    const title = category.parentTitle
+      ? `${category.parentTitle} ← ${category.title}`
+      : category.title;
+    return `${title} — ${category.productCount ?? 0} منتج / ${category.merchantCount ?? 0} متجر`;
+  }
+
+  merchantKindOptionLabel(kind: HomeCategoryMerchantKind): string {
+    return `${this.merchantKindLabel(kind.value)} — ${kind.merchantCount ?? 0} متجر`;
+  }
+
+  merchantOptionLabel(merchant: HomeCategoryMerchant): string {
+    return `${merchant.title} (${this.merchantKindLabel(merchant.merchantKind)}) — ${merchant.productCount ?? 0} منتج`;
+  }
+
+  tileAvailabilityProblem(tile: HomeCategoryTile): string | null {
+    if (!tile.active || this.tileProblem(tile)) {
+      return null;
+    }
+
+    switch (tile.linkType) {
+      case HomeCategoryLinkType.ProductCategory: {
+        const category = this.categories.find((item) => item.id === tile.productCategoryId);
+        return category && category.productCount > 0 && category.merchantCount > 0
+          ? null
+          : 'لن تظهر للعملاء حالياً: لا توجد منتجات مسعّرة لدى متجر نشط في هذا القسم.';
+      }
+      case HomeCategoryLinkType.MerchantKind: {
+        const kind = this.merchantKinds.find((item) => item.value === tile.merchantKind);
+        return kind && kind.merchantCount > 0
+          ? null
+          : 'لن تظهر للعملاء حالياً: لا يوجد متجر نشط من هذا النوع.';
+      }
+      case HomeCategoryLinkType.Merchant:
+        return this.merchants.some((merchant) => merchant.id === tile.merchantId)
+          ? null
+          : 'لن تظهر للعملاء حالياً: المتجر غير موجود أو غير مفعّل.';
+      case HomeCategoryLinkType.Search:
+        return null;
+      default:
+        return 'لن تظهر للعملاء حالياً: الوجهة غير متاحة.';
+    }
   }
 
   /** The problem the admin needs to fix before this tile can go live. */
@@ -196,9 +236,17 @@ export class HomeCategoriesListComponent implements OnInit {
     return this.config.tiles.filter((tile) => tile.active).length;
   }
 
+  get unavailableCount(): number {
+    return this.config.tiles.filter(
+      (tile) => tile.active && this.tileAvailabilityProblem(tile) !== null
+    ).length;
+  }
+
   /** How many active tiles the app will actually show, given MaxItems. */
   get visibleCount(): number {
-    const active = this.activeCount;
+    const active = this.config.tiles.filter(
+      (tile) => tile.active && this.tileAvailabilityProblem(tile) === null
+    ).length;
     return this.config.maxItems > 0 ? Math.min(active, this.config.maxItems) : active;
   }
 

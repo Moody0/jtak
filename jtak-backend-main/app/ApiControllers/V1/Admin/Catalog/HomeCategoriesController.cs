@@ -24,14 +24,17 @@ namespace App.ApiControllers.V1.Admin
     {
         private readonly IHomeCategoriesService _service;
         private readonly IProductCategoryService _categoryService;
+        private readonly IProductService _productService;
         private readonly IMerchantService _merchantService;
 
         public HomeCategoriesController(IHomeCategoriesService service,
                                         IProductCategoryService categoryService,
+                                        IProductService productService,
                                         IMerchantService merchantService)
         {
             _service = service;
             _categoryService = categoryService;
+            _productService = productService;
             _merchantService = merchantService;
         }
 
@@ -71,6 +74,47 @@ namespace App.ApiControllers.V1.Admin
                                                   })
                                                   .ToArrayAsync();
 
+            var availableOffers = await _productService.Queryable().AsNoTracking()
+                .Where(x => x.DeletionDate == null && x.Active &&
+                            x.ProductCategoryId.HasValue &&
+                            x.ProductCategory.Active)
+                .SelectMany(x => x.MerchantProducts
+                    .Where(mp => (mp.MerchantPrice > 0 ||
+                                  (mp.PriceUsd.HasValue && mp.PriceUsd.Value > 0)) &&
+                                 mp.Merchant.DeletionDate == null &&
+                                 mp.Merchant.Active)
+                    .Select(mp => new
+                    {
+                        ProductId = x.Id,
+                        CategoryId = x.ProductCategoryId.Value,
+                        mp.MerchantId
+                    }))
+                .ToArrayAsync();
+
+            var categoryParents = categories.ToDictionary(x => x.Id, x => x.ParentId);
+            foreach (var category in categories)
+            {
+                var categoryIds = GetCategoryTreeIds(category.Id, categoryParents);
+                var matches = availableOffers
+                    .Where(x => categoryIds.Contains(x.CategoryId))
+                    .ToArray();
+                category.ProductCount = matches.Select(x => x.ProductId).Distinct().Count();
+                category.MerchantCount = matches.Select(x => x.MerchantId).Distinct().Count();
+            }
+
+            foreach (var merchant in merchants)
+            {
+                merchant.ProductCount = availableOffers
+                    .Where(x => x.MerchantId == merchant.Id)
+                    .Select(x => x.ProductId)
+                    .Distinct()
+                    .Count();
+            }
+
+            var merchantKindCounts = merchants
+                .GroupBy(x => x.MerchantKind)
+                .ToDictionary(x => x.Key, x => x.Count());
+
             return new HomeCategoriesAdminVm
             {
                 Config = config,
@@ -82,7 +126,10 @@ namespace App.ApiControllers.V1.Admin
                                              .Select(x => new HomeCategoryMerchantKindDto
                                              {
                                                  Value = (int)x,
-                                                 Name = x.ToString()
+                                                 Name = x.ToString(),
+                                                 MerchantCount = merchantKindCounts.TryGetValue(x, out var count)
+                                                     ? count
+                                                     : 0
                                              })
                                              .ToArray()
             };
@@ -133,6 +180,29 @@ namespace App.ApiControllers.V1.Admin
                     return null;
             }
         }
+
+        private static HashSet<int> GetCategoryTreeIds(
+            int rootId,
+            IReadOnlyDictionary<int, int?> parentByCategoryId)
+        {
+            var result = new HashSet<int> { rootId };
+            var added = true;
+            while (added)
+            {
+                added = false;
+                foreach (var category in parentByCategoryId)
+                {
+                    if (category.Value.HasValue &&
+                        result.Contains(category.Value.Value) &&
+                        result.Add(category.Key))
+                    {
+                        added = true;
+                    }
+                }
+            }
+
+            return result;
+        }
     }
 
     public class HomeCategoriesAdminVm
@@ -151,6 +221,8 @@ namespace App.ApiControllers.V1.Admin
         public string Icon { get; set; }
         public int? ParentId { get; set; }
         public string ParentTitle { get; set; }
+        public int ProductCount { get; set; }
+        public int MerchantCount { get; set; }
     }
 
     public class HomeCategoryMerchantDto
@@ -159,11 +231,13 @@ namespace App.ApiControllers.V1.Admin
         public string Title { get; set; }
         public string Photo { get; set; }
         public MerchantKind MerchantKind { get; set; }
+        public int ProductCount { get; set; }
     }
 
     public class HomeCategoryMerchantKindDto
     {
         public int Value { get; set; }
         public string Name { get; set; }
+        public int MerchantCount { get; set; }
     }
 }

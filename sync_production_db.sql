@@ -1,9 +1,9 @@
 -- ==============================================================================
--- JTAK PRODUCTION DATABASE SYNCHRONIZATION SCRIPT (100% SAFE & NON-DESTRUCTIVE)
+-- JTAK PRODUCTION DATABASE SYNCHRONIZATION SCRIPT (CURRENT RELEASE: 2026-09-18)
 -- ==============================================================================
 -- Purpose:
---   Synchronizes an existing production MySQL / MariaDB database with the latest
---   JTAK codebase schema, tables, columns, indexes, and settings.
+--   Synchronizes an existing production MySQL / MariaDB database with the
+--   current JTAK backend release schema, tables, columns, indexes, and settings.
 --
 -- Safety Guarantees:
 --   1. ZERO DATA LOSS: No DROP TABLE, no DROP COLUMN, no TRUNCATE.
@@ -335,6 +335,61 @@ WHERE `MerchantId` = 12
 -- ------------------------------------------------------------------------------
 -- 10. Record EF Core Migration History
 -- ------------------------------------------------------------------------------
+-- ------------------------------------------------------------------------------
+-- 9.1 Current release additions (2026-09-18)
+-- ------------------------------------------------------------------------------
+-- These statements are idempotent and make the new dashboard/API fields
+-- available immediately. The backend startup still runs any remaining EF
+-- migrations, including the guarded accounting-ledger reconciliation.
+ALTER TABLE `Orders_Orders`
+    ADD COLUMN IF NOT EXISTS `DeletionDate` datetime(6) NULL,
+    ADD COLUMN IF NOT EXISTS `DeletedBy` varchar(256) CHARACTER SET utf8mb4 NULL,
+    ADD COLUMN IF NOT EXISTS `DeleteReason` varchar(500) CHARACTER SET utf8mb4 NULL;
+
+SET @orders_archive_index_exists := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'Orders_Orders'
+      AND INDEX_NAME = 'IX_Orders_Orders_DeletionDate'
+);
+SET @orders_archive_index_sql := IF(
+    @orders_archive_index_exists = 0,
+    'CREATE INDEX `IX_Orders_Orders_DeletionDate` ON `Orders_Orders` (`DeletionDate`)',
+    'SELECT 1'
+);
+PREPARE orders_archive_index_stmt FROM @orders_archive_index_sql;
+EXECUTE orders_archive_index_stmt;
+DEALLOCATE PREPARE orders_archive_index_stmt;
+
+CREATE TABLE IF NOT EXISTS `AdminAuditLogs` (
+    `Id` varchar(36) NOT NULL,
+    `CreatedDate` datetime(6) NOT NULL,
+    `AdminUserId` varchar(36) NULL,
+    `AdminName` varchar(200) CHARACTER SET utf8mb4 NULL,
+    `AdminEmail` varchar(200) CHARACTER SET utf8mb4 NULL,
+    `Module` varchar(100) CHARACTER SET utf8mb4 NULL,
+    `Action` varchar(100) CHARACTER SET utf8mb4 NULL,
+    `EntityType` varchar(100) CHARACTER SET utf8mb4 NULL,
+    `EntityId` varchar(200) CHARACTER SET utf8mb4 NULL,
+    `Description` varchar(2000) CHARACTER SET utf8mb4 NULL,
+    `Result` varchar(50) CHARACTER SET utf8mb4 NULL,
+    `FailureReason` longtext CHARACTER SET utf8mb4 NULL,
+    `IpAddress` varchar(100) CHARACTER SET utf8mb4 NULL,
+    `UserAgent` varchar(500) CHARACTER SET utf8mb4 NULL,
+    `CorrelationId` varchar(100) CHARACTER SET utf8mb4 NULL,
+    `BeforeStateJson` longtext CHARACTER SET utf8mb4 NULL,
+    `AfterStateJson` longtext CHARACTER SET utf8mb4 NULL,
+    PRIMARY KEY (`Id`),
+    INDEX `IX_AdminAuditLogs_CreatedDate` (`CreatedDate`),
+    INDEX `IX_AdminAuditLogs_AdminUserId` (`AdminUserId`),
+    INDEX `IX_AdminAuditLogs_Module` (`Module`),
+    INDEX `IX_AdminAuditLogs_Action` (`Action`),
+    INDEX `IX_AdminAuditLogs_Result` (`Result`),
+    INDEX `IX_AdminAuditLogs_EntityType_EntityId` (`EntityType`, `EntityId`),
+    INDEX `IX_AdminAuditLogs_CorrelationId` (`CorrelationId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`) VALUES
 ('20220114132548_AppInit', '6.0.12'),
 ('20220120122434_addedBanners', '6.0.12'),
@@ -375,7 +430,9 @@ INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`) VALUES
 ('20260911120259_AddDoubleEntryLedgerTables', '6.0.12'),
 ('20260915071938_AddSettlementRequestWorkflow', '6.0.12'),
 ('20260915080246_EnforceLedgerIdempotency', '6.0.12'),
-('20260915123000_AddUniqueConstraintToBillOrderIdMerchantId', '6.0.12')
+('20260915123000_AddUniqueConstraintToBillOrderIdMerchantId', '6.0.12'),
+('20260918030000_AddOrderArchiveFields', '6.0.12'),
+('20260918030100_AddAdminAuditLogs', '6.0.12')
 ON DUPLICATE KEY UPDATE `ProductVersion` = VALUES(`ProductVersion`);
 
 SET FOREIGN_KEY_CHECKS = 1;

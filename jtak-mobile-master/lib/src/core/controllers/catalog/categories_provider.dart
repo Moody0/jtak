@@ -140,21 +140,21 @@ class CategoriesProvider extends BaseProvider<CategoryModel> {
   int homeCategoriesMaxItems = 8;
   String? homeCategoriesTitle;
   List<HomeCategoryTile> homeCategoryTiles = [];
+  bool homeCategoriesAuthoritative = false;
 
   void setHomeCategoryTiles(
     List<HomeCategoryTile> tiles, {
     bool enabled = true,
     int maxItems = 8,
     String? title,
+    bool authoritative = true,
   }) {
     homeCategoriesEnabled = enabled;
     homeCategoriesMaxItems = maxItems;
     homeCategoriesTitle = title;
+    homeCategoriesAuthoritative = authoritative;
 
-    final validTiles = tiles.where((tile) {
-      final t = tile.title.trim();
-      return tile.isRoutable && t != 'المتاجر' && t != 'متاجر';
-    }).toList()
+    final validTiles = tiles.where((tile) => tile.isRoutable).toList()
       ..sort((a, b) => a.order.compareTo(b.order));
 
     if (maxItems > 0 && validTiles.length > maxItems) {

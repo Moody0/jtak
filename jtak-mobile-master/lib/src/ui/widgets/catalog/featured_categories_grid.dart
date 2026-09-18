@@ -37,24 +37,9 @@ class JtakFeaturedCategoriesGrid extends StatelessWidget {
   });
 
   void _openTile(BuildContext context, HomeCategoryTile tile) {
-    // 1. Check canonical scope by title or category id first
-    final scope = CatalogScope.fromCategory(
-      tile.productCategoryId,
-      tile.title,
-    );
-    if (scope != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => RestaurantsListPage(
-            catalogScope: scope,
-            title: scope.title,
-          ),
-        ),
-      );
-      return;
-    }
-
+    // Dashboard-authored tiles are authoritative. Never infer a different
+    // destination from their Arabic/English display title: titles can be
+    // renamed or translated without changing what a tile opens.
     switch (tile.linkType) {
       case HomeCategoryLinkType.merchant:
         Navigator.push(
@@ -178,6 +163,13 @@ class JtakFeaturedCategoriesGrid extends StatelessWidget {
           );
         },
       );
+    }
+
+    // A modern backend can deliberately return an empty curated list when no
+    // configured destination has live content. Do not resurrect legacy,
+    // hardcoded categories (especially pharmacies) in that case.
+    if (categoriesProvider.homeCategoriesAuthoritative) {
+      return const SizedBox.shrink();
     }
 
     // 2. Canonical 4 top-level service sections fallback (البقالة, المطاعم, قهوة ومشروبات, صيدليات)

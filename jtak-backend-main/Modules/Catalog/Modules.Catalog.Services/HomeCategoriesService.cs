@@ -24,14 +24,17 @@ namespace Modules.Catalog.Services
     public class HomeCategoriesService : IHomeCategoriesService
     {
         private readonly IProductCategoryService _categoryService;
+        private readonly IProductService _productService;
         private readonly IMerchantService _merchantService;
         private readonly IGenericSettingService _genericSetting;
 
         public HomeCategoriesService(IProductCategoryService categoryService,
+                                     IProductService productService,
                                      IMerchantService merchantService,
                                      IGenericSettingService genericSetting)
         {
             _categoryService = categoryService;
+            _productService = productService;
             _merchantService = merchantService;
             _genericSetting = genericSetting;
         }
@@ -112,13 +115,32 @@ namespace Modules.Catalog.Services
 
             var categories = await _categoryService.Queryable().AsNoTracking()
                                                    .Where(x => x.DeletionDate == null && x.Active)
-                                                   .Select(x => new { x.Id, x.Title, x.Icon })
+                                                   .Select(x => new { x.Id, x.Title, x.Icon, x.ParentId })
                                                    .ToDictionaryAsync(x => x.Id);
 
             var merchants = await _merchantService.Queryable().AsNoTracking()
                                                   .Where(x => x.DeletionDate == null && x.Active)
-                                                  .Select(x => new { x.Id, x.Title, x.Photo })
+                                                  .Select(x => new { x.Id, x.Title, x.Photo, x.MerchantKind })
                                                   .ToDictionaryAsync(x => x.Id);
+
+            var availableOffers = await _productService.Queryable().AsNoTracking()
+                .Where(x => x.DeletionDate == null && x.Active &&
+                            x.ProductCategoryId.HasValue &&
+                            x.ProductCategory.Active)
+                .SelectMany(x => x.MerchantProducts
+                    .Where(mp => (mp.MerchantPrice > 0 ||
+                                  (mp.PriceUsd.HasValue && mp.PriceUsd.Value > 0)) &&
+                                 mp.Merchant.DeletionDate == null &&
+                                 mp.Merchant.Active)
+                    .Select(mp => new
+                    {
+                        ProductId = x.Id,
+                        CategoryId = x.ProductCategoryId.Value,
+                        mp.MerchantId
+                    }))
+                .ToArrayAsync();
+
+            var categoryParents = categories.ToDictionary(x => x.Key, x => x.Value.ParentId);
 
             var resolved = new List<HomeCategoryTileDto>();
             foreach (var tile in tiles)
@@ -148,8 +170,31 @@ namespace Modules.Catalog.Services
                                 dto.Title = category.Title;
                             if (string.IsNullOrWhiteSpace(dto.ImageUrl))
                                 dto.ImageUrl = category.Icon;
+
+                            var categoryIds = GetCategoryTreeIds(
+                                tile.ProductCategoryId.Value,
+                                categoryParents);
+                            var matchingOffers = availableOffers
+                                .Where(x => categoryIds.Contains(x.CategoryId))
+                                .ToArray();
+                            dto.AvailableProductCount = matchingOffers
+                                .Select(x => x.ProductId)
+                                .Distinct()
+                                .Count();
+                            dto.AvailableMerchantCount = matchingOffers
+                                .Select(x => x.MerchantId)
+                                .Distinct()
+                                .Count();
+                            dto.HasAvailableContent = dto.AvailableProductCount > 0 &&
+                                                      dto.AvailableMerchantCount > 0;
+                            if (!dto.HasAvailableContent)
+                                dto.AvailabilityMessage = "لا توجد منتجات مسعّرة لدى متجر نشط في هذا القسم حالياً";
                         }
-                        else dto.TargetExists = false;
+                        else
+                        {
+                            dto.TargetExists = false;
+                            dto.HasAvailableContent = false;
+                        }
                         break;
 
                     case HomeCategoryLinkType.Merchant:
@@ -161,35 +206,105 @@ namespace Modules.Catalog.Services
                                 dto.Title = merchant.Title;
                             if (string.IsNullOrWhiteSpace(dto.ImageUrl))
                                 dto.ImageUrl = merchant.Photo;
+                            dto.AvailableMerchantCount = 1;
+                            dto.AvailableProductCount = availableOffers
+                                .Where(x => x.MerchantId == tile.MerchantId.Value)
+                                .Select(x => x.ProductId)
+                                .Distinct()
+                                .Count();
+                            dto.HasAvailableContent = true;
                         }
-                        else dto.TargetExists = false;
+                        else
+                        {
+                            dto.TargetExists = false;
+                            dto.HasAvailableContent = false;
+                        }
                         break;
 
                     case HomeCategoryLinkType.MerchantKind:
                         if (tile.MerchantKind.HasValue)
+                        {
                             dto.TargetLabel = tile.MerchantKind.Value.ToString();
-                        else dto.TargetExists = false;
+                            var merchantIds = merchants.Values
+                                .Where(x => x.MerchantKind == tile.MerchantKind.Value)
+                                .Select(x => x.Id)
+                                .ToHashSet();
+                            dto.AvailableMerchantCount = merchantIds.Count;
+                            dto.AvailableProductCount = availableOffers
+                                .Where(x => merchantIds.Contains(x.MerchantId))
+                                .Select(x => x.ProductId)
+                                .Distinct()
+                                .Count();
+                            dto.HasAvailableContent = dto.AvailableMerchantCount > 0;
+                            if (!dto.HasAvailableContent)
+                                dto.AvailabilityMessage = "لا يوجد متجر نشط من هذا النوع حالياً";
+                        }
+                        else
+                        {
+                            dto.TargetExists = false;
+                            dto.HasAvailableContent = false;
+                        }
                         break;
 
                     case HomeCategoryLinkType.Search:
                         if (!string.IsNullOrWhiteSpace(tile.SearchTerm))
+                        {
                             dto.TargetLabel = tile.SearchTerm;
-                        else dto.TargetExists = false;
+                            dto.HasAvailableContent = merchants.Count > 0;
+                            dto.AvailableMerchantCount = merchants.Count;
+                            if (!dto.HasAvailableContent)
+                                dto.AvailabilityMessage = "لا توجد متاجر نشطة للبحث حالياً";
+                        }
+                        else
+                        {
+                            dto.TargetExists = false;
+                            dto.HasAvailableContent = false;
+                        }
                         break;
 
                     default:
                         dto.TargetExists = false;
+                        dto.HasAvailableContent = false;
                         break;
                 }
 
                 // A tile with no usable title would render as a blank square.
                 if (string.IsNullOrWhiteSpace(dto.Title))
+                {
                     dto.TargetExists = false;
+                    dto.HasAvailableContent = false;
+                }
+
+                if (!dto.TargetExists && string.IsNullOrWhiteSpace(dto.AvailabilityMessage))
+                    dto.AvailabilityMessage = "الوجهة المحفوظة لم تعد موجودة أو مفعّلة";
 
                 resolved.Add(dto);
             }
 
             return resolved.ToArray();
+        }
+
+        private static HashSet<int> GetCategoryTreeIds(
+            int rootId,
+            IReadOnlyDictionary<int, int?> parentByCategoryId)
+        {
+            var result = new HashSet<int> { rootId };
+            var added = true;
+            while (added)
+            {
+                added = false;
+                foreach (var category in parentByCategoryId)
+                {
+                    if (category.Value.HasValue &&
+                        result.Contains(category.Value.Value) &&
+                        result.Add(category.Key))
+                    {
+                        added = true;
+                    }
+                }
+            }
+
+            return result;
         }
     }
 }
