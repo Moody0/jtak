@@ -41,6 +41,17 @@ export class ProductsService extends TableService<Product> implements OnDestroy 
       );
   }
 
+  deleteSelected(ids: number[]) {
+    this._isLoading$.next(true);
+    return this.http
+      .post(`${this.BASE_URL}/${this.GET_ONE_URL}/DeleteSelected`, ids)
+      .pipe(
+        finalize(() => {
+          this._isLoading$.next(false);
+        })
+      );
+  }
+
   ngOnDestroy() {
     this.subscriptions.forEach((sb) => sb.unsubscribe());
   }

@@ -10,6 +10,7 @@ import '../../../core/controllers/user/address_provider.dart';
 import '../../../core/models/user/address_model.dart';
 import '../../../core/services/location_service.dart';
 import '../../../utils/custom_widgets/syrian_flag.dart';
+import '../../../utils/utilities/phone_helper.dart';
 import '../../widgets/header_circle_button.dart';
 import '../address/choose_location_map_page.dart';
 import '../address/search_address_page.dart';
@@ -285,10 +286,7 @@ class _CheckoutLocationEditSheetState extends State<CheckoutLocationEditSheet> {
     _addressController = TextEditingController(text: baseAddress);
     _notesController = TextEditingController(text: extraNotes);
 
-    String cleanPhone = widget.initialPhone.replaceAll(RegExp(r'\s+'), '');
-    if (cleanPhone.startsWith('+963') && cleanPhone.length >= 12) {
-      cleanPhone = '0${cleanPhone.substring(4)}';
-    }
+    final cleanPhone = PhoneHelper.normalizeSyrianLocalPhone(widget.initialPhone);
     _phoneController = TextEditingController(text: cleanPhone);
 
     _selectedLat = widget.currentLat;
@@ -396,9 +394,7 @@ class _CheckoutLocationEditSheetState extends State<CheckoutLocationEditSheet> {
         _selectedLng = item.lng;
       }
       if (item.phoneNumber?.isNotEmpty == true) {
-        String p = item.phoneNumber!.replaceAll(RegExp(r'\s+'), '');
-        if (p.startsWith('+963') && p.length >= 12) p = '0${p.substring(4)}';
-        _phoneController.text = p;
+        _phoneController.text = PhoneHelper.normalizeSyrianLocalPhone(item.phoneNumber);
       }
     });
   }
@@ -420,7 +416,7 @@ class _CheckoutLocationEditSheetState extends State<CheckoutLocationEditSheet> {
 
     final notes = _notesController.text.trim();
     final String fullAddress = notes.isNotEmpty ? '$addr ($notes)' : addr;
-    final phone = _phoneController.text.trim();
+    final phone = PhoneHelper.normalizeSyrianLocalPhone(_phoneController.text);
 
     HapticFeedback.mediumImpact();
     widget.onSave(fullAddress, _selectedLat, _selectedLng, phone);
@@ -717,6 +713,9 @@ class _CheckoutLocationEditSheetState extends State<CheckoutLocationEditSheet> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   textDirection: TextDirection.ltr,
+                  inputFormatters: [
+                    SyrianPhoneInputFormatter(),
+                  ],
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -741,7 +740,7 @@ class _CheckoutLocationEditSheetState extends State<CheckoutLocationEditSheet> {
                         ],
                       ),
                     ),
-                    hintText: '0980 906 630',
+                    hintText: '980 906 630',
                     hintStyle: GoogleFonts.ibmPlexSansArabic(
                       fontSize: 12.5,
                       color: const Color(0xFF94A3B8),

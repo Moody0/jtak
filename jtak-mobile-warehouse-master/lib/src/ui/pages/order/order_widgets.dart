@@ -913,6 +913,51 @@ class OrderSingleItem extends StatelessWidget {
       );
     }
 
+    if (status == OrderDetailsStatus.readyForPickup) {
+      final hasCourier = item.deliveryUser != null && item.deliveryUser!.isNotEmpty;
+      return Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: Row(
+          children: [
+            OppositeIcon(Icons.inventory_2_outlined, color: Colors.green.shade700, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasCourier ? 'المندوب: ${item.deliveryUser}' : 'جاهز للتسليم للمندوب',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade900),
+                  ),
+                  Text(
+                    hasCourier ? 'جارٍ انتظار قبول المندوب' : 'جارٍ البحث عن كابتن توصيل',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ),
+            if (item.deliveryUserPhone != null && item.deliveryUserPhone!.isNotEmpty)
+              ElevatedButton.icon(
+                icon: const OppositeIcon(Icons.phone, size: 14, color: Colors.white),
+                label: const Text('المندوب', style: TextStyle(fontSize: 12, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+                onPressed: () => LunchUrl.canLaunch('tel:${item.deliveryUserPhone}'),
+              ),
+          ],
+        ),
+      );
+    }
+
     if (status == OrderDetailsStatus.shipping) {
       return Container(
         padding: const EdgeInsets.all(10),
@@ -932,7 +977,7 @@ class OrderSingleItem extends StatelessWidget {
                   Text(
                     item.deliveryUser != null && item.deliveryUser!.isNotEmpty
                         ? 'المندوب: ${item.deliveryUser}'
-                        : 'جاري تسليم الطلب للمندوب',
+                        : 'جارٍ تسليم الطلب للمندوب',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const Text('الطلب في طريقه إلى العميل', style: TextStyle(fontSize: 11, color: Colors.grey)),
@@ -956,11 +1001,14 @@ class OrderSingleItem extends StatelessWidget {
       );
     }
 
+    final isDelivered = status == OrderDetailsStatus.delivered;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          item.deliveryUser != null ? 'توصيل: ${item.deliveryUser}' : 'طلب منتهي',
+          isDelivered
+              ? (item.deliveryUser != null ? 'تم التوصيل بواسطة: ${item.deliveryUser}' : 'طلب مكتمل')
+              : (item.deliveryUser != null ? 'المندوب: ${item.deliveryUser}' : 'عرض تفاصيل الطلب'),
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const Text(

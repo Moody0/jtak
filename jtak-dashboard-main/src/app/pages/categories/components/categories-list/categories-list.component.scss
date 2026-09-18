@@ -576,15 +576,15 @@
   }
 
   &.status-disabled {
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
-    color: #64748b;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
 
     .status-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #94a3b8;
+      background: #ef4444;
     }
   }
 }
@@ -623,25 +623,34 @@
     color: #ea580c;
   }
 
+  &.btn-status-active,
   &.btn-toggle-active {
     color: #059669;
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+
     &:hover {
-      border-color: #a7f3d0;
-      background: #ecfdf5;
+      border-color: #6ee7b7;
+      background: #d1fae5;
       color: #047857;
     }
   }
 
+  &.btn-status-disabled,
   &.btn-toggle-disable {
     color: #dc2626;
+    background: #fef2f2;
+    border-color: #fecaca;
+
     &:hover {
-      border-color: #fecaca;
-      background: #fef2f2;
-      color: #b91c1c;
+      border-color: #fca5a5;
+      background: #fee2e2;
+      color: #991b1b;
     }
   }
 
-  &.btn-delete:hover {
+  &.btn-delete:hover,
+  &.btn-delete-row:hover {
     border-color: #fecaca;
     background: #fef2f2;
     color: #dc2626;

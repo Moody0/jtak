@@ -1,6 +1,6 @@
 <form class="form w-100" [formGroup]="loginForm" novalidate id="kt_login_signin_form" (ngSubmit)="submit()">
   <div class="jtak-login-heading">
-    <span class="jtak-login-kicker">جتك للأعمال</span>
+    <span class="jtak-login-kicker">جيتك للأعمال</span>
     <h1>{{ 'AUTH.LOGIN.TITLE' | translate }}</h1>
     <p>قم بتسجيل الدخول لإدارة العمليات اليومية.</p>
   </div>
@@ -39,7 +39,7 @@
     </ng-container>
     <ng-template #signInLabel>{{ 'AUTH.LOGIN.BUTTON' | translate }} <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i></ng-template>
   </button>
-  <p class="jtak-login-help">الدخول مخصص حصراً لموظفي ومسؤولي منصة جتك المصرح لهم.</p>
+  <p class="jtak-login-help">الدخول مخصص حصراً لموظفي ومسؤولي منصة جيتك المصرح لهم.</p>
 </form>
 
 <ng-template #formError let-control="control" let-message="message" let-validation="validation">

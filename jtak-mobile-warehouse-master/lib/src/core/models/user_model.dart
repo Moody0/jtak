@@ -100,7 +100,7 @@ class UserModel {
       id: map['id']?.toInt(),
       email: map['email'],
       emailConfirmed: map['emailConfirmed'],
-      phoneNumber: map['phone_number'],
+      phoneNumber: map['phone_number'] ?? map['phoneNumber'],
       countryPhoneCode: map['countryPhoneCode'],
       fullName: map['fullName'],
       gender: map['gender']?.toInt(),

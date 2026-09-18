@@ -1,4 +1,4 @@
-﻿using Solf.Base;
+using Solf.Base;
 using System;
 
 namespace Modules.Accounting.Entities
@@ -13,9 +13,12 @@ namespace Modules.Accounting.Entities
     public class BalanceDto
     {
         public Guid Id { get; set; }
+        public int? EntityId { get; set; }
         public string Name { get; set; }
+        public string Phone { get; set; }
         public decimal Amount { get; set; }
         public decimal PendingAmount { get; set; }
+        public decimal WagesAmount { get; set; }
         public DateTime CreatedDate { get; set; }
     }
 }

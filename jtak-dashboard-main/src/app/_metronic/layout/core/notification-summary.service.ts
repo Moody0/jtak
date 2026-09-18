@@ -48,7 +48,7 @@ export class NotificationSummaryService implements OnDestroy {
 
     this.pollingSub = timer(0, this.pollingIntervalMs)
       .pipe(
-        filter(() => !!this.authService.getAuthFromLocalStorage()),
+        filter(() => !!(this.authService.getAuthFromSessionStorage() || this.authService.getAuthFromLocalStorage())),
         switchMap(() => this.fetchSummaryObservable())
       )
       .subscribe();
@@ -58,7 +58,7 @@ export class NotificationSummaryService implements OnDestroy {
    * Trigger an immediate on-demand refresh (e.g. after order actions, ticket resolution, or settlement decisions)
    */
   public refresh(): void {
-    if (!this.authService.getAuthFromLocalStorage()) {
+    if (!(this.authService.getAuthFromSessionStorage() || this.authService.getAuthFromLocalStorage())) {
       return;
     }
     this.fetchSummaryObservable().subscribe();

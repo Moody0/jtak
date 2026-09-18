@@ -194,7 +194,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
         ? p!.phone1
         : (user?.phoneNumber ?? '');
     final logoUrl = UploadService.resolveImageUrl(p?.logo);
-    final coverageKm = ((p?.shippingCoverageInMeters ?? 5000) / 1000.0).toStringAsFixed(1);
+    final coverageKm = (((p?.shippingCoverageInMeters ?? 5000).clamp(0, 30000)) / 1000.0).toStringAsFixed(1);
 
     return Scaffold(
       backgroundColor: kPageBackground,

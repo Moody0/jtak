@@ -166,20 +166,22 @@ class AddressSingleItem extends StatelessWidget {
       return GestureDetector(
         onTap: () async {
           HapticFeedback.lightImpact();
-          var res = await showDialog(
+          var res = await showDialog<bool>(
             context: context,
-            builder: (context) => CustomConfirmationDialog(
+            builder: (dialogCtx) => CustomConfirmationDialog(
               title: str.msg.deleteConfermation,
-              yesBTNCallBack: () {
-                context.pop(data: true);
-              },
+              yesBTNCallBack: () {},
             ),
           );
-          if (res is bool && res && context.mounted) {
+          if (res == true && context.mounted) {
             final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-            await addressProvider.delete(item.id!);
+            final success = await addressProvider.delete(item.id!);
             if (context.mounted) {
-              context.showSnakBar(str.msg.addressDeleteSuccessfully);
+              if (success) {
+                context.showSnakBar(str.msg.addressDeleteSuccessfully);
+              } else {
+                context.showSnakBar(addressProvider.lastDeleteError ?? str.msg.errorOccurred);
+              }
             }
           }
         },

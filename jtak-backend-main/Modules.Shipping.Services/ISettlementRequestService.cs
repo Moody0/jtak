@@ -31,5 +31,6 @@ namespace Modules.Accounting.Services
         Task<SettlementRequestDto> AcceptAsync(Guid requestId, Guid adminId, string notes = null);
         Task<SettlementRequestDto> RejectAsync(Guid requestId, Guid adminId, string reason = null);
         Task<SettlementRequestDto> CompleteMerchantPayoutAsync(Guid requestId, Guid adminId, string notes = null);
+        Task<SettlementRequestDto> ConfirmMerchantReceiptAsync(Guid requestId, Guid merchantUserId, string notes = null);
     }
 }

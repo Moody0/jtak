@@ -14,9 +14,11 @@ class TextFormFieldWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TextFormField(
       initialValue: initialValue,
-      decoration: AppTheme.getBorderdTextFieldDecoration(lable: lable, hint: hint),
+      style: TextStyle(color: isDark ? Colors.white : null),
+      decoration: AppTheme.getBorderdTextFieldDecoration(context: context, lable: lable, hint: hint),
       onChanged: onChanged,
       validator: validator,
     );
@@ -38,16 +40,21 @@ class _PasswordTextFormFieldState extends State<PasswordTextFormField> {
   bool _obscureText = true;
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TextFormField(
       textDirection: TextDirection.ltr,
       initialValue: widget.initValue,
       obscureText: _obscureText,
       keyboardType: TextInputType.visiblePassword,
-      decoration: AppTheme.getBorderdTextFieldDecoration(lable: widget.lable, hint: widget.hint).copyWith(
-        contentPadding: const EdgeInsets.all(0),
-        prefixIcon: const Icon(Icons.lock),
+      style: TextStyle(color: isDark ? Colors.white : null),
+      decoration: AppTheme.getBorderdTextFieldDecoration(context: context, lable: widget.lable, hint: widget.hint).copyWith(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        prefixIcon: Icon(Icons.lock_rounded, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280)),
         suffixIcon: InkWell(
-          child: Icon(_obscureText ? Icons.visibility : Icons.visibility_off),
+          child: Icon(
+            _obscureText ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280),
+          ),
           onTap: () => setState(
             () => _obscureText = !_obscureText,
           ),

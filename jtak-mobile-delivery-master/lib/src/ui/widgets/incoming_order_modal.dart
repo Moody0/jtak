@@ -277,7 +277,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                                     ? (isDark
                                         ? const Color(0xFF7F1D1D)
                                         : const Color(0xFFFEE2E2))
-                                    : const Color(0xFFFFF0E8),
+                                    : (isDark
+                                        ? const Color(0xFF2A1C12)
+                                        : const Color(0xFFFFF0E8)),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -323,15 +325,21 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                             horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: isUrgent
-                              ? const Color(0xFFFEF2F2)
+                              ? (isDark
+                                  ? const Color(0xFF450A0A)
+                                  : const Color(0xFFFEF2F2))
                               : (isDark
                                   ? const Color(0xFF334155)
                                   : const Color(0xFFF8FAFC)),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isUrgent
-                                ? const Color(0xFFFECACA)
-                                : const Color(0xFFE2E8F0),
+                                ? (isDark
+                                    ? const Color(0xFF991B1B)
+                                    : const Color(0xFFFECACA))
+                                : (isDark
+                                    ? const Color(0xFF475569)
+                                    : const Color(0xFFE2E8F0)),
                           ),
                         ),
                         child: Row(
@@ -343,7 +351,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                               child: CircularProgressIndicator(
                                 value: progress,
                                 strokeWidth: 2.5,
-                                backgroundColor: const Color(0xFFE2E8F0),
+                                backgroundColor: isDark
+                                    ? const Color(0xFF475569)
+                                    : const Color(0xFFE2E8F0),
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   isUrgent ? kRed : kPrimaryOrange,
                                 ),
@@ -355,7 +365,11 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                               style: GoogleFonts.ibmPlexSansArabic(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
-                                color: isUrgent ? kRed : kCharcoalDark,
+                                color: isUrgent
+                                    ? (isDark
+                                        ? const Color(0xFFF87171)
+                                        : kRed)
+                                    : (isDark ? Colors.white : kCharcoalDark),
                               ),
                             ),
                           ],
@@ -391,10 +405,15 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                               width: 34,
                               height: 34,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFF0E8),
+                                color: isDark
+                                    ? const Color(0xFF2A1C12)
+                                    : const Color(0xFFFFF0E8),
                                 borderRadius: BorderRadius.circular(10),
-                                border:
-                                    Border.all(color: const Color(0xFFFFD4C0)),
+                                border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF7C2D12)
+                                      : const Color(0xFFFFD4C0),
+                                ),
                               ),
                               child: const Icon(
                                 PhosphorIcons.storefrontBold,
@@ -439,7 +458,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                                     merchantAddress,
                                     style: GoogleFonts.ibmPlexSansArabic(
                                       fontSize: 12,
-                                      color: kCharcoalMuted,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : kCharcoalMuted,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -466,7 +487,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                               height: 16,
                               width: 2,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFCBD5E1),
+                                color: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFCBD5E1),
                                 borderRadius: BorderRadius.circular(1),
                               ),
                             ),
@@ -482,10 +505,15 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                               width: 34,
                               height: 34,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFECFDF5),
+                                color: isDark
+                                    ? const Color(0xFF064E3B)
+                                    : const Color(0xFFECFDF5),
                                 borderRadius: BorderRadius.circular(10),
-                                border:
-                                    Border.all(color: const Color(0xFFA7F3D0)),
+                                border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF047857)
+                                      : const Color(0xFFA7F3D0),
+                                ),
                               ),
                               child: const Icon(
                                 PhosphorIcons.mapPinBold,
@@ -535,7 +563,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                                     customerAddress,
                                     style: GoogleFonts.ibmPlexSansArabic(
                                       fontSize: 12,
-                                      color: kCharcoalMuted,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : kCharcoalMuted,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -613,8 +643,11 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                     ),
                     child: Row(
                       children: [
-                        const Icon(PhosphorIcons.receiptBold,
-                            size: 16, color: kCharcoalMuted),
+                        Icon(PhosphorIcons.receiptBold,
+                            size: 16,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : kCharcoalMuted),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -638,7 +671,9 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF0E8),
+                            color: isDark
+                                ? const Color(0xFF2A1C12)
+                                : const Color(0xFFFFF0E8),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -794,7 +829,7 @@ class _IncomingOrderModalState extends State<IncomingOrderModal>
             style: GoogleFonts.ibmPlexSansArabic(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: kCharcoalMuted,
+              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

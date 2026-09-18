@@ -41,6 +41,7 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
   merchantSearchFn = (term: string, item: Merchant) => {
     if (!term) return true;
     term = term.trim().toLowerCase();
+    const cleanTerm = term.startsWith('#') ? term.substring(1) : term;
     const title = (item.title || '').toLowerCase();
     const desc = (item.shortDescription || item.description || '').toLowerCase();
     const id = String(item.id || '');
@@ -48,8 +49,10 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
       title.includes(term) ||
       desc.includes(term) ||
       id === term ||
+      id === cleanTerm ||
       `#${id}` === term ||
-      id.includes(term)
+      id.includes(term) ||
+      id.includes(cleanTerm)
     );
   };
 
@@ -79,9 +82,9 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
     this.loadingMerchants = true;
     this.subs.sink = this.merchantsService.getAllMerchants().subscribe({
       next: (items) => {
-        this.merchants = items || [];
-        this.restaurants = this.merchants.filter((m) => !this.isMarket(m));
-        this.markets = this.merchants.filter((m) => this.isMarket(m));
+        this.merchants = (items || []).filter((m) => m.active !== false);
+        this.restaurants = this.merchants.filter((m) => Number(m.merchantKind) === 0);
+        this.markets = this.merchants.filter((m) => Number(m.merchantKind) > 0);
         this.loadingMerchants = false;
         this.cdr.detectChanges();
       },
@@ -90,57 +93,6 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
     });
-  }
-
-  isMarket(merchant: Merchant): boolean {
-    if (!merchant) return false;
-    const kind = merchant.merchantKind != null ? Number(merchant.merchantKind) : null;
-    if (kind !== null && !isNaN(kind)) {
-      return kind > 0;
-    }
-    const title = (merchant.title || '').toLowerCase();
-    const desc = (merchant.shortDescription || merchant.description || '').toLowerCase();
-
-    const descHasMarket =
-      desc.includes('سوبرماركت') ||
-      desc.includes('سوبر ماركت') ||
-      desc.includes('ماركت') ||
-      desc.includes('market') ||
-      desc.includes('mart') ||
-      desc.includes('بقالة') ||
-      desc.includes('أسواق') ||
-      desc.includes('تموينات') ||
-      desc.includes('هايبر') ||
-      desc.includes('صيدلية') ||
-      desc.includes('متجر');
-
-    const descHasRestaurant =
-      desc.includes('مطعم') ||
-      desc.includes('وجبات') ||
-      desc.includes('مأكولات') ||
-      desc.includes('كافيه') ||
-      desc.includes('سناك') ||
-      desc.includes('شاورما') ||
-      desc.includes('برغر') ||
-      desc.includes('بيتزا') ||
-      desc.includes('مشاوي') ||
-      desc.includes('حلويات') ||
-      desc.includes('معجنات');
-
-    if (descHasMarket && !descHasRestaurant) return true;
-    if (descHasRestaurant && !descHasMarket) return false;
-
-    return (
-      title.includes('ماركت') ||
-      title.includes('سوبرماركت') ||
-      title.includes('سوبر ماركت') ||
-      title.includes('بقالة') ||
-      title.includes('أسواق') ||
-      title.includes('market') ||
-      title.includes('mart') ||
-      title.includes('تموينات') ||
-      title.includes('صيدلية')
-    );
   }
 
   getMerchantName(id: any): string {
@@ -211,24 +163,25 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
   }
 
   onTargetTypeChange(type: string): void {
+    const currentId = this.formGroup.get('targetMerchantId')?.value;
+    if (!currentId) return;
+
     if (type === 'restaurant') {
-      const currentId = this.formGroup.get('targetMerchantId')?.value;
       if (
-        currentId &&
         this.restaurants.length > 0 &&
         !this.restaurants.some((r) => Number(r.id) === Number(currentId))
       ) {
         this.formGroup.patchValue({ targetMerchantId: null });
       }
     } else if (type === 'market') {
-      const currentId = this.formGroup.get('targetMerchantId')?.value;
       if (
-        currentId &&
         this.markets.length > 0 &&
         !this.markets.some((m) => Number(m.id) === Number(currentId))
       ) {
         this.formGroup.patchValue({ targetMerchantId: null });
       }
+    } else {
+      this.formGroup.patchValue({ targetMerchantId: null });
     }
   }
 

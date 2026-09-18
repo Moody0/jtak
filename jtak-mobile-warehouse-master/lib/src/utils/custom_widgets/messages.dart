@@ -251,7 +251,7 @@ class CustomConfirmationDialog extends StatelessWidget {
                   child: GestureDetector(
                     onTap: () {
                       HapticFeedback.lightImpact();
-                      Navigator.of(context).pop();
+                      Navigator.of(context).pop(false);
                     },
                     behavior: HitTestBehavior.opaque,
                     child: Container(
@@ -279,6 +279,7 @@ class CustomConfirmationDialog extends StatelessWidget {
                   child: GestureDetector(
                     onTap: () {
                       HapticFeedback.lightImpact();
+                      Navigator.of(context).pop(true);
                       yesBTNCallBack();
                     },
                     behavior: HitTestBehavior.opaque,

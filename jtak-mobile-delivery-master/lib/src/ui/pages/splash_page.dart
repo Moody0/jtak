@@ -140,7 +140,6 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   void dispose() {
     _animController.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
     super.dispose();
   }
 }

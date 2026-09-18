@@ -73,9 +73,12 @@ namespace App.Helpers.StartUp
             services.AddScoped<IBalanceService, BalanceService>();
             services.AddScoped<ILedgerService, LedgerService>();
             services.AddScoped<IEodReconciliationService, EodReconciliationService>();
+            services.AddScoped<IMerchantReconciliationService, MerchantReconciliationService>();
             services.AddScoped<ISettlementRequestService, SettlementRequestService>();
+            services.AddScoped<ISettlementHistoryService, SettlementHistoryService>();
             services.AddScoped<ISupportMessageService, SupportMessageService>();
             services.AddScoped<IAdminNotificationSummaryService, AdminNotificationSummaryService>();
+            services.AddScoped<IAdminAuditService, AdminAuditService>();
 
             // Background Service Management
             services.AddHostedService<OrderCheckingService>();

@@ -126,7 +126,7 @@
           [class.active]="selectedStatus === 'active'"
           (click)="filterByStatus('active')"
         >
-          <i class="fas fa-check-circle text-success me-1"></i>
+          <i class="fas fa-check-circle me-1" style="color: #ea580c;"></i>
           {{ 'PRODUCTS_PAGE.STATUS_ACTIVE' | translate }}
         </button>
         <button
@@ -153,8 +153,11 @@
           <button type="button" class="btn btn-sm btn-light-success" (click)="bulkSetStatus(rawItems, true)">
             <i class="fas fa-check-circle me-1"></i> {{ 'PRODUCTS_PAGE.ENABLE' | translate }}
           </button>
-          <button type="button" class="btn btn-sm btn-light-danger" (click)="bulkSetStatus(rawItems, false)">
+          <button type="button" class="btn btn-sm btn-light-warning" (click)="bulkSetStatus(rawItems, false)">
             <i class="fas fa-ban me-1"></i> {{ 'PRODUCTS_PAGE.DISABLE' | translate }}
+          </button>
+          <button type="button" class="btn btn-sm btn-light-danger" (click)="bulkDelete(rawItems)">
+            <i class="fas fa-trash-alt me-1"></i> {{ 'PRODUCTS_PAGE.BULK_DELETE' | translate }}
           </button>
           <button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(rawItems, 'products')">
             <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
@@ -314,7 +317,7 @@
                 </div>
               </td>
 
-              <!-- Sourcing & Store Linkage (Realistic Branding & Links) -->
+              <!-- Sourcing & Store Linkage & Publication State -->
               <td>
                 <div class="ops-merchant-cell" *ngIf="getMerchantInfo(product) as mInfo">
                   <!-- Linked Store / Brand -->
@@ -323,15 +326,29 @@
                       <i class="fas fa-store-alt text-primary"></i>
                       <span>{{ mInfo.name }}</span>
                     </span>
-                    <a
-                      [routerLink]="['/inventory-batches']"
-                      [queryParams]="{ productId: product.id }"
-                      class="ops-batch-link"
-                      title="استعراض دفعات المخزون وتواريخ الصلاحية لهذا المنتج"
-                    >
-                      <i class="fas fa-layer-group"></i>
-                      <span>{{ 'PRODUCTS_PAGE.VIEW_BATCHES' | translate }}</span>
-                    </a>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                      <span
+                        *ngIf="getPublicationInfo(product) as pubInfo"
+                        class="badge fs-9 py-1 px-2"
+                        [ngClass]="pubInfo.badgeClass"
+                        [title]="pubInfo.tooltip"
+                      >
+                        <i
+                          class="fas me-1"
+                          [ngClass]="pubInfo.status === 'published' ? 'fa-check-circle' : (pubInfo.status === 'assigned_inactive' ? 'fa-exclamation-circle' : 'fa-folder')"
+                        ></i>
+                        {{ pubInfo.label }}
+                        <span *ngIf="pubInfo.priceDisplay" class="ms-1 fw-bold">({{ pubInfo.priceDisplay }})</span>
+                      </span>
+                      <a
+                        [routerLink]="['/inventory-batches']"
+                        [queryParams]="{ productId: product.id }"
+                        class="ops-batch-link"
+                        title="استعراض دفعات المخزون وتواريخ الصلاحية لهذا المنتج"
+                      >
+                        <i class="fas fa-layer-group"></i>
+                      </a>
+                    </div>
                   </ng-container>
 
                   <!-- Unassigned Store / Global Catalog -->
@@ -342,7 +359,7 @@
                     </span>
                     <button
                       type="button"
-                      class="ops-assign-btn"
+                      class="ops-assign-btn mt-1"
                       (click)="edit(product)"
                       title="فتح لتحديد المتجر وسعر البيع"
                     >
@@ -392,11 +409,22 @@
                   <button
                     type="button"
                     class="ops-btn-action"
-                    [ngClass]="product.active ? 'btn-toggle-disable' : 'btn-toggle-active'"
+                    [ngClass]="product.active ? 'btn-status-active' : 'btn-status-disabled'"
                     (click)="changeStatus(product.active, product.id)"
-                    [title]="(product.active ? 'PRODUCTS_PAGE.DISABLE' : 'PRODUCTS_PAGE.ENABLE') | translate"
+                    [title]="product.active ? 'نشط — اضغط للتعطيل' : 'غير نشط — اضغط للتفعيل'"
+                    [attr.aria-label]="product.active ? 'نشط — اضغط للتعطيل' : 'غير نشط — اضغط للتفعيل'"
                   >
-                    <i class="fas" [ngClass]="product.active ? 'fa-ban' : 'fa-check'"></i>
+                    <i class="fas" [ngClass]="product.active ? 'fa-check' : 'fa-ban'"></i>
+                  </button>
+
+                  <!-- Delete Product Row Action -->
+                  <button
+                    type="button"
+                    class="ops-btn-action btn-delete-row"
+                    (click)="delete(product.id)"
+                    title="حذف المنتج وأرشفته بأمان"
+                  >
+                    <i class="fas fa-trash-alt"></i>
                   </button>
                 </div>
               </td>

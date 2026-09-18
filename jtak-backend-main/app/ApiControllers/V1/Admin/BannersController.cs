@@ -28,6 +28,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly ILogger _logger;
         private readonly IBannerService _service;
         private readonly IMemoryCache _cache;
+        private readonly IAdminAuditService _auditService;
 
         public BannerController(IAppUnitOfWork unitOfWork,
             INotificationService notificationService,
@@ -35,7 +36,8 @@ namespace App.ApiControllers.V1.Admin
             IBannerService service,
             ILogger<BannerController> logger,
             IMemoryCache cache,
-            IMapper mapper)
+            IMapper mapper,
+            IAdminAuditService auditService = null)
         {
             _uow = unitOfWork;
             _userManager = userManager;
@@ -44,6 +46,7 @@ namespace App.ApiControllers.V1.Admin
             _mapper = mapper;
             _cache = cache;
             _service = service;
+            _auditService = auditService;
         }
 
 
@@ -88,6 +91,21 @@ namespace App.ApiControllers.V1.Admin
             _service.Insert(entity);
             await _uow.SaveChangesAsync();
             InvalidateBannerCache();
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Banners",
+                    Action = "Create",
+                    EntityType = "Banner",
+                    EntityId = entity.Id.ToString(),
+                    Description = $"إضافة إعلان جديد: {entity.Title}",
+                    Result = "Success",
+                    AfterState = new { entity.Id, entity.Title, entity.BannerLocation, entity.Active, entity.Order }
+                });
+            }
+
             return entity.Id;
         }
 
@@ -105,6 +123,16 @@ namespace App.ApiControllers.V1.Admin
             {
                 return BadRequest("Not found!");
             }
+
+            var beforeState = new
+            {
+                entity.Id,
+                entity.Title,
+                entity.BannerLocation,
+                entity.Active,
+                entity.Order
+            };
+
             var uid = User.GetUserId();
             entity.Title = model.Title;
             entity.Description = model.Description;
@@ -117,6 +145,28 @@ namespace App.ApiControllers.V1.Admin
             await _uow.SaveChangesAsync();
             InvalidateBannerCache();
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Banners",
+                    Action = "Edit",
+                    EntityType = "Banner",
+                    EntityId = entity.Id.ToString(),
+                    Description = $"تعديل الإعلان: {entity.Title}",
+                    Result = "Success",
+                    BeforeState = beforeState,
+                    AfterState = new
+                    {
+                        entity.Id,
+                        entity.Title,
+                        entity.BannerLocation,
+                        entity.Active,
+                        entity.Order
+                    }
+                });
+            }
+
             return entity.Id;
         }
 
@@ -128,9 +178,24 @@ namespace App.ApiControllers.V1.Admin
         [Route("{id}")]
         public async Task<ActionResult<bool>> Delete(int id)
         {
+            var banner = await _service.FindAsync(id);
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();
             InvalidateBannerCache();
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Banners",
+                    Action = "Delete",
+                    EntityType = "Banner",
+                    EntityId = id.ToString(),
+                    Description = $"حذف الإعلان: {banner?.Title ?? id.ToString()}",
+                    Result = "Success"
+                });
+            }
+
             return true;
         }
 

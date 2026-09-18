@@ -23,11 +23,13 @@ namespace App.ApiControllers.V1.Admin
     {
         private readonly ISettlementRequestService _service;
         private readonly INotificationService _notifications;
+        private readonly IAdminAuditService _auditService;
 
-        public SettlementRequestsController(ISettlementRequestService service, INotificationService notifications)
+        public SettlementRequestsController(ISettlementRequestService service, INotificationService notifications, IAdminAuditService auditService = null)
         {
             _service = service;
             _notifications = notifications;
+            _auditService = auditService;
         }
 
         [HttpGet]
@@ -42,11 +44,54 @@ namespace App.ApiControllers.V1.Admin
             try
             {
                 var result = await _service.AcceptAsync(id, User.GetUserId() ?? Guid.Empty, request?.Notes);
-                await _notifications.SendSettlementRequestStatus(new[] { result.RequestedByUserId }, result.RequestNumber, result.Amount, result.Status.ToString());
+                try
+                {
+                    if (_notifications != null && result.RequestedByUserId != Guid.Empty)
+                    {
+                        var isMerchant = result.PartyType == SettlementPartyType.Merchant;
+                        await _notifications.SendSettlementApproved(
+                            new[] { result.RequestedByUserId },
+                            result.RequestNumber,
+                            result.Amount,
+                            isMerchant);
+                    }
+                }
+                catch
+                {
+                    // Notification failure must not fail or corrupt successful database approval
+                }
+
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "Approve",
+                        EntityType = "SettlementRequest",
+                        EntityId = result.RequestNumber ?? id.ToString(),
+                        Description = $"الموافقة على طلب تسوية {result.RequestedByName} بمبلغ {result.Amount:N0} ل.س",
+                        Result = "Success",
+                        AfterState = result
+                    });
+                }
+
                 return Ok(result);
             }
             catch (InvalidOperationException ex)
             {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "Approve",
+                        EntityType = "SettlementRequest",
+                        EntityId = id.ToString(),
+                        Description = $"فشل الموافقة على طلب تسوية #{id}",
+                        Result = "Failed",
+                        FailureReason = ex.Message
+                    });
+                }
                 return BadRequest(ApiErr.Create(ex.Message));
             }
         }
@@ -57,11 +102,53 @@ namespace App.ApiControllers.V1.Admin
             try
             {
                 var result = await _service.RejectAsync(id, User.GetUserId() ?? Guid.Empty, request?.Reason);
-                await _notifications.SendSettlementRequestStatus(new[] { result.RequestedByUserId }, result.RequestNumber, result.Amount, result.Status.ToString(), result.RejectionReason);
+                try
+                {
+                    if (_notifications != null && result.RequestedByUserId != Guid.Empty)
+                    {
+                        await _notifications.SendSettlementRejected(
+                            new[] { result.RequestedByUserId },
+                            result.RequestNumber,
+                            result.Amount,
+                            result.RejectionReason);
+                    }
+                }
+                catch
+                {
+                    // Notification failure must not fail or corrupt successful database rejection
+                }
+
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "Reject",
+                        EntityType = "SettlementRequest",
+                        EntityId = result.RequestNumber ?? id.ToString(),
+                        Description = $"رفض طلب تسوية {result.RequestedByName} بمبلغ {result.Amount:N0} ل.س - السبب: {request?.Reason}",
+                        Result = "Success",
+                        AfterState = result
+                    });
+                }
+
                 return Ok(result);
             }
             catch (InvalidOperationException ex)
             {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "Reject",
+                        EntityType = "SettlementRequest",
+                        EntityId = id.ToString(),
+                        Description = $"فشل رفض طلب تسوية #{id}",
+                        Result = "Failed",
+                        FailureReason = ex.Message
+                    });
+                }
                 return BadRequest(ApiErr.Create(ex.Message));
             }
         }
@@ -72,11 +159,52 @@ namespace App.ApiControllers.V1.Admin
             try
             {
                 var result = await _service.CompleteMerchantPayoutAsync(id, User.GetUserId() ?? Guid.Empty, request?.Notes);
-                await _notifications.SendSettlementRequestStatus(new[] { result.RequestedByUserId }, result.RequestNumber, result.Amount, result.Status.ToString());
+                try
+                {
+                    if (_notifications != null && result.RequestedByUserId != Guid.Empty)
+                    {
+                        await _notifications.SendSettlementCompleted(
+                            new[] { result.RequestedByUserId },
+                            result.RequestNumber,
+                            result.Amount);
+                    }
+                }
+                catch
+                {
+                    // Notification failure must not fail or corrupt successful database completion
+                }
+
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "Pay",
+                        EntityType = "SettlementRequest",
+                        EntityId = result.RequestNumber ?? id.ToString(),
+                        Description = $"إتمام صرف تسوية التاجر {result.RequestedByName} بمبلغ {result.Amount:N0} ل.س",
+                        Result = "Success",
+                        AfterState = result
+                    });
+                }
+
                 return Ok(result);
             }
             catch (InvalidOperationException ex)
             {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "Pay",
+                        EntityType = "SettlementRequest",
+                        EntityId = id.ToString(),
+                        Description = $"فشل صرف تسوية التاجر #{id}",
+                        Result = "Failed",
+                        FailureReason = ex.Message
+                    });
+                }
                 return BadRequest(ApiErr.Create(ex.Message));
             }
         }

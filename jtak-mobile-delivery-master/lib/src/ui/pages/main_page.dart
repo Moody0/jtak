@@ -202,6 +202,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   /// ambushing them with a system prompt on first launch — measurably
   /// improves grant rates and avoids the driver reflexively tapping "Deny".
   Widget _locationRationaleCard(bool isArabic) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final reasons = <(IconData, String, String)>[
       (
         PhosphorIcons.packageBold,
@@ -238,8 +239,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         Container(
           width: 84,
           height: 84,
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFF0E8),
+          decoration: BoxDecoration(
+            color: isDark ? kDarkSurfaceWarm : const Color(0xFFFFF0E8),
             shape: BoxShape.circle,
           ),
           child: const HomeMirroredIcon(PhosphorIcons.mapPinBold,
@@ -250,7 +251,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           isArabic ? 'لماذا نحتاج موقعك؟' : 'Why we need your location',
           textAlign: TextAlign.center,
           style: GoogleFonts.ibmPlexSansArabic(
-              fontSize: 22, fontWeight: FontWeight.w800),
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : kCharcoalDark),
         ),
         const SizedBox(height: 20),
         ...reasons.map(
@@ -263,7 +266,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF0E8),
+                    color: isDark ? kDarkSurfaceWarm : const Color(0xFFFFF0E8),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child:
@@ -278,7 +281,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                         r.$2,
                         textAlign: TextAlign.start,
                         style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 14, fontWeight: FontWeight.w700),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : kCharcoalDark),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -287,7 +292,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                         style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 12.5,
                             height: 1.4,
-                            color: const Color(0xFF64748B)),
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B)),
                       ),
                     ],
                   ),
@@ -324,9 +331,10 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   /// silently does nothing once Android has already decided it won't show
   /// the "Allow all the time" dialog a second time.
   Widget _locationStatusCard(bool isArabic) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     IconData icon = PhosphorIcons.mapPinBold;
     Color iconColor = kPrimaryOrange;
-    Color iconBg = const Color(0xFFFFF0E8);
+    Color iconBg = isDark ? kDarkSurfaceWarm : const Color(0xFFFFF0E8);
     String title = isArabic ? 'الموقع مطلوب للتوصيل' : 'Location is required';
     bool primaryOpensSettings = false;
     List<String> steps = const [];
@@ -335,7 +343,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       case LocationAccessIssue.serviceDisabled:
         icon = Icons.location_off_rounded;
         iconColor = kRed;
-        iconBg = const Color(0xFFFEE2E2);
+        iconBg = isDark ? kDarkRedBg : const Color(0xFFFEE2E2);
         title =
             isArabic ? 'خدمة الموقع غير مفعّلة' : 'Location services are off';
         primaryOpensSettings = true;
@@ -348,7 +356,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       case LocationAccessIssue.permissionDeniedForever:
         icon = Icons.location_disabled_rounded;
         iconColor = kRed;
-        iconBg = const Color(0xFFFEE2E2);
+        iconBg = isDark ? kDarkRedBg : const Color(0xFFFEE2E2);
         title = isArabic ? 'تم حظر إذن الموقع' : 'Location permission blocked';
         primaryOpensSettings = true;
         break;
@@ -389,7 +397,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
           title,
           textAlign: TextAlign.center,
           style: GoogleFonts.ibmPlexSansArabic(
-              fontSize: 22, fontWeight: FontWeight.w800),
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : kCharcoalDark),
         ),
         const SizedBox(height: 12),
         Text(
@@ -399,7 +409,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   : 'Always-on location and GPS are required to receive orders and share your position during delivery.'),
           textAlign: TextAlign.center,
           style: GoogleFonts.ibmPlexSansArabic(
-              fontSize: 14, height: 1.5, color: const Color(0xFF64748B)),
+              fontSize: 14,
+              height: 1.5,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
         ),
         if (steps.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -407,9 +419,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,7 +454,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                           e.value,
                           textAlign: TextAlign.start,
                           style: GoogleFonts.ibmPlexSansArabic(
-                              fontSize: 13, fontWeight: FontWeight.w600),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : kCharcoalDark),
                         ),
                       ),
                     ],
@@ -515,7 +532,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                       Text(
                         'جيتك',
                         style: GoogleFonts.ibmPlexSansArabic(
-                          color: kCharcoalDark,
+                          color: isDark ? Colors.white : kCharcoalDark,
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                         ),
@@ -528,7 +545,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: kSurfaceWarm,
+                    color: isDark ? kDarkSurfaceWarm : kSurfaceWarm,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -571,7 +588,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFFE2E8F0),
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
                       width: 1.5,
                     ),
                   ),
@@ -583,9 +602,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                 : GlobalVar.getImageUrl(photo),
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
-                                _buildAvatarFallback(user?.fullName),
+                                _buildAvatarFallback(user?.fullName, isDark),
                           )
-                        : _buildAvatarFallback(user?.fullName),
+                        : _buildAvatarFallback(user?.fullName, isDark),
                   ),
                 ),
               ),
@@ -602,12 +621,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildAvatarFallback(String? name) {
+  Widget _buildAvatarFallback(String? name, [bool isDark = false]) {
     final initial = (name != null && name.trim().isNotEmpty)
         ? name.trim().substring(0, 1)
         : 'س';
     return Container(
-      color: const Color(0xFFFFF0E8),
+      color: isDark ? kDarkSurfaceWarm : const Color(0xFFFFF0E8),
       alignment: Alignment.center,
       child: Text(
         initial,

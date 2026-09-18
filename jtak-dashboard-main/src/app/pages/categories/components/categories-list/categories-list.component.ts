@@ -213,14 +213,24 @@ export class CategoriesListComponent
   }
 
   changeStatus(category: Category): void {
+    const wasActive = category.active;
     const updated = {
       ...category,
-      active: !category.active,
+      active: !wasActive,
     };
-    this.service.update(updated).subscribe(() => {
-      this.toaster.success('تم تحديث حالة التصنيف بنجاح');
-      this.service.fetchPost();
-      this.loadHierarchyData();
+    this.service.update(updated).subscribe({
+      next: () => {
+        this.toaster.success(
+          wasActive ? 'تم تعطيل التصنيف بنجاح' : 'تم تفعيل التصنيف بنجاح'
+        );
+        this.service.fetchPost();
+        this.loadHierarchyData();
+      },
+      error: () => {
+        this.toaster.error('تعذر تحديث حالة التصنيف من الخادم، تمت استعادة الحالة الأصلية');
+        this.service.fetchPost();
+        this.loadHierarchyData();
+      }
     });
   }
 

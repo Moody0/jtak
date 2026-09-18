@@ -22,14 +22,14 @@
   </div>
 
   <ng-container *ngIf="ordersService.items$ | async as items">
-    <!-- 2. Operational KPI Counters Strip -->
-    <section class="ops-orders-kpi-bar mb-4" *ngIf="getCounts(items) as counts">
+    <!-- 2. Operational KPI Counters Strip (The authoritative top cards) -->
+    <section class="ops-orders-kpi-bar mb-4">
       <div class="ops-kpi-chip" [class.active]="activeTab === 'ALL'" (click)="setActiveTab('ALL')">
         <div class="ops-kpi-chip-icon ops-kpi-chip-icon--dark">
           <i class="fas fa-boxes"></i>
         </div>
         <div class="ops-kpi-chip-info">
-          <strong class="ops-kpi-chip-count">{{ counts.total }}</strong>
+          <strong class="ops-kpi-chip-count">{{ summary.total }}</strong>
           <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_ALL' | translate }}</span>
         </div>
       </div>
@@ -39,7 +39,7 @@
           <i class="fas fa-hourglass-half"></i>
         </div>
         <div class="ops-kpi-chip-info">
-          <strong class="ops-kpi-chip-count text-warning">{{ counts.pending }}</strong>
+          <strong class="ops-kpi-chip-count text-warning">{{ summary.pendingApproval }}</strong>
           <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_PENDING' | translate }}</span>
         </div>
       </div>
@@ -49,7 +49,7 @@
           <i class="fas fa-user-clock"></i>
         </div>
         <div class="ops-kpi-chip-info">
-          <strong class="ops-kpi-chip-count text-danger">{{ counts.unassigned }}</strong>
+          <strong class="ops-kpi-chip-count text-danger">{{ summary.withoutDriver }}</strong>
           <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_UNASSIGNED' | translate }}</span>
         </div>
       </div>
@@ -59,7 +59,7 @@
           <i class="fas fa-box-open"></i>
         </div>
         <div class="ops-kpi-chip-info">
-          <strong class="ops-kpi-chip-count text-info">{{ counts.ready }}</strong>
+          <strong class="ops-kpi-chip-count text-info">{{ summary.readyForDelivery }}</strong>
           <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_READY' | translate }}</span>
         </div>
       </div>
@@ -69,7 +69,7 @@
           <i class="fas fa-motorcycle"></i>
         </div>
         <div class="ops-kpi-chip-info">
-          <strong class="ops-kpi-chip-count text-primary">{{ counts.inTransit }}</strong>
+          <strong class="ops-kpi-chip-count text-primary">{{ summary.inDelivery }}</strong>
           <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_IN_TRANSIT' | translate }}</span>
         </div>
       </div>
@@ -79,51 +79,39 @@
           <i class="fas fa-check-double"></i>
         </div>
         <div class="ops-kpi-chip-info">
-          <strong class="ops-kpi-chip-count text-success">{{ counts.delivered }}</strong>
+          <strong class="ops-kpi-chip-count text-success">{{ summary.completed }}</strong>
           <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_DELIVERED' | translate }}</span>
+        </div>
+      </div>
+
+      <div class="ops-kpi-chip" [class.active]="activeTab === 'CANCELED'" (click)="setActiveTab('CANCELED')">
+        <div class="ops-kpi-chip-icon ops-kpi-chip-icon--muted">
+          <i class="fas fa-ban"></i>
+        </div>
+        <div class="ops-kpi-chip-info">
+          <strong class="ops-kpi-chip-count text-muted">{{ summary.cancelledRejected }}</strong>
+          <span class="ops-kpi-chip-label">{{ 'ORDERS_PAGE.TAB_CANCELED' | translate }}</span>
         </div>
       </div>
     </section>
 
-    <!-- 3. Navigation Filter Tabs & Search Toolbar -->
+    <!-- 3. Clean Search & Toolbar (Duplicate small status row removed) -->
     <div class="ops-tabs-toolbar mb-4">
-      <nav class="ops-status-tabs" aria-label="Order Status Navigation">
-        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'ALL'" (click)="setActiveTab('ALL')">
-          <span>{{ 'ORDERS_PAGE.TAB_ALL' | translate }}</span>
-          <span class="ops-status-tab-count">{{ items.length }}</span>
-        </button>
-        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'PENDING'" (click)="setActiveTab('PENDING')">
-          <span>{{ 'ORDERS_PAGE.TAB_PENDING' | translate }}</span>
-          <span class="ops-status-tab-count ops-status-tab-count--amber">{{ getCounts(items).pending }}</span>
-        </button>
-        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'UNASSIGNED'" (click)="setActiveTab('UNASSIGNED')">
-          <span>{{ 'ORDERS_PAGE.TAB_UNASSIGNED' | translate }}</span>
-          <span class="ops-status-tab-count ops-status-tab-count--rose">{{ getCounts(items).unassigned }}</span>
-        </button>
-        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'READY'" (click)="setActiveTab('READY')">
-          <span>{{ 'ORDERS_PAGE.TAB_READY' | translate }}</span>
-          <span class="ops-status-tab-count ops-status-tab-count--blue">{{ getCounts(items).ready }}</span>
-        </button>
-        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'IN_TRANSIT'" (click)="setActiveTab('IN_TRANSIT')">
-          <span>{{ 'ORDERS_PAGE.TAB_IN_TRANSIT' | translate }}</span>
-          <span class="ops-status-tab-count ops-status-tab-count--blue">{{ getCounts(items).inTransit }}</span>
-        </button>
-        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'DELIVERED'" (click)="setActiveTab('DELIVERED')">
-          <span>{{ 'ORDERS_PAGE.TAB_DELIVERED' | translate }}</span>
-          <span class="ops-status-tab-count ops-status-tab-count--green">{{ getCounts(items).delivered }}</span>
-        </button>
-        <button type="button" class="ops-status-tab" [class.active]="activeTab === 'CANCELED'" (click)="setActiveTab('CANCELED')">
-          <span>{{ 'ORDERS_PAGE.TAB_CANCELED' | translate }}</span>
-          <span class="ops-status-tab-count ops-status-tab-count--muted">{{ getCounts(items).canceled }}</span>
-        </button>
-      </nav>
-
       <div class="ops-search-box" [formGroup]="searchGroup">
         <i class="fas fa-search ops-search-icon"></i>
         <input type="text" class="form-control ops-search-input" name="searchText"
           [placeholder]="'ORDERS_PAGE.SEARCH_PLACEHOLDER' | translate" formControlName="searchTerm" />
         <button type="button" class="btn ops-search-clear" *ngIf="searchGroup.get('searchTerm')?.value" (click)="clearSearch()" title="مسح البحث">
           <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm"
+          [ngClass]="activeTab === 'ARCHIVED' ? 'btn-dark' : 'btn-outline-secondary'"
+          (click)="setActiveTab(activeTab === 'ARCHIVED' ? 'ALL' : 'ARCHIVED')">
+          <i class="fas fa-archive me-1"></i>
+          <span>{{ 'ORDERS_PAGE.ARCHIVED_ORDERS' | translate }}</span>
         </button>
       </div>
     </div>
@@ -151,7 +139,7 @@
     <div class="d-flex align-items-center justify-content-between mb-3 px-1" *ngIf="hasActiveFilter()">
       <div class="text-muted fs-8">
         <i class="fas fa-filter text-primary me-1"></i>
-        <span>{{ 'ORDERS_PAGE.FILTER_NOTICE_PREFIX' | translate }} <strong>{{ getFilteredOrders(items).length }}</strong> {{ 'ORDERS_PAGE.FILTER_NOTICE_OF' | translate }} {{ items.length }})</span>
+        <span>{{ 'ORDERS_PAGE.FILTER_NOTICE_PREFIX' | translate }} <strong>{{ ordersService.totalRecords$ | async }}</strong> {{ 'ORDERS_PAGE.FILTER_NOTICE_OF' | translate }} {{ summary.total }})</span>
       </div>
       <button type="button" class="btn btn-link btn-sm text-primary p-0 fs-8 fw-bold" (click)="resetFilters()">
         <i class="fas fa-undo me-1"></i>{{ 'ORDERS_PAGE.RESET_FILTERS' | translate }}
@@ -160,22 +148,23 @@
 
     <!-- 5. Modern High-Density Orders Table Card -->
     <div class="ops-orders-card">
-      <div class="table-responsive" *ngIf="getFilteredOrders(items) as filteredItems">
-        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0" *ngIf="filteredItems.length > 0; else noOrdersState">
+      <!-- Desktop Table View (>= lg) -->
+      <div class="table-responsive d-none d-lg-block">
+        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0" *ngIf="items.length > 0; else noOrdersState">
           <thead>
             <tr class="ops-table-header text-muted fs-8">
               <th scope="col" style="width: 40px;" class="text-center">
                 <input type="checkbox" class="form-check-input ops-checkbox" aria-label="Select all orders"
-                  [checked]="selection.allSelected(filteredItems)" [indeterminate]="selection.partiallySelected(filteredItems)"
-                  (change)="selection.toggleAll(filteredItems, $any($event.target).checked)" />
+                  [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)"
+                  (change)="selection.toggleAll(items, $any($event.target).checked)" />
               </th>
-              <th scope="col" style="width: 155px;">
+              <th scope="col" style="width: 165px;">
                 <div class="d-flex align-items-center cursor-pointer" (click)="sort('id')">
                   <span>{{ 'ORDERS_PAGE.COL_ORDER_NUM' | translate }}</span>
                   <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
                 </div>
               </th>
-              <th scope="col" style="min-width: 260px;">
+              <th scope="col" style="min-width: 250px;">
                 <div class="d-flex align-items-center cursor-pointer" (click)="sort('purchaseDate')">
                   <span>{{ 'ORDERS_PAGE.COL_CUSTOMER_DEST' | translate }}</span>
                   <app-sort-icon column="purchaseDate" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
@@ -188,7 +177,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let o of filteredItems" [class.ops-row-selected]="selection.isSelected(o)" class="ops-table-row">
+            <tr *ngFor="let o of items" [class.ops-row-selected]="selection.isSelected(o)" class="ops-table-row">
               <!-- Select Checkbox -->
               <td class="text-center">
                 <input type="checkbox" class="form-check-input ops-checkbox" [checked]="selection.isSelected(o)"
@@ -197,7 +186,7 @@
 
               <!-- 1. Order ID, Time & Overall Status -->
               <td>
-                <div class="d-flex align-items-center gap-2 mb-1">
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
                   <span class="ops-order-id">#{{ o.id }}</span>
                   <span class="ops-status-pill" [ngClass]="getOrderOverallStatus(o).badgeClass">
                     <i class="fas me-1" [ngClass]="getOrderOverallStatus(o).icon"></i>{{ getOrderOverallStatus(o).label }}
@@ -207,6 +196,9 @@
                   <span>{{ o.purchaseDate | date:'d MMM y' }}</span>
                   <span class="ops-dot-sep">•</span>
                   <span>{{ o.purchaseDate | date:'shortTime' }}</span>
+                </div>
+                <div *ngIf="o.deleteReason" class="small mt-1 text-muted">
+                  <span class="badge badge-light-danger fs-9">سبب الأرشفة: {{ o.deleteReason }}</span>
                 </div>
                 <div *ngIf="o.adminFlowMessage" class="small mt-2"
                   [ngClass]="o.requiresMerchantDecision ? 'text-warning fw-bold' : 'text-muted'">
@@ -320,7 +312,7 @@
                     <i class="fas fa-satellite-dish me-1"></i><span>{{ 'ORDERS_PAGE.LIVE_RADAR' | translate }}</span>
                   </button>
 
-                  <!-- More Operations Dropdown (Opens Inward Toward Right via Popper container=body) -->
+                  <!-- More Operations Dropdown -->
                   <div class="btn-group" ngbDropdown container="body" [placement]="['bottom-left', 'top-left', 'bottom-right', 'top-right']" dropdownClass="ops-actions-dropdown-wrapper">
                     <button type="button" class="btn btn-sm ops-btn-act ops-btn-act--more" ngbDropdownToggle title="إجراءات وحالات الطلب" aria-label="إجراءات وحالات الطلب">
                       <i class="fas fa-ellipsis-v"></i>
@@ -374,6 +366,19 @@
                         <i class="fas fa-ban text-danger me-2"></i>
                         <span>إلغاء الطلب</span>
                       </button>
+
+                      <!-- Archive / Restore actions -->
+                      <div class="dropdown-divider my-1"></div>
+
+                      <button *ngIf="o.isArchived || o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="restoreOrder(o)">
+                        <i class="fas fa-trash-restore text-success me-2"></i>
+                        <span>{{ 'ORDERS_PAGE.RESTORE_ORDER' | translate }}</span>
+                      </button>
+
+                      <button *ngIf="!o.isArchived && !o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
+                        <i class="fas fa-archive text-danger me-2"></i>
+                        <span>{{ 'ORDERS_PAGE.ARCHIVE_ORDER' | translate }}</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -381,21 +386,186 @@
             </tr>
           </tbody>
         </table>
-
-        <!-- Empty State inside table -->
-        <ng-template #noOrdersState>
-          <div class="ops-empty-state py-5">
-            <div class="ops-empty-icon">
-              <i class="fas fa-search"></i>
-            </div>
-            <strong class="fs-5">{{ 'ORDERS_PAGE.NO_MATCHING_ORDERS' | translate }}</strong>
-            <span class="text-muted fs-7 mt-1">{{ 'ORDERS_PAGE.NO_MATCHING_DESC' | translate }}</span>
-            <button type="button" class="btn btn-sm ops-btn-primary mt-3" (click)="resetFilters()">
-              <i class="fas fa-undo me-1"></i>{{ 'ORDERS_PAGE.RESET_FILTERS' | translate }}
-            </button>
-          </div>
-        </ng-template>
       </div>
+
+      <!-- Mobile & Tablet Responsive Stacked Cards View (< lg) -->
+      <div class="d-lg-none p-3 d-flex flex-column gap-3" *ngIf="items.length > 0; else noOrdersState">
+        <div *ngFor="let o of items" class="card border border-gray-200 shadow-none rounded-3 p-3 bg-white"
+          [class.border-primary]="selection.isSelected(o)">
+          <!-- Top Row: ID, Status Badge, Kebab Menu -->
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input type="checkbox" class="form-check-input ops-checkbox me-1" [checked]="selection.isSelected(o)"
+                (change)="selection.toggle(o, $any($event.target).checked)" />
+              <strong class="ops-order-id">#{{ o.id }}</strong>
+              <span class="ops-status-pill" [ngClass]="getOrderOverallStatus(o).badgeClass">
+                <i class="fas me-1" [ngClass]="getOrderOverallStatus(o).icon"></i>{{ getOrderOverallStatus(o).label }}
+              </span>
+            </div>
+
+            <div class="d-flex align-items-center gap-1">
+              <button *ngIf="canLiveTrack(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--radar"
+                (click)="openLiveTrack(o)" title="رادار التتبع">
+                <i class="fas fa-satellite-dish"></i>
+              </button>
+              <!-- 3-Dot Kebab Menu -->
+              <div class="btn-group" ngbDropdown container="body" [placement]="['bottom-left', 'top-left']">
+                <button type="button" class="btn btn-sm ops-btn-act ops-btn-act--more" ngbDropdownToggle title="قائمة الإجراءات">
+                  <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <div ngbDropdownMenu class="dropdown-menu shadow-lg p-2 fs-7 ops-actions-menu">
+                  <button type="button" class="dropdown-item py-2 px-3 text-dark d-flex align-items-center" (click)="openHistoryModal(o)">
+                    <i class="fas fa-history text-primary me-2"></i>
+                    <span>سجل حالات الطلب والتدقيق</span>
+                  </button>
+
+                  <div class="dropdown-divider my-1"></div>
+
+                  <button *ngIf="canApprove(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="approve(o)">
+                    <i class="fas fa-check text-success me-2"></i>
+                    <span>{{ 'ORDERS_PAGE.APPROVE' | translate }}</span>
+                  </button>
+
+                  <button *ngIf="canAccept(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="acceptOrder(o)">
+                    <i class="fas fa-check text-success me-2"></i>
+                    <span>قبول الطلب وتجهيزه</span>
+                  </button>
+
+                  <button *ngIf="canPrepare(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="startPreparing(o)">
+                    <i class="fas fa-utensils text-info me-2"></i>
+                    <span>بدء التجهيز</span>
+                  </button>
+
+                  <button *ngIf="canMarkReady(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="markReady(o)">
+                    <i class="fas fa-box-open text-primary me-2"></i>
+                    <span>جاهز للاستلام</span>
+                  </button>
+
+                  <button *ngIf="isDeliveryEditable(o) || canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                    <i class="fas fa-motorcycle text-primary me-2"></i>
+                    <span>{{ hasAssignedDriver(o) ? 'تعيين / إعادة تعيين مندوب' : 'تعيين مندوب توصيل' }}</span>
+                  </button>
+
+                  <button *ngIf="canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="confirmPickup(o)">
+                    <i class="fas fa-shipping-fast text-info me-2"></i>
+                    <span>تأكيد استلام المندوب</span>
+                  </button>
+
+                  <button *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
+                    <i class="fas fa-check-double text-success me-2"></i>
+                    <span>تسليم إداري</span>
+                  </button>
+
+                  <div class="dropdown-divider my-1" *ngIf="canReject(o) || canCancel(o)"></div>
+
+                  <button *ngIf="canReject(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="rejectOrder(o)">
+                    <i class="fas fa-times-circle text-danger me-2"></i>
+                    <span>رفض الطلب</span>
+                  </button>
+
+                  <button *ngIf="canCancel(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="confirmCancel(o)">
+                    <i class="fas fa-ban text-danger me-2"></i>
+                    <span>إلغاء الطلب</span>
+                  </button>
+
+                  <!-- Archive / Restore actions -->
+                  <div class="dropdown-divider my-1"></div>
+
+                  <button *ngIf="o.isArchived || o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="restoreOrder(o)">
+                    <i class="fas fa-trash-restore text-success me-2"></i>
+                    <span>{{ 'ORDERS_PAGE.RESTORE_ORDER' | translate }}</span>
+                  </button>
+
+                  <button *ngIf="!o.isArchived && !o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
+                    <i class="fas fa-archive text-danger me-2"></i>
+                    <span>{{ 'ORDERS_PAGE.ARCHIVE_ORDER' | translate }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Customer Info -->
+          <div class="ops-customer-cell mb-2 pb-2 border-bottom border-gray-100">
+            <div class="ops-customer-primary">
+              <strong class="ops-customer-name">{{ o.user || ('ORDERS_PAGE.CUSTOMER' | translate) }}</strong>
+              <a *ngIf="o.phonenumber" [href]="'tel:' + o.phonenumber" class="ops-phone" dir="ltr">
+                <i class="fas fa-phone-alt me-1 text-success"></i>{{ formatPhoneNumber(o.phonenumber) }}
+              </a>
+            </div>
+            <div class="ops-customer-meta">
+              <span class="ops-customer-addr">
+                <i class="fas fa-map-marker-alt text-danger me-1"></i>{{ o.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}
+              </span>
+              <a *ngIf="o.lat && o.lng" class="ops-micro-link" target="_blank"
+                [href]="'https://www.google.com/maps/search/?api=1&query=' + o.lat + ',' + o.lng">
+                <i class="fas fa-map-marked-alt text-primary"></i>
+              </a>
+              <span *ngIf="o.deliveryOtp" class="ops-pin-chip">
+                PIN <strong dir="ltr">{{ o.deliveryOtp }}</strong>
+              </span>
+            </div>
+          </div>
+
+          <!-- Items Manifest -->
+          <div class="mb-2">
+            <div class="ops-manifest-list" *ngIf="o.orderDetails?.length; else noDetailsMobile">
+              <div class="ops-manifest-item" *ngFor="let detail of (isExpanded(o.id) ? o.orderDetails : o.orderDetails.slice(0, 2))">
+                <span class="ops-manifest-qty">{{ detail.quantity }}×</span>
+                <span class="ops-manifest-title">{{ detail.productTitle }}</span>
+              </div>
+              <button type="button" class="btn btn-link btn-sm ops-manifest-toggle p-0" *ngIf="o.orderDetails.length > 2" (click)="toggleExpand(o.id)">
+                <span *ngIf="!isExpanded(o.id)">+{{ o.orderDetails.length - 2 }} {{ 'ORDERS_PAGE.MORE_ITEMS_SHOW' | translate }}</span>
+                <span *ngIf="isExpanded(o.id)">{{ 'ORDERS_PAGE.MORE_ITEMS_HIDE' | translate }}</span>
+              </button>
+            </div>
+            <ng-template #noDetailsMobile>
+              <span class="text-muted fs-8 fst-italic">{{ 'ORDERS_PAGE.NO_ITEMS_RECORDED' | translate }}</span>
+            </ng-template>
+          </div>
+
+          <!-- Footer Row: Price, Driver, Time -->
+          <div class="d-flex justify-content-between align-items-center pt-2 border-top border-gray-100 flex-wrap gap-2">
+            <div>
+              <div class="ops-price-amount">
+                {{ o.price | number }} <span class="ops-price-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+              </div>
+              <span class="text-muted fs-8">{{ o.purchaseDate | date:'short' }}</span>
+            </div>
+
+            <div class="ops-captain-cell">
+              <ng-container *ngIf="hasAssignedDriver(o); else unassignedDriverMobile">
+                <div class="d-flex align-items-center gap-1">
+                  <i class="fas fa-motorcycle text-primary fs-8"></i>
+                  <span class="ops-driver-name">{{ getCleanDriverName(o.deliveryUser) }}</span>
+                </div>
+              </ng-container>
+              <ng-template #unassignedDriverMobile>
+                <span class="ops-unassigned-tag">{{ 'ORDERS_PAGE.UNASSIGNED' | translate }}</span>
+              </ng-template>
+            </div>
+          </div>
+
+          <!-- Archive Reason if present -->
+          <div *ngIf="o.deleteReason" class="mt-2 pt-2 border-top border-danger-subtle">
+            <span class="badge badge-light-danger fs-9">سبب الأرشفة: {{ o.deleteReason }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State inside table -->
+      <ng-template #noOrdersState>
+        <div class="ops-empty-state py-5">
+          <div class="ops-empty-icon">
+            <i class="fas fa-search"></i>
+          </div>
+          <strong class="fs-5">{{ 'ORDERS_PAGE.NO_MATCHING_ORDERS' | translate }}</strong>
+          <span class="text-muted fs-7 mt-1">{{ 'ORDERS_PAGE.NO_MATCHING_DESC' | translate }}</span>
+          <button type="button" class="btn btn-sm ops-btn-primary mt-3" (click)="resetFilters()">
+            <i class="fas fa-undo me-1"></i>{{ 'ORDERS_PAGE.RESET_FILTERS' | translate }}
+          </button>
+        </div>
+      </ng-template>
 
       <!-- Pagination -->
       <app-paginator class="ops-paginator px-4 py-3 d-flex justify-content-between align-items-center flex-wrap"

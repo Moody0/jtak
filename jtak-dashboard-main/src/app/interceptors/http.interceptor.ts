@@ -45,7 +45,7 @@ export class AppHttpInterceptor implements HttpInterceptor {
 
     if (isPlatformBrowser(this.platformId)) {
       const auth = this.getAuthService();
-      const authModel = auth?.getAuthFromLocalStorage();
+      const authModel = auth?.getAuthFromSessionStorage() || auth?.getAuthFromLocalStorage();
       if (authModel?.access_token) {
         setHeaders['Authorization'] = `Bearer ${authModel.access_token}`;
       }

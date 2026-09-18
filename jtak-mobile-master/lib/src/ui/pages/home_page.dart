@@ -22,6 +22,7 @@ import '../widgets/top_app_bar_widget.dart';
 import '../widgets/various_cuisines_section.dart';
 import '../../core/data/mock_catalog_data.dart';
 import 'catalog/market_page.dart';
+import 'catalog/most_ordered_products_page.dart';
 import 'catalog/restaurant_menu_page.dart';
 import 'catalog/restaurants_list_page.dart';
 import 'catalog/categories_page.dart';
@@ -166,10 +167,10 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
 
-              // 2. Featured Categories (4 Columns x Max 8 Categories)
+              // 2. Featured Categories (4 Columns x Exactly 4 Categories)
               const SliverToBoxAdapter(child: SizedBox(height: 6)),
               const SliverJtakFeaturedCategories(
-                maxCount: 8,
+                maxCount: 4,
               ),
 
               // 3. Daily Offers Section (العروض اليومية - Banners with Scroll Progress Bar)
@@ -242,7 +243,12 @@ class _HomePageState extends State<HomePage> {
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
               SliverJtakDeliveryOffersSection(
                 onViewAllTap: () {
-                  Navigator.pushNamed(context, RestaurantsListPage.routeName);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MostOrderedProductsPage(),
+                    ),
+                  );
                 },
                 onMealTap: (meal) {
                   final mockItem = MockCatalogData.getMenuItemById(meal.id);

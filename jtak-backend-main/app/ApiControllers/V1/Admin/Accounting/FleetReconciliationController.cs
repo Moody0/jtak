@@ -20,6 +20,7 @@ using Modules.Shipping.Services;
 using Modules.Catalog.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using App.Shared.Services;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -46,6 +47,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly ILedgerService _ledgerService;
         private readonly IBalanceService _balanceService;
         private readonly AccountingDbContext _accountingDb;
+        private readonly IAdminAuditService _auditService;
 
         public FleetReconciliationController(
             IEodReconciliationService reconciliationService,
@@ -55,7 +57,8 @@ namespace App.ApiControllers.V1.Admin
             IMerchantService merchantService,
             ILedgerService ledgerService,
             IBalanceService balanceService,
-            AccountingDbContext accountingDb)
+            AccountingDbContext accountingDb,
+            IAdminAuditService auditService = null)
         {
             _reconciliationService = reconciliationService ?? throw new ArgumentNullException(nameof(reconciliationService));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
@@ -65,6 +68,7 @@ namespace App.ApiControllers.V1.Admin
             _ledgerService = ledgerService;
             _balanceService = balanceService;
             _accountingDb = accountingDb;
+            _auditService = auditService;
         }
 
         /// <summary>
@@ -101,10 +105,38 @@ namespace App.ApiControllers.V1.Admin
             try
             {
                 var result = await _reconciliationService.SettleCaptainShiftAsync(request, adminId.Value);
+
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "CaptainRemittance",
+                        EntityType = "CaptainShift",
+                        EntityId = request.CaptainUserId.ToString(),
+                        Description = $"تسوية عهدة كابتن {request.CaptainUserId} بمبلغ نقدي {request.PhysicalCashReceived:N0} ل.س (رقم الدفعة #{result?.BatchCode})",
+                        Result = "Success",
+                        AfterState = result
+                    });
+                }
+
                 return Ok(result);
             }
             catch (Exception ex)
             {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "CaptainRemittance",
+                        EntityType = "CaptainShift",
+                        EntityId = request.CaptainUserId.ToString(),
+                        Description = $"فشل تسوية عهدة كابتن {request.CaptainUserId}",
+                        Result = "Failed",
+                        FailureReason = ex.Message
+                    });
+                }
                 return BadRequest(ApiErr.Create(ex.Message));
             }
         }

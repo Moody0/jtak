@@ -12,6 +12,8 @@
     <ProjectReference Include="..\Modules.Shipping.Data\Modules.Accounting.Data.csproj" />
     <ProjectReference Include="..\Modules.Shipping.Entities\Modules.Accounting.Entities.csproj" />
     <ProjectReference Include="..\Modules\Orders\Modules.Orders.Data\Modules.Orders.Data.csproj" />
+    <ProjectReference Include="..\Modules\Catalog\Modules.Catalog.Data\Modules.Catalog.Data.csproj" />
+    <ProjectReference Include="..\Modules\Catalog\Modules.Catalog.Entities\Modules.Catalog.Entities.csproj" />
     <ProjectReference Include="..\App.Data\App.Shared.Data.csproj" />
   </ItemGroup>
 

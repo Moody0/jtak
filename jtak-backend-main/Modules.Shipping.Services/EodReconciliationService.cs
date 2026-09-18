@@ -147,6 +147,10 @@ namespace Modules.Accounting.Services
             var floatStmt = floatAcc != null ? await _ledgerService.GetAccountStatementAsync(floatAcc.Id) : new List<AccountStatementItemDto>();
             var wagesStmt = wagesAcc != null ? await _ledgerService.GetAccountStatementAsync(wagesAcc.Id) : new List<AccountStatementItemDto>();
 
+            // Authoritative server-side ordering: NEWEST FIRST while preserving chronological RunningBalance
+            var sortedFloatStmt = floatStmt.OrderByDescending(x => x.PostedDate).ThenByDescending(x => x.EntryId).ToList();
+            var sortedWagesStmt = wagesStmt.OrderByDescending(x => x.PostedDate).ThenByDescending(x => x.EntryId).ToList();
+
             return new CaptainShiftDetailsDto
             {
                 CaptainUserId = captainUserId,
@@ -156,8 +160,8 @@ namespace Modules.Accounting.Services
                 ExpectedNetCashDue = floatBal - wagesBal,
                 Currency = floatAcc?.Currency ?? "SYP",
                 LastSettlementDate = lastBatch?.BatchDate,
-                FloatStatement = floatStmt,
-                EarningsStatement = wagesStmt
+                FloatStatement = sortedFloatStmt,
+                EarningsStatement = sortedWagesStmt
             };
         }
 

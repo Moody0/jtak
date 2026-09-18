@@ -74,6 +74,8 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BaseView<UserProvider>(
       modelProvider: UserProvider(),
       builder: (context, modelProvider) {
@@ -81,18 +83,25 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
         final currentCode = _activeSmsCode ?? userProvider.lastSmsCode;
 
         return Scaffold(
-          backgroundColor: kPageBackground,
+          backgroundColor: isDark ? const Color(0xFF0F172A) : kPageBackground,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             elevation: 0,
             title: Text(
               'رمز التحقق',
-              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700, fontSize: 16.5, color: kCharcoalDark),
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontWeight: FontWeight.w700,
+                fontSize: 16.5,
+                color: isDark ? Colors.white : kCharcoalDark,
+              ),
             ),
             centerTitle: true,
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Container(color: kBorderColor, height: 1),
+              child: Container(
+                color: isDark ? const Color(0xFF334155) : kBorderColor,
+                height: 1,
+              ),
             ),
           ),
           body: SafeArea(
@@ -111,9 +120,14 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                           width: 74,
                           height: 74,
                           decoration: BoxDecoration(
-                            color: kSurfaceWarm,
+                            color: isDark ? const Color(0xFF1E293B) : kSurfaceWarm,
                             shape: BoxShape.circle,
-                            border: Border.all(color: kPrimaryOrange.withOpacity(0.3), width: 2),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : kPrimaryOrange.withOpacity(0.3),
+                              width: 2,
+                            ),
                           ),
                           child: const AppIcon(
                             PhosphorIcons.shieldCheckBold,
@@ -128,7 +142,7 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
-                          color: kCharcoalDark,
+                          color: isDark ? Colors.white : kCharcoalDark,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -137,7 +151,7 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                         'تم إرسال رمز التحقق في رسالة نصية SMS إلى:',
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 13,
-                          color: kCharcoalMuted,
+                          color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -146,9 +160,12 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: kCardBorderColor, width: 1),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF334155) : kCardBorderColor,
+                              width: 1,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -160,7 +177,7 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                                 style: GoogleFonts.ibmPlexSansArabic(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
-                                  color: kCharcoalDark,
+                                  color: isDark ? Colors.white : kCharcoalDark,
                                 ),
                                 textDirection: TextDirection.ltr,
                               ),
@@ -174,9 +191,12 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: kCardBorderColor, width: 1.1),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : kCardBorderColor,
+                            width: 1.1,
+                          ),
                         ),
                         child: Column(
                           children: [
@@ -186,9 +206,14 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                                 margin: const EdgeInsets.only(bottom: 18),
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: kSurfaceWarm,
+                                  color: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: kPrimaryOrange.withOpacity(0.35), width: 1.2),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? const Color(0xFF334155)
+                                        : kPrimaryOrange.withOpacity(0.35),
+                                    width: 1.2,
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -204,7 +229,7 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                                               'رمز التحقق السريع',
                                               style: GoogleFonts.ibmPlexSansArabic(
                                                 fontSize: 11,
-                                                color: kCharcoalMuted,
+                                                color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                                                 fontWeight: FontWeight.w600,
                                               ),
                                             ),
@@ -251,7 +276,7 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
                             const SizedBox(height: 20),
 
                             // 3. Resend Timer Section
-                            _buildResendSection(),
+                            _buildResendSection(isDark),
 
                             const SizedBox(height: 20),
 
@@ -288,16 +313,21 @@ class _PhoneCodePageState extends State<PhoneCodePage> {
     );
   }
 
-  Widget _buildResendSection() {
+  Widget _buildResendSection(bool isDark) {
     if (_secondsRemaining > 0) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const AppIcon(PhosphorIcons.timerBold, size: 16, color: kCharcoalMuted),
+          AppIcon(PhosphorIcons.timerBold,
+              size: 16,
+              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
           const SizedBox(width: 6),
           Text(
             'إعادة إرسال الرمز بعد $_secondsRemaining ثانية',
-            style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: kCharcoalMuted),
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+            ),
           ),
         ],
       );

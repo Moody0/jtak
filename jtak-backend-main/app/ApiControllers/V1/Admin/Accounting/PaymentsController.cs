@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Shared.Services;
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
@@ -41,6 +41,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IBillService _billService;
         private readonly IBalanceService _balanceService;
         private readonly ILedgerService _ledgerService;
+        private readonly IAdminAuditService _auditService;
 
         public PaymentsController(IAppUnitOfWork unitOfWork,
             IAccountingUnitOfWork auow,
@@ -52,7 +53,8 @@ namespace App.ApiControllers.V1.Admin
             IBillService billService,
             IBalanceService balanceService,
             ILedgerService ledgerService,
-            IMapper mapper)
+            IMapper mapper,
+            IAdminAuditService auditService = null)
         {
             _uow = unitOfWork;
             _auow = auow;
@@ -65,6 +67,7 @@ namespace App.ApiControllers.V1.Admin
             _billService = billService;
             _balanceService = balanceService;
             _ledgerService = ledgerService;
+            _auditService = auditService;
         }
 
 
@@ -133,6 +136,20 @@ namespace App.ApiControllers.V1.Admin
                 await _balanceService.UpdateAppBalance(new BalanceDto { Amount = newBalance, PendingAmount = dBalance.PendingAmount, Id = dto.ByUserId, Name = byUser });
                 await _auow.SaveChangesAsync();
                 if (transaction != null) await transaction.CommitAsync();
+
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Settlements",
+                        Action = "Pay",
+                        EntityType = "Payment",
+                        EntityId = payment.Id.ToString(),
+                        Description = $"تحويل دفعة مالية بقيمة {dto.Amount:N0} ل.س من {byUser} إلى {toUser}",
+                        Result = "Success",
+                        AfterState = new { payment.Id, payment.Amount, payment.ByUserId, ByUser = byUser, payment.ToUserId, ToUser = toUser, payment.NewBalance }
+                    });
+                }
             }
             catch
             {

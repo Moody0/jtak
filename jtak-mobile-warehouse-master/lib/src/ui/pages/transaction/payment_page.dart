@@ -39,18 +39,28 @@ class _PaymentPageState extends State<PaymentPage> with AutomaticKeepAliveClient
 
   List<PaymentModel> _filterPayments(List<PaymentModel> payments) {
     return payments.where((p) {
-      final isReceived = p.handoverDate != null;
+      final isReceived = p.isReceived;
 
       // 1. Filter by status
-      if (_selectedFilterIndex == 1 && isReceived) return false;
-      if (_selectedFilterIndex == 2 && !isReceived) return false;
+      // 0: الكل
+      // 1: قيد التسليم (تحتاج تأكيد) - Approved settlements waiting for merchant receipt, or unreceived legacy payments
+      // 2: تم الاستلام - Completed settlements and confirmed payments
+      if (_selectedFilterIndex == 1) {
+        if (isReceived) return false;
+        if (p.isSettlementRequest && !p.isApprovedPendingReceipt) return false;
+      }
+      if (_selectedFilterIndex == 2) {
+        if (!isReceived) return false;
+      }
 
       // 2. Search query filter
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.replaceAll('#', '').toLowerCase();
         final idMatches = (p.id?.toString().toLowerCase().contains(q) ?? false);
+        final reqMatches = (p.requestNumber?.toLowerCase().contains(q) ?? false);
         final userMatches = (p.byUser?.toLowerCase().contains(q) ?? false);
-        return idMatches || userMatches;
+        final methodMatches = (p.method?.toLowerCase().contains(q) ?? false);
+        return idMatches || reqMatches || userMatches || methodMatches;
       }
 
       return true;

@@ -1,4 +1,4 @@
-﻿using Modules.Catalog.Entities;
+using Modules.Catalog.Entities;
 using App.Shared.Entities.Domain;
 using App.Shared.Entities;
 
@@ -20,5 +20,9 @@ namespace App.ApiModels
         // FeaturedCategories above is kept in step with it for app builds that
         // predate this field.
         public HomeCategoryTileDto[] HomeCategories { get; set; }
+        public bool HomeCategoriesEnabled { get; set; } = true;
+        public int HomeCategoriesMaxItems { get; set; } = 8;
+        public string HomeCategoriesTitle { get; set; }
+        public string HomeCategoriesTitleEn { get; set; }
     }
 }

@@ -15,23 +15,24 @@ class AppTheme {
 
   static const EdgeInsets contentPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 14);
 
-  static InputDecoration getBorderdTextFieldDecoration({String? lable, String? hint, EdgeInsets? contentPadding}) {
+  static InputDecoration getBorderdTextFieldDecoration({BuildContext? context, String? lable, String? hint, EdgeInsets? contentPadding}) {
+    final isDark = context != null && Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: lable,
       hintText: hint,
-      labelStyle: const TextStyle(fontSize: 13, color: kCharcoalMuted),
-      hintStyle: const TextStyle(fontSize: 13, color: kCharcoalLight),
+      labelStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
+      hintStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF64748B) : kCharcoalLight),
       isDense: true,
       filled: true,
-      fillColor: Colors.white,
+      fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       contentPadding: contentPadding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: kCardBorderColor, width: 1.1),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : kCardBorderColor, width: 1.1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: kCardBorderColor, width: 1.1),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : kCardBorderColor, width: 1.1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -40,14 +41,15 @@ class AppTheme {
     );
   }
 
-  static InputDecoration getTextFieldDecoration({String? lable, String? hint, EdgeInsets? contentPadding}) {
+  static InputDecoration getTextFieldDecoration({BuildContext? context, String? lable, String? hint, EdgeInsets? contentPadding}) {
+    final isDark = context != null && Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: lable,
       hintText: hint,
-      labelStyle: const TextStyle(fontSize: 13, color: kCharcoalMuted),
-      hintStyle: const TextStyle(fontSize: 13, color: kCharcoalLight),
+      labelStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
+      hintStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF64748B) : kCharcoalLight),
       filled: true,
-      fillColor: kGreyBackground,
+      fillColor: isDark ? const Color(0xFF0F172A) : kGreyBackground,
       contentPadding: contentPadding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -64,10 +66,11 @@ class AppTheme {
     );
   }
 
-  static Decoration getContainerBorderDecoration() {
+  static Decoration getContainerBorderDecoration([BuildContext? context]) {
+    final isDark = context != null && Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: kCardBorderColor, width: 1),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      border: Border.all(color: isDark ? const Color(0xFF334155) : kCardBorderColor, width: 1),
       borderRadius: BorderRadius.circular(borderRadiusValue),
       boxShadow: boxShadow,
     );

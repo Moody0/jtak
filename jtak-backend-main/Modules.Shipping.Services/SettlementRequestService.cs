@@ -237,9 +237,48 @@ namespace Modules.Accounting.Services
                 ?? throw new InvalidOperationException("طلب التسوية غير موجود.");
             if (entity.PartyType != SettlementPartyType.Merchant)
                 throw new InvalidOperationException("هذا الإجراء متاح لطلبات التجار فقط.");
+
+            // Idempotency: If already completed, return existing without re-posting
+            if (entity.Status == SettlementRequestStatus.Completed)
+            {
+                return Map(entity);
+            }
+
             if (entity.Status != SettlementRequestStatus.Approved)
                 throw new InvalidOperationException("يجب قبول طلب التاجر أولاً قبل تأكيد الاستلام.");
 
+            return await PostMerchantPayoutJournalAsync(entity, notes, isMerchantConfirmation: false, completedByAdminId: adminId);
+        }
+
+        public Task<SettlementRequestDto> ConfirmMerchantReceiptAsync(Guid requestId, Guid merchantUserId, string notes = null) =>
+            InFinancialTransactionAsync(() => ConfirmMerchantReceiptCoreAsync(requestId, merchantUserId, notes));
+
+        private async Task<SettlementRequestDto> ConfirmMerchantReceiptCoreAsync(Guid requestId, Guid merchantUserId, string notes)
+        {
+            var entity = await TrackingQuery().FirstOrDefaultAsync(x => x.Id == requestId)
+                ?? throw new InvalidOperationException("طلب التسوية غير موجود.");
+
+            if (entity.PartyType != SettlementPartyType.Merchant)
+                throw new InvalidOperationException("هذا الإجراء متاح لطلبات تسوية التجار فقط.");
+
+            if (entity.RequestedByUserId != merchantUserId)
+                throw new InvalidOperationException("لا يمكنك تأكيد استلام طلب تسوية يخص حساباً آخر.");
+
+            // Idempotency: If already completed, return existing without re-posting
+            if (entity.Status == SettlementRequestStatus.Completed)
+            {
+                return Map(entity);
+            }
+
+            if (entity.Status != SettlementRequestStatus.Approved)
+                throw new InvalidOperationException("يجب قبول واعتماد طلب التسوية من الإدارة أولاً لتأكيد الاستلام.");
+
+            return await PostMerchantPayoutJournalAsync(entity, notes, isMerchantConfirmation: true, completedByAdminId: null);
+        }
+
+        private async Task<SettlementRequestDto> PostMerchantPayoutJournalAsync(
+            SettlementRequest entity, string notes, bool isMerchantConfirmation, Guid? completedByAdminId)
+        {
             var entries = new List<PostLedgerEntryRequest>();
             foreach (var allocation in entity.MerchantAllocations)
             {
@@ -256,17 +295,17 @@ namespace Modules.Accounting.Services
                 });
             }
 
-            var vault = await _ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.CompanyMainVault,
-                "Company Cash Vault", AccountType.Asset, entity.Currency);
-            var vaultBalance = await _ledger.GetAccountBalanceAsync(vault.Id);
-            if (vaultBalance + 0.001m < entity.Amount)
-                throw new InvalidOperationException($"رصيد خزينة جيتك غير كافٍ لإتمام التسوية. المتاح حالياً {vaultBalance:N0} ل.س.");
+            var (sourceAccount, sourceAccountName) = await ResolvePayoutSourceAccountAsync(entity.Method, entity.Currency);
+            var sourceBalance = await _ledger.GetAccountBalanceAsync(sourceAccount.Id);
+            if (sourceBalance + 0.001m < entity.Amount)
+                throw new InvalidOperationException($"رصيد {sourceAccountName} ({sourceAccount.AccountCode}) غير كافٍ لإتمام التسوية. المتاح حالياً {sourceBalance:N0} {entity.Currency}.");
+
             entries.Add(new PostLedgerEntryRequest
             {
-                AccountId = vault.Id,
+                AccountId = sourceAccount.Id,
                 Credit = entity.Amount,
                 Currency = entity.Currency,
-                Memo = $"Merchant payout disbursed for {entity.RequestNumber}"
+                Memo = $"Merchant payout disbursed from {sourceAccount.AccountCode} for {entity.RequestNumber}"
             });
 
             var txn = await _ledger.PostTransactionAsync(new PostTransactionRequest
@@ -274,18 +313,52 @@ namespace Modules.Accounting.Services
                 ReferenceType = "MerchantSettlementRequest",
                 ReferenceId = entity.Id.ToString(),
                 IdempotencyKey = $"MerchantSettlementRequest-{entity.Id}",
-                Description = $"Merchant confirmed payout receipt for {entity.RequestNumber}",
+                Description = isMerchantConfirmation
+                    ? $"Merchant confirmed payout receipt for {entity.RequestNumber} via {sourceAccountName}"
+                    : $"Admin recorded payout receipt for {entity.RequestNumber} via {sourceAccountName}",
                 Entries = entries
             });
 
             entity.Status = SettlementRequestStatus.Completed;
-            entity.CompletedByAdminId = adminId;
+            if (completedByAdminId.HasValue) entity.CompletedByAdminId = completedByAdminId.Value;
             entity.CompletedAt = DateTime.UtcNow;
             entity.LedgerTransactionId = txn.Id;
             if (!string.IsNullOrWhiteSpace(notes)) entity.Notes = JoinNotes(entity.Notes, notes);
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Completed merchant settlement request {RequestNumber}", entity.RequestNumber);
+            _logger.LogInformation("Completed merchant settlement request {RequestNumber} (Actor: {Actor}, Source: {SourceCode})",
+                entity.RequestNumber, isMerchantConfirmation ? "Merchant" : "Admin", sourceAccount.AccountCode);
             return Map(entity);
+        }
+
+        private async Task<(Account Account, string AccountName)> ResolvePayoutSourceAccountAsync(string method, string currency)
+        {
+            var normalizedMethod = (method ?? string.Empty).Trim().ToLowerInvariant();
+
+            if (normalizedMethod.Contains("bank") || normalizedMethod.Contains("transfer") || normalizedMethod.Contains("wire"))
+            {
+                var bank = await _ledger.GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.BankMain, "Company Main Bank Account", AccountType.Asset, currency);
+                return (bank, "الحساب البنكي الرئيسي");
+            }
+
+            if (normalizedMethod.Contains("safe") || normalizedMethod == "cash_safe" || normalizedMethod == "office_safe" || normalizedMethod == "branch_safe")
+            {
+                var safe = await _ledger.GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.CompanyCashSafe, "Company Cash Safe", AccountType.Asset, currency);
+                return (safe, "صندوق الخزينة النقدي");
+            }
+
+            if (normalizedMethod.Contains("pgw") || normalizedMethod.Contains("gateway") || normalizedMethod.Contains("wallet") || normalizedMethod.Contains("clearing"))
+            {
+                var pgw = await _ledger.GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.ElectronicPaymentGateway, "Electronic Payment Gateway Clearing", AccountType.Asset, currency);
+                return (pgw, "بوابة الدفع الإلكتروني");
+            }
+
+            // Default: Company Main Cash Vault (1000)
+            var vault = await _ledger.GetOrCreateSystemAccountAsync(
+                SystemAccountCodes.CompanyMainVault, "Company Cash Vault", AccountType.Asset, currency);
+            return (vault, "خزينة جيتك الرئيسية");
         }
 
         private IQueryable<SettlementRequest> BaseQuery() => _context.SettlementRequests

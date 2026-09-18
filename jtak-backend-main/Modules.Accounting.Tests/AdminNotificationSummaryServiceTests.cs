@@ -376,4 +376,128 @@ public class AdminNotificationSummaryServiceTests
         // Total placed = 10, Completed = 5, Cancelled/Rejected = 3 -> Active = 2
         Assert.Equal(2, summary.Orders);
     }
+
+    [Fact]
+    public async Task FourBucketClassification_DistinctOrders_OverlappingConditionsAndCompletedExclusion()
+    {
+        using var ordersDb = CreateOrdersContext();
+        using var appDb = CreateAppContext();
+        using var accDb = CreateAccountingContext();
+
+        // 1. Waiting approval = 2 orders (with driver)
+        for (int i = 1; i <= 2; i++)
+        {
+            ordersDb.Orders.Add(new Order
+            {
+                Id = 400 + i,
+                OrderStatus = OrderStatus.Success,
+                DeliveredAt = null,
+                DeliveryId = Guid.NewGuid(),
+                DeliveryUser = "Driver " + i,
+                OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.Pending } }
+            });
+        }
+
+        // 2. No courier assigned = 3 orders (in pending/processing states)
+        for (int i = 1; i <= 3; i++)
+        {
+            ordersDb.Orders.Add(new Order
+            {
+                Id = 410 + i,
+                OrderStatus = OrderStatus.Success,
+                DeliveredAt = null,
+                DeliveryId = null,
+                DeliveryUser = null,
+                OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.MerchantAccepted } }
+            });
+        }
+
+        // 3. Ready for delivery = 4 orders (with driver assigned)
+        for (int i = 1; i <= 4; i++)
+        {
+            ordersDb.Orders.Add(new Order
+            {
+                Id = 420 + i,
+                OrderStatus = OrderStatus.Success,
+                DeliveredAt = null,
+                DeliveryId = Guid.NewGuid(),
+                DeliveryUser = "Captain " + i,
+                OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.ReadyForPickup } }
+            });
+        }
+
+        // 4. In delivery = 1 order (with driver)
+        ordersDb.Orders.Add(new Order
+        {
+            Id = 430,
+            OrderStatus = OrderStatus.Success,
+            DeliveredAt = null,
+            DeliveryId = Guid.NewGuid(),
+            DeliveryUser = "Courier Main",
+            OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.ShippingStarted } }
+        });
+
+        // 5. Add 100 completed orders -> must not affect badge
+        for (int i = 1; i <= 100; i++)
+        {
+            ordersDb.Orders.Add(new Order
+            {
+                Id = 500 + i,
+                OrderStatus = OrderStatus.Success,
+                DeliveredAt = DateTime.UtcNow,
+                DeliveryId = Guid.NewGuid(),
+                DeliveryUser = "Past Driver",
+                OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.Delivered } }
+            });
+        }
+
+        // 6. Add cancelled / rejected orders -> must not affect badge
+        ordersDb.Orders.Add(new Order
+        {
+            Id = 701,
+            OrderStatus = OrderStatus.Success,
+            DeliveredAt = null,
+            OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.CustomerCanceled } }
+        });
+        ordersDb.Orders.Add(new Order
+        {
+            Id = 702,
+            OrderStatus = OrderStatus.Success,
+            DeliveredAt = null,
+            OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.MerchantRejected } }
+        });
+
+        await ordersDb.SaveChangesAsync();
+
+        var service = new AdminNotificationSummaryService(ordersDb, appDb, accDb);
+        var summary = await service.GetSummaryAsync();
+
+        // 2 waiting + 3 no courier + 4 ready + 1 in delivery = 10
+        Assert.Equal(10, summary.Orders);
+
+        // 7. Overlapping conditions: An order that is BOTH Ready for Delivery AND No Courier assigned
+        // Must be counted ONCE (not twice).
+        ordersDb.Orders.Add(new Order
+        {
+            Id = 801,
+            OrderStatus = OrderStatus.Success,
+            DeliveredAt = null,
+            DeliveryId = null,
+            DeliveryUser = null, // No courier assigned
+            OrderDetails = new List<OrderDetail> { new() { OrderDetailStatus = OrderDetailStatus.ReadyForPickup } } // Ready for delivery
+        });
+        await ordersDb.SaveChangesAsync();
+
+        var summaryWithOverlap = await service.GetSummaryAsync();
+        Assert.Equal(11, summaryWithOverlap.Orders);
+
+        // 8. Lifecycle transition: When an order is delivered, count decreases immediately
+        var order430 = await ordersDb.Orders.Include(o => o.OrderDetails).FirstAsync(o => o.Id == 430);
+        order430.DeliveredAt = DateTime.UtcNow;
+        order430.OrderDetails.First().OrderDetailStatus = OrderDetailStatus.Delivered;
+        await ordersDb.SaveChangesAsync();
+
+        var summaryAfterTransition = await service.GetSummaryAsync();
+        Assert.Equal(10, summaryAfterTransition.Orders);
+    }
 }

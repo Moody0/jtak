@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -42,8 +42,55 @@ namespace App.Extensions
         }
 
 
-        public static async Task<AppUser> FindByPhoneNumberAsync(this UserManager<AppUser> userManager, string phoneNumber) =>
-            await userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+        public static string[] GetPhoneVariations(string rawPhone)
+        {
+            if (string.IsNullOrWhiteSpace(rawPhone)) return Array.Empty<string>();
+            var clean = new string(rawPhone.Where(c => char.IsDigit(c) || c == '+').ToArray()).Trim();
+            var digitsOnly = new string(clean.Where(char.IsDigit).ToArray());
+            if (string.IsNullOrWhiteSpace(digitsOnly)) return new[] { rawPhone };
+
+            string national9;
+            if (digitsOnly.StartsWith("963") && digitsOnly.Length >= 12)
+            {
+                national9 = digitsOnly.Substring(3);
+            }
+            else if (digitsOnly.StartsWith("09") && digitsOnly.Length >= 10)
+            {
+                national9 = digitsOnly.Substring(1);
+            }
+            else if (digitsOnly.StartsWith("9") && digitsOnly.Length >= 9)
+            {
+                national9 = digitsOnly;
+            }
+            else
+            {
+                national9 = digitsOnly;
+            }
+
+            var variations = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                rawPhone.Trim(),
+                clean,
+                "+" + digitsOnly.TrimStart('+'),
+                digitsOnly,
+                "+963" + national9,
+                "963" + national9,
+                "00963" + national9,
+                "0" + national9,
+                national9
+            };
+
+            return variations.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+        }
+
+        public static async Task<AppUser> FindByPhoneNumberAsync(this UserManager<AppUser> userManager, string phoneNumber)
+        {
+            if (string.IsNullOrWhiteSpace(phoneNumber)) return null;
+            var variations = GetPhoneVariations(phoneNumber);
+            return await userManager.Users.FirstOrDefaultAsync(x =>
+                (x.PhoneNumber != null && variations.Contains(x.PhoneNumber)) ||
+                (x.UserName != null && variations.Contains(x.UserName)));
+        }
 
         public static async Task<List<AppUser>> GetUsersInOtherRoles(this UserManager<AppUser> userManager, params string[] roles)
         {

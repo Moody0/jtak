@@ -403,7 +403,7 @@ namespace App.ApiControllers.V1.Customer
                                 x.ProductCategoryId == vm.ProductCategoryId ||
                                 x.ProductCategory.ParentId == vm.ProductCategoryId)
                             .Where(x => !doSearch || x.Title.ToLower().Contains(vm.q))
-                            .Where(x => x.DeletionDate == null && x.ProductCategory.Active && x.Active);
+                            .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active) && x.Active);
 
             int[] mids = null;
             // Restaurants are limited to their delivery coverage, markets are not.
@@ -415,7 +415,7 @@ namespace App.ApiControllers.V1.Customer
                 // the priced-only check applied to the results below, so a page
                 // of results cannot silently come back part empty.
                 if (mids != null && mids.Length > 0)
-                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) && m.MerchantPrice > 0));
+                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) && (m.MerchantPrice > 0 || (m.PriceUsd.HasValue && m.PriceUsd.Value > 0))));
             }
             else
             {

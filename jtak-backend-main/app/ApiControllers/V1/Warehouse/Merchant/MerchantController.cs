@@ -113,7 +113,7 @@ namespace App.ApiControllers.V1.Warehouse
 
             if (dto.ShippingCoverageInMeters.HasValue && dto.ShippingCoverageInMeters.Value > 0)
             {
-                entity.ShippingCoverageInMeters = dto.ShippingCoverageInMeters.Value;
+                entity.ShippingCoverageInMeters = Math.Min(dto.ShippingCoverageInMeters.Value, 30000);
             }
 
             if (dto.Lat.HasValue && dto.Lat.Value != 0)
@@ -226,7 +226,7 @@ namespace App.ApiControllers.V1.Warehouse
                 Phone1 = entity.Phone1 ?? "",
                 Phone2 = entity.Phone2 ?? "",
                 Address = entity.Address ?? "",
-                ShippingCoverageInMeters = entity.ShippingCoverageInMeters,
+                ShippingCoverageInMeters = Math.Min(Math.Max(entity.ShippingCoverageInMeters, 0), 30000),
                 Lat = entity.Lat,
                 Lng = entity.Lng,
                 Active = entity.Active,

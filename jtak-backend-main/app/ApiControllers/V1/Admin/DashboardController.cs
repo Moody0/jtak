@@ -75,7 +75,7 @@ namespace App.ApiControllers.V1.Admin
             return new DashboardVm
             {
                 ProductsCount = await _service.Queryable().AsNoTracking()
-                                          .CountAsync(x => x.Active),
+                                          .CountAsync(x => x.DeletionDate == null && x.Active),
                 UsersCount = await _userManager.Users.AsNoTracking().CountAsync(x => x.IsActive),
                 OrdersCount = await _orderService.Queryable().AsNoTracking().CountAsync(x => x.OrderStatus == OrderStatus.Success),
                 BillsCount = await _billService.Queryable().AsNoTracking().CountAsync(),

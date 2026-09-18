@@ -45,6 +45,7 @@ namespace App.Orders.Data
                 b.Property(x => x.ProofOfDeliverySignature).IsRequired(false);
                 b.Property(x => x.ProofOfDeliveryPhotoUrl).IsRequired(false);
                 b.Property(x => x.DeliveryNotes).IsRequired(false);
+                b.Property(x => x.DeleteReason).IsRequired(false).HasMaxLength(500);
                 b.Property(x => x.CreatedBy).IsRequired(false);
                 b.Property(x => x.UpdatedBy).IsRequired(false);
             });

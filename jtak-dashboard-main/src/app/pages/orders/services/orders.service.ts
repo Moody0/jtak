@@ -5,6 +5,15 @@ import { TableService } from 'src/app/_metronic/shared/crud-table';
 import { Order, OrderLiveTrack } from '../models/orders.model';
 import { finalize, Observable } from 'rxjs';
 
+export interface AdminOrdersSummaryDto {
+  total: number;
+  pendingApproval: number;
+  withoutDriver: number;
+  readyForDelivery: number;
+  inDelivery: number;
+  completed: number;
+  cancelledRejected: number;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -24,6 +33,10 @@ export class OrdersService extends TableService<Order> implements OnDestroy {
 
   constructor(@Inject(HttpClient) public http: HttpClient) {
     super(http);
+  }
+
+  getSummary(): Observable<AdminOrdersSummaryDto> {
+    return this.http.get<AdminOrdersSummaryDto>(`${this.BASE_URL}/Admin/Orders/Summary`);
   }
 
   cancel(orderId: number, reason?: string): Observable<boolean> {
@@ -71,6 +84,14 @@ export class OrdersService extends TableService<Order> implements OnDestroy {
 
   getLiveTrack(id: number): Observable<OrderLiveTrack> {
     return this.http.get<OrderLiveTrack>(`${this.BASE_URL}/Admin/Orders/${id}/LiveTrack`);
+  }
+
+  archive(orderId: number, reason: string): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Archive/${orderId}`, { reason });
+  }
+
+  restore(orderId: number): Observable<boolean> {
+    return this.http.post<boolean>(`${this.BASE_URL}/Admin/Orders/Restore/${orderId}`, {});
   }
 
   ngOnDestroy() {

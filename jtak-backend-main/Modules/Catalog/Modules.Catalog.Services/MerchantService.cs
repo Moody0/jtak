@@ -529,14 +529,47 @@ namespace Modules.Catalog.Services
             keyword = keyword?.Trim()?.ToLower();
             if (string.IsNullOrEmpty(keyword))
                 return query;
-            return query.Where(x => x.Title.ToLower().Contains(keyword) || x.ShortDescription.ToLower().Contains(keyword) || x.Phone1.ToLower().Contains(keyword) || x.Phone2.ToLower().Contains(keyword));
+
+            var isNumeric = int.TryParse(keyword.TrimStart('#'), out var numericId);
+            if (isNumeric)
+            {
+                return query.Where(x => x.Id == numericId ||
+                                        (x.Title != null && x.Title.ToLower().Contains(keyword)) ||
+                                        (x.ShortDescription != null && x.ShortDescription.ToLower().Contains(keyword)) ||
+                                        (x.Description != null && x.Description.ToLower().Contains(keyword)) ||
+                                        (x.Phone1 != null && x.Phone1.ToLower().Contains(keyword)) ||
+                                        (x.Phone2 != null && x.Phone2.ToLower().Contains(keyword)));
+            }
+
+            return query.Where(x => (x.Title != null && x.Title.ToLower().Contains(keyword)) ||
+                                    (x.ShortDescription != null && x.ShortDescription.ToLower().Contains(keyword)) ||
+                                    (x.Description != null && x.Description.ToLower().Contains(keyword)) ||
+                                    (x.Phone1 != null && x.Phone1.ToLower().Contains(keyword)) ||
+                                    (x.Phone2 != null && x.Phone2.ToLower().Contains(keyword)));
         }
+
         public override IQueryable<MerchantDto> Search(IQueryable<MerchantDto> query, string keyword)
         {
             keyword = keyword?.Trim()?.ToLower();
             if (string.IsNullOrEmpty(keyword))
                 return query;
-            return query.Where(x => x.Title.ToLower().Contains(keyword) || x.ShortDescription.ToLower().Contains(keyword) || x.Phone1.ToLower().Contains(keyword) || x.Phone2.ToLower().Contains(keyword));
+
+            var isNumeric = int.TryParse(keyword.TrimStart('#'), out var numericId);
+            if (isNumeric)
+            {
+                return query.Where(x => x.Id == numericId ||
+                                        (x.Title != null && x.Title.ToLower().Contains(keyword)) ||
+                                        (x.ShortDescription != null && x.ShortDescription.ToLower().Contains(keyword)) ||
+                                        (x.Description != null && x.Description.ToLower().Contains(keyword)) ||
+                                        (x.Phone1 != null && x.Phone1.ToLower().Contains(keyword)) ||
+                                        (x.Phone2 != null && x.Phone2.ToLower().Contains(keyword)));
+            }
+
+            return query.Where(x => (x.Title != null && x.Title.ToLower().Contains(keyword)) ||
+                                    (x.ShortDescription != null && x.ShortDescription.ToLower().Contains(keyword)) ||
+                                    (x.Description != null && x.Description.ToLower().Contains(keyword)) ||
+                                    (x.Phone1 != null && x.Phone1.ToLower().Contains(keyword)) ||
+                                    (x.Phone2 != null && x.Phone2.ToLower().Contains(keyword)));
         }
 
         public async Task<(decimal Lat, decimal Lng, int MerchantId)[]> GetMerchantStops(params int[] mids) =>

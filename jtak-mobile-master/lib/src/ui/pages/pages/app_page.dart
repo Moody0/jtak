@@ -18,6 +18,7 @@ import '../../../utils/utilities/global_var.dart';
 import '../../../core/services/locator.dart';
 import '../../../core/services/authentication_service.dart';
 import '../../../utils/providers/sol_api.dart';
+import '../../../utils/utilities/phone_helper.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Help & Support Page (المساعدة والدعم الفني)
@@ -874,7 +875,7 @@ class _AppPageState extends State<AppPage> {
           savedName != 'مستخدم جيتك') {
         nameController.text = savedName;
       }
-      phoneController.text = user?.phoneNumber?.trim() ?? '';
+      phoneController.text = PhoneHelper.normalizeSyrianLocalPhone(user?.phoneNumber);
     }
 
     showDialog(
@@ -948,11 +949,14 @@ class _AppPageState extends State<AppPage> {
                     keyboardType: TextInputType.phone,
                     textDirection: TextDirection.ltr,
                     textInputAction: TextInputAction.next,
+                    inputFormatters: [
+                      SyrianPhoneInputFormatter(),
+                    ],
                     style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 14, fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
                       labelText: 'رقم الهاتف',
-                      hintText: 'أدخل رقم الهاتف للتواصل معك',
+                      hintText: '9xx xxx xxx',
                       prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                       hintStyle: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 13, color: const Color(0xFF94A3B8)),
@@ -975,10 +979,9 @@ class _AppPageState extends State<AppPage> {
                       ),
                     ),
                     validator: (val) {
-                      final digits =
-                          val?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
-                      return digits.length < 7
-                          ? 'يرجى إدخال رقم هاتف صحيح'
+                      final clean = PhoneHelper.normalizeSyrianLocalPhone(val);
+                      return clean.length != 9
+                          ? 'يرجى إدخال رقم هاتف سوري صحيح (9 أرقام)'
                           : null;
                     },
                   ),
@@ -1062,7 +1065,7 @@ class _AppPageState extends State<AppPage> {
 
                         final body = {
                           'DisplayName': nameController.text.trim(),
-                          'PhoneNumber': phoneController.text.trim(),
+                          'PhoneNumber': PhoneHelper.normalizeSyrianLocalPhone(phoneController.text),
                           'Email': senderEmail,
                           'Title': 'رسالة إلى الدعم الفني',
                           'Message': messageController.text.trim(),

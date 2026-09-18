@@ -1,0 +1,250 @@
+<div class="modal-header border-0 pb-0">
+  <div class="d-flex align-items-center gap-3">
+    <div class="symbol symbol-45px symbol-circle bg-light-primary">
+      <span class="symbol-label text-primary">
+        <i class="ki-outline ki-shield-search fs-2"></i>
+      </span>
+    </div>
+    <div>
+      <h3 class="modal-title fw-bold text-gray-900 mb-1">تفاصيل سجل النشاط #{{ log?.id }}</h3>
+      <span class="text-muted fs-7">
+        {{ log?.createdDate | date:'yyyy-MM-dd HH:mm:ss' }}
+        <span *ngIf="log?.correlationId" class="badge badge-light-secondary ms-2">ID: {{ log?.correlationId }}</span>
+      </span>
+    </div>
+  </div>
+  <button type="button" class="btn btn-icon btn-sm btn-active-light-primary" (click)="dismiss()">
+    <i class="ki-outline ki-cross fs-2"></i>
+  </button>
+</div>
+
+<div class="modal-body py-4">
+  <div class="row g-4 mb-4">
+    <!-- Action Info Card -->
+    <div class="col-12 col-md-6">
+      <div class="card border border-gray-200 bg-light p-4 h-100 rounded-3">
+        <h6 class="fw-bold text-gray-800 mb-3 d-flex align-items-center gap-2">
+          <i class="ki-outline ki-information-5 text-primary fs-4"></i>
+          معلومات العملية
+        </h6>
+        <div class="d-flex flex-column gap-2 fs-7">
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">القسم / الوحدة:</span>
+            <span class="badge badge-light-primary fw-bold">{{ log?.module }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">الإجراء:</span>
+            <span class="fw-bold text-gray-900">{{ log?.action }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">الحالة:</span>
+            <span class="badge" [ngClass]="{
+              'badge-light-success text-success': log?.result === 'Success',
+              'badge-light-danger text-danger': log?.result === 'Failure' || log?.result === 'Forbidden',
+              'badge-light-warning text-warning': log?.result === 'Warning'
+            }">{{ log?.result }}</span>
+          </div>
+          <div class="d-flex justify-content-between" *ngIf="log?.entityType">
+            <span class="text-muted">الكيان المرتبط:</span>
+            <span class="text-gray-800 fw-semibold">{{ log?.entityType }} ({{ log?.entityId || '-' }})</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Actor Card -->
+    <div class="col-12 col-md-6">
+      <div class="card border border-gray-200 bg-light p-4 h-100 rounded-3">
+        <h6 class="fw-bold text-gray-800 mb-3 d-flex align-items-center gap-2">
+          <i class="ki-outline ki-user text-primary fs-4"></i>
+          المسؤول والمصدر
+        </h6>
+        <div class="d-flex flex-column gap-2 fs-7">
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">المسؤول:</span>
+            <span class="fw-bold text-gray-900">{{ log?.adminName || log?.adminUserName || 'نظام / تلقائي' }}</span>
+          </div>
+          <div class="d-flex justify-content-between" *ngIf="log?.adminEmail">
+            <span class="text-muted">البريد الإلكتروني:</span>
+            <span class="text-gray-800">{{ log?.adminEmail }}</span>
+          </div>
+          <div class="d-flex justify-content-between" *ngIf="log?.ipAddress">
+            <span class="text-muted">عنوان IP:</span>
+            <span class="badge badge-light-dark font-monospace">{{ log?.ipAddress }}</span>
+          </div>
+          <div class="d-flex justify-content-between" *ngIf="log?.userAgent">
+            <span class="text-muted">المتصفح:</span>
+            <span class="text-gray-700 text-truncate mw-200px" [title]="log?.userAgent">{{ log?.userAgent }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Description Section -->
+  <div class="mb-4" *ngIf="log?.description">
+    <label class="form-label fw-bold text-gray-800 mb-1">وصف العملية:</label>
+    <div class="p-3 bg-light rounded text-gray-800 border border-gray-200 fs-7">
+      {{ log?.description }}
+    </div>
+  </div>
+
+  <!-- Before / After JSON Payload Diff Section -->
+  <div *ngIf="formattedBeforeState || formattedAfterState" class="mt-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="fw-bold text-gray-900 mb-0 d-flex align-items-center gap-2">
+        <i class="ki-outline ki-code text-primary fs-4"></i>
+        بيانات التغيير ومقارنة الحقول
+      </h6>
+
+      <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline btn-outline-secondary"
+          *ngIf="fieldDiffs.length > 0"
+          [class.active]="activeDiffTab === 'table'"
+          (click)="activeDiffTab = 'table'">
+          <i class="ki-outline ki-element-11 fs-7 me-1"></i>
+          جدول الحقول
+        </button>
+        <button type="button" class="btn btn-outline btn-outline-secondary"
+          [class.active]="activeDiffTab === 'side-by-side'"
+          (click)="activeDiffTab = 'side-by-side'">
+          <i class="ki-outline ki-row-horizontal fs-7 me-1"></i>
+          JSON جنباً لجنب
+        </button>
+        <button type="button" class="btn btn-outline btn-outline-secondary"
+          [class.active]="activeDiffTab === 'before'"
+          (click)="activeDiffTab = 'before'">
+          السابق
+        </button>
+        <button type="button" class="btn btn-outline btn-outline-secondary"
+          [class.active]="activeDiffTab === 'after'"
+          (click)="activeDiffTab = 'after'">
+          الجديد
+        </button>
+      </div>
+    </div>
+
+    <!-- Human Readable Table Diff View -->
+    <div *ngIf="activeDiffTab === 'table' && fieldDiffs.length > 0" class="card border border-gray-300 rounded-3 mb-3">
+      <div class="table-responsive">
+        <table class="table table-hover table-row-bordered align-middle gs-4 gy-3 mb-0">
+          <thead>
+            <tr class="fw-bold fs-7 text-gray-700 bg-light text-uppercase">
+              <th class="min-w-150px">الحقل</th>
+              <th class="min-w-180px text-danger">الحالة السابقة (Before)</th>
+              <th class="min-w-180px text-success">الحالة الجديدة (After)</th>
+              <th class="min-w-80px text-center">التغيير</th>
+            </tr>
+          </thead>
+          <tbody class="fs-7">
+            <tr *ngFor="let diff of fieldDiffs" [class.bg-light-warning]="diff.changed">
+              <td>
+                <span class="fw-bold text-gray-800">{{ diff.label }}</span>
+                <span class="text-muted fs-8 d-block font-monospace">{{ diff.field }}</span>
+              </td>
+              <td>
+                <span class="badge badge-light-danger text-danger text-wrap text-start font-monospace fs-8 p-2">
+                  {{ diff.beforeValue }}
+                </span>
+              </td>
+              <td>
+                <span class="badge badge-light-success text-success text-wrap text-start font-monospace fs-8 p-2">
+                  {{ diff.afterValue }}
+                </span>
+              </td>
+              <td class="text-center">
+                <span *ngIf="diff.changed" class="badge badge-warning fw-bold fs-8">معدّل</span>
+                <span *ngIf="!diff.changed" class="badge badge-light-secondary fs-8">مطابق</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Side by side view -->
+    <div class="row g-3" *ngIf="activeDiffTab === 'side-by-side'">
+      <div class="col-12 col-lg-6">
+        <div class="card border border-danger-subtle bg-light-danger rounded-3 h-100">
+          <div class="card-header min-h-40px px-3 py-2 d-flex justify-content-between align-items-center border-bottom border-danger-subtle">
+            <span class="fw-bold text-danger fs-7">
+              <i class="ki-outline ki-arrow-down-left text-danger me-1"></i>
+              الحالة السابقة (Before)
+            </span>
+            <button class="btn btn-xs btn-icon btn-light-danger"
+              *ngIf="formattedBeforeState"
+              (click)="copyJson(formattedBeforeState, 'الحالة السابقة')"
+              title="نسخ">
+              <i class="ki-outline ki-copy fs-6"></i>
+            </button>
+          </div>
+          <div class="card-body p-3">
+            <pre *ngIf="formattedBeforeState" class="json-code-block text-danger-emphasis mb-0"><code>{{ formattedBeforeState }}</code></pre>
+            <div *ngIf="!formattedBeforeState" class="text-muted text-center py-4 fs-7">لا توجد بيانات سابقة (سجل جديد)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card border border-success-subtle bg-light-success rounded-3 h-100">
+          <div class="card-header min-h-40px px-3 py-2 d-flex justify-content-between align-items-center border-bottom border-success-subtle">
+            <span class="fw-bold text-success fs-7">
+              <i class="ki-outline ki-arrow-up-right text-success me-1"></i>
+              الحالة الجديدة (After)
+            </span>
+            <button class="btn btn-xs btn-icon btn-light-success"
+              *ngIf="formattedAfterState"
+              (click)="copyJson(formattedAfterState, 'الحالة الجديدة')"
+              title="نسخ">
+              <i class="ki-outline ki-copy fs-6"></i>
+            </button>
+          </div>
+          <div class="card-body p-3">
+            <pre *ngIf="formattedAfterState" class="json-code-block text-success-emphasis mb-0"><code>{{ formattedAfterState }}</code></pre>
+            <div *ngIf="!formattedAfterState" class="text-muted text-center py-4 fs-7">لا توجد بيانات جديدة</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before only view -->
+    <div *ngIf="activeDiffTab === 'before'">
+      <div class="card border border-gray-300 rounded-3">
+        <div class="card-header min-h-40px px-3 py-2 d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-gray-800 fs-7">الحالة السابقة (Before)</span>
+          <button class="btn btn-xs btn-light-primary"
+            *ngIf="formattedBeforeState"
+            (click)="copyJson(formattedBeforeState, 'الحالة السابقة')">
+            <i class="ki-outline ki-copy me-1"></i> نسخ JSON
+          </button>
+        </div>
+        <div class="card-body p-3">
+          <pre *ngIf="formattedBeforeState" class="json-code-block mb-0"><code>{{ formattedBeforeState }}</code></pre>
+          <div *ngIf="!formattedBeforeState" class="text-muted text-center py-4 fs-7">لا توجد بيانات سابقة</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- After only view -->
+    <div *ngIf="activeDiffTab === 'after'">
+      <div class="card border border-gray-300 rounded-3">
+        <div class="card-header min-h-40px px-3 py-2 d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-gray-800 fs-7">الحالة الجديدة (After)</span>
+          <button class="btn btn-xs btn-light-primary"
+            *ngIf="formattedAfterState"
+            (click)="copyJson(formattedAfterState, 'الحالة الجديدة')">
+            <i class="ki-outline ki-copy me-1"></i> نسخ JSON
+          </button>
+        </div>
+        <div class="card-body p-3">
+          <pre *ngIf="formattedAfterState" class="json-code-block mb-0"><code>{{ formattedAfterState }}</code></pre>
+          <div *ngIf="!formattedAfterState" class="text-muted text-center py-4 fs-7">لا توجد بيانات جديدة</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer border-0 pt-0">
+  <button type="button" class="btn btn-light" (click)="dismiss()">إغلاق</button>
+</div>

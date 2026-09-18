@@ -28,7 +28,7 @@ export const ApplicationRoutes = Object.freeze({
   Terms: 'pages/TermsAndConditions',
   PaymentTerms: 'pages/PaymentPolicy',
   About: 'pages/About',
-
+  AuditLogs: 'audit-logs',
 });
 
 export const ApplicationMenu = [
@@ -127,6 +127,11 @@ export const ApplicationMenu = [
     label: 'MENU.RESTAURANT_CATEGORIES',
     icon: 'fas fa-utensils',
   },
+  {
+    path: ApplicationRoutes.AuditLogs,
+    label: 'MENU.AUDIT_LOGS',
+    icon: 'fas fa-shield-alt',
+  },
 ];
 
 export const AppUserRoleMap = {
@@ -139,7 +144,7 @@ export const AppUserRoleMap = {
 export const ApplicationMenuGroups = [
   {
     label: 'MENU.GROUPS.OVERVIEW',
-    items: [ApplicationMenu[0]], // Dashboard
+    items: [ApplicationMenu[0], ApplicationMenu[19]], // Dashboard, AuditLogs (سجل نشاط الإدارة)
   },
   {
     label: 'MENU.GROUPS.OPERATIONS',

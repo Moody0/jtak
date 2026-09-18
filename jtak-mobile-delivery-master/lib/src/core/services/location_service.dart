@@ -41,8 +41,19 @@ class LocationService {
     // When we reach here, permissions are granted and we can
     // continue accessing the position of the device.
     try {
-      Position currentPosition = await Geolocator.getCurrentPosition();
-      return LatLng(currentPosition.latitude, currentPosition.longitude);
+      Position? currentPosition;
+      try {
+        currentPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      } catch (_) {
+        currentPosition = await Geolocator.getLastKnownPosition();
+      }
+      if (currentPosition != null) {
+        return LatLng(currentPosition.latitude, currentPosition.longitude);
+      }
     } catch (e) {
       if (isMandatory) {
         if (e is LocationServiceDisabledException && isMandatory) {
@@ -133,23 +144,9 @@ class LocationService {
       );
     }
 
-    // Granted only "while in use". On Android 11+ a second requestPermission()
-    // call here is a silent no-op — the OS will not show the "Allow all the
-    // time" dialog again, so retrying this exact step forever gets the user
-    // nowhere. The only way to upgrade is the app's own Settings page.
-    if (permission == LocationPermission.whileInUse) {
-      throw LocationAccessException(
-        LocationAccessIssue.needsAlwaysUpgrade,
-        str.msg.locationAlwaysUpgradeRequired,
-      );
-    }
-
-    // Enforce LocationPermission.always strictly for continuous background tracking
-    if (permission != LocationPermission.always) {
-      throw LocationAccessException(
-        LocationAccessIssue.permissionDenied,
-        str.msg.locationPermissionsDenied,
-      );
+    // Both 'always' and 'whileInUse' (foreground service) permit active dispatch and tracking
+    if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+      return permission;
     }
 
     return permission;

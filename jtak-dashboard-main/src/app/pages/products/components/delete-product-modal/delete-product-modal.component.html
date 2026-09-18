@@ -1,7 +1,9 @@
 <app-delete-modal
-moduleName="Product"
-title="Delete"
-(cancelClicked)="modal.dismiss()"
-(deleteClicked)="this.delete()"
+  [moduleName]="isBulk ? '' : 'Product'"
+  [title]="isBulk ? ('حذف ' + count + ' منتجات محددة') : ''"
+  [confirmationText]="isBulk ? ('هل أنت متأكد من رغبتك في حذف ' + count + ' منتج محدد ونقلها للأرشيف؟ سيتم الحفاظ الكامل على سجلات الطلبات السابقة والمحاسبة.') : 'هل أنت متأكد من حذف هذا المنتج ونقله للأرشيف؟'"
+  [isLoading]="isLoading$ | async"
+  (cancelClicked)="modal.dismiss()"
+  (deleteClicked)="delete()"
 >
 </app-delete-modal>

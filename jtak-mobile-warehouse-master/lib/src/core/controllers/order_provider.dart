@@ -2,6 +2,8 @@ import 'package:app_jtak_warehouse/src/core/controllers/app/base_provider.dart';
 import 'package:app_jtak_warehouse/src/core/controllers/app/merchant_state_provider.dart';
 import 'package:app_jtak_warehouse/src/core/enums/order_details_status_enum.dart';
 import 'package:app_jtak_warehouse/src/core/enums/payment_method_enum.dart';
+import 'package:app_jtak_warehouse/src/core/enums/viewstate.dart';
+import 'package:app_jtak_warehouse/src/core/models/order_details_model.dart';
 import 'package:app_jtak_warehouse/src/core/models/order_model.dart';
 import 'package:app_jtak_warehouse/src/core/services/locator.dart';
 import 'package:app_jtak_warehouse/src/utils/providers/sol_api.dart';
@@ -34,6 +36,21 @@ class OrderProvider extends BaseProvider<OrderModel> {
   DateTime? get lastSyncTime => _lastSyncTime;
 
   Future<void>? _loadPickedFuture;
+
+  /// Clear all cached orders, details, deadlines, and item states on account switch
+  void reset() {
+    dataList.clear();
+    order = null;
+    _activeTabIndex = 0;
+    _searchQuery = '';
+    _activeQuickFilter = 0;
+    _isSilentRefreshing = false;
+    _lastSyncTime = null;
+    _prepDeadlines.clear();
+    _pickedItemIds.clear();
+    _lastKnownPendingCount = 0;
+    notifyListeners();
+  }
 
   OrderProvider() {
     _loadStoredDeadlines();
@@ -287,11 +304,82 @@ class OrderProvider extends BaseProvider<OrderModel> {
     }
   }
 
+  int _currentLoadOrderToken = 0;
+  bool _isLoadingOrder = false;
+
+  OrderModel mergeOrderModel(OrderModel current, OrderModel update) {
+    // Merge order details non-destructively
+    final existingDetails = current.orderDetails ?? [];
+    final newDetails = update.orderDetails ?? [];
+    final mergedDetails = <OrderDetailsModel>[];
+
+    if (newDetails.isNotEmpty) {
+      final existingMap = {for (var d in existingDetails) if (d.id != null) d.id!: d};
+      for (var nd in newDetails) {
+        if (nd.id != null && existingMap.containsKey(nd.id!)) {
+          final ed = existingMap[nd.id!]!;
+          mergedDetails.add(nd.copyWith(
+            locationBin: nd.locationBin ?? ed.locationBin,
+            batchNumber: nd.batchNumber ?? ed.batchNumber,
+            barcode: nd.barcode ?? ed.barcode,
+            expirationDate: nd.expirationDate ?? ed.expirationDate,
+            isPicked: ed.isPicked || nd.isPicked,
+            productImage: (nd.productImage != null && nd.productImage!.isNotEmpty) ? nd.productImage : ed.productImage,
+            merchantTitle: (nd.merchantTitle != null && nd.merchantTitle!.isNotEmpty) ? nd.merchantTitle : ed.merchantTitle,
+          ));
+        } else {
+          mergedDetails.add(nd);
+        }
+      }
+    } else if (existingDetails.isNotEmpty) {
+      mergedDetails.addAll(existingDetails);
+    }
+
+    final effectiveDeliveryUser = (update.deliveryUser != null && update.deliveryUser!.trim().isNotEmpty)
+        ? update.deliveryUser
+        : current.deliveryUser;
+
+    final effectiveDeliveryPhone = (update.deliveryUserPhone != null && update.deliveryUserPhone!.trim().isNotEmpty)
+        ? update.deliveryUserPhone
+        : current.deliveryUserPhone;
+
+    final effectiveDeliveryId = (update.deliveryId != null && update.deliveryId!.trim().isNotEmpty)
+        ? update.deliveryId
+        : current.deliveryId;
+
+    return current.copyWith(
+      user: (update.user != null && update.user!.trim().isNotEmpty) ? update.user : current.user,
+      userId: (update.userId != null && update.userId!.trim().isNotEmpty) ? update.userId : current.userId,
+      purchaseDate: update.purchaseDate ?? current.purchaseDate,
+      createdDate: update.createdDate ?? current.createdDate,
+      description: update.description ?? current.description,
+      phonenumber: (update.phonenumber != null && update.phonenumber!.trim().isNotEmpty)
+          ? update.phonenumber
+          : current.phonenumber,
+      lat: update.lat ?? current.lat,
+      lng: update.lng ?? current.lng,
+      address: (update.address != null && update.address!.trim().isNotEmpty)
+          ? update.address
+          : current.address,
+      paymentMethod: update.paymentMethod ?? current.paymentMethod,
+      orderStatus: update.orderStatus ?? current.orderStatus,
+      orderDetails: mergedDetails.isNotEmpty ? mergedDetails : current.orderDetails,
+      price: update.price ?? current.price,
+      deliveryId: effectiveDeliveryId,
+      deliveryUser: effectiveDeliveryUser,
+      deliveryUserPhone: effectiveDeliveryPhone,
+      deliveryNotes: update.deliveryNotes ?? current.deliveryNotes,
+      notes: update.notes ?? current.notes,
+      prepTimeMinutes: update.prepTimeMinutes ?? current.prepTimeMinutes,
+      isDeliveryAssigned: update.isDeliveryAssigned ?? current.isDeliveryAssigned,
+      isDeliveryAccepted: update.isDeliveryAccepted ?? current.isDeliveryAccepted,
+    );
+  }
+
   /// Silent background sync that never wipes dataList and causes zero UI flicker
   Future<void> silentRefresh() async {
     if (_isSilentRefreshing) return;
     _isSilentRefreshing = true;
-    notifyListeners();
 
     try {
       Map body = {
@@ -326,7 +414,7 @@ class OrderProvider extends BaseProvider<OrderModel> {
             orElse: () => null,
           );
           if (updatedOrder != null) {
-            order = updatedOrder;
+            order = mergeOrderModel(order!, updatedOrder);
           }
         }
 
@@ -391,17 +479,75 @@ class OrderProvider extends BaseProvider<OrderModel> {
     } catch (_) {}
   }
 
-  Future loadOrder(int id) async {
-    return await loadBaseData(
-      loadBody: () async {
-        var data = await _api.getRequest('/Orders/$id');
-        order = OrderModel.fromMap(data);
-        if (order != null) {
-          _applyPickedStatesToOrders([order!]);
+  Future<void> loadOrder(int id, {bool isSilent = false}) async {
+    final token = ++_currentLoadOrderToken;
+    if (_isLoadingOrder) return;
+    _isLoadingOrder = true;
+
+    if (!isSilent) {
+      setState(ViewState.busy);
+    }
+
+    try {
+      var data = await _api.getRequest('/Orders/$id');
+      if (token != _currentLoadOrderToken) {
+        return;
+      }
+      if (data is Map<String, dynamic>) {
+        var loaded = OrderModel.fromMap(data);
+
+        // Fetch picking list and merge into loaded model BEFORE committing to state
+        try {
+          var pickingRes = await _api.getRequest('/Orders/$id/PickingList');
+          if (pickingRes is List && loaded.orderDetails != null) {
+            for (var item in pickingRes) {
+              final detailId = item['orderDetailId'];
+              for (var d in loaded.orderDetails!) {
+                if (d.id == detailId) {
+                  d.locationBin = item['locationBin'];
+                  d.batchNumber = item['batchNumber'];
+                  d.barcode = item['barcode'];
+                  final backendPicked = item['isPicked'] == true;
+                  if (backendPicked) {
+                    d.isPicked = true;
+                    _pickedItemIds.putIfAbsent(id, () => {}).add(detailId);
+                    _savePickedItems(id);
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        if (token != _currentLoadOrderToken) {
+          return;
         }
-        await loadPickingList(id);
-      },
-    );
+
+        await _loadPickedFuture;
+        _applyPickedStatesToOrders([loaded]);
+
+        if (order != null && order!.id == id) {
+          order = mergeOrderModel(order!, loaded);
+        } else {
+          order = loaded;
+        }
+
+        final index = dataList.indexWhere((e) => e.id == id);
+        if (index != -1) {
+          dataList[index] = order!;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading order $id: $e');
+      if (!isSilent) rethrow;
+    } finally {
+      _isLoadingOrder = false;
+      if (!isSilent) {
+        setState(ViewState.idle);
+      } else {
+        notifyListeners();
+      }
+    }
   }
 
   void setOrderObject(OrderModel orderObject) async {

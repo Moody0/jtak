@@ -429,19 +429,29 @@ namespace App.ApiControllers.V1.Authorization
 
             if (!string.IsNullOrWhiteSpace(vm.FullName))
             {
-                user.FullName = vm.FullName.Trim();
-                user.FirstName = user.FullName.Split(' ').FirstOrDefault() ?? user.FullName;
-                user.LastName = user.FullName.Contains(' ') ? user.FullName.Substring(user.FirstName.Length).Trim() : "";
+                var full = vm.FullName.Trim();
+                user.FullName = full;
+                var spaceIndex = full.IndexOf(' ');
+                if (spaceIndex > 0)
+                {
+                    user.FirstName = full.Substring(0, spaceIndex).Trim();
+                    user.LastName = full.Substring(spaceIndex + 1).Trim();
+                }
+                else
+                {
+                    user.FirstName = full;
+                    user.LastName = "";
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(vm.ProfilePhoto))
                 user.ProfilePhoto = vm.ProfilePhoto;
 
             if (!string.IsNullOrWhiteSpace(vm.PhoneNumber))
-                user.PhoneNumber = vm.PhoneNumber;
+                user.PhoneNumber = vm.PhoneNumber.Trim();
 
             if (!string.IsNullOrWhiteSpace(vm.CountryPhoneCode))
-                user.CountryPhoneCode = vm.CountryPhoneCode;
+                user.CountryPhoneCode = vm.CountryPhoneCode.Trim();
 
             if (vm.Gender.HasValue)
                 user.Gender = vm.Gender;
@@ -459,8 +469,10 @@ namespace App.ApiControllers.V1.Authorization
                 {
                     _logger.LogWarning($"Email change confirmation failed: {ex.Message}");
                 }
-                user.Email = vm.Email;
+                user.Email = vm.Email.Trim();
             }
+
+            user.UpdatedDate = DateTime.UtcNow;
 
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded) return BadRequest(result);

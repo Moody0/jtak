@@ -112,25 +112,40 @@ namespace App.ApiControllers.V1.Customer
                     .ToArray()
                 : categories;
 
-            // The curated grid. A tile whose target has been deleted or
-            // deactivated is withheld rather than shipped to the app, where it
-            // would open the wrong screen on tap.
-            var homeCategories = (await _homeCategoriesService.GetTiles(activeOnly: true))
-                .Where(tile => tile.TargetExists)
-                .ToArray();
+            // Home Categories configuration (curated grid)
+            var homeConfig = await _homeCategoriesService.GetConfig();
+            var homeCategoriesEnabled = homeConfig?.Enabled ?? true;
+            var homeCategoriesMaxItems = homeConfig?.MaxItems ?? 8;
 
-            // Older app builds read FeaturedCategories and know nothing about
-            // tiles, so mirror the same arrangement into it wherever a tile
-            // points at a product category.
-            if (homeCategories.Any())
+            HomeCategoryTileDto[] homeCategories;
+            if (!homeCategoriesEnabled)
             {
-                var mirrored = homeCategories
-                    .Where(tile => tile.ProductCategoryId.HasValue)
-                    .Select(tile => categories.FirstOrDefault(category => category.Id == tile.ProductCategoryId.Value))
-                    .Where(category => category != null)
-                    .ToArray();
-                if (mirrored.Any())
-                    featuredCategories = mirrored;
+                homeCategories = Array.Empty<HomeCategoryTileDto>();
+                featuredCategories = Array.Empty<ProductCategoryDto>();
+            }
+            else
+            {
+                var tiles = (await _homeCategoriesService.GetTiles(activeOnly: true))
+                    .Where(tile => tile.TargetExists);
+                if (homeCategoriesMaxItems > 0)
+                {
+                    tiles = tiles.Take(homeCategoriesMaxItems);
+                }
+                homeCategories = tiles.ToArray();
+
+                // Older app builds read FeaturedCategories and know nothing about
+                // tiles, so mirror the same arrangement into it wherever a tile
+                // points at a product category.
+                if (homeCategories.Any())
+                {
+                    var mirrored = homeCategories
+                        .Where(tile => tile.ProductCategoryId.HasValue)
+                        .Select(tile => categories.FirstOrDefault(category => category.Id == tile.ProductCategoryId.Value))
+                        .Where(category => category != null)
+                        .ToArray();
+                    if (mirrored.Any())
+                        featuredCategories = mirrored;
+                }
             }
 
             return new HomeVm
@@ -140,7 +155,11 @@ namespace App.ApiControllers.V1.Customer
                 Banners = await _bService.GetAllActiveBanners(),
                 Categories = categories,
                 FeaturedCategories = featuredCategories,
-                HomeCategories = homeCategories
+                HomeCategories = homeCategories,
+                HomeCategoriesEnabled = homeCategoriesEnabled,
+                HomeCategoriesMaxItems = homeCategoriesMaxItems,
+                HomeCategoriesTitle = homeConfig?.SectionTitle,
+                HomeCategoriesTitleEn = homeConfig?.SectionTitleEn
             };
         }
 

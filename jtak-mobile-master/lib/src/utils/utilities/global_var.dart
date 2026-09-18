@@ -28,12 +28,19 @@ class GlobalVar {
     }
     final lower = clean.toLowerCase();
     if (lower.endsWith('.webp') || lower.endsWith('.svg') || lower.endsWith('.gif') || lower.endsWith('.avif')) {
-      return '${SolApi.downloadUrl}$clean';
+      return '${SolApi.downloadUrl}$clean?v=$clean';
     }
-    return '${SolApi.imagePreviewUrl}$clean?w=$width&h=$height&crop=$crop';
+    return '${SolApi.imagePreviewUrl}$clean?w=$width&h=$height&crop=$crop&v=$clean';
   }
 
-  static String getDownloadUrl(String subUrl) => SolApi.downloadUrl + GlobalVar.getString(subUrl);
+  static String getDownloadUrl(String subUrl) {
+    var clean = GlobalVar.getString(subUrl).trim().replaceAll(r'\', '/');
+    while (clean.startsWith('/')) {
+      clean = clean.substring(1);
+    }
+    if (clean.isEmpty) return '';
+    return '${SolApi.downloadUrl}$clean?v=$clean';
+  }
 
   static String getString(String? string, [String defultValue = ""]) => string ?? defultValue;
   static bool checkString(String? string) => string != null && string.isNotEmpty;

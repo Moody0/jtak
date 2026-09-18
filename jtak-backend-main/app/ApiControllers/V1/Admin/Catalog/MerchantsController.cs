@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Hosting;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using App.Shared.Services;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -30,6 +31,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IMapper _mapper;
         private readonly IWebHostEnvironment _env;
         private readonly IMemoryCache _cache;
+        private readonly IAdminAuditService _auditService;
 
         public MerchantsController(IMerchantService service,
             IProductService productService, 
@@ -37,7 +39,8 @@ namespace App.ApiControllers.V1.Admin
             IMapper mapper,
             IWebHostEnvironment env,
             ILogger<MerchantsController> logger,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            IAdminAuditService auditService = null)
         {
             _env = env;
             _service = service;
@@ -46,6 +49,7 @@ namespace App.ApiControllers.V1.Admin
             _logger = logger;
             _mapper = mapper;
             _cache = cache;
+            _auditService = auditService;
         }
 
         /// <summary>
@@ -107,7 +111,7 @@ namespace App.ApiControllers.V1.Admin
                 Phone1 = item.Phone1,
                 Phone2 = item.Phone2,
                 Address = item.Address,
-                ShippingCoverageInMeters = item.ShippingCoverageInMeters,
+                ShippingCoverageInMeters = Math.Min(Math.Max(item.ShippingCoverageInMeters, 0), 30000),
                 ProfitOutOfMerchantPricePercent = item.ProfitOutOfMerchantPricePercent,
                 Lat = item.Lat,
                 Lng = item.Lng,
@@ -125,6 +129,20 @@ namespace App.ApiControllers.V1.Admin
 
             await _service.SetMerchantPercent(entity.Id, item.ProfitOutOfMerchantPricePercent);
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Merchants",
+                    Action = "Create",
+                    EntityType = "Merchant",
+                    EntityId = entity.Id.ToString(),
+                    Description = $"إنشاء متجر جديد: {entity.Title}",
+                    Result = "Success",
+                    AfterState = new { entity.Id, entity.Title, entity.Phone1, entity.Address, entity.DeliveryFee, entity.ProfitOutOfMerchantPricePercent, entity.Active }
+                });
+            }
+
             return entity.Id;
         }
 
@@ -138,8 +156,20 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<int>> Edit(int id, MerchantDto item)
         {
             var entity = await _service.FindAsync(id);
+            if (entity == null) return NotFound();
 
             var merchantActiveChanged = item.Active != entity.Active;
+
+            var beforeState = new
+            {
+                entity.Id,
+                entity.Title,
+                entity.Phone1,
+                entity.Address,
+                entity.DeliveryFee,
+                entity.ProfitOutOfMerchantPricePercent,
+                entity.Active
+            };
 
             entity.Title = item.Title;
             entity.ShortDescription = item.ShortDescription;
@@ -151,7 +181,7 @@ namespace App.ApiControllers.V1.Admin
             entity.Phone1 = item.Phone1;
             entity.Phone2 = item.Phone2;
             entity.Address = item.Address;
-            entity.ShippingCoverageInMeters = item.ShippingCoverageInMeters;
+            entity.ShippingCoverageInMeters = Math.Min(Math.Max(item.ShippingCoverageInMeters, 0), 30000);
             entity.ProfitOutOfMerchantPricePercent = item.ProfitOutOfMerchantPricePercent;
             entity.Lat = item.Lat;
             entity.Lng = item.Lng;
@@ -183,6 +213,33 @@ namespace App.ApiControllers.V1.Admin
                 }
             }
 
+            if (_auditService != null)
+            {
+                var actionName = merchantActiveChanged ? (entity.Active ? "Enable" : "Disable") : "Update";
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Merchants",
+                    Action = actionName,
+                    EntityType = "Merchant",
+                    EntityId = entity.Id.ToString(),
+                    Description = merchantActiveChanged
+                        ? $"{(entity.Active ? "تفعيل" : "تعطيل")} المتجر: {entity.Title}"
+                        : $"تعديل بيانات المتجر: {entity.Title}",
+                    Result = "Success",
+                    BeforeState = beforeState,
+                    AfterState = new
+                    {
+                        entity.Id,
+                        entity.Title,
+                        entity.Phone1,
+                        entity.Address,
+                        entity.DeliveryFee,
+                        entity.ProfitOutOfMerchantPricePercent,
+                        entity.Active
+                    }
+                });
+            }
+
             return entity.Id;
         }
 
@@ -193,8 +250,26 @@ namespace App.ApiControllers.V1.Admin
         [HttpPut]
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         [Route("Products/{mid}")]
-        public async Task<ActionResult<int>> SetProducts(int mid, [FromBody] MerchantProductAssignDto[] products) =>
-            await _service.AssignMerchantProducts(new[] { mid }, products);
+        public async Task<ActionResult<int>> SetProducts(int mid, [FromBody] MerchantProductAssignDto[] products)
+        {
+            var res = await _service.AssignMerchantProducts(new[] { mid }, products);
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Merchants",
+                    Action = "AssignProducts",
+                    EntityType = "Merchant",
+                    EntityId = mid.ToString(),
+                    Description = $"تحديث ربط المنتجات للمتجر #{mid} (عدد المنتجات: {products?.Length ?? 0})",
+                    Result = "Success",
+                    AfterState = new { MerchantId = mid, ProductsCount = products?.Length ?? 0 }
+                });
+            }
+
+            return res;
+        }
 
         /// <summary>
         /// Get all Products, including the ones linked to a Merchant (MerchantId == mid)
@@ -265,8 +340,22 @@ namespace App.ApiControllers.V1.Admin
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();
             _cache.Remove("GetValidMerchants");
-            _cache.Remove($"GetActiveMerchantPrices_{id}");
-            _cache.Remove($"GetAllMerchantPrices_{id}");
+            _cache.Remove($"ActiveMerchantPrices_{id}");
+            _cache.Remove($"AllMerchantPrices_{id}");
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Merchants",
+                    Action = "Delete",
+                    EntityType = "Merchant",
+                    EntityId = id.ToString(),
+                    Description = $"حذف المتجر: {merchant?.Title ?? id.ToString()}",
+                    Result = "Success"
+                });
+            }
+
             return true;
         }
 

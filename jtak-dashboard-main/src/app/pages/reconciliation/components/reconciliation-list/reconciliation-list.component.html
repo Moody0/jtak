@@ -7,13 +7,17 @@
         <span class="fw-bold">{{ 'RECONCILIATION_PAGE.EOD_MONITOR' | translate }}</span>
       </div>
       <div class="ops-sync-meta">
-        <i class="fas fa-vault text-primary me-1"></i>
+        <i class="fas fa-store text-warning me-1"></i>
+        <span>التجار النشطون: <strong>{{ merchantSummary?.activeMerchantsCount || merchantsList.length }}</strong></span>
+      </div>
+      <div class="ops-sync-meta">
+        <i class="fas fa-motorcycle text-primary me-1"></i>
         <span>{{ 'RECONCILIATION_PAGE.ACTIVE_DRIVERS' | translate }}: <strong>{{ activeFleetCount }}</strong></span>
       </div>
     </div>
     <div class="ops-utility-right">
-      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="loadCaptains(); loadHistory(); loadSettlementRequests()" [disabled]="isLoading || isLoadingRequests">
-        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="loadMerchantSummary(); loadMerchants(); loadCaptains(); loadHistory(); loadSettlementRequests()" [disabled]="isLoading || isLoadingRequests || isLoadingMerchants">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading || isLoadingRequests || isLoadingMerchants"></i>
         <span>{{ 'COMMON.REFRESH' | translate }}</span>
       </button>
     </div>
@@ -24,7 +28,7 @@
     <nav class="ops-status-tabs" aria-label="Reconciliation Navigation">
       <button type="button" class="ops-status-tab" [class.active]="activeTab === 'merchants'" (click)="activeTab = 'merchants'">
         <i class="fas fa-store me-2 text-warning"></i>
-        <span>طابور تسويات التجار (Merchant Queue)</span>
+        <span>طابور وتسويات التجار (Merchant Reconciliations)</span>
         <span class="ops-status-tab-count ops-status-tab-count--orange" *ngIf="pendingMerchantRequestsCount > 0">{{ pendingMerchantRequestsCount }}</span>
       </button>
       <button type="button" class="ops-status-tab" [class.active]="activeTab === 'couriers'" (click)="activeTab = 'couriers'">
@@ -34,8 +38,8 @@
       </button>
       <button type="button" class="ops-status-tab" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">
         <i class="fas fa-history me-2 text-info"></i>
-        <span>{{ 'RECONCILIATION_PAGE.TAB_HISTORY' | translate }}</span>
-        <span class="ops-status-tab-count ops-status-tab-count--blue">{{ history.length }}</span>
+        <span>سجل دفعات التسوية (Settlement History)</span>
+        <span class="ops-status-tab-count ops-status-tab-count--blue">{{ historySummary?.totalCompletedCount ?? historyTotalRecords }}</span>
       </button>
     </nav>
 
@@ -49,88 +53,361 @@
     </div>
   </div>
 
-  <!-- TAB 1: DEDICATED MERCHANT SETTLEMENTS QUEUE -->
-  <div class="ops-orders-card mb-4" *ngIf="activeTab === 'merchants'">
-    <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
-      <div>
-        <h3 class="mb-1">طابور طلبات تسوية مستحقات التجار (Merchant Settlements Queue)</h3>
-        <div class="text-muted fs-8">
-          دورة حياة التسوية: طلب التاجر ➔ قيد المراجعة (حجز المبلغ دون تحريك أموال) ➔ قبول الطلب ➔ صرف المستحقات ➔ تسجيل القيد في دفتر الحسابات.
+  <!-- ========================================================================= -->
+  <!-- TAB 1: DEDICATED MERCHANT RECONCILIATION & SETTLEMENTS -->
+  <!-- ========================================================================= -->
+  <div *ngIf="activeTab === 'merchants'">
+    <!-- 1. Five Authoritative Merchant Summary KPI Cards -->
+    <div class="row g-3 mb-4">
+      <!-- Card 1: Gross Payable -->
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="ops-kpi-card ops-kpi-card--primary">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">إجمالي مستحقات التجار</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--primary">
+              <i class="fas fa-money-bill-wave"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-primary">
+            {{ (merchantSummary?.totalMerchantPayables || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">إجمالي الذمم الدائنة لكافة التجار في دفتر الحسابات (Vendor Payable)</div>
         </div>
       </div>
-      <button class="btn btn-sm ops-btn-refresh" type="button" (click)="loadSettlementRequests()" [disabled]="isLoadingRequests">
-        <i class="fas fa-sync-alt" [class.fa-spin]="isLoadingRequests"></i> تحديث
-      </button>
+
+      <!-- Card 2: Reserved for Settlement -->
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="ops-kpi-card ops-kpi-card--warning">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">المبالغ المحجوزة للتسوية</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--warning">
+              <i class="fas fa-lock"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-warning">
+            {{ (merchantSummary?.totalReservedSettlements || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">المبالغ المعلقة ضمن طلبات تسوية قيد المراجعة أو الصرف</div>
+        </div>
+      </div>
+
+      <!-- Card 3: Available for Settlement -->
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="ops-kpi-card ops-kpi-card--success">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">المتاح للتسوية</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--success">
+              <i class="fas fa-hand-holding-usd"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-success">
+            {{ (merchantSummary?.totalAvailableForSettlement || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">صافي الرصيد المتبقي المؤهل للصرف والتسوية الفورية</div>
+        </div>
+      </div>
+
+      <!-- Card 4: JTak Commission Share -->
+      <div class="col-xl col-md-6 col-sm-6">
+        <div class="ops-kpi-card ops-kpi-card--info">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">حصة / عمولة جيتك</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--info">
+              <i class="fas fa-percentage"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-info">
+            {{ (merchantSummary?.totalJTakCommission || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">إجمالي إيرادات وعمولات المنصة المحققة من طلبات التجار</div>
+        </div>
+      </div>
+
+      <!-- Card 5: Completed Settlements -->
+      <div class="col-xl col-md-6 col-sm-6">
+        <div class="ops-kpi-card ops-kpi-card--primary">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">التسويات المكتملة</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--primary">
+              <i class="fas fa-check-circle"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-dark">
+            {{ (merchantSummary?.totalCompletedSettlements || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">إجمالي الحوالات والمبالغ المسددة فعلياً للتجار</div>
+        </div>
+      </div>
     </div>
-    <div class="table-responsive">
-      <table class="table ops-orders-table align-middle mb-0">
-        <thead>
-          <tr class="ops-table-header text-muted fs-8">
-            <th>رقم الطلب</th>
-            <th>التاجر والمتاجر التابعة</th>
-            <th>المبلغ المطلوب</th>
-            <th>طريقة الصرف المقترحة وبيانات الحساب</th>
-            <th>الحالة</th>
-            <th>تاريخ الطلب</th>
-            <th class="text-center">الإجراء الإداري</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngIf="isLoadingRequests"><td colspan="7" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i></td></tr>
-          <tr *ngIf="!isLoadingRequests && merchantRequests.length === 0">
-            <td colspan="7" class="text-center text-muted py-4">لا توجد طلبات تسوية تجار حالياً.</td>
-          </tr>
-          <tr *ngFor="let request of merchantRequests">
-            <td><strong>{{ request.requestNumber }}</strong></td>
-            <td>
-              <div class="fw-bold">{{ request.requestedByName }}</div>
-              <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
-              <div *ngIf="request.merchantAllocations && request.merchantAllocations.length > 0" class="small text-muted mt-1">
-                <span *ngFor="let alloc of request.merchantAllocations" class="badge badge-light me-1">
-                  {{ alloc.merchantTitle }}: {{ alloc.amount | number:'1.0-0' }} ل.س
+
+    <!-- 2. Authoritative Merchant Reconciliation Table Card -->
+    <div class="ops-orders-card mb-4">
+      <div class="d-flex flex-wrap align-items-center justify-content-between px-4 py-3 border-bottom gap-3">
+        <div>
+          <h3 class="mb-1">دليل ومطابقة حسابات التجار (Merchant Financial &amp; Reconciliation Directory)</h3>
+          <div class="text-muted fs-8">
+            مطابقة محاسبية فورية مستخرجة من دفتر الأستاذ العام (حسابات <code>2010-VND-</code>) مع تتبع الحجوزات والمتاح للتسوية.
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="ops-search-box">
+            <i class="fas fa-search ops-search-icon"></i>
+            <input type="text" class="form-control ops-search-input" [(ngModel)]="merchantSearchTerm" (keyup.enter)="onMerchantSearch()"
+              placeholder="البحث باسم المتجر أو المالك أو الهاتف أو رقم التاجر..." />
+            <button type="button" class="btn ops-search-clear" *ngIf="merchantSearchTerm" (click)="merchantSearchTerm = ''; onMerchantSearch()">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" (click)="onMerchantSearch()">
+            <i class="fas fa-search me-1"></i> بحث
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
+          <thead>
+            <tr class="ops-table-header text-muted fs-8">
+              <th scope="col" style="min-width: 200px;">التاجر والمالك</th>
+              <th scope="col" style="width: 130px;">الهاتف</th>
+              <th scope="col" style="width: 90px;" class="text-center">الطلبات</th>
+              <th scope="col" style="width: 120px;" class="text-end">إجمالي المبيعات</th>
+              <th scope="col" style="width: 110px;" class="text-end">حصة جيتك</th>
+              <th scope="col" style="width: 120px;" class="text-end">صافي التاجر</th>
+              <th scope="col" style="width: 125px;" class="text-end">المحجوز للتسوية</th>
+              <th scope="col" style="width: 120px;" class="text-end">المتاح للتسوية</th>
+              <th scope="col" style="width: 130px;" class="text-end">رصيد الذمم الحقيقي</th>
+              <th scope="col" style="width: 130px;">آخر تسوية</th>
+              <th scope="col" style="width: 110px;" class="text-center">الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoadingMerchants">
+              <td colspan="11" class="text-center py-5 text-muted">
+                <i class="fas fa-spinner fa-spin me-2"></i> جاري تحميل بيانات التجار والحسابات...
+              </td>
+            </tr>
+            <tr *ngIf="!isLoadingMerchants && merchantsList.length === 0">
+              <td colspan="11" class="text-center py-5 text-muted">
+                لا توجد بيانات مطابقة لخيارات البحث.
+              </td>
+            </tr>
+            <tr *ngFor="let m of merchantsList" class="ops-table-row">
+              <!-- 1. Merchant Identity -->
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="ops-avatar bg-light-warning text-warning">{{ getInitials(m.merchantName || m.merchantTitle) }}</span>
+                  <div class="min-w-0">
+                    <strong class="ops-customer-name d-block text-truncate">{{ m.merchantName || m.merchantTitle }}</strong>
+                    <span class="text-muted fs-8 d-block" *ngIf="m.ownerName"><i class="fas fa-user-tie me-1"></i>{{ m.ownerName }}</span>
+                    <span class="badge badge-light-secondary font-monospace fs-9 mt-1">2010-VND-{{ m.merchantId }}</span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- 2. Phone -->
+              <td>
+                <a *ngIf="m.phone" [href]="'tel:' + m.phone" class="ops-phone" dir="ltr">
+                  <i class="fas fa-phone-alt me-1 text-success"></i>{{ formatPhoneNumber(m.phone) }}
+                </a>
+                <span *ngIf="!m.phone" class="text-muted">-</span>
+              </td>
+
+              <!-- 3. Financially Relevant Orders Count -->
+              <td class="text-center">
+                <span class="ops-orders-pill" [class.ops-orders-pill--active]="m.ordersCount > 0">
+                  {{ m.ordersCount }}
                 </span>
-              </div>
-            </td>
-            <td><strong class="text-success fs-6">{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
-            <td>
-              <div class="fw-bold">{{ request.method || 'حوالة / نقدي' }}</div>
-              <small class="text-muted d-block">{{ request.accountDetails }}</small>
-              <small *ngIf="request.notes" class="text-primary d-block mt-1">ملاحظات: {{ request.notes }}</small>
-            </td>
-            <td>
-              <span class="badge" [ngClass]="{
-                'badge-light-warning': request.status === requestStatus.Pending,
-                'badge-light-primary': request.status === requestStatus.Approved,
-                'badge-light-danger': request.status === requestStatus.Rejected,
-                'badge-light-success': request.status === requestStatus.Completed
-              }">{{ requestStatusLabel(request.status) }}</span>
-              <div *ngIf="request.rejectionReason" class="text-danger small mt-1">{{ request.rejectionReason }}</div>
-            </td>
-            <td>{{ request.createdDate | date:'short' }}</td>
-            <td class="text-center">
-              <ng-container *ngIf="request.status === requestStatus.Pending">
-                <button class="btn btn-sm btn-success me-1" (click)="acceptSettlementRequest(request)" [disabled]="processingRequestId === request.id">
-                  <i class="fas fa-check"></i> قبول واعتماد
+              </td>
+
+              <!-- 4. Gross Sales -->
+              <td class="text-end">
+                <span class="ops-price-amount">{{ m.grossSales | number: '1.0-0' }}</span>
+                <span class="ops-price-curr ms-1">ل.س</span>
+              </td>
+
+              <!-- 5. JTak Share -->
+              <td class="text-end">
+                <span class="ops-price-amount text-info">{{ m.jTakShare | number: '1.0-0' }}</span>
+                <span class="ops-price-curr ms-1">ل.س</span>
+              </td>
+
+              <!-- 6. Merchant Net -->
+              <td class="text-end">
+                <span class="ops-price-amount text-primary">{{ m.merchantNet | number: '1.0-0' }}</span>
+                <span class="ops-price-curr ms-1">ل.س</span>
+              </td>
+
+              <!-- 7. Reserved & Approved Awaiting Payout -->
+              <td class="text-end">
+                <span class="badge ops-pill-pay" *ngIf="m.reservedAmount > 0">
+                  <i class="fas fa-lock me-1"></i>{{ m.reservedAmount | number: '1.0-0' }} ل.س
+                </span>
+                <div class="text-primary fs-9 mt-1" *ngIf="m.approvedAwaitingReceiptAmount > 0" title="مبالغ تمت الموافقة عليها وبانتظار تسليم الإشعار والصرف">
+                  <i class="fas fa-clock me-1"></i>موافق عليه: {{ m.approvedAwaitingReceiptAmount | number: '1.0-0' }} ل.س
+                </div>
+                <span *ngIf="m.reservedAmount === 0" class="text-muted fs-8">-</span>
+              </td>
+
+              <!-- 8. Available for Settlement -->
+              <td class="text-end">
+                <span class="badge ops-pill-due" *ngIf="m.availableAmount > 0">
+                  <i class="fas fa-check me-1"></i>{{ m.availableAmount | number: '1.0-0' }} ل.س
+                </span>
+                <span *ngIf="m.availableAmount === 0" class="text-muted fs-8">0 ل.س</span>
+              </td>
+
+              <!-- 9. Current Balance (Ledger VendorPayable) -->
+              <td class="text-end">
+                <strong class="ops-price-amount font-weight-bolder" [ngClass]="m.currentBalance > 0 ? 'text-success' : 'text-muted'">
+                  {{ m.currentBalance | number: '1.0-0' }}
+                </strong>
+                <span class="ops-price-curr ms-1">ل.س</span>
+              </td>
+
+              <!-- 10. Last Settlement Date & Status -->
+              <td>
+                <div *ngIf="m.lastSettlementDate; else noSettlement">
+                  <div class="ops-order-meta">
+                    <span>{{ m.lastSettlementDate | date: 'd MMM y' }}</span>
+                  </div>
+                  <span class="badge mt-1" [ngClass]="{
+                    'badge-light-warning': m.lastSettlementStatus === 'Pending' || m.lastSettlementStatus === '0',
+                    'badge-light-primary': m.lastSettlementStatus === 'Approved' || m.lastSettlementStatus === '1',
+                    'badge-light-danger': m.lastSettlementStatus === 'Rejected' || m.lastSettlementStatus === '2',
+                    'badge-light-success': m.lastSettlementStatus === 'Completed' || m.lastSettlementStatus === '3'
+                  }">{{ m.lastSettlementStatus || 'تسوية' }}</span>
+                </div>
+                <ng-template #noSettlement>
+                  <span class="text-muted fs-8">لا يوجد تسويات سابقة</span>
+                </ng-template>
+              </td>
+
+              <!-- 11. Action: Account Statement Modal Button -->
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-light-primary fw-bold px-3 py-1 d-inline-flex align-items-center gap-1"
+                  (click)="openMerchantStatement(merchantStatementModal, m)" title="عرض كشف الحساب المالي المفصل وتاريخ التسويات">
+                  <i class="fas fa-file-invoice-dollar"></i>
+                  <span>كشف الحساب</span>
                 </button>
-                <button class="btn btn-sm btn-light-danger" (click)="rejectSettlementRequest(request)" [disabled]="processingRequestId === request.id">
-                  <i class="fas fa-times"></i> رفض
-                </button>
-              </ng-container>
-              <button *ngIf="request.status === requestStatus.Approved"
-                class="btn btn-sm btn-primary" (click)="completeMerchantSettlement(request)" [disabled]="processingRequestId === request.id">
-                <i class="fas fa-handshake"></i> تأكيد صرف واستلام المستحقات
-              </button>
-              <span *ngIf="request.status === requestStatus.Completed" class="text-success fw-bold">
-                <i class="fas fa-check-circle me-1"></i> تم الصرف وإغلاق القيد
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Controls -->
+      <div class="d-flex align-items-center justify-content-between p-4 border-top flex-wrap gap-2" *ngIf="merchantTotalRecords > 0">
+        <div class="text-muted fs-8">
+          عرض {{ (merchantPageNumber - 1) * merchantPageSize + 1 }} إلى {{ merchantPageNumber * merchantPageSize > merchantTotalRecords ? merchantTotalRecords : merchantPageNumber * merchantPageSize }} من إجمالي {{ merchantTotalRecords }} تاجر
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <button type="button" class="btn btn-sm btn-icon btn-light" [disabled]="merchantPageNumber <= 1" (click)="onMerchantPageChange(merchantPageNumber - 1)">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-icon" *ngFor="let p of merchantPagesArray"
+            [ngClass]="p === merchantPageNumber ? 'btn-primary' : 'btn-light'" (click)="onMerchantPageChange(p)">
+            {{ p }}
+          </button>
+          <button type="button" class="btn btn-sm btn-icon btn-light" [disabled]="merchantPageNumber >= totalMerchantPages" (click)="onMerchantPageChange(merchantPageNumber + 1)">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Existing Merchant Settlement Requests Queue -->
+    <div class="ops-orders-card mb-4">
+      <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+        <div>
+          <h3 class="mb-1">طابور طلبات تسوية مستحقات التجار (Merchant Settlement Requests Queue)</h3>
+          <div class="text-muted fs-8">
+            دورة حياة التسوية: طلب التاجر ➔ قيد المراجعة (حجز المبلغ دون تحريك أموال) ➔ قبول الطلب ➔ صرف المستحقات ➔ تسجيل القيد في دفتر الحسابات.
+          </div>
+        </div>
+        <button class="btn btn-sm ops-btn-refresh" type="button" (click)="loadSettlementRequests()" [disabled]="isLoadingRequests">
+          <i class="fas fa-sync-alt" [class.fa-spin]="isLoadingRequests"></i> تحديث
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table ops-orders-table align-middle mb-0">
+          <thead>
+            <tr class="ops-table-header text-muted fs-8">
+              <th>رقم الطلب</th>
+              <th>التاجر والمتاجر التابعة</th>
+              <th>المبلغ المطلوب</th>
+              <th>طريقة الصرف المقترحة وبيانات الحساب</th>
+              <th>الحالة</th>
+              <th>تاريخ الطلب</th>
+              <th class="text-center">الإجراء الإداري</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoadingRequests"><td colspan="7" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i></td></tr>
+            <tr *ngIf="!isLoadingRequests && merchantRequests.length === 0">
+              <td colspan="7" class="text-center text-muted py-4">لا توجد طلبات تسوية تجار حالياً.</td>
+            </tr>
+            <tr *ngFor="let request of merchantRequests">
+              <td><strong>{{ request.requestNumber }}</strong></td>
+              <td>
+                <div class="fw-bold">{{ request.requestedByName }}</div>
+                <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
+                <div *ngIf="request.merchantAllocations && request.merchantAllocations.length > 0" class="small text-muted mt-1">
+                  <span *ngFor="let alloc of request.merchantAllocations" class="badge badge-light me-1">
+                    {{ alloc.merchantTitle }}: {{ alloc.amount | number:'1.0-0' }} ل.س
+                  </span>
+                </div>
+              </td>
+              <td><strong class="text-success fs-6">{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
+              <td>
+                <div class="fw-bold">{{ request.method || 'حوالة / نقدي' }}</div>
+                <small class="text-muted d-block">{{ request.accountDetails }}</small>
+                <small *ngIf="request.notes" class="text-primary d-block mt-1">ملاحظات: {{ request.notes }}</small>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="{
+                  'badge-light-warning': request.status === requestStatus.Pending,
+                  'badge-light-primary': request.status === requestStatus.Approved,
+                  'badge-light-danger': request.status === requestStatus.Rejected,
+                  'badge-light-success': request.status === requestStatus.Completed
+                }">{{ requestStatusLabel(request.status) }}</span>
+                <div *ngIf="request.rejectionReason" class="text-danger small mt-1">{{ request.rejectionReason }}</div>
+              </td>
+              <td>{{ request.createdDate | date:'short' }}</td>
+              <td class="text-center">
+                <ng-container *ngIf="request.status === requestStatus.Pending">
+                  <button class="btn btn-sm btn-success me-1" (click)="acceptSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                    <i class="fas fa-check"></i> قبول واعتماد
+                  </button>
+                  <button class="btn btn-sm btn-light-danger" (click)="rejectSettlementRequest(request)" [disabled]="processingRequestId === request.id">
+                    <i class="fas fa-times"></i> رفض
+                  </button>
+                </ng-container>
+                <div *ngIf="request.status === requestStatus.Approved" class="d-flex flex-column align-items-center gap-1">
+                  <span class="badge badge-light-primary text-primary">
+                    <i class="fas fa-clock me-1"></i> بانتظار استلام وتأكيد التاجر
+                  </span>
+                  <button class="btn btn-xs btn-outline-secondary py-1 px-2 mt-1" (click)="completeMerchantSettlement(request)" [disabled]="processingRequestId === request.id" title="إتمام يدوي اختياري من الإدارة في حال تعذر التاجر عن التأكيد">
+                    <small><i class="fas fa-handshake me-1"></i> إتمام يدوي (Admin Override)</small>
+                  </button>
+                </div>
+                <span *ngIf="request.status === requestStatus.Completed" class="text-success fw-bold">
+                  <i class="fas fa-check-circle me-1"></i> تم الصرف وإغلاق القيد
+                </span>
+                <span *ngIf="request.status === requestStatus.Rejected" class="text-danger small">
+                  <i class="fas fa-ban me-1"></i> مرفوض
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
+  <!-- ========================================================================= -->
   <!-- TAB 2: COURIER / FLEET RECONCILIATION & ACTIVE SHIFTS -->
+  <!-- ========================================================================= -->
   <ng-container *ngIf="activeTab === 'couriers'">
     <!-- Courier Float Handover Requests Queue -->
     <div class="ops-orders-card mb-4" *ngIf="courierRequests.length > 0">
@@ -242,213 +519,694 @@
         </div>
       </div>
     </div>
-  </ng-container>
 
-  <!-- TAB 1: COURIER ACTIVE RECONCILIATION -->
-  <div class="ops-orders-card" *ngIf="activeTab === 'couriers'">
-    <div class="table-responsive">
-      <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
-        <thead>
-          <tr class="ops-table-header text-muted fs-8">
-            <th scope="col" style="min-width: 220px;">{{ 'RECONCILIATION_PAGE.COL_COURIER' | translate }}</th>
-            <th scope="col" style="width: 150px;">{{ 'RECONCILIATION_PAGE.COL_PHONE' | translate }}</th>
-            <th scope="col" style="width: 100px;" class="text-center">{{ 'RECONCILIATION_PAGE.COL_ORDERS' | translate }}</th>
-            <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_CASH_FLOAT' | translate }}</th>
-            <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_EARNED_WAGES' | translate }}</th>
-            <th scope="col" style="width: 170px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_NET_VAULT' | translate }}</th>
-            <th scope="col" style="width: 140px;">{{ 'RECONCILIATION_PAGE.COL_LAST_SETTLED' | translate }}</th>
-            <th scope="col" style="width: 160px; text-align: center;">{{ 'RECONCILIATION_PAGE.COL_ACTION' | translate }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngIf="isLoading">
-            <td colspan="8" class="text-center py-5 text-muted">
-              <i class="fas fa-spinner fa-spin me-2"></i> {{ 'COMMON.LOADING' | translate }}
-            </td>
-          </tr>
-          <tr *ngIf="!isLoading && filteredCaptains.length === 0">
-            <td colspan="8" class="text-center py-5 text-muted">
-              {{ 'RECONCILIATION_PAGE.NO_DRIVERS' | translate }}
-            </td>
-          </tr>
-          <tr *ngFor="let cap of filteredCaptains" class="ops-table-row">
-            <!-- 1. Courier Identity -->
-            <td>
-              <div class="d-flex align-items-center gap-2">
-                <span class="ops-avatar">{{ getInitials(cap.captainName) }}</span>
-                <div class="min-w-0">
-                  <strong class="ops-customer-name d-block text-truncate">{{ cap.captainName || 'Unnamed Courier' }}</strong>
-                  <span class="ops-courier-role"><i class="fas fa-motorcycle text-primary me-1"></i>{{ 'RECONCILIATION_PAGE.COURIER_ROLE' | translate }}</span>
+    <!-- COURIER ACTIVE RECONCILIATION TABLE -->
+    <div class="ops-orders-card">
+      <div class="table-responsive">
+        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
+          <thead>
+            <tr class="ops-table-header text-muted fs-8">
+              <th scope="col" style="min-width: 220px;">{{ 'RECONCILIATION_PAGE.COL_COURIER' | translate }}</th>
+              <th scope="col" style="width: 150px;">{{ 'RECONCILIATION_PAGE.COL_PHONE' | translate }}</th>
+              <th scope="col" style="width: 100px;" class="text-center">{{ 'RECONCILIATION_PAGE.COL_ORDERS' | translate }}</th>
+              <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_CASH_FLOAT' | translate }}</th>
+              <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_EARNED_WAGES' | translate }}</th>
+              <th scope="col" style="width: 170px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_NET_VAULT' | translate }}</th>
+              <th scope="col" style="width: 140px;">{{ 'RECONCILIATION_PAGE.COL_LAST_SETTLED' | translate }}</th>
+              <th scope="col" style="width: 160px; text-align: center;">{{ 'RECONCILIATION_PAGE.COL_ACTION' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoading">
+              <td colspan="8" class="text-center py-5 text-muted">
+                <i class="fas fa-spinner fa-spin me-2"></i> {{ 'COMMON.LOADING' | translate }}
+              </td>
+            </tr>
+            <tr *ngIf="!isLoading && filteredCaptains.length === 0">
+              <td colspan="8" class="text-center py-5 text-muted">
+                {{ 'RECONCILIATION_PAGE.NO_DRIVERS' | translate }}
+              </td>
+            </tr>
+            <tr *ngFor="let cap of filteredCaptains" class="ops-table-row">
+              <!-- 1. Courier Identity -->
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="ops-avatar">{{ getInitials(cap.captainName) }}</span>
+                  <div class="min-w-0">
+                    <strong class="ops-customer-name d-block text-truncate">{{ cap.captainName || 'Unnamed Courier' }}</strong>
+                    <span class="ops-courier-role"><i class="fas fa-motorcycle text-primary me-1"></i>{{ 'RECONCILIATION_PAGE.COURIER_ROLE' | translate }}</span>
+                  </div>
                 </div>
-              </div>
-            </td>
+              </td>
 
-            <!-- 2. Phone Number -->
-            <td>
-              <a *ngIf="cap.phoneNumber" [href]="'tel:' + cap.phoneNumber" class="ops-phone" dir="ltr">
-                <i class="fas fa-phone-alt me-1 text-success"></i>{{ formatPhoneNumber(cap.phoneNumber) }}
-              </a>
-              <span *ngIf="!cap.phoneNumber" class="text-muted">-</span>
-            </td>
+              <!-- 2. Phone Number -->
+              <td>
+                <a *ngIf="cap.phoneNumber" [href]="'tel:' + cap.phoneNumber" class="ops-phone" dir="ltr">
+                  <i class="fas fa-phone-alt me-1 text-success"></i>{{ formatPhoneNumber(cap.phoneNumber) }}
+                </a>
+                <span *ngIf="!cap.phoneNumber" class="text-muted">-</span>
+              </td>
 
-            <!-- 3. Orders Delivered -->
-            <td class="text-center">
-              <span class="ops-orders-pill" [class.ops-orders-pill--active]="cap.totalDeliveredOrders > 0">
-                <i class="fas fa-box me-1" *ngIf="cap.totalDeliveredOrders > 0"></i>{{ cap.totalDeliveredOrders }}
-              </span>
-            </td>
-
-            <!-- 4. Cash Float (Collected) -->
-            <td class="text-end">
-              <span class="ops-price-amount" [class.text-muted]="(cap.cashFloatBalance || 0) === 0">
-                {{ cap.cashFloatBalance | number: '1.0-0' }}
-              </span>
-              <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
-            </td>
-
-            <!-- 5. Earned Wages -->
-            <td class="text-end">
-              <span class="ops-price-amount" [ngClass]="(cap.wagesEarnedBalance || 0) > 0 ? 'text-info' : 'text-muted'">
-                {{ cap.wagesEarnedBalance | number: '1.0-0' }}
-              </span>
-              <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
-            </td>
-
-            <!-- 6. Net Vault Due -->
-            <td class="text-end">
-              <ng-container *ngIf="isSettled(cap)">
-                <div class="d-flex align-items-center justify-content-end gap-1">
-                  <span class="ops-price-amount text-muted">0</span>
-                  <span class="ops-price-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
-                  <i class="fas fa-check-circle text-success ms-1" [title]="'RECONCILIATION_PAGE.SETTLED_NO_FLOAT' | translate"></i>
-                </div>
-              </ng-container>
-              <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue > 0">
-                <span class="badge ops-pill-due">
-                  <i class="fas fa-arrow-down me-1"></i>{{ cap.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+              <!-- 3. Orders Delivered -->
+              <td class="text-center">
+                <span class="ops-orders-pill" [class.ops-orders-pill--active]="cap.totalDeliveredOrders > 0">
+                  <i class="fas fa-box me-1" *ngIf="cap.totalDeliveredOrders > 0"></i>{{ cap.totalDeliveredOrders }}
                 </span>
-              </ng-container>
-              <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue < 0">
-                <span class="badge ops-pill-pay">
-                  <i class="fas fa-arrow-up me-1"></i>{{ (cap.expectedNetCashDue * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+              </td>
+
+              <!-- 4. Cash Float (Collected) -->
+              <td class="text-end">
+                <span class="ops-price-amount" [class.text-muted]="(cap.cashFloatBalance || 0) === 0">
+                  {{ cap.cashFloatBalance | number: '1.0-0' }}
                 </span>
-              </ng-container>
-            </td>
+                <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+              </td>
 
-            <!-- 7. Last Settled Date -->
-            <td>
-              <div class="ops-order-meta" *ngIf="cap.lastSettlementDate; else neverSettled">
-                <span>{{ cap.lastSettlementDate | date: 'd MMM y' }}</span>
-                <span class="ops-dot-sep">•</span>
-                <span>{{ cap.lastSettlementDate | date: 'shortTime' }}</span>
-              </div>
-              <ng-template #neverSettled>
-                <span class="text-muted fs-8">-</span>
-              </ng-template>
-            </td>
+              <!-- 5. Earned Wages -->
+              <td class="text-end">
+                <span class="ops-price-amount" [ngClass]="(cap.wagesEarnedBalance || 0) > 0 ? 'text-info' : 'text-muted'">
+                  {{ cap.wagesEarnedBalance | number: '1.0-0' }}
+                </span>
+                <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+              </td>
 
-            <!-- 8. Actions -->
-            <td class="text-center">
-              <div class="ops-actions-cluster">
-                <button type="button" class="btn ops-btn-statement" [title]="'RECONCILIATION_PAGE.STATEMENT_TITLE' | translate" (click)="openStatementModal(statementModal, cap)">
-                  <i class="fas fa-file-invoice"></i>
-                </button>
+              <!-- 6. Net Vault Due -->
+              <td class="text-end">
                 <ng-container *ngIf="isSettled(cap)">
-                  <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled [title]="'RECONCILIATION_PAGE.ZERO_BALANCE_HINT' | translate">
-                    <i class="fas fa-check me-1"></i>{{ 'RECONCILIATION_PAGE.SETTLED_NO_FLOAT' | translate }}
-                  </button>
+                  <div class="d-flex align-items-center justify-content-end gap-1">
+                    <span class="ops-price-amount text-muted">0</span>
+                    <span class="ops-price-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                    <i class="fas fa-check-circle text-success ms-1" [title]="'RECONCILIATION_PAGE.SETTLED_NO_FLOAT' | translate"></i>
+                  </div>
                 </ng-container>
-                <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue >= 0">
-                  <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled title="يجب أن يرسل المندوب طلب تسوية أولاً">
-                    <i class="fas fa-hourglass-half me-1"></i>بانتظار طلب المندوب
-                  </button>
+                <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue > 0">
+                  <span class="badge ops-pill-due">
+                    <i class="fas fa-arrow-down me-1"></i>{{ cap.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+                  </span>
                 </ng-container>
                 <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue < 0">
-                  <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled title="تسوية الأجور منفصلة عن عهدة التحصيل">
-                    <i class="fas fa-info-circle me-1"></i>رصيد أجور
-                  </button>
+                  <span class="badge ops-pill-pay">
+                    <i class="fas fa-arrow-up me-1"></i>{{ (cap.expectedNetCashDue * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+                  </span>
                 </ng-container>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+              </td>
 
-  <!-- TAB 2: SETTLEMENT BATCH HISTORY -->
-  <div class="ops-orders-card" *ngIf="activeTab === 'history'">
-    <div class="table-responsive">
-      <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
-        <thead>
-          <tr class="ops-table-header text-muted fs-8">
-            <th scope="col" style="width: 140px;">{{ 'INVENTORY_BATCHES_PAGE.COL_BATCH_NUM' | translate }}</th>
-            <th scope="col" style="min-width: 180px;">{{ 'RECONCILIATION_PAGE.COL_COURIER' | translate }}</th>
-            <th scope="col" style="width: 160px;">{{ 'COMMON.DATE' | translate }}</th>
-            <th scope="col" style="width: 130px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_CASH_FLOAT' | translate }}</th>
-            <th scope="col" style="width: 130px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_EARNED_WAGES' | translate }}</th>
-            <th scope="col" style="width: 140px;" class="text-end">{{ 'RECONCILIATION_PAGE.COL_NET_VAULT' | translate }}</th>
-            <th scope="col" style="width: 130px;" class="text-center">{{ 'COMMON.STATUS' | translate }}</th>
-            <th scope="col" style="min-width: 150px;">{{ 'COMMON.DESCRIPTION' | translate }}</th>
-            <th scope="col" style="width: 70px;" class="text-center">{{ 'RECONCILIATION_PAGE.COL_ACTION' | translate }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngIf="history.length === 0">
-            <td colspan="9" class="text-center py-5 text-muted">
-              {{ 'COMMON.NO_RECORDS' | translate }}
-            </td>
-          </tr>
-          <tr *ngFor="let b of history" class="ops-table-row">
-            <td>
-              <span class="badge badge-light-primary fw-bold font-monospace">{{ b.batchCode }}</span>
-            </td>
-            <td>
-              <strong class="ops-customer-name">{{ b.captainName }}</strong>
-            </td>
-            <td>
-              <div class="ops-order-meta">
-                <span>{{ b.batchDate | date: 'd MMM y' }}</span>
-                <span class="ops-dot-sep">•</span>
-                <span>{{ b.batchDate | date: 'shortTime' }}</span>
-              </div>
-            </td>
-            <td class="text-end font-weight-bold">
-              {{ b.totalCashCollected | number: '1.0-0' }} <small class="text-muted">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
-            </td>
-            <td class="text-end font-weight-bold text-info">
-              {{ b.totalWagesEarned | number: '1.0-0' }} <small class="text-muted">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
-            </td>
-            <td class="text-end font-weight-bolder text-success">
-              {{ b.netCashRemitted | number: '1.0-0' }} <small class="text-muted">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
-            </td>
-            <td class="text-center">
-              <span class="badge font-weight-bold py-1 px-2" [ngClass]="{
-                'badge-light-success text-success': b.discrepancyAmount === 0,
-                'badge-light-danger text-danger': b.discrepancyAmount < 0,
-                'badge-light-primary text-primary': b.discrepancyAmount > 0
-              }">
-                {{ b.discrepancyAmount === 0 ? ('RECONCILIATION_PAGE.EXACT_MATCH' | translate) : (b.discrepancyAmount > 0 ? ('+' + (b.discrepancyAmount | number: '1.0-0')) : (b.discrepancyAmount | number: '1.0-0')) }}
-              </span>
-            </td>
-            <td>
-              <span class="text-muted fs-8 text-truncate d-block" style="max-width: 160px;" [title]="b.discrepancyReason || b.notes || '-'">
-                {{ b.discrepancyReason || b.notes || '-' }}
-              </span>
-            </td>
-            <td class="text-center">
-              <button type="button" class="btn btn-icon btn-sm btn-light" (click)="printVoucher(b)" [title]="'RECONCILIATION_PAGE.PRINT_VOUCHER' | translate">
-                <i class="fas fa-print text-muted"></i>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <!-- 7. Last Settled Date -->
+              <td>
+                <div class="ops-order-meta" *ngIf="cap.lastSettlementDate; else neverSettled">
+                  <span>{{ cap.lastSettlementDate | date: 'd MMM y' }}</span>
+                  <span class="ops-dot-sep">•</span>
+                  <span>{{ cap.lastSettlementDate | date: 'shortTime' }}</span>
+                </div>
+                <ng-template #neverSettled>
+                  <span class="text-muted fs-8">-</span>
+                </ng-template>
+              </td>
+
+              <!-- 8. Actions -->
+              <td class="text-center">
+                <div class="ops-actions-cluster">
+                  <button type="button" class="btn ops-btn-statement" [title]="'RECONCILIATION_PAGE.STATEMENT_TITLE' | translate" (click)="openStatementModal(statementModal, cap)">
+                    <i class="fas fa-file-invoice"></i>
+                  </button>
+                  <ng-container *ngIf="isSettled(cap)">
+                    <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled [title]="'RECONCILIATION_PAGE.ZERO_BALANCE_HINT' | translate">
+                      <i class="fas fa-check me-1"></i>{{ 'RECONCILIATION_PAGE.SETTLED_NO_FLOAT' | translate }}
+                    </button>
+                  </ng-container>
+                  <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue >= 0">
+                    <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled title="يجب أن يرسل المندوب طلب تسوية أولاً">
+                      <i class="fas fa-hourglass-half me-1"></i>بانتظار طلب المندوب
+                    </button>
+                  </ng-container>
+                  <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue < 0">
+                    <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled title="تسوية الأجور منفصلة عن عهدة التحصيل">
+                      <i class="fas fa-info-circle me-1"></i>رصيد أجور
+                    </button>
+                  </ng-container>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 3: AUTHORITATIVE SETTLEMENT PAYMENT HISTORY & PRINTING -->
+  <!-- ========================================================================= -->
+  <div *ngIf="activeTab === 'history'">
+    <!-- 1. History KPI Summary Cards -->
+    <div class="row g-3 mb-4">
+      <!-- Card 1: Total Completed Payments -->
+      <div class="col-xl-4 col-md-4 col-sm-6">
+        <div class="ops-kpi-card ops-kpi-card--primary">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">إجمالي الدفعات والتسويات المكتملة</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--primary">
+              <i class="fas fa-check-double"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-primary">
+            {{ (historySummary?.totalCompletedAmount || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">
+            إجمالي <strong>{{ historySummary?.totalCompletedCount || 0 }}</strong> دفعة وتسوية مالية مكتملة ومقيدة بالدفتر
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Merchant Completed Payouts -->
+      <div class="col-xl-4 col-md-4 col-sm-6">
+        <div class="ops-kpi-card ops-kpi-card--warning">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">مسددات مستحقات التجار</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--warning">
+              <i class="fas fa-store"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-warning">
+            {{ (historySummary?.merchantCompletedAmount || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">
+            إجمالي <strong>{{ historySummary?.merchantCompletedCount || 0 }}</strong> حوالة ومسدد تم صرفه للتجار
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Captain Remittances & Float Settlements -->
+      <div class="col-xl-4 col-md-4 col-sm-12">
+        <div class="ops-kpi-card ops-kpi-card--success">
+          <div class="ops-kpi-card-header">
+            <span class="ops-kpi-card-label">توريدات وتسويات المناديب</span>
+            <div class="ops-kpi-card-icon ops-kpi-card-icon--success">
+              <i class="fas fa-motorcycle"></i>
+            </div>
+          </div>
+          <div class="ops-kpi-card-value text-success">
+            {{ (historySummary?.driverCompletedAmount || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+          </div>
+          <div class="ops-kpi-card-hint">
+            إجمالي <strong>{{ historySummary?.driverCompletedCount || 0 }}</strong> عملية توريد نقدية مسجلة بالخزينة
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. History Filter & Search Utility Bar -->
+    <div class="ops-orders-card mb-4">
+      <div class="d-flex flex-wrap align-items-center justify-content-between p-3 border-bottom gap-3">
+        <!-- Party Filters Segmented Buttons -->
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Filter Party">
+            <button type="button" class="btn" [ngClass]="historyPartyFilter === historyPartyFilterEnum.All ? 'btn-primary fw-bold' : 'btn-light'"
+              (click)="onHistoryPartyFilterChange(historyPartyFilterEnum.All)">
+              الكل ({{ historySummary?.totalCompletedCount || 0 }})
+            </button>
+            <button type="button" class="btn" [ngClass]="historyPartyFilter === historyPartyFilterEnum.Merchant ? 'btn-warning text-white fw-bold' : 'btn-light'"
+              (click)="onHistoryPartyFilterChange(historyPartyFilterEnum.Merchant)">
+              <i class="fas fa-store me-1"></i> التجار ({{ historySummary?.merchantCompletedCount || 0 }})
+            </button>
+            <button type="button" class="btn" [ngClass]="historyPartyFilter === historyPartyFilterEnum.Captain ? 'btn-success fw-bold' : 'btn-light'"
+              (click)="onHistoryPartyFilterChange(historyPartyFilterEnum.Captain)">
+              <i class="fas fa-motorcycle me-1"></i> المناديب ({{ historySummary?.driverCompletedCount || 0 }})
+            </button>
+          </div>
+
+          <!-- Date Filters -->
+          <div class="d-flex align-items-center gap-1">
+            <span class="text-muted fs-8">من:</span>
+            <input type="date" class="form-control form-control-sm" style="max-width: 140px;" [(ngModel)]="historyFromDate" (change)="onHistoryDateChange()" />
+            <span class="text-muted fs-8 ms-1">إلى:</span>
+            <input type="date" class="form-control form-control-sm" style="max-width: 140px;" [(ngModel)]="historyToDate" (change)="onHistoryDateChange()" />
+          </div>
+
+          <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" *ngIf="hasActiveHistoryFilters()" (click)="clearHistoryFilters()">
+            <i class="fas fa-undo me-1"></i> إعادة ضبط الفلاتر
+          </button>
+        </div>
+
+        <!-- Search Box & Print Action -->
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="ops-search-box">
+            <i class="fas fa-search ops-search-icon"></i>
+            <input type="text" class="form-control ops-search-input" [(ngModel)]="historySearchTerm" (keyup.enter)="onHistorySearch()"
+              placeholder="البحث بالمرجع أو الاسم أو الهاتف أو القيد..." />
+            <button type="button" class="btn ops-search-clear" *ngIf="historySearchTerm" (click)="clearHistorySearch()">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <button type="button" class="btn btn-sm btn-light-primary" (click)="onHistorySearch()">
+            <i class="fas fa-search me-1"></i> بحث
+          </button>
+          <button type="button" class="btn btn-sm btn-primary" (click)="printActiveHistory()" [disabled]="isPrintingHistory" title="طباعة السجل بالخيارات الحالية">
+            <i class="fas fa-print me-1" [class.fa-spin]="isPrintingHistory"></i>
+            <span>طباعة السجل</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. History Data Table -->
+      <div class="table-responsive">
+        <table class="table ops-orders-table align-middle gs-3 gy-2 mb-0">
+          <thead>
+            <tr class="ops-table-header text-muted fs-8">
+              <th scope="col" style="width: 140px;">المرجع / الطلب</th>
+              <th scope="col" style="width: 95px;" class="text-center">النوع</th>
+              <th scope="col" style="min-width: 170px;">الطرف والمستفيد</th>
+              <th scope="col" style="width: 120px;">الهاتف</th>
+              <th scope="col" style="width: 130px;" class="text-end">المبلغ المكتمل</th>
+              <th scope="col" style="width: 140px;">طريقة الصرف</th>
+              <th scope="col" style="width: 130px;">الحساب المحاسبي</th>
+              <th scope="col" style="width: 140px;">تاريخ الإكمال</th>
+              <th scope="col" style="width: 120px;">المسؤول</th>
+              <th scope="col" style="width: 125px;">رقم القيد</th>
+              <th scope="col" style="width: 115px;" class="text-center">الإجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoadingHistory">
+              <td colspan="11" class="text-center py-5 text-muted">
+                <i class="fas fa-spinner fa-spin me-2"></i> جاري تحميل سجل دفعات التسوية...
+              </td>
+            </tr>
+            <tr *ngIf="!isLoadingHistory && historyItems.length === 0">
+              <td colspan="11" class="text-center py-5 text-muted">
+                <i class="fas fa-info-circle me-1 text-info"></i> لا توجد دفعات تسوية مكتملة مطابقة لخيارات البحث والفلاتر المحددة.
+              </td>
+            </tr>
+            <tr *ngFor="let item of historyItems" class="ops-table-row">
+              <!-- 1. Reference / Request Number -->
+              <td>
+                <span class="badge badge-light-primary fw-bold font-monospace fs-8">{{ item.requestNumber }}</span>
+              </td>
+
+              <!-- 2. Party Type Badge -->
+              <td class="text-center">
+                <span class="badge" [ngClass]="item.partyType === 1 ? 'badge-light-warning text-warning' : 'badge-light-success text-success'">
+                  <i class="fas me-1" [ngClass]="item.partyType === 1 ? 'fa-store' : 'fa-motorcycle'"></i>
+                  {{ item.partyTypeLabel }}
+                </span>
+              </td>
+
+              <!-- 3. Party Name -->
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="ops-avatar" [ngClass]="item.partyType === 1 ? 'bg-light-warning text-warning' : 'bg-light-primary text-primary'">
+                    {{ getInitials(item.partyName) }}
+                  </span>
+                  <div class="min-w-0">
+                    <strong class="ops-customer-name d-block text-truncate">{{ item.partyName }}</strong>
+                    <span class="text-muted fs-9" *ngIf="item.merchantId">تاجر #{{ item.merchantId }}</span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- 4. Phone -->
+              <td>
+                <a *ngIf="item.phone" [href]="'tel:' + item.phone" class="ops-phone fs-8" dir="ltr">
+                  {{ formatPhoneNumber(item.phone) }}
+                </a>
+                <span *ngIf="!item.phone" class="text-muted fs-8">-</span>
+              </td>
+
+              <!-- 5. Completed Amount -->
+              <td class="text-end font-weight-bolder">
+                <span class="ops-price-amount text-success fs-7">{{ item.amount | number: '1.0-0' }}</span>
+                <span class="ops-price-curr ms-1">{{ item.currency || 'ل.س' }}</span>
+              </td>
+
+              <!-- 6. Method & Payout Source -->
+              <td>
+                <span class="badge badge-light-secondary fs-9 d-block text-truncate" style="max-width: 135px;" [title]="item.method">
+                  {{ item.method }}
+                </span>
+              </td>
+
+              <!-- 7. Accounting Destination Account -->
+              <td>
+                <span class="badge badge-light-dark font-monospace fs-9">
+                  {{ item.destinationAccount || '-' }}
+                </span>
+              </td>
+
+              <!-- 8. Completed At -->
+              <td>
+                <div class="ops-order-meta">
+                  <span class="fw-bold">{{ item.completedAt | date: 'd MMM y' }}</span>
+                  <span class="ops-dot-sep">•</span>
+                  <span class="text-muted" dir="ltr">{{ item.completedAt | date: 'shortTime' }}</span>
+                </div>
+              </td>
+
+              <!-- 9. Responsible Admin / Confirmed By -->
+              <td>
+                <span class="text-dark fs-8 text-truncate d-block" style="max-width: 115px;" [title]="item.confirmedBy || item.approvedBy || '-'">
+                  {{ item.confirmedBy || item.approvedBy || 'الإدارة' }}
+                </span>
+              </td>
+
+              <!-- 10. Journal Transaction Number -->
+              <td>
+                <span *ngIf="item.journalTransactionNumber" class="badge badge-light-info font-monospace fs-9" [title]="'رقم القيد: ' + item.journalTransactionNumber">
+                  {{ item.journalTransactionNumber }}
+                </span>
+                <span *ngIf="!item.journalTransactionNumber" class="text-muted fs-8">-</span>
+              </td>
+
+              <!-- 11. Actions -->
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-light-primary ops-btn-receipt px-2 py-1"
+                  (click)="openReceiptModal(settlementReceiptModal, item)" [title]="'طباعة إيصال تسوية مالي معتمد'">
+                  <i class="fas fa-file-invoice-dollar me-1"></i>
+                  <span>إيصال</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 4. Server-Side Pagination Footer -->
+      <div class="d-flex flex-wrap align-items-center justify-content-between p-3 border-top gap-2" *ngIf="historyTotalRecords > 0">
+        <div class="text-muted fs-8">
+          عرض الصفحة <strong>{{ historyPage }}</strong> من <strong>{{ historyTotalPages }}</strong> (إجمالي <strong>{{ historyTotalRecords }}</strong> تسوية مكتملة)
+        </div>
+        <div class="d-flex align-items-center gap-1" *ngIf="historyTotalPages > 1">
+          <button type="button" class="btn btn-sm btn-light" [disabled]="historyPage <= 1" (click)="onHistoryPageChange(historyPage - 1)">
+            <i class="fas fa-chevron-right me-1"></i> السابق
+          </button>
+          <button type="button" class="btn btn-sm" [ngClass]="historyPage === p ? 'btn-primary' : 'btn-light'"
+            *ngFor="let p of [].constructor(historyTotalPages); let i = index"
+            [hidden]="i + 1 < historyPage - 2 || i + 1 > historyPage + 2"
+            (click)="onHistoryPageChange(i + 1)">
+            {{ i + 1 }}
+          </button>
+          <button type="button" class="btn btn-sm btn-light" [disabled]="historyPage >= historyTotalPages" (click)="onHistoryPageChange(historyPage + 1)">
+            التالي <i class="fas fa-chevron-left ms-1"></i>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- MODAL: SETTLE SHIFT -->
+<!-- ========================================================================= -->
+<!-- MODAL: MERCHANT FINANCIAL STATEMENT & SETTLEMENT HISTORY -->
+<!-- ========================================================================= -->
+<ng-template #merchantStatementModal let-modal>
+  <div class="modal-header border-bottom py-3">
+    <div class="d-flex align-items-center gap-3">
+      <div class="ops-avatar bg-light-primary text-primary">
+        <i class="fas fa-file-invoice-dollar fs-4"></i>
+      </div>
+      <div>
+        <h4 class="modal-title font-weight-bolder text-dark mb-0">
+          كشف الحساب المالي للتاجر — {{ selectedMerchantForStatement?.merchantTitle }}
+        </h4>
+        <div class="d-flex align-items-center gap-2 mt-1">
+          <span class="badge badge-light-secondary font-monospace">الحساب: 2010-VND-{{ selectedMerchantForStatement?.merchantId }}</span>
+          <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.ownerName">المالك: {{ selectedMerchantForStatement?.ownerName }}</span>
+          <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.phone" dir="ltr">الهاتف: {{ selectedMerchantForStatement?.phone }}</span>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+  </div>
+
+  <div class="modal-body p-4">
+    <!-- Real-time Balance Strip -->
+    <div class="row g-2 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="p-3 rounded bg-light border">
+          <span class="text-muted fs-8 d-block">رصيد الذمم الإجمالي (الدفتر)</span>
+          <strong class="fs-5 text-dark" [ngClass]="(merchantStatementData?.currentBalance || 0) > 0 ? 'text-success' : 'text-dark'">
+            {{ (merchantStatementData?.currentBalance || selectedMerchantForStatement?.currentVendorPayableBalance || 0) | number:'1.0-0' }} ل.س
+          </strong>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="p-3 rounded bg-light-warning border border-warning border-dashed">
+          <span class="text-muted fs-8 d-block">المبالغ المحجوزة للتسوية</span>
+          <strong class="fs-5 text-warning">
+            {{ (merchantStatementData?.reservedAmount || selectedMerchantForStatement?.reservedSettlementAmount || 0) | number:'1.0-0' }} ل.س
+          </strong>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="p-3 rounded bg-light-success border border-success border-dashed">
+          <span class="text-muted fs-8 d-block">المتاح للتسوية والصرف</span>
+          <strong class="fs-5 text-success">
+            {{ (merchantStatementData?.availableAmount || selectedMerchantForStatement?.availableSettlementAmount || 0) | number:'1.0-0' }} ل.س
+          </strong>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="p-3 rounded bg-light-info border border-info border-dashed">
+          <span class="text-muted fs-8 d-block">معتمد بانتظار استلام التاجر</span>
+          <strong class="fs-5 text-info">
+            {{ (merchantStatementData?.approvedAwaitingReceiptAmount || selectedMerchantForStatement?.approvedAwaitingPayoutAmount || 0) | number:'1.0-0' }} ل.س
+          </strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Internal Tabs -->
+    <ul class="nav nav-tabs nav-line-tabs mb-4 fs-7 fw-bold" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" [class.active]="statementActiveTab === 'statement'" (click)="statementActiveTab = 'statement'" type="button">
+          <i class="fas fa-list-ol me-1"></i> كشف حساب الحركات المالية (Transactions Statement)
+          <span class="badge badge-light-primary ms-1" *ngIf="(merchantStatementData?.items || merchantStatementData?.transactions)">{{ (merchantStatementData?.items || merchantStatementData?.transactions)?.length }}</span>
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" [class.active]="statementActiveTab === 'settlements'" (click)="statementActiveTab = 'settlements'" type="button">
+          <i class="fas fa-history me-1"></i> سجل طلبات التسوية (Settlement Requests History)
+          <span class="badge badge-light-warning ms-1" *ngIf="merchantStatementData?.settlementHistory">{{ merchantStatementData?.settlementHistory?.length }}</span>
+        </button>
+      </li>
+    </ul>
+
+    <!-- Spinner if loading -->
+    <div *ngIf="isLoadingMerchantStatement" class="text-center py-5">
+      <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+      <p class="mt-2 text-muted">جاري تحميل كشف الحساب من دفتر الأستاذ العام...</p>
+    </div>
+
+    <!-- Statement Transactions View -->
+    <div *ngIf="!isLoadingMerchantStatement && statementActiveTab === 'statement'">
+      <!-- Transaction Filter Bar -->
+      <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+        <div class="ops-search-box" style="width: 380px;">
+          <i class="fas fa-search ops-search-icon"></i>
+          <input type="text" class="form-control ops-search-input" [(ngModel)]="statementSearchTerm" (keyup.enter)="onStatementSearch()"
+            placeholder="البحث برقم الحركة (TXN-...) أو رقم الطلب أو البيان..." />
+          <button type="button" class="btn ops-search-clear" *ngIf="statementSearchTerm" (click)="clearStatementSearch()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <button type="button" class="btn btn-sm btn-light-primary" (click)="onStatementSearch()">
+          <i class="fas fa-filter me-1"></i> تصفية
+        </button>
+      </div>
+
+      <!-- Transactions Statement Table (Authoritative Chronological Running Balance) -->
+      <div class="table-responsive border rounded">
+        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm">
+          <thead class="bg-light">
+            <tr class="text-muted fs-8 fw-bold">
+              <th scope="col" style="min-width: 120px;">التاريخ</th>
+              <th scope="col" style="min-width: 140px;">رقم الحركة</th>
+              <th scope="col" style="min-width: 110px;">نوع الحركة</th>
+              <th scope="col" style="min-width: 160px;">تفاصيل الطلب والعميل</th>
+              <th scope="col" style="min-width: 90px;" class="text-end">إجمالي الطلب</th>
+              <th scope="col" style="min-width: 80px;" class="text-end">عمولة جيتك</th>
+              <th scope="col" style="min-width: 90px;" class="text-end">صافي التاجر</th>
+              <th scope="col" style="min-width: 80px;" class="text-center">طريقة الدفع</th>
+              <th scope="col" style="min-width: 80px;" class="text-center">الحالة</th>
+              <th scope="col" style="min-width: 100px;" class="text-end text-danger">مدين (تسوية/صرف)</th>
+              <th scope="col" style="min-width: 100px;" class="text-end text-success">دائن (استحقاق)</th>
+              <th scope="col" style="min-width: 110px;" class="text-end">الرصيد التراكمي</th>
+              <th scope="col" style="min-width: 220px;">البيان</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="!(merchantStatementData?.items || merchantStatementData?.transactions) || (merchantStatementData?.items || merchantStatementData?.transactions)?.length === 0">
+              <td colspan="13" class="text-center py-4 text-muted">لا توجد حركات مالية مسجلة لهذا الحساب.</td>
+            </tr>
+            <tr *ngFor="let tx of (merchantStatementData?.items || merchantStatementData?.transactions)">
+              <!-- 1. Posted Date -->
+              <td class="fs-8">
+                <div>{{ tx.postedDate | date:'d MMM y' }}</div>
+                <small class="text-muted">{{ tx.postedDate | date:'shortTime' }}</small>
+              </td>
+
+              <!-- 2. Txn Number -->
+              <td>
+                <code class="fw-bold">{{ tx.transactionNumber }}</code>
+              </td>
+
+              <!-- 3. Type -->
+              <td>
+                <span class="badge" [ngClass]="{
+                  'badge-light-success': tx.credit > 0,
+                  'badge-light-primary': tx.debit > 0 && tx.type.includes('تسوية'),
+                  'badge-light-danger': tx.debit > 0 && tx.type.includes('إلغاء')
+                }">{{ tx.type }}</span>
+              </td>
+
+              <!-- 4. Order & Customer -->
+              <td>
+                <div *ngIf="tx.orderNumber">
+                  <strong>طلب #{{ tx.orderNumber }}</strong>
+                  <div class="text-muted fs-8" *ngIf="tx.customerName">{{ tx.customerName }}</div>
+                  <small class="text-muted" *ngIf="tx.customerPhone" dir="ltr">{{ tx.customerPhone }}</small>
+                </div>
+                <div *ngIf="!tx.orderNumber && tx.settlementRequestNumber">
+                  <span class="badge badge-light-primary font-monospace">{{ tx.settlementRequestNumber }}</span>
+                </div>
+                <span *ngIf="!tx.orderNumber && !tx.settlementRequestNumber" class="text-muted fs-8">-</span>
+              </td>
+
+              <!-- 5. Gross Amount -->
+              <td class="text-end">
+                <span *ngIf="tx.grossAmount">{{ tx.grossAmount | number:'1.0-0' }}</span>
+                <span *ngIf="!tx.grossAmount" class="text-muted">-</span>
+              </td>
+
+              <!-- 6. JTak Share -->
+              <td class="text-end text-info">
+                <span *ngIf="tx.jTakShare">{{ tx.jTakShare | number:'1.0-0' }}</span>
+                <span *ngIf="!tx.jTakShare" class="text-muted">-</span>
+              </td>
+
+              <!-- 7. Merchant Net -->
+              <td class="text-end text-primary">
+                <span *ngIf="tx.merchantNet">{{ tx.merchantNet | number:'1.0-0' }}</span>
+                <span *ngIf="!tx.merchantNet" class="text-muted">-</span>
+              </td>
+
+              <!-- 8. Payment Method -->
+              <td class="text-center fs-8">
+                <span *ngIf="tx.paymentMethod" class="badge badge-light">{{ tx.paymentMethod }}</span>
+                <span *ngIf="!tx.paymentMethod" class="text-muted">-</span>
+              </td>
+
+              <!-- 9. Financial Status -->
+              <td class="text-center">
+                <span class="badge badge-light-info fs-9" *ngIf="tx.financialStatus">{{ tx.financialStatus }}</span>
+                <span *ngIf="!tx.financialStatus" class="text-muted">-</span>
+              </td>
+
+              <!-- 10. Debit (Paid / Reverse) -->
+              <td class="text-end text-danger font-weight-bold">
+                {{ tx.debit > 0 ? (tx.debit | number:'1.0-0') : '-' }}
+              </td>
+
+              <!-- 11. Credit (New sales earned) -->
+              <td class="text-end text-success font-weight-bold">
+                {{ tx.credit > 0 ? (tx.credit | number:'1.0-0') : '-' }}
+              </td>
+
+              <!-- 12. Running Balance -->
+              <td class="text-end font-weight-bolder">
+                {{ tx.runningBalance | number:'1.0-0' }} ل.س
+              </td>
+
+              <!-- 13. Description -->
+              <td>
+                <span class="fs-8 text-dark">{{ tx.description }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Settlement History View -->
+    <div *ngIf="!isLoadingMerchantStatement && statementActiveTab === 'settlements'">
+      <div class="table-responsive border rounded">
+        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm align-middle">
+          <thead class="bg-light">
+            <tr class="text-muted fs-8 fw-bold">
+              <th>رقم طلب التسوية</th>
+              <th class="text-end">المبلغ</th>
+              <th>طريقة الصرف</th>
+              <th>بيانات الحساب / مصدر الصرف</th>
+              <th>الحالة</th>
+              <th>تاريخ الطلب</th>
+              <th>الموافقة والتدقيق</th>
+              <th>الرفض وسببه</th>
+              <th>الصرف والإتمام</th>
+              <th>ملاحظات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="!merchantStatementData?.settlementHistory || merchantStatementData?.settlementHistory?.length === 0">
+              <td colspan="10" class="text-center py-4 text-muted">لا توجد طلبات تسوية سابقة لهذا التاجر.</td>
+            </tr>
+            <tr *ngFor="let s of merchantStatementData?.settlementHistory">
+              <td><strong class="font-monospace">{{ s.requestNumber }}</strong></td>
+              <td class="text-end text-success font-weight-bold">{{ s.amount | number:'1.0-0' }} ل.س</td>
+              <td>{{ s.method || 'حوالة / نقدي' }}</td>
+              <td>
+                <div><small class="text-dark fw-bold" *ngIf="s.payoutSourceAccount">{{ s.payoutSourceAccount }}</small></div>
+                <small class="text-muted" *ngIf="s.accountDetails">{{ s.accountDetails }}</small>
+                <span *ngIf="!s.payoutSourceAccount && !s.accountDetails" class="text-muted">-</span>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="{
+                  'badge-light-warning': s.status === requestStatus.Pending,
+                  'badge-light-primary': s.status === requestStatus.Approved,
+                  'badge-light-danger': s.status === requestStatus.Rejected,
+                  'badge-light-success': s.status === requestStatus.Completed
+                }">{{ requestStatusLabel(s.status) }}</span>
+              </td>
+              <td class="fs-8">{{ s.requestedAt | date:'short' }}</td>
+              <td class="fs-8">
+                <div *ngIf="s.approvedAt">
+                  <span>{{ s.approvedAt | date:'short' }}</span>
+                  <div class="text-muted fs-9" *ngIf="s.approvedBy">المراجع: {{ s.approvedBy }}</div>
+                </div>
+                <span *ngIf="!s.approvedAt" class="text-muted">-</span>
+              </td>
+              <td class="fs-8">
+                <div *ngIf="s.rejectedAt || s.rejectionReason">
+                  <span class="text-danger small d-block" *ngIf="s.rejectionReason">{{ s.rejectionReason }}</span>
+                  <span class="text-muted fs-9" *ngIf="s.rejectedAt">{{ s.rejectedAt | date:'short' }}</span>
+                </div>
+                <span *ngIf="!s.rejectedAt && !s.rejectionReason" class="text-muted">-</span>
+              </td>
+              <td class="fs-8">
+                <div *ngIf="s.completedAt">
+                  <span>{{ s.completedAt | date:'short' }}</span>
+                  <div class="text-muted fs-9" *ngIf="s.confirmedBy">المؤكد: {{ s.confirmedBy }}</div>
+                </div>
+                <span *ngIf="!s.completedAt" class="text-muted">-</span>
+              </td>
+              <td>
+                <span *ngIf="s.notes" class="text-muted small">{{ s.notes }}</span>
+                <span *ngIf="!s.notes" class="text-muted">-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer border-top py-2 d-flex justify-content-between">
+    <button type="button" class="btn btn-sm btn-light-primary" (click)="printMerchantStatement()">
+      <i class="fas fa-print me-1"></i> طباعة كشف الحساب
+    </button>
+    <button type="button" class="btn btn-sm btn-secondary" (click)="modal.close()">
+      {{ 'COMMON.CLOSE' | translate }}
+    </button>
+  </div>
+</ng-template>
+
+<!-- MODAL: SETTLE CAPTAIN SHIFT -->
 <ng-template #settleModal let-modal>
   <div class="modal-header">
     <h4 class="modal-title font-weight-bolder text-dark">
@@ -571,7 +1329,7 @@
   </div>
 </ng-template>
 
-<!-- MODAL: LEDGER STATEMENT -->
+<!-- MODAL: CAPTAIN LEDGER STATEMENT -->
 <ng-template #statementModal let-modal>
   <div class="modal-header">
     <h4 class="modal-title font-weight-bolder text-dark">
@@ -664,3 +1422,255 @@
     <button type="button" class="btn btn-secondary" (click)="modal.close()">{{ 'COMMON.CLOSE' | translate }}</button>
   </div>
 </ng-template>
+
+<!-- ========================================================================= -->
+<!-- MODAL: INDIVIDUAL SETTLEMENT RECEIPT (PRINT-FRIENDLY FINANCIAL VOUCHER)  -->
+<!-- ========================================================================= -->
+<ng-template #settlementReceiptModal let-modal>
+  <div class="modal-header border-bottom py-3 no-print">
+    <div class="d-flex align-items-center gap-3">
+      <div class="ops-avatar bg-light-primary text-primary">
+        <i class="fas fa-receipt fs-4"></i>
+      </div>
+      <div>
+        <h4 class="modal-title font-weight-bolder text-dark mb-0">
+          {{ selectedReceipt?.receiptTitle || 'إيصال تسوية مالية معتمد' }}
+        </h4>
+        <span class="text-muted fs-8 font-monospace">{{ selectedReceipt?.receiptNumber || selectedReceipt?.requestNumber }}</span>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-sm btn-primary" (click)="printReceipt()" [disabled]="isLoadingReceipt || !selectedReceipt">
+        <i class="fas fa-print me-1"></i> طباعة الإيصال
+      </button>
+      <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+    </div>
+  </div>
+
+  <div class="modal-body p-4" id="individualReceiptPrintArea">
+    <div *ngIf="isLoadingReceipt" class="text-center py-5">
+      <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+      <p class="mt-2 text-muted">جاري تحميل بيانات الإيصال المالي الرسمي...</p>
+    </div>
+
+    <div *ngIf="!isLoadingReceipt && selectedReceipt" class="ops-receipt-card">
+      <!-- Receipt Official Header -->
+      <div class="ops-receipt-header text-center pb-3 mb-3 border-bottom border-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="text-start">
+            <h3 class="fw-bolder text-primary mb-0">جيتك • JTAK</h3>
+            <span class="text-muted fs-9">منصة التوصيل والخدمات اللوجستية</span>
+          </div>
+          <div class="text-center">
+            <h4 class="fw-bold text-dark mb-0">{{ selectedReceipt.receiptTitle }}</h4>
+            <span class="badge badge-light-success text-success fw-bold mt-1">
+              <i class="fas fa-check-circle me-1"></i> حركة مالية مكتملة ومقيدة بالدفتر
+            </span>
+          </div>
+          <div class="text-end font-monospace fs-8">
+            <strong class="d-block text-dark">{{ selectedReceipt.receiptNumber }}</strong>
+            <span class="text-muted">{{ selectedReceipt.completedAt | date: 'd MMM y' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prominent Amount Banner -->
+      <div class="ops-receipt-amount-box text-center p-3 rounded mb-4 bg-light border border-2 border-primary">
+        <span class="text-muted fs-8 fw-bold d-block text-uppercase">المبلغ المسدد / المورد الصافي</span>
+        <div class="fs-2x fw-bolder text-primary">
+          {{ selectedReceipt.amount | number: '1.0-0' }} <span class="fs-4">{{ selectedReceipt.currency || 'ل.س' }}</span>
+        </div>
+        <span class="text-muted fs-9">تمت معالجة القيد المحاسبي بالكامل وترحيله إلى الخزينة</span>
+      </div>
+
+      <!-- Receipt Metadata Grid -->
+      <div class="row g-3 mb-4 fs-7">
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">الطرف / المستفيد:</span>
+            <strong class="text-dark">{{ selectedReceipt.partyName }}</strong>
+            <span class="badge badge-light-dark ms-1 fs-9" *ngIf="selectedReceipt.merchantId">تاجر #{{ selectedReceipt.merchantId }}</span>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">رقم الهاتف:</span>
+            <strong class="text-dark" dir="ltr">{{ formatPhoneNumber(selectedReceipt.phone) || '-' }}</strong>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">طريقة الصرف / القبض:</span>
+            <strong class="text-dark">{{ selectedReceipt.method || 'نقداً من الخزينة' }}</strong>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">نوع العملية المالية:</span>
+            <strong class="text-dark">{{ selectedReceipt.operationType || 'تسوية مالية' }}</strong>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">حساب الذمم / العهدة:</span>
+            <strong class="text-primary font-monospace fs-8">{{ selectedReceipt.vendorPayableAccount || selectedReceipt.captainCashFloatAccount || selectedReceipt.destinationAccount || '-' }}</strong>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">حساب الخزينة / المصدر:</span>
+            <strong class="text-dark font-monospace fs-8">{{ selectedReceipt.payoutSourceAccount || '1000 - خزينة الشركة الرئيسية' }}</strong>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">رقم القيد في دفتر الأستاذ:</span>
+            <strong class="text-info font-monospace fs-8">{{ selectedReceipt.journalTransactionNumber || 'قيد محاسبي مرحل' }}</strong>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">تاريخ وساعة الإكمال:</span>
+            <strong class="text-dark">{{ selectedReceipt.completedAt | date: 'd MMM y, h:mm a' }}</strong>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+          <div class="p-2 border rounded bg-white">
+            <span class="text-muted fs-9 d-block">المسؤول عن الاعتماد / الصرف:</span>
+            <strong class="text-dark">{{ selectedReceipt.confirmedBy || selectedReceipt.approvedBy || 'الإدارة المالية' }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes if present -->
+      <div class="p-3 border rounded bg-light mb-4 fs-8" *ngIf="selectedReceipt.notes">
+        <strong class="d-block text-dark mb-1"><i class="fas fa-sticky-note me-1 text-muted"></i> بيان وملاحظات التسوية:</strong>
+        <span class="text-muted">{{ selectedReceipt.notes }}</span>
+      </div>
+
+      <!-- Official Signatures Block -->
+      <div class="row g-3 mt-4 pt-3 border-top border-2 text-center ops-receipt-signatures">
+        <div class="col-4">
+          <div class="d-flex flex-column align-items-center">
+            <span class="text-muted fs-8 fw-bold">إعداد ومراجعة المحاسب</span>
+            <div class="ops-signature-line mt-4 pt-2 border-top border-dashed w-75">
+              <span class="fs-9 text-dark">{{ selectedReceipt.approvedBy || 'المحاسب المعتمد' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="d-flex flex-column align-items-center">
+            <span class="text-muted fs-8 fw-bold">اعتماد الإدارة المالية</span>
+            <div class="ops-signature-line mt-4 pt-2 border-top border-dashed w-75">
+              <span class="fs-9 text-dark">{{ selectedReceipt.confirmedBy || 'الإدارة العامة' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="d-flex flex-column align-items-center">
+            <span class="text-muted fs-8 fw-bold">توقيع المستلم / المفوض</span>
+            <div class="ops-signature-line mt-4 pt-2 border-top border-dashed w-75">
+              <span class="fs-9 text-dark">{{ selectedReceipt.partyName }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer no-print">
+    <button type="button" class="btn btn-secondary" (click)="modal.close()">{{ 'COMMON.CLOSE' | translate }}</button>
+    <button type="button" class="btn btn-primary" (click)="printReceipt()" [disabled]="isLoadingReceipt || !selectedReceipt">
+      <i class="fas fa-print me-1"></i> طباعة الإيصال
+    </button>
+  </div>
+</ng-template>
+
+<!-- ========================================================================= -->
+<!-- PRINT REPORT CONTAINER: FULL ACTIVE SETTLEMENT HISTORY FOR @media print   -->
+<!-- ========================================================================= -->
+<div class="ops-print-history-report d-none" id="historyPrintReport">
+  <div class="ops-print-header text-center mb-4 pb-3 border-bottom border-2">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="text-start">
+        <h2 class="fw-bolder mb-0">جيتك • JTAK</h2>
+        <span>منصة التوصيل السريع — الإدارة المالية</span>
+      </div>
+      <div class="text-center">
+        <h3 class="fw-bold mb-0">سجل دفعات وحوالات التسوية المالية</h3>
+        <span class="text-muted fs-9" *ngIf="historyPartyFilter === historyPartyFilterEnum.Merchant">الفلتر: مسددات التجار فقط</span>
+        <span class="text-muted fs-9" *ngIf="historyPartyFilter === historyPartyFilterEnum.Captain">الفلتر: توريدات المناديب فقط</span>
+        <span class="text-muted fs-9" *ngIf="historyPartyFilter === historyPartyFilterEnum.All">الفلتر: كافة الحركات (تجار ومناديب)</span>
+      </div>
+      <div class="text-end fs-9">
+        <div>تاريخ الطباعة: {{ now | date: 'd MMM y, h:mm a' }}</div>
+        <div>إجمالي الحركات: <strong>{{ (historyPrintItems.length > 0 ? historyPrintItems.length : historyItems.length) }}</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Print KPI Summary Strip -->
+  <div class="d-flex justify-content-around p-2 mb-3 border rounded bg-light fs-8">
+    <div>إجمالي الدفعات المكتملة: <strong>{{ (historySummary?.totalCompletedAmount || 0) | number: '1.0-0' }} ل.س</strong> ({{ historySummary?.totalCompletedCount || 0 }} حركة)</div>
+    <div>مسددات التجار: <strong>{{ (historySummary?.merchantCompletedAmount || 0) | number: '1.0-0' }} ل.س</strong></div>
+    <div>توريدات المناديب: <strong>{{ (historySummary?.driverCompletedAmount || 0) | number: '1.0-0' }} ل.س</strong></div>
+  </div>
+
+  <!-- Printable Table -->
+  <table class="table table-bordered table-sm ops-print-table">
+    <thead>
+      <tr class="bg-light fs-8">
+        <th style="width: 130px;">المرجع</th>
+        <th style="width: 70px;">النوع</th>
+        <th>الطرف / المستفيد</th>
+        <th style="width: 110px;">الهاتف</th>
+        <th style="width: 120px;" class="text-end">المبلغ المكتمل</th>
+        <th style="width: 120px;">طريقة الصرف</th>
+        <th style="width: 120px;">الحساب المحاسبي</th>
+        <th style="width: 120px;">تاريخ الإكمال</th>
+        <th style="width: 110px;">المسؤول</th>
+        <th style="width: 110px;">رقم القيد</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of (historyPrintItems.length > 0 ? historyPrintItems : historyItems)">
+        <td class="font-monospace fs-9">{{ item.requestNumber }}</td>
+        <td>{{ item.partyTypeLabel }}</td>
+        <td><strong>{{ item.partyName }}</strong></td>
+        <td dir="ltr">{{ formatPhoneNumber(item.phone) || '-' }}</td>
+        <td class="text-end fw-bold">{{ item.amount | number: '1.0-0' }} {{ item.currency }}</td>
+        <td class="fs-9">{{ item.method }}</td>
+        <td class="font-monospace fs-9">{{ item.destinationAccount || '-' }}</td>
+        <td class="fs-9">{{ item.completedAt | date: 'd MMM y' }}</td>
+        <td class="fs-9">{{ item.confirmedBy || item.approvedBy || '-' }}</td>
+        <td class="font-monospace fs-9">{{ item.journalTransactionNumber || '-' }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Print Footer Signatures -->
+  <div class="row mt-5 pt-4 text-center fs-8">
+    <div class="col-4">
+      <span>توقيع المحاسب المالي</span>
+      <div class="mt-4 pt-3 border-top border-dark w-75 mx-auto"></div>
+    </div>
+    <div class="col-4">
+      <span>اعتماد المدير المالي</span>
+      <div class="mt-4 pt-3 border-top border-dark w-75 mx-auto"></div>
+    </div>
+    <div class="col-4">
+      <span>خاتم الرقابة المالية</span>
+      <div class="mt-4 pt-3 border-top border-dark w-75 mx-auto"></div>
+    </div>
+  </div>
+</div>

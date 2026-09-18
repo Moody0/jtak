@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using App.Orders.Data;
@@ -34,17 +35,59 @@ namespace Modules.Accounting.Services
 
         public async Task<AdminNotificationSummaryDto> GetSummaryAsync()
         {
-            // 1. All active non-terminal orders:
-            // Confirmed placed orders (OrderStatus.Success, DeliveredAt == null) with active non-terminal details
-            var pendingOrders = await _ordersDb.Orders
+            // 1. All active orders belonging to the 4 Admin categories:
+            // - Waiting for approval (بانتظار الموافقة)
+            // - No courier assigned (بدون مندوب)
+            // - Ready for delivery (جاهز للتوصيل)
+            // - In delivery (جاري التوصيل)
+            // Strictly excludes: Completed/Delivered, Cancelled, Rejected, carts/unplaced orders
+            var placedOrders = await _ordersDb.Orders
                 .AsNoTracking()
+                .Include(o => o.OrderDetails)
                 .Where(o => o.OrderStatus == OrderStatus.Success && o.DeliveredAt == null)
-                .Where(o => o.OrderDetails.Any(d =>
+                .ToListAsync();
+
+            int pendingOrders = 0;
+            foreach (var order in placedOrders)
+            {
+                var details = order.OrderDetails ?? (ICollection<OrderDetail>)Array.Empty<OrderDetail>();
+
+                bool allTerminal = details.Count > 0 && details.All(d =>
+                    d.OrderDetailStatus == OrderDetailStatus.CustomerCanceled ||
+                    d.OrderDetailStatus == OrderDetailStatus.DeliveryCanceled ||
+                    d.OrderDetailStatus == OrderDetailStatus.MerchantRejected);
+
+                if (allTerminal) continue;
+
+                var active = details.Where(d =>
                     d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
                     d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
-                    d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
-                    d.OrderDetailStatus != OrderDetailStatus.Delivered))
-                .CountAsync();
+                    d.OrderDetailStatus != OrderDetailStatus.MerchantRejected).ToList();
+
+                bool isDelivered = active.Count > 0 && active.All(d => d.OrderDetailStatus == OrderDetailStatus.Delivered);
+                if (isDelivered) continue;
+
+                bool hasAssignedDriver = order.DeliveryId.HasValue &&
+                                         !string.IsNullOrWhiteSpace(order.DeliveryUser) &&
+                                         !order.DeliveryUser.Contains("?");
+
+                bool isPending = details.Count == 0 || active.Any(d =>
+                    d.OrderDetailStatus == OrderDetailStatus.Pending ||
+                    d.OrderDetailStatus == OrderDetailStatus.CustomerPending ||
+                    d.OrderDetailStatus == OrderDetailStatus.MerchantAccepted);
+
+                bool isReady = active.Count > 0 && active.All(d => d.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
+
+                bool isInTransit = active.Any(d => d.OrderDetailStatus == OrderDetailStatus.ShippingStarted);
+
+                bool isUnassigned = !hasAssignedDriver;
+
+                // Distinct 4-bucket union: counted once per order ID
+                if (isPending || isUnassigned || isReady || isInTransit)
+                {
+                    pendingOrders++;
+                }
+            }
 
             // 2. Unread / New customer support messages
             var pendingSupportMessages = await _appDb.SupportMessages

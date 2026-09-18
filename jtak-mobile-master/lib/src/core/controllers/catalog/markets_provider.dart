@@ -573,6 +573,21 @@ class MarketsProvider extends BaseProvider {
   bool _isLoadingPopularMeals = false;
   bool get isLoadingPopularMeals => _isLoadingPopularMeals;
 
+  bool _hasLoadedPopularMeals = false;
+  bool get hasLoadedPopularMeals => _hasLoadedPopularMeals;
+
+  String? _popularMealsError;
+  String? get popularMealsError => _popularMealsError;
+
+  @visibleForTesting
+  void setPopularMealsForTesting(List<MealItemData> meals, {String? error}) {
+    _popularMeals = List.from(meals);
+    _popularMealsError = error;
+    _isLoadingPopularMeals = false;
+    _hasLoadedPopularMeals = true;
+    notifyListeners();
+  }
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -593,10 +608,15 @@ class MarketsProvider extends BaseProvider {
     }
   }
 
-  MarketsProvider() {
-    loadMarkets();
-    fetchExchangeRate();
-    loadPopularMeals();
+  final http.Client? _httpClient;
+
+  MarketsProvider({http.Client? httpClient, bool autoLoad = true})
+      : _httpClient = httpClient {
+    if (autoLoad) {
+      loadMarkets();
+      fetchExchangeRate();
+      loadPopularMeals();
+    }
   }
 
   List<Map<String, dynamic>>? getCachedProducts(int marketId) =>
@@ -797,19 +817,21 @@ class MarketsProvider extends BaseProvider {
     return null;
   }
 
-  /// Loads real popular / most ordered meals from backend with multi-tier resilience
-  Future<void> loadPopularMeals() async {
+  /// Loads authoritative popular / most ordered meals directly from backend endpoint
+  /// (/Customer/Products/Popular) respecting backend ranking without synthetic fallbacks.
+  Future<void> loadPopularMeals({int take = 30}) async {
     if (_popularMeals.isEmpty) {
       _isLoadingPopularMeals = true;
+      _popularMealsError = null;
       notifyListeners();
     }
 
-    // 1. Try dedicated customer popular endpoint (sorted by real order volume on backend)
     try {
       final userToken = locator<AuthenticationService>().getAccessToken;
       final url =
-          Uri.parse('https://api.jtak.app/api/v1/Customer/Products/Popular?take=15');
-      final res = await http.get(
+          Uri.parse('https://api.jtak.app/api/v1/Customer/Products/Popular?take=$take');
+      final client = _httpClient ?? http.Client();
+      final res = await client.get(
         url,
         headers: {
           'Accept': 'application/json',
@@ -819,7 +841,7 @@ class MarketsProvider extends BaseProvider {
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        if (decoded is List && decoded.isNotEmpty) {
+        if (decoded is List) {
           final List<MealItemData> items = [];
           for (final item in decoded) {
             final pid = int.tryParse(item['id']?.toString() ?? '0') ?? 0;
@@ -873,104 +895,23 @@ class MarketsProvider extends BaseProvider {
             ));
           }
 
-          if (items.isNotEmpty) {
-            _popularMeals = items;
-            _isLoadingPopularMeals = false;
-            notifyListeners();
-            return;
-          }
+          _popularMeals = items;
+          _popularMealsError = null;
+          _isLoadingPopularMeals = false;
+          _hasLoadedPopularMeals = true;
+          notifyListeners();
+          return;
         }
       }
+
+      _popularMealsError = 'HTTP ${res.statusCode}';
     } catch (e) {
       debugPrint('MarketsProvider: Error fetching /Customer/Products/Popular: $e');
+      _popularMealsError = e.toString();
     }
 
-    // 2. Resilient live fallback: Query active merchant products across live backend restaurants only
-    try {
-      final List<MealItemData> fallbackItems = [];
-      final candidateMerchants = (_restaurants.isNotEmpty
-              ? _restaurants
-              : _defaultLiveSeededRestaurants)
-          .where((r) {
-            final t = r.name.toLowerCase();
-            return !t.contains('ماركت') &&
-                !t.contains('سوبرماركت') &&
-                !t.contains('سوبر ماركت') &&
-                !t.contains('market') &&
-                !t.contains('mall');
-          }).toList();
-
-      final List<List<MealItemData>> perMerchantDishes = [];
-
-      for (final rest in candidateMerchants) {
-        final products = await fetchMarketProducts(rest.id);
-        final List<MealItemData> storeDishes = [];
-        for (final p in products) {
-          final pid = (p['productId'] as num?)?.toInt() ?? 0;
-          if (pid <= 0) continue;
-          final title = (p['product'] ?? '').toString().trim();
-          final photo = (p['productPhotos'] ?? '').toString().trim();
-          final numPrice =
-              (p['finalPrice'] ?? p['merchantPrice'] ?? p['price'] ?? 0) as num;
-          if (numPrice <= 0) continue;
-
-          final assets =
-              RestaurantStoreModel._resolveRestaurantAssets(rest.name);
-          String coverUrl = '';
-          if (photo.isNotEmpty && photo != 'null') {
-            coverUrl = GlobalVar.getImageUrl(photo);
-          } else {
-            coverUrl = assets['dish'] ?? rest.coverUrl;
-          }
-
-          String logoUrl = rest.logoUrl;
-          if (logoUrl.isEmpty || logoUrl == coverUrl) {
-            logoUrl = assets['logo'] ?? rest.logoUrl;
-          }
-
-          storeDishes.add(MealItemData(
-            id: pid,
-            title: title,
-            price: '${_formatNumber(numPrice.toInt())} ل.س',
-            coverUrl: coverUrl,
-            merchantLogoUrl: logoUrl,
-            merchantName: rest.name,
-            eta: rest.eta,
-            distance: rest.distance,
-            merchantId: rest.id,
-            numericPrice: numPrice.toDouble(),
-            isMarket: false,
-          ));
-        }
-        if (storeDishes.isNotEmpty) {
-          perMerchantDishes.add(storeDishes);
-        }
-      }
-
-      // Interleave items from each restaurant to present diverse cuisines (Shawarma, Grills, Burgers, Sweets, Cafe)
-      for (int i = 0; i < 3; i++) {
-        for (final list in perMerchantDishes) {
-          if (i < list.length) {
-            fallbackItems.add(list[i]);
-            if (fallbackItems.length >= 15) break;
-          }
-        }
-        if (fallbackItems.length >= 15) break;
-      }
-
-      if (fallbackItems.isNotEmpty) {
-        _popularMeals = fallbackItems;
-        _isLoadingPopularMeals = false;
-        notifyListeners();
-        return;
-      }
-    } catch (e) {
-      debugPrint(
-          'MarketsProvider: Error aggregating fallback live popular meals: $e');
-    }
-
-    // 3. Keep empty state if no backend meals available (Canonical #35)
     _isLoadingPopularMeals = false;
+    _hasLoadedPopularMeals = true;
     notifyListeners();
   }
 

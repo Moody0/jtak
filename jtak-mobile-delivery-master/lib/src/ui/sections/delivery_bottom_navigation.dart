@@ -151,6 +151,9 @@ class DeliveryBottomNavigation extends StatelessWidget {
     required bool isActive,
     int badgeCount = 0,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inactiveColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return SizedBox(
       width: width,
       height: 52,
@@ -180,8 +183,7 @@ class DeliveryBottomNavigation extends StatelessWidget {
                         isActive ? activeIcon : inactiveIcon,
                         key: ValueKey<bool>(isActive),
                         size: 22,
-                        color:
-                            isActive ? kPrimaryOrange : const Color(0xFF64748B),
+                        color: isActive ? kPrimaryOrange : inactiveColor,
                       ),
                     ),
                   ),
@@ -197,7 +199,10 @@ class DeliveryBottomNavigation extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: kPrimaryOrange,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white, width: 1.5),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            width: 1.5,
+                          ),
                         ),
                         constraints:
                             const BoxConstraints(minWidth: 16, minHeight: 16),
@@ -227,7 +232,7 @@ class DeliveryBottomNavigation extends StatelessWidget {
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 11.5,
                 fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                color: isActive ? kPrimaryOrange : const Color(0xFF64748B),
+                color: isActive ? kPrimaryOrange : inactiveColor,
                 letterSpacing: -0.2,
                 height: 1.1,
               ),

@@ -26,6 +26,7 @@ class OrderDetailsPage extends StatefulWidget {
 
 class _OrderDetailsPageState extends State<OrderDetailsPage> {
   Timer? _refreshTimer;
+  bool _isPeriodicRefreshing = false;
 
   @override
   void initState() {
@@ -35,10 +36,20 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       provider.setOrderObject(widget.order);
     });
 
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!mounted) return;
+      if (_isPeriodicRefreshing) return;
       final provider = Provider.of<OrderProvider>(context, listen: false);
-      if (!provider.isBusy && widget.order.id != null) {
-        provider.loadOrder(widget.order.id!);
+      if (widget.order.id != null) {
+        _isPeriodicRefreshing = true;
+        try {
+          await provider.loadOrder(widget.order.id!, isSilent: true);
+        } catch (_) {
+        } finally {
+          if (mounted) {
+            _isPeriodicRefreshing = false;
+          }
+        }
       }
     });
   }
@@ -46,6 +57,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _refreshTimer = null;
     super.dispose();
   }
 
@@ -83,7 +95,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               _buildCustomerCard(activeOrder),
               if (activeOrder.deliveryUser != null || activeOrder.deliveryUserPhone != null) ...[
                 const SizedBox(height: 12),
-                _buildCourierCard(activeOrder),
+                _buildCourierCard(activeOrder, status),
               ],
               if ((activeOrder.description != null && activeOrder.description!.isNotEmpty) ||
                   (activeOrder.notes != null && activeOrder.notes!.isNotEmpty)) ...[
@@ -286,7 +298,42 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  Widget _buildCourierCard(OrderModel activeOrder) {
+  Widget _buildCourierCard(OrderModel activeOrder, OrderDetailsStatus status) {
+    final hasValidPhone = activeOrder.deliveryUserPhone != null &&
+        activeOrder.deliveryUserPhone!.trim().isNotEmpty;
+    final hasCourierName = activeOrder.deliveryUser != null &&
+        activeOrder.deliveryUser!.trim().isNotEmpty;
+
+    final String courierTitle = hasCourierName
+        ? activeOrder.deliveryUser!.trim()
+        : 'مندوب التوصيل';
+
+    final String courierSubtitle;
+    switch (status) {
+      case OrderDetailsStatus.pending:
+      case OrderDetailsStatus.customerPending:
+      case OrderDetailsStatus.merchantAccepted:
+      case OrderDetailsStatus.readyForPickup:
+        courierSubtitle = 'جارٍ انتظار قبول المندوب';
+        break;
+      case OrderDetailsStatus.shipping:
+        courierSubtitle = 'الطلب في طريقه إلى العميل مع المندوب';
+        break;
+      case OrderDetailsStatus.delivered:
+        courierSubtitle = 'تم تسليم الطلب للعميل بنجاح';
+        break;
+      case OrderDetailsStatus.merchantRejected:
+        courierSubtitle = 'تم رفض الطلب من المتجر';
+        break;
+      case OrderDetailsStatus.customerCanceled:
+      case OrderDetailsStatus.deliveryCanceled:
+        courierSubtitle = 'تم إلغاء الطلب';
+        break;
+    }
+
+    final bool showCallButton = hasValidPhone &&
+        (status == OrderDetailsStatus.readyForPickup || status == OrderDetailsStatus.shipping);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -307,17 +354,18 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  activeOrder.deliveryUser ?? 'مندوب التوصيل',
+                  courierTitle,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  activeOrder.deliveryUserPhone ?? 'جاري انتظار قبول المندوب',
+                  courierSubtitle,
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
               ],
             ),
           ),
-          if (activeOrder.deliveryUserPhone != null && activeOrder.deliveryUserPhone!.isNotEmpty)
+          if (showCallButton)
             ElevatedButton.icon(
               icon: const OppositeIcon(Icons.phone, size: 14, color: Colors.white),
               label: const Text('اتصال بالمندوب', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),

@@ -43,6 +43,7 @@ class CustomDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayMessage = cleanErrorMessage(message);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -50,9 +51,12 @@ class CustomDialog extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: kCardBorderColor, width: 1.2),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : kCardBorderColor,
+            width: 1.2,
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -62,14 +66,18 @@ class CustomDialog extends StatelessWidget {
               width: 58,
               height: 58,
               decoration: BoxDecoration(
-                color: isSuccess ? kGreenLight : kRedLight,
+                color: isDark
+                    ? (isSuccess ? kDarkGreenBg : kDarkRedBg)
+                    : (isSuccess ? kGreenLight : kRedLight),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: AppIcon(
                   isSuccess ? PhosphorIcons.checkCircleBold : PhosphorIcons.warningCircleBold,
                   size: 30,
-                  color: isSuccess ? kGreen : kRed,
+                  color: isDark
+                      ? (isSuccess ? kDarkGreenText : kDarkRedText)
+                      : (isSuccess ? kGreen : kRed),
                 ),
               ),
             ),
@@ -81,7 +89,7 @@ class CustomDialog extends StatelessWidget {
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 16.5,
                 fontWeight: FontWeight.w700,
-                color: kCharcoalDark,
+                color: isDark ? Colors.white : kCharcoalDark,
               ),
               textAlign: TextAlign.center,
             ),
@@ -93,7 +101,7 @@ class CustomDialog extends StatelessWidget {
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
-                color: kCharcoalMedium,
+                color: isDark ? const Color(0xFFCBD5E1) : kCharcoalMedium,
                 height: 1.45,
               ),
               textAlign: TextAlign.center,
@@ -135,15 +143,20 @@ class CustomConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: kCardBorderColor, width: 1.2),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : kCardBorderColor,
+            width: 1.2,
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -151,8 +164,8 @@ class CustomConfirmationDialog extends StatelessWidget {
             Container(
               width: 58,
               height: 58,
-              decoration: const BoxDecoration(
-                color: kSurfaceWarm,
+              decoration: BoxDecoration(
+                color: isDark ? kDarkSurfaceWarm : kSurfaceWarm,
                 shape: BoxShape.circle,
               ),
               child: const Center(
@@ -169,7 +182,7 @@ class CustomConfirmationDialog extends StatelessWidget {
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 16.5,
                 fontWeight: FontWeight.w700,
-                color: kCharcoalDark,
+                color: isDark ? Colors.white : kCharcoalDark,
               ),
               textAlign: TextAlign.center,
             ),
@@ -180,7 +193,7 @@ class CustomConfirmationDialog extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
-                  color: kCharcoalMedium,
+                  color: isDark ? const Color(0xFFCBD5E1) : kCharcoalMedium,
                   height: 1.45,
                 ),
                 textAlign: TextAlign.center,
@@ -192,8 +205,11 @@ class CustomConfirmationDialog extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: kCharcoalMuted,
-                      side: const BorderSide(color: kBorderColor, width: 1.1),
+                      foregroundColor: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF334155) : kBorderColor,
+                        width: 1.1,
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       textStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 13.5, fontWeight: FontWeight.w600),

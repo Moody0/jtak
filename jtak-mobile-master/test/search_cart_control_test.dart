@@ -504,7 +504,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Initially, not in cart: should show initial add button, NO stepper, and NO 'X' icon
       expect(find.byKey(const ValueKey('initial_add_btn')), findsOneWidget);
@@ -513,7 +514,8 @@ void main() {
 
       // Tap '+' to add to cart
       await tester.tap(find.byKey(const ValueKey('circular_add_tap_target')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Now item is in cart with quantity = 1:
       // Stepper MUST be displayed with [-] 1 [+]
@@ -529,7 +531,8 @@ void main() {
 
       // Tap '+' on the stepper to increment
       await tester.tap(find.byKey(const ValueKey('stepper_increment_btn')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Stepper should now show quantity '2'
       expect(find.text('2'), findsOneWidget);
@@ -538,7 +541,8 @@ void main() {
 
       // Tap '-' on the stepper to decrement
       await tester.tap(find.byKey(const ValueKey('stepper_decrement_btn')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Stepper should now show quantity '1'
       expect(find.text('1'), findsOneWidget);
@@ -553,6 +557,7 @@ void main() {
       expect(find.byKey(const ValueKey('initial_add_btn')), findsOneWidget);
       expect(cartProvider.findItme(product.id!, product.merchantId!), isNull);
       expect(cartProvider.localCartItems.length, 0);
+      await tester.pump(const Duration(milliseconds: 600));
     });
 
     testWidgets('Independent widget state: Product A and Product B steppers are completely isolated', (tester) async {
@@ -588,7 +593,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Both start as initial add buttons
       expect(find.byKey(const ValueKey('quantity_stepper')), findsNothing);
@@ -599,7 +605,8 @@ void main() {
         matching: find.byKey(const ValueKey('circular_add_tap_target')),
       );
       await tester.tap(btnAFinder);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Product A is stepper with 1; Product B remains initial add button
       expect(
@@ -623,7 +630,8 @@ void main() {
         matching: find.byKey(const ValueKey('circular_add_tap_target')),
       );
       await tester.tap(btnBFinder);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Both are steppers with quantity 1
       expect(cartProvider.findItme(productA.id!, productA.merchantId!)?.quantity, 1);
@@ -635,10 +643,12 @@ void main() {
         matching: find.byKey(const ValueKey('stepper_increment_btn')),
       );
       await tester.tap(btnAInc);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       expect(cartProvider.findItme(productA.id!, productA.merchantId!)?.quantity, 2);
       expect(cartProvider.findItme(productB.id!, productB.merchantId!)?.quantity, 1);
+      await tester.pump(const Duration(milliseconds: 600));
     });
 
     testWidgets('Multi-merchant UI isolation: Same productId=100 under Merchant A=10 and Merchant B=20 has strictly independent steppers', (tester) async {
@@ -683,7 +693,8 @@ void main() {
         title: productA.title,
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Product A (Merchant 10) has stepper with '2'
       expect(
@@ -725,7 +736,8 @@ void main() {
         matching: find.byKey(const ValueKey('stepper_increment_btn')),
       );
       await tester.tap(btnM10Inc);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
 
       expect(cartProvider.findItme(100, 10)?.quantity, 3);
       expect(cartProvider.findItme(100, 20), isNull);
@@ -752,7 +764,8 @@ void main() {
         quantity: 1,
         title: productB.title,
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
 
       // Now both show their respective independent steppers
       expect(
@@ -776,7 +789,8 @@ void main() {
         matching: find.byKey(const ValueKey('stepper_decrement_btn')),
       );
       await tester.tap(btnM20Dec);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
 
       expect(cartProvider.findItme(100, 20), isNull);
       expect(cartProvider.findItme(100, 10)?.quantity, 3);
@@ -794,6 +808,7 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.pump(const Duration(milliseconds: 600));
     });
   });
 }

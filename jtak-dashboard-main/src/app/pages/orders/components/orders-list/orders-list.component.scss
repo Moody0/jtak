@@ -104,15 +104,19 @@
 // 2. Operational KPI Counters Strip
 .ops-orders-kpi-bar {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
 
-  @media (max-width: 1200px) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  @media (max-width: 1400px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr 1fr;
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -157,6 +161,7 @@
   &--cyan { background: #ecfeff; color: #0891b2; }
   &--blue { background: #eff6ff; color: #2563eb; }
   &--green { background: #ecfdf5; color: #059669; }
+  &--muted { background: #f1f5f9; color: #64748b; }
 }
 
 .ops-kpi-chip-info {

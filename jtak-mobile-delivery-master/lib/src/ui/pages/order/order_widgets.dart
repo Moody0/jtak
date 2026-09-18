@@ -16,6 +16,7 @@ import '../../../ui/widgets/app_widgets.dart';
 import '../../../ui/widgets/quick_chat_sheet.dart';
 import '../../../utils/custom_widgets/image_widgets.dart';
 import '../../../utils/utilities/global_var.dart';
+import '../../../utils/utilities/map_helper.dart';
 import '../../../utils/utilities/phone_helper.dart';
 import 'order_details_page.dart';
 
@@ -190,11 +191,11 @@ class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: kGreenLight,
+              color: isDark ? kDarkGreenBg : kGreenLight,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const AppIcon(PhosphorIcons.shieldCheckBold,
-                color: kGreen, size: 22),
+            child: AppIcon(PhosphorIcons.shieldCheckBold,
+                color: isDark ? kDarkGreenText : kGreen, size: 22),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -206,6 +207,7 @@ class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
+                    color: isDark ? Colors.white : kCharcoalDark,
                   ),
                 ),
                 Text(
@@ -353,20 +355,23 @@ class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
                 padding: const EdgeInsets.all(10),
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: kRedLight,
+                  color: isDark ? kDarkRedBg : kRedLight,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kRed.withValues(alpha: 0.3)),
+                  border: Border.all(
+                      color: isDark
+                          ? kDarkRedBorder
+                          : kRed.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: kRed, size: 18),
+                    Icon(Icons.error_outline_rounded,
+                        color: isDark ? kDarkRedText : kRed, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
                         style: GoogleFonts.ibmPlexSansArabic(
-                          color: kRed,
+                          color: isDark ? kDarkRedText : kRed,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -385,7 +390,7 @@ class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
                     : 'Ask the customer for the 4-digit confirmation code:',
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 12.5,
-                  color: kCharcoalMuted,
+                  color: isDark ? const Color(0xFFCBD5E1) : kCharcoalMuted,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -407,11 +412,13 @@ class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 8,
+                    color: isDark ? Colors.white : kCharcoalDark,
                   ),
                   decoration: InputDecoration(
                     hintText: '----',
-                    hintStyle: const TextStyle(
-                        letterSpacing: 8, color: Color(0xFFCBD5E1)),
+                    hintStyle: TextStyle(
+                        letterSpacing: 8,
+                        color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1)),
                     counterText: '',
                     filled: true,
                     fillColor: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
@@ -454,7 +461,7 @@ class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
                     : 'Capture a clear photo of the delivered package at the door:',
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 12.5,
-                  color: kCharcoalMuted,
+                  color: isDark ? const Color(0xFFCBD5E1) : kCharcoalMuted,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -552,15 +559,32 @@ class _PoDVerificationDialogState extends State<PoDVerificationDialog> {
               TextField(
                 controller: _notesController,
                 enabled: !_isSubmitting,
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 13,
+                  color: isDark ? Colors.white : kCharcoalDark,
+                ),
                 decoration: InputDecoration(
                   hintText: isArabic
                       ? 'ملاحظات إضافية (اختياري: مثال: تم الاستلام باليد)'
                       : 'Additional notes (optional)',
-                  hintStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 12),
+                  hintStyle: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  ),
                   filled: true,
                   fillColor: isDark ? const Color(0xFF0F172A) : kPageBackground,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
@@ -627,8 +651,8 @@ class MerchentOrderDetailsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final orderProv = Provider.of<OrderProvider>(context);
-    final isActionInFlight = orderProv.isActionInFlight(orderId);
+    final orderProv = Provider.of<OrderProvider?>(context);
+    final isActionInFlight = orderProv?.isActionInFlight(orderId) ?? false;
     final isPickedUp = item.orderDetailStatus == OrderDetailsStatus.shipping ||
         item.orderDetailStatus == OrderDetailsStatus.delivered;
     final isReadyForPickup =
@@ -636,12 +660,6 @@ class MerchentOrderDetailsCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isDarkStore = item.isDarkStore;
-
-    final navUrl = GlobalVar.getMerchantNavigationUrl(
-      lat: item.lat,
-      lng: item.lng,
-      address: item.merchantAddress,
-    );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -684,8 +702,12 @@ class MerchentOrderDetailsCard extends StatelessWidget {
                         height: 44,
                         decoration: BoxDecoration(
                           color: isDarkStore
-                              ? const Color(0xFFEEF2FF)
-                              : kSurfaceWarm,
+                              ? (isDark
+                                  ? const Color(0xFF312E81)
+                                  : const Color(0xFFEEF2FF))
+                              : (isDark
+                                  ? const Color(0xFF0F172A)
+                                  : kSurfaceWarm),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
@@ -695,7 +717,7 @@ class MerchentOrderDetailsCard extends StatelessWidget {
                                 : PhosphorIcons.storefrontBold,
                             size: 22,
                             color: isDarkStore
-                                ? const Color(0xFF6366F1)
+                                ? const Color(0xFF818CF8)
                                 : kPrimaryOrange,
                           ),
                         ),
@@ -736,7 +758,9 @@ class MerchentOrderDetailsCard extends StatelessWidget {
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF6366F1),
+                            color: isDark
+                                ? const Color(0xFF818CF8)
+                                : const Color(0xFF6366F1),
                           ),
                         ),
                       ),
@@ -745,8 +769,11 @@ class MerchentOrderDetailsCard extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 3),
                         child: Row(
                           children: [
-                            const AppIcon(PhosphorIcons.mapPinBold,
-                                size: 12, color: kCharcoalMuted),
+                            AppIcon(PhosphorIcons.mapPinBold,
+                                size: 12,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : kCharcoalMuted),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
@@ -829,29 +856,31 @@ class MerchentOrderDetailsCard extends StatelessWidget {
                   ),
                 ),
               ],
-              if (navUrl != null)
-                OutlinedButton.icon(
-                  onPressed: () => GlobalVar.launchNavigationUrl(navUrl),
-                  icon: const AppIcon(PhosphorIcons.navigationArrowBold,
-                      size: 14, color: kBlue),
-                  label: Text(
-                    isArabic ? 'خريطة المتجر' : 'Store Map',
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: kBlue,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: kBlue.withValues(alpha: 0.4)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+              OutlinedButton.icon(
+                onPressed: () => MapHelper.launchStoreMap(
+                  context: context,
+                  item: item,
+                ),
+                icon: const AppIcon(PhosphorIcons.navigationArrowBold,
+                    size: 14, color: kBlue),
+                label: Text(
+                  isArabic ? 'خريطة المتجر' : 'Store Map',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: kBlue,
                   ),
                 ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: kBlue.withValues(alpha: 0.4)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
             ],
           ),
 
@@ -865,8 +894,10 @@ class MerchentOrderDetailsCard extends StatelessWidget {
                     ? null
                     : () async {
                         try {
-                          await orderProv.startShipping(
-                              orderId, item.merchantId!);
+                          await (orderProv ??
+                                  Provider.of<OrderProvider?>(context,
+                                      listen: false))
+                              ?.startShipping(orderId, item.merchantId!);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -933,7 +964,9 @@ class MerchentOrderDetailsCard extends StatelessWidget {
           ],
 
           const SizedBox(height: 12),
-          const Divider(height: 1, color: kBorderColor),
+          Divider(
+              height: 1,
+              color: isDark ? const Color(0xFF334155) : kBorderColor),
           const SizedBox(height: 10),
 
           // Items List inside this merchant
@@ -957,18 +990,18 @@ class MerchentOrderDetailsCard extends StatelessWidget {
     switch (status) {
       case OrderDetailsStatus.delivered:
       case OrderDetailsStatus.shipping:
-        bg = isDark ? const Color(0xFF064E3B) : kGreenLight;
-        fg = isDark ? const Color(0xFF34D399) : kGreen;
+        bg = isDark ? kDarkGreenBg : kGreenLight;
+        fg = isDark ? kDarkGreenText : kGreen;
         text = isArabic ? 'تم الاستلام ✓' : 'Picked Up ✓';
         break;
       case OrderDetailsStatus.readyForPickup:
-        bg = isDark ? const Color(0xFF1E3A8A) : kBlueLight;
-        fg = isDark ? const Color(0xFF60A5FA) : kBlue;
+        bg = isDark ? kDarkBlueBg : kBlueLight;
+        fg = isDark ? kDarkBlueText : kBlue;
         text = isArabic ? 'جاهز للاستلام' : 'Ready for Pickup';
         break;
       case OrderDetailsStatus.merchantAccepted:
-        bg = isDark ? const Color(0xFF78350F) : kAmberLight;
-        fg = isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+        bg = isDark ? kDarkAmberBg : kAmberLight;
+        fg = isDark ? kDarkAmberText : const Color(0xFFB45309);
         text = isArabic ? 'قيد التجهيز' : 'Preparing';
         break;
       default:
@@ -1009,12 +1042,6 @@ class CustomerOrderDetailsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    final navUrl = GlobalVar.getCustomerNavigationUrl(
-      lat: order.lat,
-      lng: order.lng,
-      address: order.address,
-    );
 
     final customerName = GlobalVar.checkString(order.user)
         ? order.user!
@@ -1109,7 +1136,8 @@ class CustomerOrderDetailsCard extends StatelessWidget {
                       order.description!,
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 12,
-                        color: kCharcoalDark,
+                        color:
+                            isDark ? const Color(0xFFCBD5E1) : kCharcoalDark,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1202,30 +1230,32 @@ class CustomerOrderDetailsCard extends StatelessWidget {
                   ),
                 ),
               ],
-              if (navUrl != null)
-                OutlinedButton.icon(
-                  onPressed: () => GlobalVar.launchNavigationUrl(navUrl),
-                  icon: const AppIcon(PhosphorIcons.navigationArrowBold,
-                      size: 14, color: kPrimaryOrange),
-                  label: Text(
-                    isArabic ? 'خريطة العميل' : 'Customer Map',
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: kPrimaryOrange,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                        color: kPrimaryOrange.withValues(alpha: 0.4)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+              OutlinedButton.icon(
+                onPressed: () => MapHelper.launchCustomerMap(
+                  context: context,
+                  order: order,
+                ),
+                icon: const AppIcon(PhosphorIcons.navigationArrowBold,
+                    size: 14, color: kPrimaryOrange),
+                label: Text(
+                  isArabic ? 'خريطة العميل' : 'Customer Map',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: kPrimaryOrange,
                   ),
                 ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                      color: kPrimaryOrange.withValues(alpha: 0.4)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
             ],
           ),
         ],
@@ -1288,7 +1318,7 @@ class OrderDetailsSingleItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                   color: isDark ? const Color(0xFF334155) : kBorderColor,
@@ -1318,7 +1348,7 @@ class OrderDetailsSingleItem extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Center(
@@ -1384,7 +1414,7 @@ class DeliveryOrderCard extends StatelessWidget {
                 ? kPrimaryOrange.withValues(alpha: 0.4)
                 : (isReadyForPickup
                     ? kBlue.withValues(alpha: 0.3)
-                    : kCardBorderColor),
+                    : (isDark ? const Color(0xFF334155) : kCardBorderColor)),
             width: isShipping ? 1.4 : 1.0,
           ),
           boxShadow: const [
@@ -1408,7 +1438,9 @@ class DeliveryOrderCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: kSurfaceWarm,
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : kSurfaceWarm,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1427,13 +1459,21 @@ class DeliveryOrderCard extends StatelessWidget {
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: order.isCod
-                            ? const Color(0xFFFFFBEB)
-                            : const Color(0xFFECFDF5),
+                            ? (isDark
+                                ? kDarkAmberBg
+                                : const Color(0xFFFFFBEB))
+                            : (isDark
+                                ? kDarkGreenBg
+                                : const Color(0xFFECFDF5)),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: order.isCod
-                              ? const Color(0xFFFDE68A)
-                              : const Color(0xFFA7F3D0),
+                              ? (isDark
+                                  ? kDarkAmberBorder
+                                  : const Color(0xFFFDE68A))
+                              : (isDark
+                                  ? kDarkGreenBorder
+                                  : const Color(0xFFA7F3D0)),
                         ),
                       ),
                       child: Text(
@@ -1446,8 +1486,12 @@ class DeliveryOrderCard extends StatelessWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: order.isCod
-                              ? const Color(0xFFB45309)
-                              : const Color(0xFF047857),
+                              ? (isDark
+                                  ? kDarkAmberText
+                                  : const Color(0xFFB45309))
+                              : (isDark
+                                  ? kDarkGreenText
+                                  : const Color(0xFF047857)),
                         ),
                       ),
                     ),
@@ -1471,8 +1515,12 @@ class DeliveryOrderCard extends StatelessWidget {
                       height: 32,
                       decoration: BoxDecoration(
                         color: isDarkStore(order)
-                            ? const Color(0xFFEEF2FF)
-                            : kSurfaceWarm,
+                            ? (isDark
+                                ? const Color(0xFF312E81)
+                                : const Color(0xFFEEF2FF))
+                            : (isDark
+                                ? const Color(0xFF0F172A)
+                                : kSurfaceWarm),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
@@ -1482,7 +1530,9 @@ class DeliveryOrderCard extends StatelessWidget {
                               : PhosphorIcons.storefrontBold,
                           size: 16,
                           color: isDarkStore(order)
-                              ? const Color(0xFF6366F1)
+                              ? (isDark
+                                  ? const Color(0xFF818CF8)
+                                  : const Color(0xFF6366F1))
                               : kPrimaryOrange,
                         ),
                       ),
@@ -1498,7 +1548,9 @@ class DeliveryOrderCard extends StatelessWidget {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Center(
@@ -1519,7 +1571,9 @@ class DeliveryOrderCard extends StatelessWidget {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: kCharcoalMuted,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : kCharcoalMuted,
                         ),
                       ),
                       Text(
@@ -1539,7 +1593,9 @@ class DeliveryOrderCard extends StatelessWidget {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: kCharcoalMuted,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : kCharcoalMuted,
                         ),
                       ),
                       Text(
@@ -1559,7 +1615,9 @@ class DeliveryOrderCard extends StatelessWidget {
             ),
 
             const SizedBox(height: 12),
-            const Divider(height: 1, color: kBorderColor),
+            Divider(
+                height: 1,
+                color: isDark ? const Color(0xFF334155) : kBorderColor),
             const SizedBox(height: 10),
 
             // Info Bar: Time, Distance, Cash to Collect
@@ -1568,28 +1626,34 @@ class DeliveryOrderCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const HomeMirroredIcon(PhosphorIcons.clockBold,
-                        size: 14, color: kCharcoalMuted),
+                    HomeMirroredIcon(PhosphorIcons.clockBold,
+                        size: 14,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : kCharcoalMuted),
                     const SizedBox(width: 4),
                     Text(
                       timeFormatted,
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: kCharcoalDark,
+                        color: isDark ? Colors.white : kCharcoalDark,
                       ),
                     ),
                     if (distanceFormatted != null) ...[
                       const SizedBox(width: 12),
-                      const HomeMirroredIcon(PhosphorIcons.mapPinBold,
-                          size: 14, color: kCharcoalMuted),
+                      HomeMirroredIcon(PhosphorIcons.mapPinBold,
+                          size: 14,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : kCharcoalMuted),
                       const SizedBox(width: 4),
                       Text(
                         distanceFormatted,
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: kCharcoalDark,
+                          color: isDark ? Colors.white : kCharcoalDark,
                         ),
                       ),
                     ],
@@ -1602,7 +1666,9 @@ class DeliveryOrderCard extends StatelessWidget {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: order.isCod ? kPrimaryOrange : kGreen,
+                    color: order.isCod
+                        ? (isDark ? kDarkAmberText : kPrimaryOrange)
+                        : (isDark ? kDarkGreenText : kGreen),
                   ),
                 ),
               ],
@@ -1625,10 +1691,12 @@ class DeliveryOrderCard extends StatelessWidget {
                       ? kGreen
                       : (isReadyForPickup
                           ? kPrimaryOrange
-                          : const Color(0xFFFFF0E8)),
+                          : (isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFFFF0E8))),
                   foregroundColor: (isShipping || isReadyForPickup)
                       ? Colors.white
-                      : kPrimaryOrange,
+                      : (isDark ? Colors.white : kPrimaryOrange),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -1645,7 +1713,7 @@ class DeliveryOrderCard extends StatelessWidget {
                       size: 16,
                       color: (isShipping || isReadyForPickup)
                           ? Colors.white
-                          : kPrimaryOrange,
+                          : (isDark ? Colors.white : kPrimaryOrange),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -1655,7 +1723,7 @@ class DeliveryOrderCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                         color: (isShipping || isReadyForPickup)
                             ? Colors.white
-                            : kPrimaryOrange,
+                            : (isDark ? Colors.white : kPrimaryOrange),
                       ),
                     ),
                   ],
@@ -1705,8 +1773,8 @@ class DeliveryOrderCard extends StatelessWidget {
 
     switch (status) {
       case OrderDetailsStatus.delivered:
-        bg = isDark ? const Color(0xFF064E3B) : kGreenLight;
-        fg = isDark ? const Color(0xFF34D399) : kGreen;
+        bg = isDark ? kDarkGreenBg : kGreenLight;
+        fg = isDark ? kDarkGreenText : kGreen;
         text = isArabic ? 'تم التسليم بنجاح ✓' : 'Delivered ✓';
         icon = PhosphorIcons.checkCircleBold;
         break;
@@ -1717,22 +1785,22 @@ class DeliveryOrderCard extends StatelessWidget {
         icon = PhosphorIcons.mopedBold;
         break;
       case OrderDetailsStatus.readyForPickup:
-        bg = isDark ? const Color(0xFF1E3A8A) : kBlueLight;
-        fg = isDark ? const Color(0xFF60A5FA) : kBlue;
+        bg = isDark ? kDarkBlueBg : kBlueLight;
+        fg = isDark ? kDarkBlueText : kBlue;
         text = isArabic ? 'جاهز للاستلام' : 'Ready for Pickup';
         icon = PhosphorIcons.storefrontBold;
         break;
       case OrderDetailsStatus.merchantAccepted:
-        bg = isDark ? const Color(0xFF78350F) : kAmberLight;
-        fg = isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+        bg = isDark ? kDarkAmberBg : kAmberLight;
+        fg = isDark ? kDarkAmberText : const Color(0xFFB45309);
         text = isArabic ? 'قيد التجهيز' : 'Preparing';
         icon = PhosphorIcons.clockBold;
         break;
       case OrderDetailsStatus.deliveryCanceled:
       case OrderDetailsStatus.customerCanceled:
       case OrderDetailsStatus.merchantRejected:
-        bg = isDark ? const Color(0xFF450A0A) : kRedLight;
-        fg = isDark ? const Color(0xFFF87171) : kRed;
+        bg = isDark ? kDarkRedBg : kRedLight;
+        fg = isDark ? kDarkRedText : kRed;
         text = isArabic ? 'ملغي' : 'Canceled';
         icon = PhosphorIcons.xCircleBold;
         break;

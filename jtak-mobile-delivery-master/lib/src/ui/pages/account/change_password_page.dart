@@ -25,12 +25,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return BaseView<UserProvider>(
       modelProvider: UserProvider(),
       builder: (context, modelProvider) {
         provider = modelProvider;
         return Scaffold(
-          backgroundColor: kPageBackground,
+          backgroundColor: isDark ? const Color(0xFF0F172A) : kPageBackground,
           appBar: AppBar(
             title: const Text(
               'تغيير كلمة المرور',
@@ -47,9 +49,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: kCardBorderColor, width: 1.1),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : kCardBorderColor,
+                        width: 1.1,
+                      ),
                     ),
                     child: Form(
                       key: _formKey,
@@ -65,7 +70,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                 style: GoogleFonts.ibmPlexSansArabic(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
-                                  color: kCharcoalDark,
+                                  color: isDark ? Colors.white : kCharcoalDark,
                                 ),
                               ),
                             ],
@@ -76,7 +81,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: kCharcoalMuted,
+                              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -90,7 +95,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: kCharcoalMuted,
+                              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                             ),
                           ),
                           const SizedBox(height: 6),

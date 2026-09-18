@@ -83,6 +83,11 @@ const Routing: Routes = [
       import('./inventory-batches/inventory-batches.module').then((m) => m.InventoryBatchesModule),
   },
   {
+    path: 'audit-logs',
+    loadChildren: () =>
+      import('./audit-logs/audit-logs.module').then((m) => m.AuditLogsModule),
+  },
+  {
     path: 'notifications',
     loadChildren: () =>
       import('./notifications/notifications.module').then((m) => m.NotificationsModule),

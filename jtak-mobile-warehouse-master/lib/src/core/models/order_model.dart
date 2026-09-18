@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:app_jtak_warehouse/src/core/enums/order_details_status_enum.dart';
 import 'package:app_jtak_warehouse/src/core/enums/order_status_enum.dart';
 import 'package:flutter/foundation.dart';
 
@@ -22,11 +23,14 @@ class OrderModel {
   List<OrderDetailsModel>? orderDetails;
   double? price;
   String? createdDate;
+  String? deliveryId;
   String? deliveryUser;
   String? deliveryUserPhone;
   String? deliveryNotes;
   String? notes;
   int? prepTimeMinutes;
+  bool? isDeliveryAssigned;
+  bool? isDeliveryAccepted;
 
   OrderModel({
     this.id,
@@ -43,11 +47,14 @@ class OrderModel {
     this.orderDetails,
     this.price,
     this.createdDate,
+    this.deliveryId,
     this.deliveryUser,
     this.deliveryUserPhone,
     this.deliveryNotes,
     this.notes,
     this.prepTimeMinutes,
+    this.isDeliveryAssigned,
+    this.isDeliveryAccepted,
   });
 
   OrderModel copyWith({
@@ -65,11 +72,14 @@ class OrderModel {
     List<OrderDetailsModel>? orderDetails,
     double? price,
     String? createdDate,
+    String? deliveryId,
     String? deliveryUser,
     String? deliveryUserPhone,
     String? deliveryNotes,
     String? notes,
     int? prepTimeMinutes,
+    bool? isDeliveryAssigned,
+    bool? isDeliveryAccepted,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -86,12 +96,30 @@ class OrderModel {
       orderDetails: orderDetails ?? this.orderDetails,
       price: price ?? this.price,
       createdDate: createdDate ?? this.createdDate,
+      deliveryId: deliveryId ?? this.deliveryId,
       deliveryUser: deliveryUser ?? this.deliveryUser,
       deliveryUserPhone: deliveryUserPhone ?? this.deliveryUserPhone,
       deliveryNotes: deliveryNotes ?? this.deliveryNotes,
       notes: notes ?? this.notes,
       prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
+      isDeliveryAssigned: isDeliveryAssigned ?? this.isDeliveryAssigned,
+      isDeliveryAccepted: isDeliveryAccepted ?? this.isDeliveryAccepted,
     );
+  }
+
+  bool get hasCourierAssigned =>
+      (deliveryId != null && deliveryId!.isNotEmpty) ||
+      (deliveryUser != null && deliveryUser!.trim().isNotEmpty) ||
+      (deliveryUserPhone != null && deliveryUserPhone!.trim().isNotEmpty);
+
+  bool get isCourierAccepted {
+    if (isDeliveryAccepted == true) return true;
+    if (orderDetails != null && orderDetails!.isNotEmpty) {
+      return orderDetails!.any((d) =>
+          d.orderDetailStatus == OrderDetailsStatus.shipping ||
+          d.orderDetailStatus == OrderDetailsStatus.delivered);
+    }
+    return false;
   }
 
   Map<String, dynamic> toMap() {
@@ -110,11 +138,14 @@ class OrderModel {
       'orderDetails': orderDetails?.map((x) => x.toMap()).toList(),
       'price': price,
       'createdDate': createdDate,
+      'deliveryId': deliveryId,
       'deliveryUser': deliveryUser,
       'deliveryUserPhone': deliveryUserPhone,
       'deliveryNotes': deliveryNotes,
       'notes': notes,
       'prepTimeMinutes': prepTimeMinutes,
+      'isDeliveryAssigned': isDeliveryAssigned,
+      'isDeliveryAccepted': isDeliveryAccepted,
     };
   }
 
@@ -142,11 +173,14 @@ class OrderModel {
           : null,
       price: (map['price'] ?? map['Price']) is num ? (map['price'] ?? map['Price']).toDouble() : double.tryParse('${map['price'] ?? map['Price']}'),
       createdDate: (map['createdDate'] ?? map['CreatedDate'])?.toString(),
+      deliveryId: (map['deliveryId'] ?? map['DeliveryId'])?.toString(),
       deliveryUser: (map['deliveryUser'] ?? map['DeliveryUser'])?.toString(),
       deliveryUserPhone: (map['deliveryUserPhone'] ?? map['DeliveryUserPhone'])?.toString(),
       deliveryNotes: (map['deliveryNotes'] ?? map['DeliveryNotes'])?.toString(),
       notes: (map['notes'] ?? map['Notes'])?.toString(),
       prepTimeMinutes: (map['prepTimeMinutes'] ?? map['PrepTimeMinutes']) is num ? (map['prepTimeMinutes'] ?? map['PrepTimeMinutes']).toInt() : int.tryParse('${map['prepTimeMinutes'] ?? map['PrepTimeMinutes']}'),
+      isDeliveryAssigned: map['isDeliveryAssigned'] ?? map['IsDeliveryAssigned'],
+      isDeliveryAccepted: map['isDeliveryAccepted'] ?? map['IsDeliveryAccepted'],
     );
   }
 

@@ -1,4 +1,4 @@
-﻿using App.Catalog.Data;
+using App.Catalog.Data;
 using App.Shared.Data.MultiContext;
 using App.Shared.Services;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +38,8 @@ namespace Modules.Catalog.Services
             await Queryable().Include(x => x.ProductCategory)
                              .Include(x => x.Tags)
                              .ThenInclude(x => x.Tag)
+                             .Include(x => x.MerchantProducts)
+                             .ThenInclude(x => x.Merchant)
                              .FirstOrDefaultAsync(x => x.Id == id);
 
         public async Task<ProductLiteDto> GetProduct(int pid) =>
@@ -62,8 +64,15 @@ namespace Modules.Catalog.Services
             if (string.IsNullOrEmpty(keyword))
                 return query;
             return query.Where(x => x.Title.ToLower().Contains(keyword) ||
-                                    x.Id.ToString() == keyword ||
-                                    x.ProductCategory.Title.ToLower().Contains(keyword));
+                                    (x.TitleEn != null && x.TitleEn.ToLower().Contains(keyword)) ||
+                                    (x.Unit != null && x.Unit.ToLower().Contains(keyword)) ||
+                                    (x.Description != null && x.Description.ToLower().Contains(keyword)) ||
+                                    (x.DescriptionEn != null && x.DescriptionEn.ToLower().Contains(keyword)) ||
+                                    (x.Barcode != null && x.Barcode.ToLower().Contains(keyword)) ||
+                                    (x.Brand != null && x.Brand.ToLower().Contains(keyword)) ||
+                                    (x.ProductCategory != null && x.ProductCategory.Title.ToLower().Contains(keyword)) ||
+                                    (x.MerchantProducts.Any(mp => mp.Merchant != null && mp.Merchant.Title.ToLower().Contains(keyword))) ||
+                                    x.Id.ToString() == keyword);
         }
 
     }

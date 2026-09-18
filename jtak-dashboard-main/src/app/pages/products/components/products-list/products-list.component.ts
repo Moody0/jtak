@@ -23,6 +23,7 @@ import { CategoriesService } from 'src/app/pages/categories/services/categories.
 import { InventoryBatchService } from 'src/app/pages/inventory-batches/services/inventory-batch.service';
 import { BatchMerchantLookup } from 'src/app/pages/inventory-batches/models/product-batch.model';
 import { PopularProductsService } from 'src/app/pages/popular-products/services/popular-products.service';
+import { MerchantsService } from 'src/app/pages/merchant/services/merchants.service';
 
 export interface CategoryHierarchyInfo {
   id: number;
@@ -43,6 +44,14 @@ export interface CategoryBadgeDisplay {
 export interface MerchantDisplayInfo {
   name: string;
   isAssigned: boolean;
+}
+
+export interface PublicationInfo {
+  status: 'published' | 'assigned_inactive' | 'unassigned';
+  label: string;
+  badgeClass: string;
+  tooltip: string;
+  priceDisplay?: string;
 }
 
 @Component({
@@ -89,6 +98,7 @@ export class ProductsListComponent
     public service: ProductsService,
     public filesService: FilesService,
     private categoriesService: CategoriesService,
+    private merchantsService: MerchantsService,
     private batchService: InventoryBatchService,
     private popularService: PopularProductsService,
     private modalService: NgbModal,
@@ -132,15 +142,25 @@ export class ProductsListComponent
     forkJoin({
       roots: this.categoriesService.getAll(true).pipe(catchError(() => of([]))),
       subs: this.categoriesService.getAll(false).pipe(catchError(() => of([]))),
-      merchants: this.batchService.lookupMerchants().pipe(catchError(() => of([]))),
+      merchants: this.merchantsService
+        .getAllMerchants()
+        .pipe(
+          catchError(() => this.batchService.lookupMerchants()),
+          catchError(() => of([]))
+        ),
     }).subscribe(({ roots, subs, merchants }) => {
       const rootMap = new Map<number, string>();
-      roots.forEach((r) => rootMap.set(r.id, r.title));
+      (roots || []).forEach((r) => {
+        if (r && r.id) rootMap.set(r.id, r.title);
+      });
 
+      const seenCatIds = new Set<number>();
       const allCats: CategoryHierarchyInfo[] = [];
 
-      // Add roots
-      roots.forEach((r) => {
+      // Add roots (Deduplicated by ID)
+      (roots || []).forEach((r) => {
+        if (!r || !r.id || seenCatIds.has(r.id)) return;
+        seenCatIds.add(r.id);
         const info: CategoryHierarchyInfo = {
           id: r.id,
           title: r.title,
@@ -152,17 +172,20 @@ export class ProductsListComponent
         allCats.push(info);
       });
 
-      // Add subcategories
-      subs.forEach((s) => {
+      // Add subcategories (Deduplicated by ID, preserving legitimate distinct hierarchies)
+      (subs || []).forEach((s) => {
+        if (!s || !s.id || seenCatIds.has(s.id)) return;
+        seenCatIds.add(s.id);
         const parentTitle = s.parentId ? rootMap.get(s.parentId) : undefined;
         const fullPath = parentTitle ? `${parentTitle} > ${s.title}` : s.title;
+        const isRoot = !parentTitle && (!s.parentId || s.parentId === 0);
         const info: CategoryHierarchyInfo = {
           id: s.id,
           title: s.title,
-          parentId: s.parentId,
+          parentId: s.parentId || null,
           parentTitle,
           fullPath,
-          isRoot: false,
+          isRoot,
         };
         this.categoryMap.set(s.id, info);
         allCats.push(info);
@@ -173,10 +196,12 @@ export class ProductsListComponent
 
       // Merchants
       if (merchants && merchants.length > 0) {
-        merchants.forEach((m) => {
-          this.merchantsMap.set(m.id, m.title);
-          if (!this.merchantsList.some((existing) => existing.id === m.id)) {
-            this.merchantsList.push(m);
+        merchants.forEach((m: any) => {
+          const id = m.id;
+          const title = m.title || m.name || m.fullName || `متجر #${id}`;
+          this.merchantsMap.set(id, title);
+          if (!this.merchantsList.some((existing) => existing.id === id)) {
+            this.merchantsList.push({ id, title });
           }
         });
         this.kpiMerchantsCount = this.merchantsList.length;
@@ -269,6 +294,44 @@ export class ProductsListComponent
     }
 
     return { name: 'كتالوج عام (غير مسند)', isAssigned: false };
+  }
+
+  /**
+   * Resolve Publication status for Customer App
+   */
+  getPublicationInfo(product: Product): PublicationInfo {
+    const hasMerchant = !!product.merchantId && product.merchantId > 0;
+    const hasPrice = product.price !== undefined && product.price !== null && product.price > 0;
+    const isActive = !!product.active;
+
+    if (!hasMerchant) {
+      return {
+        status: 'unassigned',
+        label: 'غير مسند (كتالوج)',
+        badgeClass: 'badge-light-secondary text-muted',
+        tooltip: 'مسودة كتالوج إداري — غير منشور للعملاء لعدم إسناده لمتجر',
+      };
+    }
+
+    if (!isActive || !hasPrice) {
+      const reason = !isActive && !hasPrice ? 'معطل وبدون سعر' : !isActive ? 'معطل' : 'بدون سعر بيع';
+      return {
+        status: 'assigned_inactive',
+        label: `مسند (${reason})`,
+        badgeClass: 'badge-light-warning text-warning',
+        tooltip: `${reason} — لن يظهر في تطبيق العملاء حتى تفعيله وتحديد السعر`,
+        priceDisplay: hasPrice ? `${product.price?.toLocaleString()} ل.س` : 'غير مسعر',
+      };
+    }
+
+    const merchantName = (product.merchantId && this.merchantsMap.get(product.merchantId)) || product.merchantTitle || 'المتجر';
+    return {
+      status: 'published',
+      label: 'منشور للعملاء',
+      badgeClass: 'badge-light-success text-success',
+      tooltip: `منشور في متجر ${merchantName} بسعر ${product.price?.toLocaleString()} ل.س`,
+      priceDisplay: `${product.price?.toLocaleString()} ل.س`,
+    };
   }
 
   /**
@@ -377,16 +440,50 @@ export class ProductsListComponent
   delete(id: number): void {
     const modalRef = this.modalService.open(DeleteProductModalComponent);
     modalRef.componentInstance.id = id;
+    modalRef.componentInstance.isBulk = false;
     modalRef.result.then(
-      () => this.service.fetchPost(),
+      () => {
+        this.toaster.success('تم حذف المنتج بنجاح وأرشفته بأمان');
+        this.service.fetchPost();
+      },
       () => {}
     );
   }
 
   changeStatus(isActive: boolean, id: number): void {
-    this.service.changeStatus(isActive, id).subscribe(() => {
-      this.service.fetchPost();
+    this.service.changeStatus(isActive, id).subscribe({
+      next: () => {
+        this.toaster.success(isActive ? 'تم تعطيل المنتج بنجاح' : 'تم تفعيل المنتج بنجاح');
+        this.service.fetchPost();
+      },
+      error: () => {
+        this.toaster.error('تعذر تحديث حالة المنتج من الخادم، تمت استعادة الحالة الأصلية');
+        this.service.fetchPost();
+      }
     });
+  }
+
+  bulkDelete(rawItems: Product[]): void {
+    const selected = this.selection.selectedItems(rawItems);
+    if (!selected.length) return;
+
+    const ids = selected.map((i) => i.id);
+    const count = ids.length;
+
+    const modalRef = this.modalService.open(DeleteProductModalComponent);
+    modalRef.componentInstance.id = ids[0];
+    modalRef.componentInstance.isBulk = true;
+    modalRef.componentInstance.count = count;
+    modalRef.componentInstance.selectedIds = ids;
+
+    modalRef.result.then(
+      () => {
+        this.selection.clear();
+        this.toaster.success(`تم حذف ${count} منتج بنجاح وأرشفتها بأمان`);
+        this.service.fetchPost();
+      },
+      () => {}
+    );
   }
 
   bulkSetStatus(items: Product[], enabled: boolean): void {
@@ -395,9 +492,16 @@ export class ProductsListComponent
       .filter((item) => item.active !== enabled)
       .map((item) => this.service.changeStatus(item.active, item.id));
     if (!requests.length) return;
-    forkJoin(requests).subscribe(() => {
-      this.selection.clear();
-      this.service.fetchPost();
+    forkJoin(requests).subscribe({
+      next: () => {
+        this.selection.clear();
+        this.toaster.success(`تم تحديث حالة ${requests.length} منتج بنجاح`);
+        this.service.fetchPost();
+      },
+      error: () => {
+        this.toaster.error('تعذر تحديث حالة بعض المنتجات من الخادم');
+        this.service.fetchPost();
+      }
     });
   }
 

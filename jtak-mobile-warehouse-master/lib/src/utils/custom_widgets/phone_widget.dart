@@ -8,6 +8,7 @@ import 'package:app_jtak_warehouse/src/core/controllers/app/app_state_manager.da
 import 'package:app_jtak_warehouse/src/core/models/phone_number_model.dart';
 import 'package:app_jtak_warehouse/src/core/services/locator.dart';
 import 'package:app_jtak_warehouse/src/utils/utilities/global_var.dart';
+import 'package:app_jtak_warehouse/src/utils/utilities/phone_helper.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 
 class PhoneWidget extends StatefulWidget {
@@ -56,8 +57,9 @@ class _PhoneWidgetState extends State<PhoneWidget> {
         contentPadding: EdgeInsets.only(left: 8, right: 8),
       ),
       onInputChanged: (PhoneNumber value) {
+        final clean = PhoneHelper.normalizeSyrianLocalPhone(value.phoneNumber);
         _phoneNumber = PhoneNumberModel(
-          phoneNumber: value.phoneNumber,
+          phoneNumber: clean.isNotEmpty ? clean : value.phoneNumber,
           isoCode: value.isoCode,
           dialCode: value.dialCode,
         );

@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../generated/locale_base.dart';
 import '../providers/sol_api.dart';
 
+import 'map_helper.dart';
+
 late LocaleBase str;
 
 class GlobalVar {
@@ -55,26 +57,14 @@ class GlobalVar {
   }
 
   /// Builds direct Google Maps navigation URL to the customer's delivery destination.
-  /// Prioritizes GPS coordinates (lat, lng), then falls back to encoded address text.
+  /// Prioritizes valid GPS coordinates (lat, lng), then falls back to encoded address text.
   static String? getCustomerNavigationUrl({double? lat, double? lng, String? address}) {
-    if (lat != null && lng != null && lat != 0 && lng != 0) {
-      return 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng';
-    }
-    if (address != null && address.trim().isNotEmpty && address.trim() != 'null') {
-      return 'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address.trim())}';
-    }
-    return null;
+    return MapHelper.buildDirectionsUrl(lat: lat, lng: lng, address: address);
   }
 
   /// Builds direct Google Maps navigation URL to the merchant pickup point.
   static String? getMerchantNavigationUrl({double? lat, double? lng, String? address}) {
-    if (lat != null && lng != null && lat != 0 && lng != 0) {
-      return 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng';
-    }
-    if (address != null && address.trim().isNotEmpty && address.trim() != 'null') {
-      return 'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address.trim())}';
-    }
-    return null;
+    return MapHelper.buildDirectionsUrl(lat: lat, lng: lng, address: address);
   }
 
   /// Safely launches a navigation URL in an external maps application.
@@ -85,7 +75,7 @@ class GlobalVar {
       if (await canLaunchUrl(uri)) {
         return await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-      return false;
+      return await launchUrl(uri, mode: LaunchMode.platformDefault);
     } catch (_) {
       return false;
     }

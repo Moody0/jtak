@@ -210,7 +210,7 @@
     "searchFaild": "لا يوجد نتائج مطابقة",
     "pleaseAddFullName": "يرجى اضافة اسم للحساب",
     "pleaseChooseCategory": "يرجى تحديد الفئة",
-    "loading": "جاري تحميل البيانات ...",
+    "loading": "جارٍ تحميل البيانات ...",
     "deleteSuccessfully": "تم الحذف بنجاح",
     "invalidPhoneNumber": "رقم الهاتف غير صالح",
     "smsCodeSend": "تم ارسال كود التفعيل الى رقم الهاتف"

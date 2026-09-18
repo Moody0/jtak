@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Shared.Services;
 using App.Shared.Data.App;
 using App.Shared.Entities.Enums;
@@ -29,8 +29,9 @@ namespace App.ApiControllers.V1.Admin
         private readonly IAppUnitOfWork _unitOfWork;
         private readonly ILogger _logger;
         private readonly IMapper _mapper;
+        private readonly IAdminAuditService _auditService;
 
-        public SettingsController(IProductService service, IProductCategoryService categoryService, IMerchantService merchantService, IGenericSettingService genericSetting, IAppUnitOfWork unitOfWork, IMapper mapper, ILogger<SettingsController> logger)
+        public SettingsController(IProductService service, IProductCategoryService categoryService, IMerchantService merchantService, IGenericSettingService genericSetting, IAppUnitOfWork unitOfWork, IMapper mapper, ILogger<SettingsController> logger, IAdminAuditService auditService = null)
         {
             _service = service;
             _categoryService = categoryService;
@@ -39,15 +40,26 @@ namespace App.ApiControllers.V1.Admin
             _unitOfWork = unitOfWork;
             _logger = logger;
             _mapper = mapper;
+            _auditService = auditService;
         }
 
         /// <summary>
-        /// Get Settings Value
+        /// Set Settings Value
         /// </summary>
         /// <returns></returns>
         [HttpPut]
         public async Task<ActionResult<bool>> SetSettings(SettingsVm vm)
         {
+            var previousSettings = await _genericSetting.GetValue<SettingsVm>(nameof(SettingsVm), CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+            var previousRate = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
+
+            var beforeState = new
+            {
+                UsdToSypExchangeRate = previousRate?.Rate ?? previousSettings?.UsdToSypExchangeRate ?? 0,
+                HomeFeaturedCategoryIds = previousSettings?.HomeFeaturedCategoryIds,
+                HomeFeaturedProductIds = previousSettings?.HomeFeaturedProductIds
+            };
+
             vm.HomeFeaturedCategories = null;
             vm.HomeFeaturedProducts = null;
             await _genericSetting.SetValue(nameof(SettingsVm), vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
@@ -55,8 +67,7 @@ namespace App.ApiControllers.V1.Admin
             // The rest of the settings blob is stored per language, but a rate
             // is not translatable and every culture has to resolve the same
             // one, so it is kept under its own neutral key as well.
-            var previous = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
-            if (vm.UsdToSypExchangeRate > 0 && (previous?.Rate ?? 0) != vm.UsdToSypExchangeRate)
+            if (vm.UsdToSypExchangeRate > 0 && (previousRate?.Rate ?? 0) != vm.UsdToSypExchangeRate)
             {
                 await _genericSetting.SetValue(UsdExchangeRateSetting.Key,
                                                new UsdExchangeRateSetting { Rate = vm.UsdToSypExchangeRate });
@@ -67,6 +78,27 @@ namespace App.ApiControllers.V1.Admin
                 _logger.LogInformation("Exchange rate changed to {Rate}; repriced {Count} dollar-quoted products.",
                                        vm.UsdToSypExchangeRate, repriced);
             }
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Settings",
+                    Action = "UpdateSettings",
+                    EntityType = "Settings",
+                    EntityId = "GlobalSettings",
+                    Description = $"تحديث إعدادات النظام وسعر الصرف ({vm.UsdToSypExchangeRate:N0} ل.س)",
+                    Result = "Success",
+                    BeforeState = beforeState,
+                    AfterState = new
+                    {
+                        vm.UsdToSypExchangeRate,
+                        vm.HomeFeaturedCategoryIds,
+                        vm.HomeFeaturedProductIds
+                    }
+                });
+            }
+
             return true;
         }
 

@@ -1,8 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:app_jtak_warehouse/src/core/controllers/app/merchant_state_provider.dart';
 import 'package:app_jtak_warehouse/src/core/controllers/app_parameters_provider.dart';
+import 'package:app_jtak_warehouse/src/core/controllers/merchant_profile_provider.dart';
+import 'package:app_jtak_warehouse/src/core/controllers/order_provider.dart';
+import 'package:app_jtak_warehouse/src/core/controllers/payment_provider.dart';
+import 'package:app_jtak_warehouse/src/core/controllers/products_provider.dart';
+import 'package:app_jtak_warehouse/src/core/controllers/user_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:app_jtak_warehouse/src/core/models/user_model.dart';
 import '../../utils/utilities/global_var.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,6 +41,8 @@ class AuthenticationService extends BaseProvider {
 
   Future<void> loginByPhone(String phoneNumber, String code) async {
     try {
+      await clearUserSessionData();
+
       Map<String, String> body = {
         "grant_type": "sol:sms_code",
         "username": phoneNumber,
@@ -51,6 +60,9 @@ class AuthenticationService extends BaseProvider {
       if (user != null && (user!.role == null || user!.role != kMerchantRole)) {
         user!.role = kMerchantRole;
       }
+      if (locator.isRegistered<MerchantProfileProvider>()) {
+        await locator<MerchantProfileProvider>().loadProfile();
+      }
     } catch (err) {
       rethrow;
     }
@@ -58,6 +70,8 @@ class AuthenticationService extends BaseProvider {
 
   Future<void> login(String email, String password) async {
     try {
+      await clearUserSessionData();
+
       Map<String, String> body = {
         "grant_type": "password",
         "username": email,
@@ -71,6 +85,13 @@ class AuthenticationService extends BaseProvider {
       _authorizationModel = AuthorizationModel.fromJson(data);
       saveAuthorizationData();
       _api.accessToken = _authorizationModel?.accessToken;
+      await loadUserData();
+      if (user != null && (user!.role == null || user!.role != kMerchantRole)) {
+        user!.role = kMerchantRole;
+      }
+      if (locator.isRegistered<MerchantProfileProvider>()) {
+        await locator<MerchantProfileProvider>().loadProfile();
+      }
     } catch (err) {
       rethrow;
     }
@@ -152,15 +173,61 @@ class AuthenticationService extends BaseProvider {
     }
   }
 
-  Future logOut() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey(authorizationKey)) {
-      prefs.remove(authorizationKey);
+  /// Clears all authenticated/user-scoped state while preserving global app settings (language, theme)
+  Future<void> clearUserSessionData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.containsKey(authorizationKey)) {
+        await prefs.remove(authorizationKey);
+      }
+      final allKeys = prefs.getKeys().toList();
+      for (final key in allKeys) {
+        if (key.startsWith('merchant_prep_deadline_') ||
+            key.startsWith('merchant_picked_items_')) {
+          await prefs.remove(key);
+        }
+      }
+    } catch (_) {}
+
+    // Reset all user-scoped singleton providers
+    if (locator.isRegistered<MerchantProfileProvider>()) {
+      locator<MerchantProfileProvider>().reset();
     }
-    locator<AppParametersProvider>().resetData();
+    if (locator.isRegistered<MerchantStateProvider>()) {
+      locator<MerchantStateProvider>().reset();
+    }
+    if (locator.isRegistered<OrderProvider>()) {
+      locator<OrderProvider>().reset();
+    }
+    if (locator.isRegistered<PaymentProvider>()) {
+      locator<PaymentProvider>().reset();
+    }
+    if (locator.isRegistered<ProductsProvider>()) {
+      locator<ProductsProvider>().reset();
+    }
+    if (locator.isRegistered<UserProvider>()) {
+      locator<UserProvider>().reset();
+    }
+    if (locator.isRegistered<AppParametersProvider>()) {
+      try {
+        final prov = locator<AppParametersProvider>();
+        await prov.resetData();
+      } catch (_) {}
+    }
+
+    // Evict cached images in memory so old profile avatar/banner is never rendered
+    try {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+    } catch (_) {}
+
     _user = null;
     _authorizationModel = null;
     _api.accessToken = null;
     notifyListeners();
+  }
+
+  Future logOut() async {
+    await clearUserSessionData();
   }
 }

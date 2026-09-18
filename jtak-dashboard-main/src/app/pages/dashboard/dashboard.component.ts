@@ -6,6 +6,7 @@ import { SubSink } from 'subsink';
 import { Balance } from './models/balance.model';
 import { Dashboard } from './models/dashboard.model';
 import { DashboardService } from './services/dashboard.service';
+import { DriverBalancesService } from './services/driver-balances.service';
 import { Category } from '../categories/models/Category.model';
 import { CategoriesService } from '../categories/services/categories.service';
 import { OrdersService } from '../orders/services/orders.service';
@@ -22,10 +23,12 @@ import { TranslateService } from '@ngx-translate/core';
 export class DashboardComponent implements OnInit, OnDestroy, ISortView, IPaginatorView, ISearchView {
 private subs = new SubSink();
 isLoading: boolean;
+isDriverLoading: boolean;
 dashboardLoading = true;
 lastUpdated = new Date();
 totalRecords: number;
 searchGroup: FormGroup;
+driverSearchGroup: FormGroup;
   public data: Dashboard = {
     billsCount: 0,
     jTakAdditionalOrdersValue: 0,
@@ -42,6 +45,7 @@ searchGroup: FormGroup;
   constructor(
     private fb: FormBuilder,
     public service: DashboardService,
+    public driverBalancesService: DriverBalancesService,
     public ordersService: OrdersService,
     private categoriesService: CategoriesService,
     private translate: TranslateService,
@@ -51,6 +55,11 @@ searchGroup: FormGroup;
   paginator: PaginatorState;
   paginate(paginator: PaginatorState) {
     this.service.patchState({ paginator });
+  }
+
+  driverPaginator: PaginatorState;
+  paginateDrivers(paginator: PaginatorState) {
+    this.driverBalancesService.patchState({ paginator });
   }
 
   sorting: SortState;
@@ -67,6 +76,20 @@ searchGroup: FormGroup;
     this.service.patchState({ sorting });
   }
 
+  driverSorting: SortState;
+  sortDrivers(column: string): void {
+    const driverSorting = this.driverSorting;
+    const isActiveColumn = driverSorting.column === column;
+    if (!isActiveColumn) {
+      driverSorting.column = column;
+      driverSorting.direction = 'ASC';
+    } else {
+      driverSorting.direction = driverSorting.direction === 'ASC' ? 'DESC' : 'ASC';
+    }
+
+    this.driverBalancesService.patchState({ sorting: driverSorting });
+  }
+
   searchForm() {
     this.searchGroup = this.fb.group({
       searchTerm: [''],
@@ -74,10 +97,21 @@ searchGroup: FormGroup;
     this.subs.sink = this.searchGroup.controls.searchTerm.valueChanges
       .pipe(debounceTime(500), distinctUntilChanged())
       .subscribe((val) => this.search(val));
+
+    this.driverSearchGroup = this.fb.group({
+      searchTerm: [''],
+    });
+    this.subs.sink = this.driverSearchGroup.controls.searchTerm.valueChanges
+      .pipe(debounceTime(500), distinctUntilChanged())
+      .subscribe((val) => this.searchDrivers(val));
   }
 
   search(searchTerm: string) {
     this.service.patchState({ searchTerm });
+  }
+
+  searchDrivers(searchTerm: string) {
+    this.driverBalancesService.patchState({ searchTerm });
   }
   exchangeRate: number = 15000;
   isSavingRate: boolean = false;
@@ -262,6 +296,9 @@ searchGroup: FormGroup;
         this.cdr.detectChanges();
       }
     });
+    this.service.fetchPost();
+    this.driverBalancesService.fetchPost();
+    this.ordersService.fetchPost();
   }
 
   getTopProductShare(count: number): number {
@@ -330,14 +367,19 @@ searchGroup: FormGroup;
   ngOnInit(): void {
     this.refreshDashboard();
     this.service.setDefaults();
+    this.driverBalancesService.setDefaults();
     this.searchForm();
     this.loadExchangeRate();
     this.loadFeaturedCategories();
     this.service.fetchPost();
+    this.driverBalancesService.fetchPost();
     this.ordersService.fetchPost();
     this.subs.sink = this.service.isLoading$.subscribe(res => this.isLoading = res);
+    this.subs.sink = this.driverBalancesService.isLoading$.subscribe(res => this.isDriverLoading = res);
     this.sorting = this.service.sorting;
     this.paginator = this.service.paginator;
+    this.driverPaginator = this.driverBalancesService.paginator;
+    this.driverSorting = this.driverBalancesService.sorting;
   }
 
   ngOnDestroy(): void {

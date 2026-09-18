@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
@@ -14,6 +13,7 @@ import '../../../utils/custom_widgets/init_widget.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/custom_widgets/messages.dart';
 import '../../../utils/custom_widgets/syrian_flag.dart';
+import '../../../utils/utilities/phone_helper.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -37,22 +37,17 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String _formatPhoneNumber(String raw) {
-    String clean = raw.replaceAll(RegExp(r'\s+'), '');
-    if (clean.startsWith('+963')) {
-      clean = clean.substring(4);
-    } else if (clean.startsWith('963')) {
-      clean = clean.substring(3);
-    } else if (clean.startsWith('0')) {
-      clean = clean.substring(1);
-    }
+    final clean = PhoneHelper.normalizeSyrianLocalPhone(raw);
     return '+963$clean';
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: _buildAppBar(),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      appBar: _buildAppBar(isDark),
       body: SafeArea(
         child: BaseView<UserProvider>(
           modelProvider: UserProvider(),
@@ -73,9 +68,14 @@ class _LoginPageState extends State<LoginPage> {
                           width: 84,
                           height: 84,
                           decoration: BoxDecoration(
-                            color: kSurfaceWarm,
+                            color: isDark ? const Color(0xFF1E293B) : kSurfaceWarm,
                             shape: BoxShape.circle,
-                            border: Border.all(color: kPrimaryOrange.withValues(alpha: 0.35), width: 2),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : kPrimaryOrange.withValues(alpha: 0.35),
+                              width: 2,
+                            ),
                           ),
                           child: const Center(
                             child: AppIcon(
@@ -92,7 +92,7 @@ class _LoginPageState extends State<LoginPage> {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
-                          color: kCharcoalDark,
+                          color: isDark ? Colors.white : kCharcoalDark,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -101,7 +101,7 @@ class _LoginPageState extends State<LoginPage> {
                         'أدخل رقم هاتفك وكلمة المرور المسجلة لمتابعة توصيل الطلبات',
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 13.5,
-                          color: kCharcoalMuted,
+                          color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                           height: 1.4,
                         ),
                         textAlign: TextAlign.center,
@@ -112,9 +112,12 @@ class _LoginPageState extends State<LoginPage> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            width: 1.1,
+                          ),
                         ),
                         child: Form(
                           key: _formKey,
@@ -126,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                                 style: GoogleFonts.ibmPlexSansArabic(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
-                                  color: kCharcoalDark,
+                                  color: isDark ? Colors.white : kCharcoalDark,
                                 ),
                               ),
                               const SizedBox(height: 10),
@@ -134,18 +137,24 @@ class _LoginPageState extends State<LoginPage> {
                               // Custom Syrian Phone Field
                               Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
+                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+                                  border: Border.all(
+                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                    width: 1.1,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
                                     // Syrian Flag & Dial Code (+963)
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                      decoration: const BoxDecoration(
+                                      decoration: BoxDecoration(
                                         border: Border(
-                                          left: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                                          left: BorderSide(
+                                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                            width: 1,
+                                          ),
                                         ),
                                       ),
                                       child: Row(
@@ -158,7 +167,7 @@ class _LoginPageState extends State<LoginPage> {
                                             style: GoogleFonts.ibmPlexSansArabic(
                                               fontSize: 14.5,
                                               fontWeight: FontWeight.w700,
-                                              color: kCharcoalDark,
+                                              color: isDark ? Colors.white : kCharcoalDark,
                                             ),
                                             textDirection: TextDirection.ltr,
                                           ),
@@ -173,17 +182,19 @@ class _LoginPageState extends State<LoginPage> {
                                         keyboardType: TextInputType.phone,
                                         textDirection: TextDirection.ltr,
                                         textAlign: TextAlign.left,
-                                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                        inputFormatters: [
+                                          SyrianPhoneInputFormatter(),
+                                        ],
                                         style: GoogleFonts.ibmPlexSansArabic(
                                           fontSize: 15.5,
                                           fontWeight: FontWeight.w700,
-                                          color: kCharcoalDark,
+                                          color: isDark ? Colors.white : kCharcoalDark,
                                           letterSpacing: 1.0,
                                         ),
                                         decoration: InputDecoration(
-                                          hintText: '09xx xxx xxx',
+                                          hintText: '9xx xxx xxx',
                                           hintStyle: GoogleFonts.ibmPlexSansArabic(
-                                            color: const Color(0xFF94A3B8),
+                                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                                             fontSize: 14,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -197,8 +208,9 @@ class _LoginPageState extends State<LoginPage> {
                                           if (value == null || value.trim().isEmpty) {
                                             return 'يرجى إدخال رقم الهاتف';
                                           }
-                                          if (value.trim().length < 8) {
-                                            return 'رقم الهاتف قصير جداً';
+                                          final clean = PhoneHelper.normalizeSyrianLocalPhone(value);
+                                          if (clean.length != 9 || !clean.startsWith('9')) {
+                                            return 'يرجى إدخال رقم هاتف سوري صحيح (9 أرقام)';
                                           }
                                           return null;
                                         },
@@ -208,142 +220,149 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
 
-                                const SizedBox(height: 18),
+                              const SizedBox(height: 18),
 
-                                Text(
-                                  'كلمة المرور',
+                              Text(
+                                'كلمة المرور',
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : kCharcoalDark,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Password Field
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                    width: 1.1,
+                                  ),
+                                ),
+                                child: TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
                                   style: GoogleFonts.ibmPlexSansArabic(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: kCharcoalDark,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : kCharcoalDark,
                                   ),
+                                  decoration: InputDecoration(
+                                    hintText: '••••••••',
+                                    hintStyle: GoogleFonts.ibmPlexSansArabic(
+                                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                      fontSize: 14,
+                                    ),
+                                    prefixIcon: Icon(
+                                      PhosphorIcons.lockKeyBold,
+                                      size: 20,
+                                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                    ),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword ? PhosphorIcons.eyeClosedBold : PhosphorIcons.eyeBold,
+                                        size: 20,
+                                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    filled: false,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'يرجى إدخال كلمة المرور';
+                                    }
+                                    if (value.trim().length < 4) {
+                                      return 'كلمة المرور قصيرة جداً';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                const SizedBox(height: 10),
+                              ),
 
-                                // Password Field
-                                Container(
+                              const SizedBox(height: 24),
+
+                              // Primary CTA: Log In
+                              GestureDetector(
+                                onTap: _onContinue,
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
+                                    color: kPrimaryOrange,
                                     borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
                                   ),
-                                  child: TextFormField(
-                                    controller: _passwordController,
-                                    obscureText: _obscurePassword,
-                                    style: GoogleFonts.ibmPlexSansArabic(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: kCharcoalDark,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: '••••••••',
-                                      hintStyle: GoogleFonts.ibmPlexSansArabic(
-                                        color: const Color(0xFF94A3B8),
-                                        fontSize: 14,
-                                      ),
-                                      prefixIcon: const Icon(PhosphorIcons.lockKeyBold, size: 20, color: Color(0xFF94A3B8)),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscurePassword ? PhosphorIcons.eyeClosedBold : PhosphorIcons.eyeBold,
-                                          size: 20,
-                                          color: const Color(0xFF94A3B8),
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _obscurePassword = !_obscurePassword;
-                                          });
-                                        },
-                                      ),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      filled: false,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                    ),
-                                    validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
-                                        return 'يرجى إدخال كلمة المرور';
-                                      }
-                                      if (value.trim().length < 4) {
-                                        return 'كلمة المرور قصيرة جداً';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-
-                                const SizedBox(height: 24),
-
-                                // Primary CTA: Log In
-                                GestureDetector(
-                                  onTap: _onContinue,
-                                  behavior: HitTestBehavior.opaque,
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: kPrimaryOrange,
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'تسجيل الدخول',
-                                        style: GoogleFonts.ibmPlexSansArabic(
-                                          fontSize: 15.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
+                                  child: Center(
+                                    child: Text(
+                                      'تسجيل الدخول',
+                                      style: GoogleFonts.ibmPlexSansArabic(
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
+                      ),
 
-                        const SizedBox(height: 28),
+                      const SizedBox(height: 28),
 
-                        // 3. Security Trust Footer
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const AppIcon(
-                              PhosphorIcons.shieldCheckBold,
-                              size: 16,
-                              color: kCharcoalLight,
+                      // 3. Security Trust Footer
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AppIcon(
+                            PhosphorIcons.shieldCheckBold,
+                            size: 16,
+                            color: isDark ? const Color(0xFF64748B) : kCharcoalLight,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'حسابات السائقين معتمدة ومفعلة من قبل الإدارة',
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 12,
+                              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+                              fontWeight: FontWeight.w500,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'حسابات السائقين معتمدة ومفعلة من قبل الإدارة',
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                fontSize: 12,
-                                color: kCharcoalMuted,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-      );
+      ),
+    );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(bool isDark) {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       title: Text(
         'تسجيل دخول السائقين',
         style: GoogleFonts.ibmPlexSansArabic(
-          color: kCharcoalDark,
+          color: isDark ? Colors.white : kCharcoalDark,
           fontSize: 16.5,
           fontWeight: FontWeight.w700,
         ),
@@ -351,7 +370,10 @@ class _LoginPageState extends State<LoginPage> {
       centerTitle: true,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(color: kBorderColor, height: 1),
+        child: Container(
+          color: isDark ? const Color(0xFF334155) : kBorderColor,
+          height: 1,
+        ),
       ),
     );
   }

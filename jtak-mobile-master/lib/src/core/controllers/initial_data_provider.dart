@@ -65,16 +65,49 @@ class InitialDataProvider extends BaseProvider {
       // The curated Home grid, where every tile carries its own destination.
       // Older backends do not send this; the featured category list above then
       // remains the fallback.
+      final bool homeCategoriesEnabled = data.containsKey('homeCategoriesEnabled') && data['homeCategoriesEnabled'] != null
+          ? data['homeCategoriesEnabled'] as bool
+          : true;
+      final int homeCategoriesMaxItems = data.containsKey('homeCategoriesMaxItems') && data['homeCategoriesMaxItems'] != null
+          ? (data['homeCategoriesMaxItems'] as num).toInt()
+          : 8;
+      final String? homeCategoriesTitle = data['homeCategoriesTitle'] as String?;
+
       if (data.containsKey('homeCategories') && data['homeCategories'] != null) {
         final tiles = <HomeCategoryTile>[];
         for (final item in data['homeCategories']) {
           tiles.add(HomeCategoryTile.fromMap(Map<String, dynamic>.from(item)));
         }
         if (locator.isRegistered<CategoriesProvider>()) {
-          locator<CategoriesProvider>().setHomeCategoryTiles(tiles);
+          locator<CategoriesProvider>().setHomeCategoryTiles(
+            tiles,
+            enabled: homeCategoriesEnabled,
+            maxItems: homeCategoriesMaxItems,
+            title: homeCategoriesTitle,
+          );
         } else if (context.mounted) {
-          Provider.of<CategoriesProvider>(context, listen: false)
-              .setHomeCategoryTiles(tiles);
+          Provider.of<CategoriesProvider>(context, listen: false).setHomeCategoryTiles(
+            tiles,
+            enabled: homeCategoriesEnabled,
+            maxItems: homeCategoriesMaxItems,
+            title: homeCategoriesTitle,
+          );
+        }
+      } else {
+        if (locator.isRegistered<CategoriesProvider>()) {
+          locator<CategoriesProvider>().setHomeCategoryTiles(
+            [],
+            enabled: homeCategoriesEnabled,
+            maxItems: homeCategoriesMaxItems,
+            title: homeCategoriesTitle,
+          );
+        } else if (context.mounted) {
+          Provider.of<CategoriesProvider>(context, listen: false).setHomeCategoryTiles(
+            [],
+            enabled: homeCategoriesEnabled,
+            maxItems: homeCategoriesMaxItems,
+            title: homeCategoriesTitle,
+          );
         }
       }
 

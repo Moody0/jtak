@@ -10,6 +10,7 @@ import '../../../utils/custom_widgets/base_view.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/custom_widgets/messages.dart';
 import '../../../utils/custom_widgets/syrian_flag.dart';
+import '../../../utils/utilities/phone_helper.dart';
 import '../../widgets/header_circle_button.dart';
 import 'phone_code_page.dart';
 
@@ -38,14 +39,8 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String _formatPhoneNumber(String raw) {
-    String clean = raw.replaceAll(RegExp(r'\s+'), '');
-    if (clean.startsWith('0')) {
-      clean = clean.substring(1);
-    }
-    if (!clean.startsWith('+963')) {
-      clean = '+963$clean';
-    }
-    return clean;
+    final clean = PhoneHelper.normalizeSyrianLocalPhone(raw);
+    return '+963$clean';
   }
 
   @override
@@ -138,6 +133,9 @@ class _LoginPageState extends State<LoginPage> {
                                       keyboardType: TextInputType.phone,
                                       textDirection: TextDirection.ltr,
                                       textAlign: TextAlign.left,
+                                      inputFormatters: [
+                                        SyrianPhoneInputFormatter(),
+                                      ],
                                       style: GoogleFonts.ibmPlexSansArabic(
                                         fontSize: 15.5,
                                         fontWeight: FontWeight.w700,
@@ -145,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
                                         letterSpacing: 1.0,
                                       ),
                                       decoration: InputDecoration(
-                                        hintText: '09xx xxx xxx',
+                                        hintText: '9xx xxx xxx',
                                         hintStyle:
                                             GoogleFonts.ibmPlexSansArabic(
                                           color: const Color(0xFF94A3B8),
@@ -162,8 +160,9 @@ class _LoginPageState extends State<LoginPage> {
                                             value.trim().isEmpty) {
                                           return 'يرجى إدخال رقم الهاتف';
                                         }
-                                        if (value.trim().length < 8) {
-                                          return 'رقم الهاتف قصير جداً';
+                                        final clean = PhoneHelper.normalizeSyrianLocalPhone(value);
+                                        if (clean.length != 9 || !clean.startsWith('9')) {
+                                          return 'يرجى إدخال رقم هاتف سوري صحيح (9 أرقام)';
                                         }
                                         return null;
                                       },

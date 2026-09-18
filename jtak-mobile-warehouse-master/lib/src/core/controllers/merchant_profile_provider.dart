@@ -24,6 +24,15 @@ class MerchantProfileProvider extends ChangeNotifier {
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
 
+  /// Clear all cached profile state on account switch or logout
+  void reset() {
+    _profile = null;
+    _isLoading = false;
+    _isSaving = false;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   /// Fetch merchant profile from backend
   Future<void> loadProfile() async {
     _isLoading = true;

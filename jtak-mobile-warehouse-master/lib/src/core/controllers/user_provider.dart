@@ -16,6 +16,17 @@ class UserProvider extends BaseProvider {
   PhoneNumberModel? phoneNumber;
   String? lastVerificationCode;
 
+  /// Clear all cached profile form state on account switch or logout
+  void reset() {
+    fullName = null;
+    email = null;
+    oldPassword = null;
+    newPassword = null;
+    phoneNumber = null;
+    lastVerificationCode = null;
+    notifyListeners();
+  }
+
   void loadUserDataProfile() async {
     if (authService.user == null) {
       await loadUserData();

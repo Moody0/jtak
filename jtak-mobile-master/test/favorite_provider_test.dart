@@ -1,12 +1,16 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jtek_app/src/core/controllers/catalog/favorite_product_provider.dart';
-import 'package:jtek_app/src/core/data/mock_catalog_data.dart';
 import 'package:jtek_app/src/core/services/locator.dart';
 import 'package:jtek_app/src/utils/providers/sol_api.dart';
+import 'package:jtek_app/src/core/services/authentication_service.dart';
+import 'package:jtek_app/src/core/controllers/app/home_navigation_provider.dart';
 import 'package:jtek_app/src/ui/widgets/catalog/meal_card_widget.dart';
 import 'package:jtek_app/src/ui/widgets/catalog/restaurant_card_widget.dart';
 import 'package:jtek_app/src/ui/pages/catalog/market_page.dart';
+import 'package:jtek_app/src/ui/pages/catalog/favorite_page.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +18,10 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     if (!locator.isRegistered<SolApi>()) {
-      setupLocator();
+      locator.registerLazySingleton<SolApi>(() => SolApi());
+    }
+    if (!locator.isRegistered<AuthenticationService>()) {
+      locator.registerLazySingleton<AuthenticationService>(() => AuthenticationService());
     }
   });
 
@@ -95,5 +102,29 @@ void main() {
     expect(provider.isRestaurantFavorite(7777), isFalse);
     expect(provider.favoriteRestaurants.length, 0);
     expect(provider.totalFavoritesCount, 1);
+  });
+
+  testWidgets('FavoritePage renders tabs labeled المطاعم and الأصناف', (tester) async {
+    final provider = FavoriteProductProvider();
+    final navProvider = HomeNavigationProvider();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<FavoriteProductProvider>.value(value: provider),
+          ChangeNotifierProvider<HomeNavigationProvider>.value(value: navProvider),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: FavoritePage(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('المطاعم'), findsOneWidget);
+    expect(find.textContaining('الأصناف'), findsOneWidget);
+    expect(find.textContaining('الأطباق'), findsNothing);
   });
 }

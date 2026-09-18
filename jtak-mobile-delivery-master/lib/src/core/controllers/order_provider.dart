@@ -543,19 +543,42 @@ class OrderProvider extends BaseProvider<OrderModel> {
   Future<void> _beginLocationSharing([int? orderId]) async {
     if (orderId != null) _trackingOrderId = orderId;
     if (_locationSubscription != null) {
-      final current = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.high),
-      );
-      await _publishLocation(current);
+      try {
+        Position? current;
+        try {
+          current = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 5),
+            ),
+          );
+        } catch (_) {
+          current = await Geolocator.getLastKnownPosition();
+        }
+        if (current != null) {
+          await _publishLocation(current);
+        }
+      } catch (_) {}
       return;
     }
 
     await LocationService(isMandatory: true).requireAlwaysPermission();
-    final current = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
-    await _publishLocation(current);
+    try {
+      Position? current;
+      try {
+        current = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      } catch (_) {
+        current = await Geolocator.getLastKnownPosition();
+      }
+      if (current != null) {
+        await _publishLocation(current);
+      }
+    } catch (_) {}
 
     final LocationSettings settings;
     if (defaultTargetPlatform == TargetPlatform.android) {

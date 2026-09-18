@@ -108,6 +108,7 @@ class _OrdersPageState extends State<OrdersPage> {
   }
 
   void _toggleShiftStatus(BuildContext context, OrderProvider orderProv) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final targetOnline = !orderProv.isOnline;
 
@@ -143,7 +144,8 @@ class _OrdersPageState extends State<OrdersPage> {
                   ? 'هل تريد إيقاف الوردية؟ لن يتم توجيه أي طلبات جديدة إليك أثناء التوقف.'
                   : 'Pause your shift? You will not receive any new delivery dispatches while offline.'),
           style: GoogleFonts.ibmPlexSansArabic(
-              fontSize: 13.5, color: kCharcoalMuted),
+              fontSize: 13.5,
+              color: isDark ? const Color(0xFFCBD5E1) : kCharcoalMuted),
         ),
         actions: [
           TextButton(
@@ -206,7 +208,7 @@ class _OrdersPageState extends State<OrdersPage> {
             children: [
               // 1. Driver Greeting & Interactive Shift Status Toggle
               _buildGreetingAndShiftRow(
-                  context, firstName, isArabic, orderProv),
+                  context, firstName, isArabic, isDark, orderProv),
 
               const SizedBox(height: 18),
 
@@ -224,8 +226,8 @@ class _OrdersPageState extends State<OrdersPage> {
               ],
 
               // 4. Active vs Completed Deliveries Header Tabs
-              _buildActiveOrdersHeader(context, isArabic, activeOrders.length,
-                  completedOrders.length),
+              _buildActiveOrdersHeader(context, isArabic, isDark,
+                  activeOrders.length, completedOrders.length),
 
               const SizedBox(height: 12),
 
@@ -249,9 +251,23 @@ class _OrdersPageState extends State<OrdersPage> {
     BuildContext context,
     String firstName,
     bool isArabic,
+    bool isDark,
     OrderProvider orderProv,
   ) {
     final isOnline = orderProv.isOnline;
+
+    final Color shiftBg = isDark
+        ? (isOnline ? kDarkGreenBg : kDarkRedBg)
+        : (isOnline ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2));
+    final Color shiftBorder = isDark
+        ? (isOnline ? kDarkGreenBorder : kDarkRedBorder)
+        : (isOnline ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA));
+    final Color shiftTextColor = isDark
+        ? (isOnline ? kDarkGreenText : kDarkRedText)
+        : (isOnline ? const Color(0xFF047857) : const Color(0xFFB91C1C));
+    final Color shiftSubtextColor = isDark
+        ? (isOnline ? const Color(0xFF6EE7B7) : const Color(0xFFFCA5A5))
+        : (isOnline ? const Color(0xFF059669) : const Color(0xFFDC2626));
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,7 +282,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: kCharcoalDark,
+                  color: isDark ? Colors.white : kCharcoalDark,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -278,7 +294,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: kCharcoalMuted,
+                  color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                 ),
               ),
             ],
@@ -294,13 +310,10 @@ class _OrdersPageState extends State<OrdersPage> {
             duration: const Duration(milliseconds: 250),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color:
-                  isOnline ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+              color: shiftBg,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isOnline
-                    ? const Color(0xFFA7F3D0)
-                    : const Color(0xFFFECACA),
+                color: shiftBorder,
                 width: 1.2,
               ),
               boxShadow: [
@@ -333,9 +346,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
-                        color: isOnline
-                            ? const Color(0xFF047857)
-                            : const Color(0xFFB91C1C),
+                        color: shiftTextColor,
                       ),
                     ),
                   ],
@@ -350,9 +361,7 @@ class _OrdersPageState extends State<OrdersPage> {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
-                    color: isOnline
-                        ? const Color(0xFF059669)
-                        : const Color(0xFFDC2626),
+                    color: shiftSubtextColor,
                   ),
                 ),
               ],
@@ -664,6 +673,7 @@ class _OrdersPageState extends State<OrdersPage> {
   Widget _buildActiveOrdersHeader(
     BuildContext context,
     bool isArabic,
+    bool isDark,
     int activeCount,
     int completedCount,
   ) {
@@ -676,6 +686,7 @@ class _OrdersPageState extends State<OrdersPage> {
               title: isArabic ? 'الطلبات الحالية' : 'Current',
               count: activeCount,
               isSelected: _selectedOrdersTab == 0,
+              isDark: isDark,
               onTap: () {
                 setState(() => _selectedOrdersTab = 0);
               },
@@ -685,6 +696,7 @@ class _OrdersPageState extends State<OrdersPage> {
               title: isArabic ? 'سجل الطلبات' : 'History',
               count: completedCount,
               isSelected: _selectedOrdersTab == 1,
+              isDark: isDark,
               onTap: () {
                 setState(() => _selectedOrdersTab = 1);
               },
@@ -718,8 +730,20 @@ class _OrdersPageState extends State<OrdersPage> {
     required String title,
     required int count,
     required bool isSelected,
+    required bool isDark,
     required VoidCallback onTap,
   }) {
+    final Color unselectedBg =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final Color unselectedBorder =
+        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final Color unselectedTextColor =
+        isDark ? const Color(0xFFCBD5E1) : kCharcoalDark;
+    final Color unselectedCountBg =
+        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final Color unselectedCountText =
+        isDark ? const Color(0xFF94A3B8) : kCharcoalMuted;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -727,10 +751,10 @@ class _OrdersPageState extends State<OrdersPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? kPrimaryOrange : const Color(0xFFF1F5F9),
+          color: isSelected ? kPrimaryOrange : unselectedBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? kPrimaryOrange : const Color(0xFFE2E8F0),
+            color: isSelected ? kPrimaryOrange : unselectedBorder,
             width: 1,
           ),
         ),
@@ -742,7 +766,7 @@ class _OrdersPageState extends State<OrdersPage> {
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? Colors.white : kCharcoalDark,
+                color: isSelected ? Colors.white : unselectedTextColor,
               ),
             ),
             const SizedBox(width: 6),
@@ -751,7 +775,7 @@ class _OrdersPageState extends State<OrdersPage> {
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.white.withValues(alpha: 0.25)
-                    : const Color(0xFFE2E8F0),
+                    : unselectedCountBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -759,7 +783,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: isSelected ? Colors.white : kCharcoalMuted,
+                  color: isSelected ? Colors.white : unselectedCountText,
                 ),
               ),
             ),
@@ -797,8 +821,8 @@ class _OrdersPageState extends State<OrdersPage> {
               height: 60,
               decoration: BoxDecoration(
                 color: isCompletedTab
-                    ? const Color(0xFFECFDF5)
-                    : const Color(0xFFFFF0E8),
+                    ? (isDark ? kDarkGreenBg : const Color(0xFFECFDF5))
+                    : (isDark ? kDarkSurfaceWarm : const Color(0xFFFFF0E8)),
                 shape: BoxShape.circle,
               ),
               child: HomeMirroredIcon(
@@ -806,7 +830,7 @@ class _OrdersPageState extends State<OrdersPage> {
                     ? PhosphorIcons.checkCircleBold
                     : PhosphorIcons.mopedBold,
                 color:
-                    isCompletedTab ? const Color(0xFF059669) : kPrimaryOrange,
+                    isCompletedTab ? (isDark ? kDarkGreenText : const Color(0xFF059669)) : kPrimaryOrange,
                 size: 30,
               ),
             ),
@@ -837,7 +861,7 @@ class _OrdersPageState extends State<OrdersPage> {
               textAlign: TextAlign.center,
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 12.5,
-                color: kCharcoalMuted,
+                color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
               ),
             ),
           ],

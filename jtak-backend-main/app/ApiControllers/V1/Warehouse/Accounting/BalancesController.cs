@@ -222,6 +222,25 @@ namespace App.ApiControllers.V1.Warehouse
             if (!uid.HasValue) return Unauthorized();
             return Ok(await _settlements.GetMineAsync(uid.Value, SettlementPartyType.Merchant));
         }
+
+        [HttpPost]
+        [Route("SettlementRequests/{id}/ConfirmReceipt")]
+        [Route("ConfirmSettlementReceipt/{id}")]
+        public async Task<ActionResult<SettlementRequestDto>> ConfirmReceipt(Guid id)
+        {
+            var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
+
+            try
+            {
+                var result = await _settlements.ConfirmMerchantReceiptAsync(id, uid.Value);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiErr.Create(ex.Message));
+            }
+        }
     }
 
     public class SettlementRequestDto

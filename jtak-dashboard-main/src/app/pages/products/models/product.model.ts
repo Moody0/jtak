@@ -14,6 +14,8 @@ export interface Product extends BaseModel {
   categoryHierarchy?: string;
   merchantId?: number;
   merchantTitle?: string;
-  price?: number;
+  price?: number | null;
+  priceUsd?: number | null;
+  discount?: number | null;
   currency?: number;
 }

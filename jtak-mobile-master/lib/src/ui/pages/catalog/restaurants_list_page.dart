@@ -13,7 +13,6 @@ import '../../../core/controllers/catalog/markets_provider.dart';
 import '../../../core/controllers/initial_data_provider.dart';
 import '../../../core/models/catalog/restaurant_category_model.dart';
 import '../../../core/controllers/order/order_provider.dart';
-import '../../../core/data/mock_catalog_data.dart';
 import '../../../core/models/banner_model.dart';
 import '../../../core/models/user/address_model.dart';
 import '../../../core/services/locator.dart';
@@ -365,71 +364,165 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
 
     setState(() => _isLoadingScopedMerchants = true);
     final provider = locator<MarketsProvider>();
-    final categoryMerchants = await provider.fetchMerchantsForCategory(
-      scope.categoryId,
-      scope.merchantKind,
-    );
-    final candidates = categoryMerchants.isNotEmpty
-        ? _buildMarketMerchants(categoryMerchants)
-        : _buildProviderMerchants(provider, includeMarkets: true);
-    final matched = <_RestaurantListItem>[];
 
-    await Future.wait(candidates.map((merchant) async {
-      final products = await provider.fetchMarketProducts(merchant.id);
-      final categories = <String>{};
-      var belongsToScope = false;
+    if (scope.kind == CatalogScopeKind.grocery) {
+      final categoryMerchants = await provider.fetchMerchantsForCategory(
+        scope.categoryId,
+        scope.merchantKind,
+      );
+      final candidates = categoryMerchants.isNotEmpty
+          ? _buildMarketMerchants(categoryMerchants)
+          : _buildMarketMerchants(provider.markets);
+      final matched = <_RestaurantListItem>[];
 
-      for (final product in products) {
-        final parentId = int.tryParse(
-          (product['categoryParentId'] ?? '').toString(),
-        );
-        final parentTitle = (product['productCat2'] ?? '').toString().trim();
-        final childTitle = (product['productCat1'] ?? '').toString().trim();
-        final matchesParent = parentId == scope.categoryId ||
-            _sameCategory(parentTitle, scope.title);
+      await Future.wait(candidates.map((merchant) async {
+        final products = await provider.fetchMarketProducts(merchant.id);
+        final categories = <String>{};
+        var belongsToScope = false;
 
-        if (!matchesParent) continue;
-        belongsToScope = true;
-        if (childTitle.isNotEmpty) {
-          categories.add(childTitle);
-          _scopeCategoryImages.putIfAbsent(
-            childTitle,
-            () => _firstProductImage(product),
+        for (final product in products) {
+          final parentId = int.tryParse(
+            (product['categoryParentId'] ?? '').toString(),
           );
+          final parentTitle = (product['productCat2'] ?? '').toString().trim();
+          final childId = int.tryParse(
+            (product['productCategoryId'] ?? product['productCat1Id'] ?? '').toString(),
+          );
+          final childTitle = (product['productCat1'] ?? '').toString().trim();
+          final matchesParent = parentId == scope.categoryId ||
+              _sameCategory(parentTitle, scope.title);
+
+          if (!matchesParent) continue;
+          belongsToScope = true;
+          if (childTitle.isNotEmpty) {
+            // Strictly exclude restaurant cuisines from grocery child categories
+            final normChild = childTitle.toLowerCase();
+            if (!normChild.contains('شاورما') &&
+                !normChild.contains('برغر') &&
+                !normChild.contains('برجر') &&
+                !normChild.contains('مشاوي') &&
+                !normChild.contains('بيتزا')) {
+              final canonicalChild =
+                  CanonicalCategoryRegistry.canonicalizeName(childId, childTitle);
+              categories.add(canonicalChild);
+              categories.add(childTitle);
+              _scopeCategoryImages.putIfAbsent(
+                canonicalChild,
+                () => _firstProductImage(product),
+              );
+            }
+          }
+        }
+
+        if (belongsToScope || merchant.isProductMerchant || merchant.id == 12) {
+          matched.add(merchant);
+          _merchantProductCategories[merchant.id] = categories;
+        }
+      }));
+
+      // Seed fallback grocery categories if API has not returned them yet
+      if (_scopeCategoryImages.isEmpty) {
+        for (final def in scope.defaultChildCategories) {
+          _scopeCategoryImages[def] = _getScopeAssetForCategory(def, scope.fallbackImage);
         }
       }
 
-      if (belongsToScope) {
-        matched.add(merchant);
-        _merchantProductCategories[merchant.id] = categories;
+      if (matched.isEmpty) {
+        matched.addAll(candidates);
       }
-    }));
 
-    // The bundled grocery merchants remain useful while the API is offline.
-    if (matched.isEmpty && scope.kind == CatalogScopeKind.grocery) {
-      matched
-          .addAll(candidates.where((merchant) => merchant.isProductMerchant));
+      if (!mounted) return;
+      matched.sort((a, b) => b.rating.compareTo(a.rating));
+      setState(() {
+        _scopedMerchants = matched;
+        _isLoadingScopedMerchants = false;
+      });
+      return;
     }
 
-    if (!mounted) return;
-    matched.sort((a, b) => b.rating.compareTo(a.rating));
-    setState(() {
-      _scopedMerchants = matched;
-      _isLoadingScopedMerchants = false;
-    });
+    if (scope.kind == CatalogScopeKind.restaurants) {
+      final list = _buildProviderMerchants(provider);
+      if (!mounted) return;
+      setState(() {
+        _scopedMerchants = list;
+        _isLoadingScopedMerchants = false;
+      });
+      return;
+    }
+
+    if (scope.kind == CatalogScopeKind.coffee) {
+      final cafes = provider.restaurants.where((r) {
+        final q = '${r.name} ${r.cuisine} ${r.categoryTag}'.toLowerCase();
+        return q.contains('كافيه') ||
+            q.contains('قهوة') ||
+            q.contains('مشروبات') ||
+            q.contains('شاي') ||
+            q.contains('عصير') ||
+            q.contains('نوفرة') ||
+            q.contains('art') ||
+            q.contains('cafe');
+      }).toList();
+      final list = cafes.map((r) => _RestaurantListItem(
+            id: r.id,
+            name: r.name,
+            cuisine: r.cuisine,
+            categoryTag: r.categoryTag,
+            rating: r.rating,
+            ratingCount: r.ratingCount,
+            eta: r.eta,
+            distance: r.distance,
+            deliveryFee: r.deliveryFee,
+            hasOffers: r.hasOffers,
+            isFast: r.isFast,
+            coverUrl: r.coverUrl,
+            logoUrl: r.logoUrl,
+            isProductMerchant: false,
+          )).toList();
+      if (!mounted) return;
+      setState(() {
+        _scopedMerchants = list;
+        _isLoadingScopedMerchants = false;
+      });
+      return;
+    }
+
+    if (scope.kind == CatalogScopeKind.pharmacy) {
+      final pharmacies = provider.markets
+          .where((m) => m.merchantKind == 3 || m.name.contains('صيدل'))
+          .toList();
+      final list = pharmacies.isNotEmpty
+          ? _buildMarketMerchants(pharmacies)
+          : [
+              const _RestaurantListItem(
+                id: 15,
+                name: 'صيدلية جيتك المركزية - JTAK Pharmacy',
+                cuisine: 'أدوية، فيتامينات ومستحضرات عناية طبية',
+                categoryTag: 'صيدلية',
+                rating: 4.9,
+                ratingCount: 320,
+                eta: '15-20 دقيقة',
+                distance: '1.5 كم',
+                deliveryFee: 'مجاني',
+                hasOffers: true,
+                isFast: true,
+                coverUrl: 'assets/images/categories/cat_grocery.webp',
+                logoUrl: 'assets/images/categories/cat_grocery.webp',
+                isProductMerchant: true,
+              ),
+            ];
+      if (!mounted) return;
+      setState(() {
+        _scopedMerchants = list;
+        _isLoadingScopedMerchants = false;
+      });
+      return;
+    }
+
+    setState(() => _isLoadingScopedMerchants = false);
   }
 
   bool _sameCategory(String first, String second) {
-    String normalize(String value) => value
-        .trim()
-        .toLowerCase()
-        .replaceFirst(RegExp(r'^ال'), '')
-        .replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '');
-    final a = normalize(first);
-    final b = normalize(second);
-    return a.isNotEmpty &&
-        b.isNotEmpty &&
-        (a == b || a.contains(b) || b.contains(a));
+    return CanonicalCategoryRegistry.areSameCategory(name1: first, name2: second);
   }
 
   String? _firstProductImage(Map<String, dynamic> product) {
@@ -438,6 +531,20 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     final photos = (product['productPhotos'] ?? '').toString().trim();
     if (photos.isEmpty) return null;
     return photos.split(',').first.trim();
+  }
+
+  String _getScopeAssetForCategory(String title, String fallback) {
+    final bucket = CanonicalCategoryRegistry.findBucket(null, title);
+    if (bucket != null) {
+      return bucket.fallbackImage;
+    }
+    final t = title.trim().toLowerCase();
+    if (t.contains('خضار') || t.contains('فواكه')) return 'assets/images/categories/cat_vegetables.webp';
+    if (t.contains('لحوم') || t.contains('دواجن') || t.contains('دجاج')) return 'assets/images/categories/cat_meat.webp';
+    if (t.contains('حلويات') || t.contains('مخبوزات') || t.contains('كيك')) return 'assets/images/categories/cat_sweets.jpg';
+    if (t.contains('قهوة') || t.contains('مشروبات') || t.contains('عصير')) return 'assets/images/categories/cat_drinks.webp';
+    if (t.contains('ألبان') || t.contains('أجبان') || t.contains('جبن')) return 'assets/images/categories/cat_grocery.webp';
+    return fallback;
   }
 
   int get _activeFiltersCount {
@@ -454,9 +561,10 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   bool _isCategorySelected(String catTitle) {
     if (_selectedCategory == catTitle) return true;
     if (_selectedCategory == 'الكل') return false;
-    final a = _selectedCategory.replaceAll('ال', '').trim().toLowerCase();
-    final b = catTitle.replaceAll('ال', '').trim().toLowerCase();
-    return a == b;
+    return CanonicalCategoryRegistry.areSameCategory(
+      name1: _selectedCategory,
+      name2: catTitle,
+    );
   }
 
   String _categoryFilterTag(String title) {
@@ -493,125 +601,75 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   bool _matchesCategory(_RestaurantListItem r, String category) {
     if (category == 'الكل' || category.trim().isEmpty) return true;
 
-    final target = category.trim().toLowerCase();
-    final tag = r.categoryTag.trim().toLowerCase();
-    final cuisine = r.cuisine.trim().toLowerCase();
-    final name = r.name.trim().toLowerCase();
+    final normTarget = category.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
+    final normTag = r.categoryTag.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
+    final normCuisine = r.cuisine.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
+    final normName = r.name.trim().toLowerCase().replaceFirst(RegExp(r'^ال'), '');
 
     // Direct equality or substring match
-    if (tag == target || cuisine == target || name == target) return true;
-    if (tag.contains(target) || target.contains(tag)) return true;
-    if (cuisine.contains(target) || target.contains(cuisine)) return true;
-    if (name.contains(target)) return true;
+    if (normTag == normTarget || normCuisine == normTarget || normName == normTarget) return true;
+    if (normTag.contains(normTarget) || normTarget.contains(normTag)) return true;
+    if (normCuisine.contains(normTarget) || normTarget.contains(normCuisine)) return true;
+    if (normName.contains(normTarget)) return true;
 
     // 1. Burgers
-    if (target.contains('برجر') ||
-        target.contains('برغر') ||
-        target.contains('burger')) {
-      return tag.contains('برغر') ||
-          tag.contains('برجر') ||
-          cuisine.contains('برغر') ||
-          cuisine.contains('برجر') ||
-          name.contains('burger') ||
-          name.contains('برغر') ||
-          name.contains('برجر') ||
-          name.contains('كلاسيك');
+    if (normTarget.contains('برجر') || normTarget.contains('برغر') || normTarget.contains('burger')) {
+      return normTag.contains('برغر') || normTag.contains('برجر') ||
+          normCuisine.contains('برغر') || normCuisine.contains('برجر') ||
+          normName.contains('burger') || normName.contains('برغر') || normName.contains('برجر') || normName.contains('كلاسيك');
     }
 
     // 2. Shawarma
-    if (target.contains('شاورما') || target.contains('shawarma')) {
-      return tag.contains('شاورما') ||
-          cuisine.contains('شاورما') ||
-          name.contains('شاورما') ||
-          name.contains('أنس') ||
-          name.contains('anas');
+    if (normTarget.contains('شاورما') || normTarget.contains('shawarma')) {
+      return normTag.contains('شاورما') || normCuisine.contains('شاورما') ||
+          normName.contains('شاورما') || normName.contains('أنس') || normName.contains('anas');
     }
 
-    // 3. Sweets & Desserts
-    if (target.contains('حلويات') ||
-        target.contains('حلى') ||
-        target.contains('sweet') ||
-        target.contains('dessert') ||
-        target.contains('بوظة')) {
-      return tag.contains('حلويات') ||
-          tag.contains('حلى') ||
-          cuisine.contains('حلويات') ||
-          cuisine.contains('حلى') ||
-          cuisine.contains('بوظة') ||
-          name.contains('بكداش') ||
-          name.contains('داوود') ||
-          name.contains('مهنا');
+    // 3. Grills & Barbecue
+    if (normTarget.contains('مشاوي') || normTarget.contains('مشويات') || normTarget.contains('كباب') || normTarget.contains('grill')) {
+      return normTag.contains('مشاوي') || normTag.contains('مشويات') ||
+          normCuisine.contains('مشاوي') || normCuisine.contains('مشويات') ||
+          normCuisine.contains('كباب') || normName.contains('بوابة دمشق') || normName.contains('مشاوي');
     }
 
-    // 4. Bakery & Pastries
-    if (target.contains('مخبوزات') ||
-        target.contains('مخبز') ||
-        target.contains('فطاير') ||
-        target.contains('معجنات')) {
-      return tag.contains('مخبوزات') ||
-          tag.contains('فطاير') ||
-          cuisine.contains('معجنات') ||
-          cuisine.contains('فطاير') ||
-          name.contains('بوز الجدي');
+    // 4. Popular Breakfast / Falafel & Foul
+    if (normTarget.contains('فلافل') || normTarget.contains('فول') || normTarget.contains('فطور') || normTarget.contains('فتات')) {
+      return normTag.contains('فطور') || normTag.contains('فلافل') || normTag.contains('فول') ||
+          normCuisine.contains('فطور') || normCuisine.contains('تساقي') ||
+          normName.contains('بوز الجدي') || normName.contains('فلافل');
     }
 
-    // 5. Popular Breakfast / Falafel & Foul
-    if (target.contains('فلافل') ||
-        target.contains('فول') ||
-        target.contains('فطور') ||
-        target.contains('فتات')) {
-      return tag.contains('فطور') ||
-          tag.contains('فلافل') ||
-          tag.contains('فول') ||
-          cuisine.contains('فطور') ||
-          cuisine.contains('تساقي') ||
-          name.contains('بوز الجدي') ||
-          name.contains('فلافل');
+    // 5. Sweets & Desserts
+    if (normTarget.contains('حلويات') || normTarget.contains('حلى') || normTarget.contains('sweet') || normTarget.contains('dessert') || normTarget.contains('بوظة')) {
+      return normTag.contains('حلويات') || normTag.contains('حلى') ||
+          normCuisine.contains('حلويات') || normCuisine.contains('حلى') ||
+          normCuisine.contains('بوظة') || normName.contains('بكداش') || normName.contains('داوود') || normName.contains('مهنا');
     }
 
-    // 6. Drinks & Coffee
-    if (target.contains('مشروبات') ||
-        target.contains('كافيه') ||
-        target.contains('قهوة') ||
-        target.contains('cafe') ||
-        target.contains('coffee')) {
-      return tag.contains('كافيه') ||
-          tag.contains('مشروبات') ||
-          tag.contains('قهوة') ||
-          cuisine.contains('كافيه') ||
-          cuisine.contains('مشروبات') ||
-          cuisine.contains('قهوة') ||
-          name.contains('نوفرة') ||
-          name.contains('النوفرة') ||
-          name.contains('أرت') ||
-          name.contains('art');
+    // 6. Bakery & Pastries
+    if (normTarget.contains('مخبوزات') || normTarget.contains('مخبز') || normTarget.contains('فطاير') || normTarget.contains('معجنات')) {
+      return normTag.contains('مخبوزات') || normTag.contains('فطاير') ||
+          normCuisine.contains('معجنات') || normCuisine.contains('فطاير') ||
+          normName.contains('بوز الجدي');
     }
 
-    // 7. Grills & Barbecue
-    if (target.contains('مشاوي') ||
-        target.contains('مشويات') ||
-        target.contains('كباب') ||
-        target.contains('grill')) {
-      return tag.contains('مشاوي') ||
-          tag.contains('مشويات') ||
-          cuisine.contains('مشاوي') ||
-          cuisine.contains('مشويات') ||
-          cuisine.contains('كباب') ||
-          name.contains('بوابة دمشق') ||
-          name.contains('مشاوي');
+    // 7. Drinks & Coffee
+    if (normTarget.contains('مشروبات') || normTarget.contains('كافيه') || normTarget.contains('قهوة') || normTarget.contains('cafe') || normTarget.contains('coffee')) {
+      return normTag.contains('كافيه') || normTag.contains('مشروبات') || normTag.contains('قهوة') ||
+          normCuisine.contains('كافيه') || normCuisine.contains('مشروبات') || normCuisine.contains('قهوة') ||
+          normName.contains('نوفرة') || normName.contains('أرت') || normName.contains('art');
     }
 
     // 8. Syrian / Shami Cuisine
-    if (target.contains('سوري') ||
-        target.contains('شامي') ||
-        target.contains('دمشقي')) {
-      return tag.contains('شامي') ||
-          tag.contains('سوري') ||
-          cuisine.contains('شامي') ||
-          cuisine.contains('سوري') ||
-          cuisine.contains('شعبي') ||
-          name.contains('شام') ||
-          name.contains('دمشق');
+    if (normTarget.contains('سوري') || normTarget.contains('شامي') || normTarget.contains('دمشقي')) {
+      return normTag.contains('شامي') || normTag.contains('سوري') ||
+          normCuisine.contains('شامي') || normCuisine.contains('سوري') ||
+          normCuisine.contains('شعبي') || normName.contains('شام') || normName.contains('دمشق');
+    }
+
+    // 9. Pizza
+    if (normTarget.contains('بيتزا') || normTarget.contains('pizza')) {
+      return normTag.contains('بيتزا') || normCuisine.contains('بيتزا') || normName.contains('بيتزا') || normName.contains('pizza');
     }
 
     return false;
@@ -621,11 +679,16 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
     List<_RestaurantListItem> list = _allRestaurants.where((r) {
       if (widget.catalogScope != null) {
         if (_selectedCategory != 'الكل') {
-          final merchantCategories =
-              _merchantProductCategories[r.id] ?? const <String>{};
-          if (!merchantCategories.any(
-            (category) => _sameCategory(category, _selectedCategory),
-          )) {
+          if (widget.catalogScope!.kind == CatalogScopeKind.grocery) {
+            final merchantCategories =
+                _merchantProductCategories[r.id] ?? const <String>{};
+            final hasCategory = merchantCategories.any(
+              (category) => _sameCategory(category, _selectedCategory),
+            );
+            if (!hasCategory && !_matchesCategory(r, _selectedCategory)) {
+              if (r.id != 12) return false;
+            }
+          } else if (!_matchesCategory(r, _categoryFilterTag(_selectedCategory))) {
             return false;
           }
         }
@@ -1094,6 +1157,185 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   }
 
   // ---------------------------------------------------------------------------
+  // 5. Section Categories Resolution
+  // ---------------------------------------------------------------------------
+  List<Map<String, String>> _resolveSectionCategories() {
+    final scope = widget.catalogScope;
+    if (scope != null) {
+      if (scope.kind == CatalogScopeKind.grocery) {
+        final list = <Map<String, String>>[];
+        final seenCanonical = <String>{};
+        for (final entry in _scopeCategoryImages.entries) {
+          final rawTitle = entry.key.trim();
+          if (rawTitle.isEmpty) continue;
+          final canonicalTitle =
+              CanonicalCategoryRegistry.canonicalizeName(null, rawTitle);
+          if (seenCanonical.contains(canonicalTitle)) continue;
+          final norm = canonicalTitle.toLowerCase();
+          if (norm.contains('شاورما') ||
+              norm.contains('مشاوي') ||
+              norm.contains('برغر') ||
+              norm.contains('برجر') ||
+              norm.contains('بيتزا')) {
+            continue;
+          }
+          seenCanonical.add(canonicalTitle);
+          list.add({
+            'title': canonicalTitle,
+            'image': entry.value ??
+                _getScopeAssetForCategory(canonicalTitle, scope.fallbackImage),
+          });
+        }
+        if (list.isEmpty) {
+          for (final def in scope.defaultChildCategories) {
+            list.add({
+              'title': def,
+              'image': _getScopeAssetForCategory(def, scope.fallbackImage),
+            });
+          }
+        }
+        return list;
+      }
+
+      if (scope.kind == CatalogScopeKind.restaurants) {
+        return [
+          {
+            'title': 'شاورما',
+            'image': 'assets/images/products/Arabic Chicken Shawarma Platter.webp',
+          },
+          {
+            'title': 'مشاوي',
+            'image': 'assets/images/categories/meat_poultry.png',
+          },
+          {
+            'title': 'فطور شعبي',
+            'image': 'assets/images/categories/dish_syrian.png',
+          },
+          {
+            'title': 'حلويات',
+            'image': 'assets/images/products/Classic Roll.webp',
+          },
+          {
+            'title': 'البرجر',
+            'image': 'assets/images/products/Double Angus Smash Burger.webp',
+          },
+          {
+            'title': 'بيتزا',
+            'image': 'assets/images/products/Minibon 9-Pack Box.webp',
+          },
+          {
+            'title': 'مشروبات',
+            'image': 'assets/images/products/Iced Spanish Latte.webp',
+          },
+          {
+            'title': 'مخبوزات',
+            'image': 'assets/images/products/Minibon 9-Pack Box.webp',
+          },
+        ];
+      }
+
+      if (scope.kind == CatalogScopeKind.coffee) {
+        return [
+          {
+            'title': 'قهوة مختصة',
+            'image': 'assets/images/products/Iced Spanish Latte.webp',
+          },
+          {
+            'title': 'مشروبات باردة',
+            'image': 'assets/images/categories/cat_drinks.webp',
+          },
+          {
+            'title': 'مشروبات ساخنة',
+            'image': 'assets/images/products/Iced Spanish Latte.webp',
+          },
+          {
+            'title': 'عصائر',
+            'image': 'assets/images/categories/cat_drinks.webp',
+          },
+          {
+            'title': 'شاي وأعشاب',
+            'image': 'assets/images/products/Iced Spanish Latte.webp',
+          },
+          {
+            'title': 'حلويات الكافيه',
+            'image': 'assets/images/products/Classic Roll.webp',
+          },
+        ];
+      }
+
+      if (scope.kind == CatalogScopeKind.pharmacy) {
+        return [
+          {
+            'title': 'أدوية ومسكنات',
+            'image': 'assets/images/categories/cat_grocery.webp',
+          },
+          {
+            'title': 'عناية شخصية',
+            'image': 'assets/images/categories/cat_grocery.webp',
+          },
+          {
+            'title': 'فيتامينات ومكملات',
+            'image': 'assets/images/categories/cat_grocery.webp',
+          },
+          {
+            'title': 'عناية بالطفل',
+            'image': 'assets/images/categories/cat_grocery.webp',
+          },
+          {
+            'title': 'إسعافات أولية',
+            'image': 'assets/images/categories/cat_grocery.webp',
+          },
+        ];
+      }
+    }
+
+    final configured = _restaurantCategoriesConfig;
+    if (configured != null && configured.items.isNotEmpty) {
+      final activeItems = configured.items
+          .where((item) => item.active && item.title.trim().isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+      return activeItems
+          .map((item) => <String, String>{
+                'title': _categoryDisplayTitle(item),
+                'image': item.image,
+              })
+          .toList();
+    }
+
+    return [
+      {
+        'title': 'شاورما',
+        'image': 'assets/images/products/Arabic Chicken Shawarma Platter.webp',
+      },
+      {
+        'title': 'مشاوي',
+        'image': 'assets/images/categories/meat_poultry.png',
+      },
+      {
+        'title': 'فطور شعبي',
+        'image': 'assets/images/categories/dish_syrian.png',
+      },
+      {
+        'title': 'حلويات',
+        'image': 'assets/images/products/Classic Roll.webp',
+      },
+      {
+        'title': 'البرجر',
+        'image': 'assets/images/products/Double Angus Smash Burger.webp',
+      },
+      {
+        'title': 'مشروبات',
+        'image': 'assets/images/products/Iced Spanish Latte.webp',
+      },
+      {
+        'title': 'مخبوزات',
+        'image': 'assets/images/products/Minibon 9-Pack Box.webp',
+      },
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
   // 5. Section 3: "كل المطاعم" (All Restaurant Categories Circular Chips)
   // ---------------------------------------------------------------------------
   Widget _buildCategoriesSection() {
@@ -1104,67 +1346,7 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
       return const SizedBox.shrink();
     }
 
-    final List<Map<String, String>> categories;
-    if (widget.catalogScope != null) {
-      categories = _scopeCategoryImages.entries
-          .map((entry) => <String, String>{
-                'title': entry.key,
-                'image': entry.value ?? widget.catalogScope!.fallbackImage,
-              })
-          .toList()
-        ..sort((a, b) => a['title']!.compareTo(b['title']!));
-    } else if (configured != null && configured.items.isNotEmpty) {
-      final activeItems = configured.items
-          .where((item) => item.active && item.title.trim().isNotEmpty)
-          .toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
-      categories = activeItems
-          .map((item) => <String, String>{
-                'title': _categoryDisplayTitle(item),
-                'image': item.image,
-              })
-          .toList();
-    } else {
-      categories = [
-        {
-          'title': 'شاورما',
-          'image':
-              'assets/images/products/Arabic Chicken Shawarma Platter.webp',
-        },
-        {
-          'title': 'مشاوي',
-          'image': 'assets/images/categories/meat_poultry.png',
-        },
-        {
-          'title': 'فطور شعبي',
-          'image': 'assets/images/categories/dish_syrian.png',
-        },
-        {
-          'title': 'حلويات',
-          'image': 'assets/images/products/Classic Roll.webp',
-        },
-        {
-          'title': 'البرجر',
-          'image': 'assets/images/products/Double Angus Smash Burger.webp',
-        },
-        {
-          'title': 'مشروبات',
-          'image': 'assets/images/products/Iced Spanish Latte.webp',
-        },
-        {
-          'title': 'مخبوزات',
-          'image': 'assets/images/products/Minibon 9-Pack Box.webp',
-        },
-      ];
-    }
-
-    // When the admin intentionally deactivates every category, do not leave
-    // an empty heading/list placeholder in the customer app.
-    if (widget.catalogScope == null &&
-        configured != null &&
-        categories.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final List<Map<String, String>> categories = _resolveSectionCategories();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1458,21 +1640,8 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   }
 
   void _openCuisinesBottomSheet() {
-    final List<String> cuisineList = widget.catalogScope != null
-        ? ['الكل', ..._scopeCategoryImages.keys]
-        : [
-            'الكل',
-            'شاورما',
-            'البرجر',
-            'بيتزا',
-            'حلويات',
-            'مخبوزات',
-            'فول و فلافل',
-            'مشاوي',
-            'مشروبات',
-            'سوري',
-            'كشري',
-          ];
+    final rawList = _resolveSectionCategories();
+    final List<String> cuisineList = ['الكل', ...rawList.map((c) => c['title']!)];
 
     showModalBottomSheet(
       context: context,
@@ -1818,6 +1987,78 @@ class _RestaurantsListPageState extends State<RestaurantsListPage>
   // ---------------------------------------------------------------------------
   List<_RestaurantListItem> get _allRestaurants {
     if (widget.catalogScope != null) {
+      if (_scopedMerchants != null && _scopedMerchants!.isNotEmpty) {
+        return _scopedMerchants!;
+      }
+      final scope = widget.catalogScope!;
+      if (locator.isRegistered<MarketsProvider>()) {
+        final marketsProv = locator<MarketsProvider>();
+        if (scope.kind == CatalogScopeKind.grocery) {
+          return _buildMarketMerchants(marketsProv.markets);
+        }
+        if (scope.kind == CatalogScopeKind.restaurants) {
+          return _buildProviderMerchants(marketsProv);
+        }
+        if (scope.kind == CatalogScopeKind.coffee) {
+          final cafes = marketsProv.restaurants.where((r) {
+            final q = '${r.name} ${r.cuisine} ${r.categoryTag}'.toLowerCase();
+            return q.contains('كافيه') ||
+                q.contains('قهوة') ||
+                q.contains('مشروبات') ||
+                q.contains('شاي') ||
+                q.contains('عصير') ||
+                q.contains('نوفرة') ||
+                q.contains('art') ||
+                q.contains('cafe');
+          }).toList();
+          return cafes
+              .map((r) => _RestaurantListItem(
+                    id: r.id,
+                    name: r.name,
+                    cuisine: r.cuisine,
+                    categoryTag: r.categoryTag,
+                    rating: r.rating,
+                    ratingCount: r.ratingCount,
+                    eta: r.eta,
+                    distance: r.distance,
+                    deliveryFee: r.deliveryFee,
+                    hasOffers: r.hasOffers,
+                    isFast: r.isFast,
+                    coverUrl: r.coverUrl,
+                    logoUrl: r.logoUrl,
+                    isProductMerchant: false,
+                  ))
+              .toList();
+        }
+        if (scope.kind == CatalogScopeKind.pharmacy) {
+          final pharmacies = marketsProv.markets
+              .where((m) => m.merchantKind == 3 || m.name.contains('صيدل'))
+              .toList();
+          if (pharmacies.isNotEmpty) {
+            return _buildMarketMerchants(pharmacies);
+          }
+        }
+      }
+      if (scope.kind == CatalogScopeKind.pharmacy) {
+        return [
+          const _RestaurantListItem(
+            id: 15,
+            name: 'صيدلية جيتك المركزية - JTAK Pharmacy',
+            cuisine: 'أدوية، فيتامينات ومستحضرات عناية طبية',
+            categoryTag: 'صيدلية',
+            rating: 4.9,
+            ratingCount: 320,
+            eta: '15-20 دقيقة',
+            distance: '1.5 كم',
+            deliveryFee: 'مجاني',
+            hasOffers: true,
+            isFast: true,
+            coverUrl: 'assets/images/categories/cat_grocery.webp',
+            logoUrl: 'assets/images/categories/cat_grocery.webp',
+            isProductMerchant: true,
+          ),
+        ];
+      }
       return _scopedMerchants ?? const [];
     }
 

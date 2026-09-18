@@ -40,6 +40,82 @@ final darkTheme = ThemeData(
     titleSpacing: 16,
   ),
 
+  ////////////////{ Dialog & BottomSheet Theme } ////////////////
+  dialogTheme: DialogThemeData(
+    backgroundColor: const Color(0xFF1E293B),
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+      side: const BorderSide(color: Color(0xFF334155), width: 1.1),
+    ),
+    titleTextStyle: const TextStyle(
+      color: Colors.white,
+      fontSize: 16.5,
+      fontWeight: FontWeight.w700,
+      fontFamily: 'IBMPlexSansArabic',
+    ),
+    contentTextStyle: const TextStyle(
+      color: Color(0xFFCBD5E1),
+      fontSize: 13.5,
+      fontFamily: 'IBMPlexSansArabic',
+    ),
+  ),
+
+  bottomSheetTheme: const BottomSheetThemeData(
+    backgroundColor: Color(0xFF1E293B),
+    modalBackgroundColor: Color(0xFF1E293B),
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+  ),
+
+  snackBarTheme: SnackBarThemeData(
+    backgroundColor: const Color(0xFF1E293B),
+    contentTextStyle: const TextStyle(
+      color: Colors.white,
+      fontFamily: 'IBMPlexSansArabic',
+      fontWeight: FontWeight.w600,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: Color(0xFF334155), width: 1),
+    ),
+    behavior: SnackBarBehavior.floating,
+  ),
+
+  popupMenuTheme: PopupMenuThemeData(
+    color: const Color(0xFF1E293B),
+    surfaceTintColor: Colors.transparent,
+    textStyle: const TextStyle(
+      color: Colors.white,
+      fontFamily: 'IBMPlexSansArabic',
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: Color(0xFF334155), width: 1),
+    ),
+  ),
+
+  dividerTheme: const DividerThemeData(
+    color: Color(0xFF334155),
+    thickness: 1,
+    space: 1,
+  ),
+
+  switchTheme: SwitchThemeData(
+    thumbColor: MaterialStateProperty.resolveWith((states) =>
+        states.contains(MaterialState.selected)
+            ? kPrimaryOrange
+            : const Color(0xFF94A3B8)),
+    trackColor: MaterialStateProperty.resolveWith((states) =>
+        states.contains(MaterialState.selected)
+            ? kPrimaryOrange.withOpacity(0.4)
+            : const Color(0xFF334155)),
+  ),
+
   ////////////////{ Buttons Theme } ////////////////
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
@@ -102,6 +178,8 @@ final darkTheme = ThemeData(
     filled: true,
     fillColor: const Color(0xFF1E293B),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+    labelStyle: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
       borderSide: const BorderSide(color: Color(0xFF334155), width: 1.1),

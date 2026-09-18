@@ -13,6 +13,7 @@ import 'catalog/item_customization_sheet.dart';
 import 'catalog/meal_card_widget.dart';
 import 'catalog/replace_cart_bottom_sheet.dart';
 import 'clean_shimmer_skeletons.dart';
+import '../pages/catalog/most_ordered_products_page.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Most Popular Dishes Section (الأكثر طلباً)
@@ -149,7 +150,16 @@ class JtakDeliveryOffersSection extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: onViewAllTap,
+                onTap: onViewAllTap ??
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const MostOrderedProductsPage(),
+                        ),
+                      );
+                    },
                 behavior: HitTestBehavior.opaque,
                 child: Directionality(
                   textDirection: TextDirection.ltr,
@@ -210,7 +220,7 @@ class JtakDeliveryOffersSection extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Text(
-                        'لا توجد وجبات متاحة حالياً',
+                        'لا توجد أصناف أكثر طلباً متاحة حالياً',
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,

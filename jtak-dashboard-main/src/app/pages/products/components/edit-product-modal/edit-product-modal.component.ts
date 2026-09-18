@@ -1,6 +1,6 @@
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable, forkJoin, of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
@@ -11,6 +11,8 @@ import { CategoriesService } from 'src/app/pages/categories/services/categories.
 import { FilesService } from 'src/app/modules/shared/services/files.service';
 import { InventoryBatchService } from 'src/app/pages/inventory-batches/services/inventory-batch.service';
 import { BatchMerchantLookup } from 'src/app/pages/inventory-batches/models/product-batch.model';
+import { MerchantsService } from 'src/app/pages/merchant/services/merchants.service';
+import { DeleteProductModalComponent } from '../delete-product-modal/delete-product-modal.component';
 
 export interface CategoryOption {
   id: number;
@@ -32,7 +34,9 @@ const EMPTY_Product: Product = {
   productCategoryId: 0,
   productCategory: '',
   merchantId: undefined,
-  price: 0,
+  price: null,
+  priceUsd: null,
+  discount: null,
 };
 
 @Component({
@@ -60,10 +64,12 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   constructor(
     private service: ProductsService,
     private categoriesService: CategoriesService,
+    private merchantsService: MerchantsService,
     private batchService: InventoryBatchService,
     public filesService: FilesService,
     private fb: FormBuilder,
     public modal: NgbActiveModal,
+    private modalService: NgbModal,
     private toasterService: ToastrService
   ) {}
 
@@ -92,6 +98,9 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       photos: [photoList],
       productCategoryId: [this.item.productCategoryId || null, [Validators.required]],
       merchantId: [this.item.merchantId || null],
+      price: [this.item.price ?? null],
+      priceUsd: [this.item.priceUsd ?? null],
+      discount: [this.item.discount ?? null],
     });
   }
 
@@ -99,15 +108,25 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     forkJoin({
       roots: this.categoriesService.getAll(true).pipe(catchError(() => of([]))),
       subs: this.categoriesService.getAll(false).pipe(catchError(() => of([]))),
-      merchants: this.batchService.lookupMerchants().pipe(catchError(() => of([]))),
+      merchants: this.merchantsService
+        .getAllMerchants()
+        .pipe(
+          catchError(() => this.batchService.lookupMerchants()),
+          catchError(() => of([]))
+        ),
     }).subscribe(({ roots, subs, merchants }) => {
       const rootMap = new Map<number, string>();
-      roots.forEach((r) => rootMap.set(r.id, r.title));
+      (roots || []).forEach((r) => {
+        if (r && r.id) rootMap.set(r.id, r.title);
+      });
 
+      const seenCatIds = new Set<number>();
       const allCats: CategoryOption[] = [];
 
-      // Add roots
-      roots.forEach((r) => {
+      // Add roots (Deduplicated by ID)
+      (roots || []).forEach((r) => {
+        if (!r || !r.id || seenCatIds.has(r.id)) return;
+        seenCatIds.add(r.id);
         const option: CategoryOption = {
           id: r.id,
           title: r.title,
@@ -119,24 +138,39 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
         allCats.push(option);
       });
 
-      // Add subcategories
-      subs.forEach((s) => {
+      // Add subcategories (Deduplicated by ID, preserving distinct same-name hierarchies)
+      (subs || []).forEach((s) => {
+        if (!s || !s.id || seenCatIds.has(s.id)) return;
+        seenCatIds.add(s.id);
         const parentTitle = s.parentId ? rootMap.get(s.parentId) : undefined;
         const fullPath = parentTitle ? `${parentTitle} > ${s.title}` : s.title;
         const option: CategoryOption = {
           id: s.id,
           title: s.title,
-          parentId: s.parentId,
+          parentId: s.parentId || null,
           parentTitle,
           fullPath,
-          isRoot: false,
+          isRoot: !parentTitle && (!s.parentId || s.parentId === 0),
         };
         this.categoryMap.set(s.id, option);
         allCats.push(option);
       });
 
       this.categoriesList = allCats.sort((a, b) => a.fullPath.localeCompare(b.fullPath));
-      this.merchantsList = merchants || [];
+
+      // Merchants
+      const mList: BatchMerchantLookup[] = [];
+      if (merchants && merchants.length > 0) {
+        merchants.forEach((m: any) => {
+          const id = m.id;
+          const title = m.title || m.name || m.fullName || `متجر #${id}`;
+          if (!mList.some((existing) => existing.id === id)) {
+            mList.push({ id, title });
+          }
+        });
+      }
+      this.merchantsList = mList;
+
       if (this.item?.merchantId && this.item?.merchantTitle) {
         if (!this.merchantsList.some((m) => m.id === this.item.merchantId)) {
           this.merchantsList.unshift({
@@ -250,6 +284,25 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
         })
       )
       .subscribe();
+  }
+
+  deleteCurrentProduct(): void {
+    if (!this.item?.id) return;
+    const modalRef = this.modalService.open(DeleteProductModalComponent, {
+      size: 'md',
+      centered: true,
+    });
+    modalRef.componentInstance.id = this.item.id;
+    modalRef.componentInstance.isBulk = false;
+    modalRef.result.then(
+      (result) => {
+        if (result) {
+          this.toasterService.success('تم حذف المنتج بنجاح وأرشفته بأمان');
+          this.modal.close({ deleted: true, id: this.item.id });
+        }
+      },
+      () => {}
+    );
   }
 
   private modalResult(product: Product): Product {

@@ -101,11 +101,44 @@ namespace App.ApiControllers.V1.Warehouse
                     PaymentMethod = x.PaymentMethod,
                     DeliveryId = x.DeliveryId,
                     DeliveryUser = x.DeliveryUser,
+                    DeliveryNotes = x.DeliveryNotes,
+                    DeliveryOtp = x.DeliveryOtp,
+                    DeliveredAt = x.DeliveredAt,
                     OrderDetails = x.OrderDetails.Where(d => mids.Contains(d.MerchantId)).Select(d => d.ToDto()).ToArray()
                 }, x =>
                 x.OrderDetails.Any(d => mids.Contains(d.MerchantId))
                 && x.OrderStatus == OrderStatus.Success
                 && x.PurchaseDate > threeDaysAgo, x => x.OrderDetails);
+
+            if (orders?.Items != null && orders.Items.Length > 0)
+            {
+                var deliveryIds = orders.Items
+                    .Where(x => x.DeliveryId.HasValue && x.DeliveryId.Value != Guid.Empty)
+                    .Select(x => x.DeliveryId.Value)
+                    .Distinct()
+                    .ToArray();
+
+                if (deliveryIds.Length > 0)
+                {
+                    var deliveryUsers = await _userManager.Users
+                        .Where(u => deliveryIds.Contains(u.Id))
+                        .Select(u => new { u.Id, u.PhoneNumber, u.FullName })
+                        .ToDictionaryAsync(u => u.Id);
+
+                    foreach (var ord in orders.Items)
+                    {
+                        if (ord.DeliveryId.HasValue && deliveryUsers.TryGetValue(ord.DeliveryId.Value, out var delUser))
+                        {
+                            ord.DeliveryUserPhone = delUser.PhoneNumber;
+                            if (string.IsNullOrWhiteSpace(ord.DeliveryUser))
+                            {
+                                ord.DeliveryUser = delUser.FullName;
+                            }
+                        }
+                    }
+                }
+            }
+
             return orders;
         }
 
@@ -217,6 +250,9 @@ namespace App.ApiControllers.V1.Warehouse
                 Address = order.Address,
                 DeliveryId = order.DeliveryId,
                 DeliveryUser = order.DeliveryUser,
+                DeliveryNotes = order.DeliveryNotes,
+                DeliveryOtp = order.DeliveryOtp,
+                DeliveredAt = order.DeliveredAt,
                 OrderDetails = order.OrderDetails.Where(d => mids.Contains(d.MerchantId))
                                     .Select(d => new OrderDetailDto
                                     {

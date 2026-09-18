@@ -52,11 +52,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   void _confirmCancelOrder(BuildContext context, OrderModel order) {
     final orderProv = Provider.of<OrderProvider>(context, listen: false);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -64,7 +66,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             const SizedBox(width: 8),
             Text(
               isArabic ? 'إلغاء مهمة التوصيل' : 'Cancel Delivery Task',
-              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700, fontSize: 16),
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: isDark ? Colors.white : kCharcoalDark,
+              ),
             ),
           ],
         ),
@@ -72,11 +78,20 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           isArabic
               ? 'هل أنت متأكد من رغبتك في إلغاء توصيل الطلب #${order.id}؟ سيتم إخطار الإدارة والتاجر وإلغاء المهمة.'
               : 'Are you sure you want to cancel delivery for order #${order.id}? Management and merchants will be notified.',
-          style: GoogleFonts.ibmPlexSansArabic(fontSize: 13.5, color: kCharcoalMuted),
+          style: GoogleFonts.ibmPlexSansArabic(
+            fontSize: 13.5,
+            color: isDark ? const Color(0xFFCBD5E1) : kCharcoalMuted,
+          ),
         ),
         actions: [
           TextButton(
-            child: Text(isArabic ? 'تراجع' : 'Back', style: GoogleFonts.ibmPlexSansArabic()),
+            child: Text(
+              isArabic ? 'تراجع' : 'Back',
+              style: GoogleFonts.ibmPlexSansArabic(
+                color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             onPressed: () => Navigator.pop(ctx),
           ),
           ElevatedButton(
@@ -290,7 +305,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: kSurfaceWarm,
+                    color: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -325,14 +340,14 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             decoration: BoxDecoration(
               color: _nextStepBackgroundColor(order, isDark),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _nextStepBorderColor(order)),
+              border: Border.all(color: _nextStepBorderColor(order, isDark)),
             ),
             child: Row(
               children: [
                 AppIcon(
                   _nextStepIcon(order),
                   size: 22,
-                  color: _nextStepTextColor(order),
+                  color: _nextStepTextColor(order, isDark),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -344,7 +359,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: _nextStepTextColor(order).withValues(alpha: 0.8),
+                          color: _nextStepTextColor(order, isDark).withValues(alpha: 0.8),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -353,7 +368,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          color: _nextStepTextColor(order),
+                          color: _nextStepTextColor(order, isDark),
                         ),
                       ),
                     ],
@@ -368,13 +383,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: kRed.withValues(alpha: 0.1),
+                color: isDark ? kDarkRedBg : kRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: kRed.withValues(alpha: 0.3)),
+                border: Border.all(
+                    color: isDark ? kDarkRedBorder : kRed.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  const AppIcon(PhosphorIcons.warningCircleBold, size: 16, color: kRed),
+                  AppIcon(PhosphorIcons.warningCircleBold,
+                      size: 16, color: isDark ? kDarkRedText : kRed),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -382,7 +399,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: kRed,
+                        color: isDark ? kDarkRedText : kRed,
                       ),
                     ),
                   ),
@@ -396,13 +413,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                const AppIcon(PhosphorIcons.clockBold, size: 13, color: kCharcoalMuted),
+                AppIcon(PhosphorIcons.clockBold,
+                    size: 13,
+                    color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted),
                 const SizedBox(width: 4),
                 Text(
                   timeFormatted,
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 11.5,
-                    color: kCharcoalMuted,
+                    color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -425,13 +444,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isCod
-            ? (isDark ? const Color(0xFF291A07) : const Color(0xFFFFFBEB))
-            : (isDark ? const Color(0xFF042F2E) : const Color(0xFFECFDF5)),
+            ? (isDark ? kDarkAmberBg : const Color(0xFFFFFBEB))
+            : (isDark ? kDarkGreenBg : const Color(0xFFECFDF5)),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCod
-              ? const Color(0xFFFDE68A)
-              : const Color(0xFFA7F3D0),
+              ? (isDark ? kDarkAmberBorder : const Color(0xFFFDE68A))
+              : (isDark ? kDarkGreenBorder : const Color(0xFFA7F3D0)),
           width: 1.2,
         ),
       ),
@@ -441,14 +460,18 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: isCod ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
+              color: isCod
+                  ? (isDark ? const Color(0xFF451A03) : const Color(0xFFFEF3C7))
+                  : (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
               child: AppIcon(
                 isCod ? PhosphorIcons.moneyBold : PhosphorIcons.creditCardBold,
                 size: 22,
-                color: isCod ? const Color(0xFFB45309) : const Color(0xFF047857),
+                color: isCod
+                    ? (isDark ? kDarkAmberText : const Color(0xFFB45309))
+                    : (isDark ? kDarkGreenText : const Color(0xFF047857)),
               ),
             ),
           ),
@@ -464,7 +487,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isCod ? const Color(0xFF92400E) : const Color(0xFF065F46),
+                    color: isCod
+                        ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
+                        : (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46)),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -475,7 +500,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: isCod ? 16 : 13,
                     fontWeight: FontWeight.w800,
-                    color: isCod ? const Color(0xFFB45309) : const Color(0xFF047857),
+                    color: isCod
+                        ? (isDark ? kDarkAmberText : const Color(0xFFB45309))
+                        : (isDark ? kDarkGreenText : const Color(0xFF047857)),
                   ),
                 ),
               ],
@@ -496,11 +523,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        border: Border.all(
+          color: isDark ? kDarkBlueBorder : const Color(0xFFBFDBFE),
+        ),
       ),
       child: Row(
         children: [
-          const AppIcon(PhosphorIcons.pathBold, size: 20, color: Color(0xFF2563EB)),
+          AppIcon(PhosphorIcons.pathBold,
+              size: 20,
+              color: isDark ? kDarkBlueText : const Color(0xFF2563EB)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -511,7 +542,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1E40AF),
+                    color: isDark
+                        ? kDarkBlueText
+                        : const Color(0xFF1E40AF),
                   ),
                 ),
                 Text(
@@ -521,7 +554,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1E3A8A),
+                    color: isDark ? Colors.white : const Color(0xFF1E3A8A),
                   ),
                 ),
               ],
@@ -556,18 +589,19 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: kGreenLight,
+            color: isDark ? kDarkGreenBg : kGreenLight,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const AppIcon(PhosphorIcons.checkCircleBold, color: kGreen, size: 20),
+              AppIcon(PhosphorIcons.checkCircleBold,
+                  color: isDark ? kDarkGreenText : kGreen, size: 20),
               const SizedBox(width: 8),
               Text(
                 isArabic ? 'تم تسليم هذا الطلب بنجاح ✓' : 'Order Delivered Successfully ✓',
                 style: GoogleFonts.ibmPlexSansArabic(
-                  color: kGreen,
+                  color: isDark ? kDarkGreenText : kGreen,
                   fontWeight: FontWeight.w800,
                   fontSize: 14.5,
                 ),
@@ -590,18 +624,19 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: kRedLight,
+            color: isDark ? kDarkRedBg : kRedLight,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const AppIcon(PhosphorIcons.xCircleBold, color: kRed, size: 20),
+              AppIcon(PhosphorIcons.xCircleBold,
+                  color: isDark ? kDarkRedText : kRed, size: 20),
               const SizedBox(width: 8),
               Text(
                 isArabic ? 'هذا الطلب ملغي' : 'Order is Canceled',
                 style: GoogleFonts.ibmPlexSansArabic(
-                  color: kRed,
+                  color: isDark ? kDarkRedText : kRed,
                   fontWeight: FontWeight.w800,
                   fontSize: 14.5,
                 ),
@@ -743,18 +778,20 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: kAmberLight,
+          color: isDark ? kDarkAmberBg : kAmberLight,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const AppIcon(PhosphorIcons.clockBold, color: Color(0xFFB45309), size: 18),
+            AppIcon(PhosphorIcons.clockBold,
+                color: isDark ? kDarkAmberText : const Color(0xFFB45309),
+                size: 18),
             const SizedBox(width: 8),
             Text(
               isArabic ? 'المتجر يقوم بتجهيز الطلب حالياً...' : 'Merchant is preparing order...',
               style: GoogleFonts.ibmPlexSansArabic(
-                color: const Color(0xFFB45309),
+                color: isDark ? kDarkAmberText : const Color(0xFFB45309),
                 fontWeight: FontWeight.w700,
                 fontSize: 13.5,
               ),
@@ -775,8 +812,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
     switch (status) {
       case OrderDetailsStatus.delivered:
-        bg = isDark ? const Color(0xFF064E3B) : kGreenLight;
-        fg = isDark ? const Color(0xFF34D399) : kGreen;
+        bg = isDark ? kDarkGreenBg : kGreenLight;
+        fg = isDark ? kDarkGreenText : kGreen;
         text = isArabic ? 'تم التسليم بنجاح ✓' : 'Delivered ✓';
         break;
       case OrderDetailsStatus.shipping:
@@ -785,20 +822,20 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         text = isArabic ? 'قيد التوصيل للعميل' : 'Out for Delivery';
         break;
       case OrderDetailsStatus.readyForPickup:
-        bg = isDark ? const Color(0xFF1E3A8A) : kBlueLight;
-        fg = isDark ? const Color(0xFF60A5FA) : kBlue;
+        bg = isDark ? kDarkBlueBg : kBlueLight;
+        fg = isDark ? kDarkBlueText : kBlue;
         text = isArabic ? 'جاهز للاستلام من المتجر' : 'Ready for Pickup';
         break;
       case OrderDetailsStatus.merchantAccepted:
-        bg = isDark ? const Color(0xFF78350F) : kAmberLight;
-        fg = isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+        bg = isDark ? kDarkAmberBg : kAmberLight;
+        fg = isDark ? kDarkAmberText : const Color(0xFFB45309);
         text = isArabic ? 'قيد التجهيز لدى المتجر' : 'Preparing';
         break;
       case OrderDetailsStatus.deliveryCanceled:
       case OrderDetailsStatus.customerCanceled:
       case OrderDetailsStatus.merchantRejected:
-        bg = isDark ? const Color(0xFF450A0A) : kRedLight;
-        fg = isDark ? const Color(0xFFF87171) : kRed;
+        bg = isDark ? kDarkRedBg : kRedLight;
+        fg = isDark ? kDarkRedText : kRed;
         text = isArabic ? 'ملغي' : 'Canceled';
         break;
       default:
@@ -826,27 +863,27 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
   Color _nextStepBackgroundColor(OrderModel o, bool isDark) {
-    if (o.isDelivered) return isDark ? const Color(0xFF064E3B) : kGreenLight;
-    if (o.isCanceled) return isDark ? const Color(0xFF450A0A) : kRedLight;
+    if (o.isDelivered) return isDark ? kDarkGreenBg : kGreenLight;
+    if (o.isCanceled) return isDark ? kDarkRedBg : kRedLight;
     if (o.canDeliverToCustomer) return isDark ? const Color(0xFF2A1C12) : const Color(0xFFFFF0E8);
     if (o.hasPendingPickups) return isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF);
-    return isDark ? const Color(0xFF291A07) : kAmberLight;
+    return isDark ? kDarkAmberBg : kAmberLight;
   }
 
-  Color _nextStepBorderColor(OrderModel o) {
-    if (o.isDelivered) return const Color(0xFFA7F3D0);
-    if (o.isCanceled) return const Color(0xFFFECACA);
-    if (o.canDeliverToCustomer) return const Color(0xFFFFD4C0);
-    if (o.hasPendingPickups) return const Color(0xFFBFDBFE);
-    return const Color(0xFFFDE68A);
+  Color _nextStepBorderColor(OrderModel o, bool isDark) {
+    if (o.isDelivered) return isDark ? kDarkGreenBorder : const Color(0xFFA7F3D0);
+    if (o.isCanceled) return isDark ? kDarkRedBorder : const Color(0xFFFECACA);
+    if (o.canDeliverToCustomer) return isDark ? const Color(0xFF7C2D12) : const Color(0xFFFFD4C0);
+    if (o.hasPendingPickups) return isDark ? kDarkBlueBorder : const Color(0xFFBFDBFE);
+    return isDark ? kDarkAmberBorder : const Color(0xFFFDE68A);
   }
 
-  Color _nextStepTextColor(OrderModel o) {
-    if (o.isDelivered) return const Color(0xFF047857);
-    if (o.isCanceled) return const Color(0xFFB91C1C);
+  Color _nextStepTextColor(OrderModel o, bool isDark) {
+    if (o.isDelivered) return isDark ? kDarkGreenText : const Color(0xFF047857);
+    if (o.isCanceled) return isDark ? kDarkRedText : const Color(0xFFB91C1C);
     if (o.canDeliverToCustomer) return kPrimaryOrange;
-    if (o.hasPendingPickups) return const Color(0xFF1E40AF);
-    return const Color(0xFFB45309);
+    if (o.hasPendingPickups) return isDark ? kDarkBlueText : const Color(0xFF1E40AF);
+    return isDark ? kDarkAmberText : const Color(0xFFB45309);
   }
 
   IconData _nextStepIcon(OrderModel o) {

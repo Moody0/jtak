@@ -148,13 +148,12 @@
 
     <div class="ops-finance-body">
       <!-- Visual Split Progress Bar -->
-      <!-- Visual Split Progress Bar -->
       <div class="ops-split-progress-container mb-4" *ngIf="data.totalOrdersValue > 0">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="fs-8 fw-bold text-muted">{{ 'DASHBOARD.SALES_SPLIT_LABEL' | translate }}</span>
           <div class="d-flex gap-3 fs-8 fw-bold">
-            <span class="text-primary"><i class="fas fa-circle fs-9 me-1"></i>{{ 'DASHBOARD.JTAK_SHARE' | translate }}: {{ getJTakSharePercent() }}%</span>
-            <span class="text-warning"><i class="fas fa-circle fs-9 me-1"></i>{{ 'DASHBOARD.MERCHANT_SHARE' | translate }}: {{ getMerchantSharePercent() }}%</span>
+            <span style="color: #2563eb;"><i class="fas fa-circle fs-9 me-1"></i>{{ 'DASHBOARD.JTAK_SHARE' | translate }}: {{ getJTakSharePercent() }}%</span>
+            <span style="color: #ea580c;"><i class="fas fa-circle fs-9 me-1"></i>{{ 'DASHBOARD.MERCHANT_SHARE' | translate }}: {{ getMerchantSharePercent() }}%</span>
           </div>
         </div>
         <div class="ops-split-progress-track">
@@ -195,7 +194,7 @@
             <strong class="ops-finance-sub-number text-dark">{{ data.merchantOrdersValue | number }}</strong>
             <small class="text-muted">{{ 'DASHBOARD.SYP' | translate }}</small>
           </div>
-          <span class="badge badge-light-warning text-warning fs-9 mt-1 py-1 px-2">{{ getMerchantSharePercent() }}% {{ 'DASHBOARD.OF_TOTAL' | translate }}</span>
+          <span class="badge fs-9 mt-1 py-1 px-2" style="color: #ea580c; background-color: #fff7ed; border: 1px solid #ffedd5;">{{ getMerchantSharePercent() }}% {{ 'DASHBOARD.OF_TOTAL' | translate }}</span>
         </div>
 
         <div class="ops-finance-col">
@@ -296,14 +295,14 @@
   </section>
 
 
-  <!-- 6. Bottom Balanced Grid: Merchant Balances & Top Demanded Products -->
+  <!-- 6. Bottom Balanced Grid: Merchant Balances, Driver Balances & Top Demanded Products -->
   <div class="ops-content-grid">
     <!-- Merchant Balances Card -->
     <section class="ops-card" aria-labelledby="balances-heading">
       <div class="ops-card-header">
         <div class="d-flex align-items-center gap-3">
           <div class="ops-header-icon ops-header-icon--blue">
-            <i class="fas fa-wallet" aria-hidden="true"></i>
+            <i class="fas fa-store" aria-hidden="true"></i>
           </div>
           <div>
             <span class="ops-section-kicker">{{ 'DASHBOARD.SETTLEMENTS' | translate }}</span>
@@ -314,6 +313,15 @@
           <span>{{ 'DASHBOARD.PAYMENTS' | translate }}</span>
           <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i>
         </a>
+      </div>
+      <!-- Search Form -->
+      <div class="ops-table-search-box" [formGroup]="searchGroup">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white border-end-0">
+            <i class="fas fa-search text-muted fs-8"></i>
+          </span>
+          <input type="text" class="form-control border-start-0" formControlName="searchTerm" [placeholder]="'DASHBOARD.SEARCH_MERCHANTS_PLACEHOLDER' | translate" />
+        </div>
       </div>
       <div class="ops-card-body p-0">
         <ng-container *ngIf="service.items$ | async as merchants">
@@ -331,8 +339,15 @@
                     <div class="ops-merchant">
                       <span class="ops-merchant-avatar">{{ merchant.name ? merchant.name.charAt(0) : 'M' }}</span>
                       <div>
-                        <strong class="d-block text-dark fs-7">{{ merchant.name }}</strong>
-                        <small class="text-muted fs-9">{{ 'DASHBOARD.MERCHANT_ACCOUNT' | translate }}</small>
+                        <div class="d-flex align-items-center gap-2">
+                          <strong class="text-dark fs-7">{{ merchant.name }}</strong>
+                          <span class="badge badge-light-secondary text-muted fs-9" *ngIf="merchant.entityId">#{{ merchant.entityId }}</span>
+                        </div>
+                        <div class="ops-entity-phone" *ngIf="merchant.phone">
+                          <i class="fas fa-phone-alt fs-9 text-muted"></i>
+                          <span>{{ merchant.phone }}</span>
+                        </div>
+                        <small class="text-muted fs-9" *ngIf="!merchant.phone">{{ 'DASHBOARD.MERCHANT_ACCOUNT' | translate }}</small>
                       </div>
                     </div>
                   </td>
@@ -345,7 +360,7 @@
                   <td colspan="2">
                     <div class="ops-empty-state py-4">
                       <div class="ops-empty-icon">
-                        <i class="fas fa-wallet"></i>
+                        <i class="fas fa-store"></i>
                       </div>
                       <strong>{{ 'DASHBOARD.NO_BALANCES_YET' | translate }}</strong>
                       <span>{{ 'DASHBOARD.NO_BALANCES_DESC' | translate }}</span>
@@ -361,8 +376,93 @@
       </div>
     </section>
 
+    <!-- Driver Balances Card -->
+    <section class="ops-card" aria-labelledby="driver-balances-heading">
+      <div class="ops-card-header">
+        <div class="d-flex align-items-center gap-3">
+          <div class="ops-header-icon ops-header-icon--blue">
+            <i class="fas fa-motorcycle" aria-hidden="true"></i>
+          </div>
+          <div>
+            <span class="ops-section-kicker">{{ 'DASHBOARD.LOGISTICS' | translate }}</span>
+            <h3 id="driver-balances-heading" class="ops-card-title">{{ 'DASHBOARD.DRIVER_BALANCES' | translate }}</h3>
+          </div>
+        </div>
+        <a routerLink="/users" class="ops-header-link">
+          <span>{{ 'DASHBOARD.DRIVERS' | translate }}</span>
+          <i class="fas fa-arrow-right rtl-flip ms-1" aria-hidden="true"></i>
+        </a>
+      </div>
+      <!-- Driver Search Form -->
+      <div class="ops-table-search-box" [formGroup]="driverSearchGroup">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white border-end-0">
+            <i class="fas fa-search text-muted fs-8"></i>
+          </span>
+          <input type="text" class="form-control border-start-0" formControlName="searchTerm" [placeholder]="'DASHBOARD.SEARCH_DRIVERS_PLACEHOLDER' | translate" />
+        </div>
+      </div>
+      <div class="ops-card-body p-0">
+        <ng-container *ngIf="driverBalancesService.items$ | async as drivers">
+          <div class="table-responsive">
+            <table class="table ops-table align-middle mb-0">
+              <thead>
+                <tr class="fw-bolder text-muted fs-8 bg-light">
+                  <th scope="col">{{ 'DASHBOARD.DRIVER' | translate }}</th>
+                  <th scope="col" class="text-end">{{ 'DASHBOARD.CUSTODY_BALANCE' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let driver of drivers">
+                  <td>
+                    <div class="ops-merchant">
+                      <span class="ops-merchant-avatar ops-driver-avatar">{{ driver.name ? driver.name.charAt(0) : 'D' }}</span>
+                      <div>
+                        <div class="d-flex align-items-center gap-2">
+                          <strong class="text-dark fs-7">{{ driver.name }}</strong>
+                        </div>
+                        <div class="ops-entity-phone" *ngIf="driver.phone">
+                          <i class="fas fa-phone-alt fs-9 text-muted"></i>
+                          <span>{{ driver.phone }}</span>
+                        </div>
+                        <small class="text-muted fs-9" *ngIf="!driver.phone">{{ 'DASHBOARD.DRIVER_ACCOUNT' | translate }}</small>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-end">
+                    <div>
+                      <strong class="ops-merchant-amount">{{ driver.amount | number }}</strong>
+                      <span class="ops-currency-badge ms-1">{{ 'DASHBOARD.SYP' | translate }}</span>
+                    </div>
+                    <div *ngIf="driver.wagesAmount" class="text-muted fs-9 mt-1">
+                      <span>{{ 'DASHBOARD.WAGES' | translate }}: </span>
+                      <strong class="text-dark">{{ driver.wagesAmount | number }}</strong>
+                      <span class="ms-1">{{ 'DASHBOARD.SYP' | translate }}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr *ngIf="!drivers.length">
+                  <td colspan="2">
+                    <div class="ops-empty-state py-4">
+                      <div class="ops-empty-icon">
+                        <i class="fas fa-motorcycle"></i>
+                      </div>
+                      <strong>{{ 'DASHBOARD.NO_DRIVER_BALANCES_YET' | translate }}</strong>
+                      <span>{{ 'DASHBOARD.NO_DRIVER_BALANCES_DESC' | translate }}</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+        <app-paginator class="ops-paginator px-4 py-3 d-flex justify-content-between align-items-center flex-wrap"
+          [paginator]="driverPaginator" [isLoading]="isDriverLoading" (paginate)="paginateDrivers($event)"></app-paginator>
+      </div>
+    </section>
+
     <!-- Top Products Card -->
-    <section class="ops-card" aria-labelledby="products-heading">
+    <section class="ops-card" aria-labelledby="products-heading" style="grid-column: 1 / -1;">
       <div class="ops-card-header">
         <div class="d-flex align-items-center gap-3">
           <div class="ops-header-icon ops-header-icon--green">

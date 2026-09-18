@@ -5,17 +5,18 @@ import '../../config/constants/constants.dart';
 import '../../config/themes/colors.dart';
 
 class AppBarWidget {
-  static PreferredSizeWidget getAppBar({Widget? leading, String? title}) {
+  static PreferredSizeWidget getAppBar({Widget? leading, String? title, BuildContext? context}) {
+    final isDark = context != null && Theme.of(context).brightness == Brightness.dark;
     return AppBar(
       elevation: 0,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       title: title != null
           ? Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: kCharcoalDark,
+                color: isDark ? Colors.white : kCharcoalDark,
               ),
             )
           : Image.asset(kLogo2, height: 28),
@@ -23,7 +24,7 @@ class AppBarWidget {
       leading: leading,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(color: kBorderColor, height: 1),
+        child: Container(color: isDark ? const Color(0xFF334155) : kBorderColor, height: 1),
       ),
     );
   }

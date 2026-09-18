@@ -26,6 +26,10 @@ export interface Order extends BaseModel {
     adminFlowMessage?: string;
     notes?: string;
     warning?: string;
+    deleteReason?: string;
+    deletedBy?: string;
+    deletionDate?: string;
+    isArchived?: boolean;
 }
 
 export interface ShippingStopProgress {

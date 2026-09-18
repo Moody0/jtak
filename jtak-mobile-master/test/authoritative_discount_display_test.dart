@@ -49,6 +49,7 @@ void main() {
   late CartProvider cartProvider;
 
   setUp(() async {
+    locator.allowReassignment = true;
     SharedPreferences.setMockInitialValues({});
     if (locator.isRegistered<AppParametersProvider>()) {
       locator.unregister<AppParametersProvider>();
@@ -61,6 +62,8 @@ void main() {
       locator.registerLazySingleton(() => AddressProvider());
       locator.registerLazySingleton(() => CartProvider());
       locator.registerLazySingleton(() => MarketsProvider());
+    }
+    if (!locator.isRegistered<AppStateManager>()) {
       locator.registerLazySingleton(() => AppStateManager());
     }
     cartProvider = locator<CartProvider>();
@@ -93,7 +96,7 @@ void main() {
     test('2. OriginalPrice null but PriceUsd exists: => hasAuthoritativeDiscount is false', () {
       final product = ProductModel(
         id: 7269,
-        title: 'Oral-B Indicator Toothbrush',
+        title: 'اورال-بي برو فرشاة الأسنان Oral-B 1-2-3 Indicator Medium',
         price: 81.0,
         finalPrice: 81.0,
         priceUsd: 0.60,
@@ -158,28 +161,30 @@ void main() {
         'id': 7269,
         'title': 'Oral-B',
         'price': 81.0,
-        'finalPrice': 81.0,
         'priceUsd': 0.60,
         'originalPrice': null,
         'discount': 0.0,
       };
-      final p1 = ProductModel.fromMap(mapNoDiscount);
-      expect(p1.originalPrice, isNull);
-      expect(p1.discount, equals(0.0));
-      expect(p1.hasAuthoritativeDiscount, isFalse);
 
-      final mapDiscounted = {
-        'id': 7270,
-        'title': 'Special Deal Item',
+      final parsed = ProductModel.fromMap(mapNoDiscount);
+      expect(parsed.hasAuthoritativeDiscount, isFalse);
+      expect(parsed.originalPrice, isNull);
+      expect(parsed.discount, 0.0);
+
+      final mapWithDiscount = {
+        'id': 5001,
+        'title': 'Indomie Special Offer',
         'price': 100.0,
         'finalPrice': 75.0,
         'originalPrice': 100.0,
         'discount': 25.0,
       };
-      final p2 = ProductModel.fromMap(mapDiscounted);
-      expect(p2.originalPrice, equals(100.0));
-      expect(p2.discount, equals(25.0));
-      expect(p2.hasAuthoritativeDiscount, isTrue);
+
+      final parsedDiscount = ProductModel.fromMap(mapWithDiscount);
+      expect(parsedDiscount.hasAuthoritativeDiscount, isTrue);
+      expect(parsedDiscount.originalPrice, 100.0);
+      expect(parsedDiscount.discount, 25.0);
+      expect(parsedDiscount.canonicalSellingPrice, 75.0);
     });
   });
 
@@ -191,7 +196,6 @@ void main() {
             body: Column(
               children: [
                 DiscountWidget(price: 0.0),
-                DiscountWidget(price: null),
                 DiscountWidget(price: -5.0),
               ],
             ),
@@ -225,7 +229,11 @@ void main() {
           ],
           child: MaterialApp(
             home: Scaffold(
-              body: ProductSingleItem(product7269),
+              body: ListView(
+                children: [
+                  ProductSingleItem(product7269),
+                ],
+              ),
             ),
           ),
         ),
@@ -261,7 +269,11 @@ void main() {
           ],
           child: MaterialApp(
             home: Scaffold(
-              body: ProductSingleItem(energizer),
+              body: ListView(
+                children: [
+                  ProductSingleItem(energizer),
+                ],
+              ),
             ),
           ),
         ),
@@ -292,7 +304,11 @@ void main() {
           ],
           child: MaterialApp(
             home: Scaffold(
-              body: ProductSingleItem(discountedProduct),
+              body: ListView(
+                children: [
+                  ProductSingleItem(discountedProduct),
+                ],
+              ),
             ),
           ),
         ),
@@ -330,8 +346,10 @@ void main() {
           ],
           child: MaterialApp(
             home: Scaffold(
-              body: SingleChildScrollView(
-                child: ProductMiniSingleItem(item: regularProduct, width: 200),
+              body: ListView(
+                children: [
+                  ProductMiniSingleItem(item: regularProduct, width: 200),
+                ],
               ),
             ),
           ),

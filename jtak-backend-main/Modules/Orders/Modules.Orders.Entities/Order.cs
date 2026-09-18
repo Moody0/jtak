@@ -8,7 +8,7 @@ using System.Linq;
 
 namespace Modules.Orders.Entities
 {
-    public class Order : AuditableEntity
+    public class Order : SoftDeleteEntity
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -44,7 +44,16 @@ namespace Modules.Orders.Entities
         public string ProofOfDeliveryPhotoUrl { get; set; }
         public string DeliveryNotes { get; set; }
 
+        [StringLength(500)]
+        public string DeleteReason { get; set; }
+
         public virtual ICollection<OrderDetail> OrderDetails { get; set; }
+    }
+
+    public class ArchiveOrderRequest
+    {
+        [Required(ErrorMessage = "سبب الأرشفة إلزامي.")]
+        public string Reason { get; set; }
     }
 
     public class DeliverOrderRequest
@@ -102,6 +111,9 @@ namespace Modules.Orders.Entities
         public string ProofOfDeliveryPhotoUrl { get; set; }
         public string DeliveryNotes { get; set; }
 
+        public bool IsDeliveryAssigned => DeliveryId.HasValue && DeliveryId.Value != Guid.Empty;
+        public bool IsDeliveryAccepted => IsDeliveryAssigned && OrderDetails != null && OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.ShippingStarted || d.OrderDetailStatus == OrderDetailStatus.Delivered);
+
         [Display(Name = "OrderDetails", ResourceType = typeof(_Order))]
         public OrderDetailDto[] OrderDetails { get; set; } = Array.Empty<OrderDetailDto>();
 
@@ -114,6 +126,11 @@ namespace Modules.Orders.Entities
 
         [Display(Name = "CreatedDate", ResourceType = typeof(_Entities))]
         public DateTime CreatedDate { get; set; }
+
+        public string DeleteReason { get; set; }
+        public string DeletedBy { get; set; }
+        public DateTime? DeletionDate { get; set; }
+        public bool IsArchived => DeletionDate.HasValue;
 
         public string Warning
         {

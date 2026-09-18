@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-//import * as moment from 'moment';
 import { Observable, BehaviorSubject, of, Subscription } from 'rxjs';
 import { map, finalize, tap, switchMap, catchError } from 'rxjs/operators';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
@@ -7,6 +6,8 @@ import { AuthModel } from '../models/auth.model';
 import { environment } from 'src/environments/environment';
 import { GRANT_TYPES } from '../enums/grant-types.enum';
 import { UserModel } from '..';
+
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root',
@@ -18,9 +19,9 @@ export class AuthService {
     }),
   };
 
-  private unsubscribe: Subscription[] = []; // Read more: => https://brianflove.com/2016/12/11/anguar-2-unsubscribe-observables/
-  private authLocalStorageKey = 'sol-auth';
-  private userLocalStorageKey = 'sol-user';
+  private unsubscribe: Subscription[] = [];
+  private readonly authSessionStorageKey = 'sol-session-auth';
+  private readonly userSessionStorageKey = 'sol-session-user';
 
   // public fields
   isLoading$: Observable<boolean>;
@@ -28,64 +29,91 @@ export class AuthService {
   user$: Observable<UserModel | undefined>;
   userSubject: BehaviorSubject<UserModel | undefined>;
 
-  constructor(private httpClient: HttpClient) {
+  constructor(
+    private httpClient: HttpClient,
+    private router: Router
+  ) {
+    this.cleanupLegacyPersistentAuth();
     this.isLoadingSubject = new BehaviorSubject<boolean>(false);
     this.isLoading$ = this.isLoadingSubject.asObservable();
-
-
     this.userSubject = new BehaviorSubject<UserModel | undefined>(undefined);
-    //const subscr = this.getUserByToken().subscribe((res) => {
-    //  if (res !== undefined) {
-    //    this.setUserFromLocalStorage(res);
-    //  }
-    //});
-    //this.unsubscribe.push(subscr);
     this.user$ = this.userSubject.asObservable();
-    /// Restore session:
     this.restoreSession();
   }
 
+  /**
+   * Safely removes legacy persistent localStorage Admin auth keys so old remembered logins
+   * cannot authenticate future sessions across browser closures.
+   * Does NOT touch unrelated preferences (e.g. language, theme, layout).
+   */
+  private cleanupLegacyPersistentAuth(): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const legacyAuthKeys = [
+          'sol-auth',
+          'sol-user',
+          'remember-me',
+          'auth_remember',
+          'rememberMe',
+          'sol-remember',
+          'admin-auth',
+          'admin-user',
+        ];
+        for (const key of legacyAuthKeys) {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {
+      console.warn('Unable to clean legacy localStorage auth keys', e);
+    }
+  }
+
   restoreSession() {
-    // if no valid auth, delete it!
-    let auth = this.getAuthFromLocalStorage();
+    const auth = this.getAuthFromSessionStorage();
+    if (!auth || !auth.access_token) {
+      return;
+    }
+
     let expiryDate = undefined;
     if (auth?.createDate !== undefined) {
-      expiryDate = new Date(auth?.createDate);
-      expiryDate?.setSeconds(expiryDate?.getSeconds() + auth.expires_in);
+      expiryDate = new Date(auth.createDate);
+      expiryDate.setSeconds(expiryDate.getSeconds() + (auth.expires_in || 0));
     }
+
     if (expiryDate !== undefined && expiryDate < new Date()) {
-      console.log('is expiered');
-      // If auth is expired, try getting refresh token
+      // If session auth token expired within the active session, try refreshing it
       this.getAuthByToken(GRANT_TYPES.REFRESH_TOKEN)
         .pipe(
-          map((auth: AuthModel) => {
-            console.log('get auth by refresh token');
-            auth.createDate = new Date();
-            const result = this.setAuthFromLocalStorage(auth);
-            return result;
+          map((refreshedAuth: AuthModel) => {
+            refreshedAuth.createDate = new Date();
+            this.setAuthToSessionStorage(refreshedAuth);
+            return refreshedAuth;
           }),
           switchMap(() => this.getUserByToken()),
           map((user) => {
-            if (user !== undefined)
-              this.setUserFromLocalStorage(user);
+            if (user !== undefined) {
+              this.setUserToSessionStorage(user);
+            }
             this.userSubject.next(user);
             return user;
           }),
           catchError((err) => {
-            console.error('err', err);
+            console.error('Session refresh error', err);
             this.logout();
             return of(undefined);
           }),
           finalize(() => this.isLoadingSubject.next(false))
         )
         .subscribe();
+      return;
     }
-    var user = this.getUserFromLocalStorage();
+
+    const user = this.getUserFromSessionStorage();
     if (user !== undefined) {
       this.userSubject.next(user);
     }
   }
-  // public methods
+
   login(
     type: GRANT_TYPES,
     email?: string,
@@ -96,17 +124,18 @@ export class AuthService {
       .pipe(
         map((auth: AuthModel) => {
           auth.createDate = new Date();
-          const result = this.setAuthFromLocalStorage(auth);
+          const result = this.setAuthToSessionStorage(auth);
           return result;
         }),
         switchMap(() => this.getUserByToken()),
         map((user) => {
-          if (user !== undefined)
-            this.setUserFromLocalStorage(user);
+          if (user !== undefined) {
+            this.setUserToSessionStorage(user);
+          }
           return user;
         }),
         catchError((err) => {
-          console.error('err', err);
+          console.error('Login error', err);
           return of(undefined);
         }),
         finalize(() => this.isLoadingSubject.next(false))
@@ -116,27 +145,30 @@ export class AuthService {
   getAuthByToken(
     type: GRANT_TYPES,
     username?: string,
-    password?: string): Observable<AuthModel> {
+    password?: string
+  ): Observable<AuthModel> {
     let params = new HttpParams();
     if (type === GRANT_TYPES.PASSWORD) {
-      params = params.set('username', username as string)
+      params = params
+        .set('username', username as string)
         .set('password', password as string)
         .set('grant_type', type)
         .set('scope', 'offline_access profile roles phone email');
     } else if (type === GRANT_TYPES.REFRESH_TOKEN) {
-      const authData = this.getAuthFromLocalStorage();
-      if (authData)
-        params = params.set('refresh_token', authData.refresh_token)
+      const authData = this.getAuthFromSessionStorage();
+      if (authData) {
+        params = params
+          .set('refresh_token', authData.refresh_token)
           .set('grant_type', type)
           .set('scope', 'offline_access');
+      }
     }
 
-    return this.httpClient
-      .post<AuthModel>(
-        environment.baseUrl + '/connect/token',
-        params.toString(),
-        this.httpOptions
-      )
+    return this.httpClient.post<AuthModel>(
+      environment.baseUrl + '/connect/token',
+      params.toString(),
+      this.httpOptions
+    );
   }
 
   forgotPassword(values: any): Observable<boolean> {
@@ -147,9 +179,17 @@ export class AuthService {
   }
 
   logout() {
-    localStorage.removeItem(this.authLocalStorageKey);
-    localStorage.removeItem(this.userLocalStorageKey);
-    document.location.replace('/auth/login');
+    this.cleanupLegacyPersistentAuth();
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.removeItem(this.authSessionStorageKey);
+        sessionStorage.removeItem(this.userSessionStorageKey);
+      }
+    } catch (e) {
+      console.warn('Error clearing sessionStorage', e);
+    }
+    this.userSubject.next(undefined);
+    this.router.navigate(['/auth/login']);
   }
 
   fetchUserData(): Observable<any> {
@@ -157,7 +197,7 @@ export class AuthService {
     return this.httpClient.get(environment.apiUrl + '/Authorization/Account').pipe(
       tap((res: any) => {
         this.userSubject.next(res.user);
-        localStorage.setItem(this.userLocalStorageKey, JSON.stringify(res.user));
+        this.setUserToSessionStorage(res.user);
       }),
       finalize(() => {
         this.isLoadingSubject.next(false);
@@ -165,22 +205,12 @@ export class AuthService {
     );
   }
 
-  //getClaims() {
-  //  const user = JSON.parse(localStorage.getItem(this.authLocalStorageKey));
-  //  return user && user.claims;
-  //}
-
-  //showBasedOnClaim(claim) {
-  //  const claims = this.getClaims();
-  //  return claims && claims.length > 0 && claims.includes(claim);
-  //}
-
   getToken(): string | undefined {
-    return this.getAuthFromLocalStorage()?.access_token;
+    return this.getAuthFromSessionStorage()?.access_token;
   }
 
   getUserByToken(): Observable<UserModel | undefined> {
-    const auth = this.getAuthFromLocalStorage();
+    const auth = this.getAuthFromSessionStorage();
     if (!auth || !auth.access_token) {
       return of(undefined);
     }
@@ -199,54 +229,81 @@ export class AuthService {
     );
   }
 
+  public getAuthFromSessionStorage(): AuthModel | undefined {
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) {
+        return undefined;
+      }
+      const ssValue = sessionStorage.getItem(this.authSessionStorageKey);
+      if (!ssValue) {
+        return undefined;
+      }
+      const authData = JSON.parse(ssValue);
+      return authData;
+    } catch (error) {
+      console.error(error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Compatibility alias pointing strictly to session-based storage.
+   */
   public getAuthFromLocalStorage(): AuthModel | undefined {
-    try {
-      const lsValue = localStorage.getItem(this.authLocalStorageKey);
-      if (!lsValue) {
-        return undefined;
-      }
-
-      const authData = JSON.parse(lsValue);
-      return authData;
-    } catch (error) {
-      console.error(error);
-      return undefined;
-    }
+    return this.getAuthFromSessionStorage();
   }
 
-  private setAuthFromLocalStorage(auth: AuthModel): boolean {
-    // store auth authToken/refreshToken/epiresIn in local storage to keep user logged in between page refreshes
+  private setAuthToSessionStorage(auth: AuthModel): boolean {
     if (auth && auth.access_token) {
-      localStorage.setItem(this.authLocalStorageKey, JSON.stringify(auth));
-      return true;
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          sessionStorage.setItem(this.authSessionStorageKey, JSON.stringify(auth));
+          return true;
+        }
+      } catch (e) {
+        console.error('Failed to write auth to sessionStorage', e);
+      }
     }
     return false;
   }
 
-  private getUserFromLocalStorage(): UserModel | undefined {
+  public getUserFromSessionStorage(): UserModel | undefined {
     try {
-      const lsValue = localStorage.getItem(this.userLocalStorageKey);
-      if (!lsValue) {
+      if (typeof window === 'undefined' || !window.sessionStorage) {
         return undefined;
       }
-
-      const authData = JSON.parse(lsValue);
-      return authData;
+      const ssValue = sessionStorage.getItem(this.userSessionStorageKey);
+      if (!ssValue) {
+        return undefined;
+      }
+      const userData = JSON.parse(ssValue);
+      return userData;
     } catch (error) {
       console.error(error);
       return undefined;
     }
   }
 
-  private setUserFromLocalStorage(user: UserModel): boolean {
-    // store auth authToken/refreshToken/epiresIn in local storage to keep user logged in between page refreshes
+  /**
+   * Compatibility alias pointing strictly to session-based user storage.
+   */
+  public getUserFromLocalStorage(): UserModel | undefined {
+    return this.getUserFromSessionStorage();
+  }
+
+  private setUserToSessionStorage(user: UserModel): boolean {
     if (user && user.id) {
-      localStorage.setItem(this.userLocalStorageKey, JSON.stringify(user));
-      return true;
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          sessionStorage.setItem(this.userSessionStorageKey, JSON.stringify(user));
+          return true;
+        }
+      } catch (e) {
+        console.error('Failed to write user to sessionStorage', e);
+      }
     }
     return false;
   }
-
 
   ngOnDestroy() {
     this.unsubscribe.forEach((sb) => sb.unsubscribe());

@@ -89,6 +89,8 @@ namespace Modules.Catalog.Entities
         public decimal Discount { get; set; }
         public decimal? PriceUsd { get; set; }
         public int? MerchantId { get; set; }
+        public string Merchant { get; set; }
+        public string MerchantTitle { get; set; }
         public Currency Currency { get; set; }
         public string CurrencyString => Currency.ToLocalizedName();
         public bool Active { get; set; } = true;

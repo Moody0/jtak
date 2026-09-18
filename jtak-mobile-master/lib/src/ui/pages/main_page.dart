@@ -14,63 +14,77 @@ import 'package:provider/provider.dart';
 import '../../../main_imports.dart';
 
 class MainPage extends StatefulWidget {
-  const MainPage({Key? key}) : super(key: key);
+  const MainPage({super.key});
   static const String routeName = '/MainPage';
   @override
-  _MainPageState createState() => _MainPageState();
+  State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   late HomeNavigationProvider homeNavigationProvider;
 
   @override
   void initState() {
     log('^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MainPage : initState ');
-
+    WidgetsBinding.instance.addObserver(this);
     initialize();
     checkingList();
-    _checkAppLifecycleState();
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      Provider.of<InitialDataProvider>(context, listen: false).getInitData(context);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     homeNavigationProvider = Provider.of<HomeNavigationProvider>(context);
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: context.appTheme.primaryColor,
-      statusBarIconBrightness: Brightness.light,
-    ));
-    return WillPopScope(
-      onWillPop: homeNavigationProvider.onWillPop,
-      child: Scaffold(
-        backgroundColor: kPageBackground,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 240),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: child,
-                );
-              },
-              child: KeyedSubtree(
-                key: ValueKey(homeNavigationProvider.currentIndex),
-                child: homeNavigationProvider.getMainWidget(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: context.appTheme.primaryColor,
+        statusBarIconBrightness: Brightness.light,
+      ),
+      child: WillPopScope(
+        onWillPop: homeNavigationProvider.onWillPop,
+        child: Scaffold(
+          backgroundColor: kPageBackground,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 240),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  );
+                },
+                child: KeyedSubtree(
+                  key: ValueKey(homeNavigationProvider.currentIndex),
+                  child: homeNavigationProvider.getMainWidget(),
+                ),
               ),
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: BottomNavigation(
-                onChange: (index) => homeNavigationProvider.changePage(index),
-              ),
-            )
-          ],
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: BottomNavigation(
+                  onChange: (index) => homeNavigationProvider.changePage(index),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
@@ -84,21 +98,14 @@ class _MainPageState extends State<MainPage> {
 
   void checkingList() {
     Future.microtask(() {
+      if (!mounted) return;
       AddressProvider addressProvider = Provider.of<AddressProvider>(context, listen: false);
       if (GlobalVar.checkString(addressProvider.globalMessage)) {
-        context.showSnakBar(addressProvider.globalMessage);
+        if (mounted) {
+          context.showSnakBar(addressProvider.globalMessage);
+        }
         addressProvider.globalMessage = null;
       }
-    });
-  }
-
-  void _checkAppLifecycleState() {
-    SystemChannels.lifecycle.setMessageHandler((msg) {
-      debugPrint('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^SystemChannels> $msg');
-      if (msg == AppLifecycleState.resumed.toString()) {
-        Provider.of<InitialDataProvider>(context, listen: false).getInitData(context);
-      }
-      return Future.value(msg);
     });
   }
 }

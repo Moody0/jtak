@@ -103,4 +103,12 @@ class MerchantStateProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Reset transient state on account switch or logout
+  void reset() {
+    _currentIndex = 0;
+    _pendingOrdersCount = 0;
+    _isStoreOpen = true;
+    notifyListeners();
+  }
 }

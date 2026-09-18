@@ -57,7 +57,7 @@ export class SignalrTrackingService implements OnDestroy {
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(hubUrl, {
         accessTokenFactory: () => {
-          const auth = this.authService.getAuthFromLocalStorage();
+          const auth = this.authService.getAuthFromSessionStorage() || this.authService.getAuthFromLocalStorage();
           return auth?.access_token || '';
         },
         skipNegotiation: false,

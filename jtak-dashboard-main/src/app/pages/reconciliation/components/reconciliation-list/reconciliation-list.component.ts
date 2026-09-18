@@ -1,5 +1,7 @@
-import { Component, OnInit, ChangeDetectorRef, ViewChild, TemplateRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, TemplateRef } from '@angular/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { SubSink } from 'subsink';
+import { interval } from 'rxjs';
 import {
   CaptainSettlementSummary,
   CaptainShiftDetails,
@@ -9,6 +11,19 @@ import {
   SettlementRequestItem,
   SettlementRequestStatus,
   SettlementPartyType,
+  MerchantReconciliationSummary,
+  MerchantReconciliationItem,
+  MerchantReconciliationDataTableRequest,
+  MerchantReconciliationDataTableResult,
+  MerchantStatement,
+  MerchantStatementTransaction,
+  MerchantSettlementHistoryItem,
+  SettlementHistoryItem,
+  SettlementHistorySummary,
+  SettlementHistoryDataTableRequest,
+  SettlementHistoryDataTableResult,
+  SettlementReceipt,
+  SettlementHistoryPartyFilter,
 } from '../../models/reconciliation.model';
 import { ReconciliationService } from '../../services/reconciliation.service';
 import { NotificationSummaryService } from 'src/app/_metronic/layout/core/notification-summary.service';
@@ -18,8 +33,33 @@ import { NotificationSummaryService } from 'src/app/_metronic/layout/core/notifi
   templateUrl: './reconciliation-list.component.html',
   styleUrls: ['./reconciliation-list.component.scss'],
 })
-export class ReconciliationListComponent implements OnInit {
+export class ReconciliationListComponent implements OnInit, OnDestroy {
+  private subs = new SubSink();
+  private isPollingRequests = false;
+  private isPollingCaptains = false;
+  private isPollingHistory = false;
+  private isPollingMerchants = false;
+
   activeTab: 'merchants' | 'couriers' | 'history' = 'merchants';
+
+  // Merchant Reconciliation State
+  merchantSummary: MerchantReconciliationSummary | null = null;
+  merchantsList: MerchantReconciliationItem[] = [];
+  merchantTotalRecords: number = 0;
+  merchantPageNumber: number = 1;
+  merchantPageSize: number = 10;
+  merchantSearchTerm: string = '';
+  isLoadingMerchants: boolean = false;
+  isLoadingMerchantSummary: boolean = false;
+
+  // Merchant Statement Modal State
+  selectedMerchantForStatement: MerchantReconciliationItem | null = null;
+  merchantStatementData: MerchantStatement | null = null;
+  isLoadingMerchantStatement: boolean = false;
+  statementSearchTerm: string = '';
+  statementActiveTab: 'statement' | 'settlements' = 'statement';
+
+  // Captain Reconciliation State
   captains: CaptainSettlementSummary[] = [];
   filteredCaptains: CaptainSettlementSummary[] = [];
   history: DailySettlementBatch[] = [];
@@ -28,6 +68,24 @@ export class ReconciliationListComponent implements OnInit {
   processingRequestId: string | null = null;
   readonly requestStatus = SettlementRequestStatus;
   readonly partyType = SettlementPartyType;
+
+  // Settlement Payment History State
+  historyItems: SettlementHistoryItem[] = [];
+  historySummary: SettlementHistorySummary | null = null;
+  historyTotalRecords: number = 0;
+  historyPage: number = 1;
+  historyPageSize: number = 10;
+  historySearchTerm: string = '';
+  historyPartyFilter: SettlementHistoryPartyFilter = SettlementHistoryPartyFilter.All;
+  historyFromDate: string = '';
+  historyToDate: string = '';
+  isLoadingHistory: boolean = false;
+  selectedReceipt: SettlementReceipt | null = null;
+  isLoadingReceipt: boolean = false;
+  isPrintingHistory: boolean = false;
+  historyPrintItems: SettlementHistoryItem[] = [];
+  readonly historyPartyFilterEnum = SettlementHistoryPartyFilter;
+  now: Date = new Date();
 
   get merchantRequests(): SettlementRequestItem[] {
     return this.settlementRequests.filter(r => r.partyType === SettlementPartyType.Merchant);
@@ -69,9 +127,221 @@ export class ReconciliationListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.loadMerchantSummary();
+    this.loadMerchants();
     this.loadCaptains();
     this.loadHistory();
     this.loadSettlementRequests();
+    this.startAutoRefresh();
+  }
+
+  startAutoRefresh(): void {
+    this.subs.sink = interval(5000).subscribe(() => {
+      // Avoid interrupting the user if a modal is open or an action is currently processing
+      if (this.modalService.hasOpenModals() || this.processingRequestId || this.isSettling) {
+        return;
+      }
+      this.pollSettlementRequests();
+      if (this.activeTab === 'merchants') {
+        this.pollMerchants();
+      } else if (this.activeTab === 'couriers') {
+        this.pollCaptains();
+      } else if (this.activeTab === 'history') {
+        this.pollHistory();
+      }
+      this.notificationSummaryService.refresh();
+    });
+  }
+
+  loadMerchantSummary(): void {
+    this.isLoadingMerchantSummary = true;
+    this.reconciliationService.getMerchantSummary().subscribe({
+      next: (summary) => {
+        this.merchantSummary = summary;
+        this.isLoadingMerchantSummary = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load merchant reconciliation summary', err);
+        this.isLoadingMerchantSummary = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  loadMerchants(): void {
+    this.isLoadingMerchants = true;
+    const req: MerchantReconciliationDataTableRequest = {
+      pageNumber: this.merchantPageNumber,
+      pageSize: this.merchantPageSize,
+      search: this.merchantSearchTerm,
+    };
+    this.reconciliationService.getMerchantReconciliationDataTable(req).subscribe({
+      next: (res) => {
+        this.merchantsList = res.items || [];
+        this.merchantTotalRecords = res.totalRecords || 0;
+        this.isLoadingMerchants = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load merchants list', err);
+        this.isLoadingMerchants = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  pollMerchants(): void {
+    if (this.isPollingMerchants) return;
+    this.isPollingMerchants = true;
+    this.reconciliationService.getMerchantSummary().subscribe({
+      next: (s) => {
+        this.merchantSummary = s;
+        const req: MerchantReconciliationDataTableRequest = {
+          pageNumber: this.merchantPageNumber,
+          pageSize: this.merchantPageSize,
+          search: this.merchantSearchTerm,
+        };
+        this.reconciliationService.getMerchantReconciliationDataTable(req).subscribe({
+          next: (res) => {
+            this.merchantsList = res.items || [];
+            this.merchantTotalRecords = res.totalRecords || 0;
+            this.isPollingMerchants = false;
+            this.cdr.detectChanges();
+          },
+          error: () => {
+            this.isPollingMerchants = false;
+          },
+        });
+      },
+      error: () => {
+        this.isPollingMerchants = false;
+      },
+    });
+  }
+
+  onMerchantSearch(): void {
+    this.merchantPageNumber = 1;
+    this.loadMerchants();
+  }
+
+  onMerchantPageChange(page: number): void {
+    if (page < 1 || page > this.totalMerchantPages) return;
+    this.merchantPageNumber = page;
+    this.loadMerchants();
+  }
+
+  get totalMerchantPages(): number {
+    return Math.ceil(this.merchantTotalRecords / this.merchantPageSize) || 1;
+  }
+
+  get merchantPagesArray(): number[] {
+    const total = this.totalMerchantPages;
+    const current = this.merchantPageNumber;
+    const delta = 2;
+    const range: number[] = [];
+    for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) {
+      range.push(i);
+    }
+    return range;
+  }
+
+  openMerchantStatement(content: TemplateRef<any>, merchant: MerchantReconciliationItem): void {
+    this.selectedMerchantForStatement = merchant;
+    this.statementSearchTerm = '';
+    this.statementActiveTab = 'statement';
+    this.merchantStatementData = null;
+    this.isLoadingMerchantStatement = true;
+
+    this.modalService.open(content, { size: 'xl', centered: true, scrollable: true });
+
+    this.loadMerchantStatementData(merchant.merchantId);
+  }
+
+  loadMerchantStatementData(merchantId: number, search?: string): void {
+    this.isLoadingMerchantStatement = true;
+    this.reconciliationService.getMerchantStatement(merchantId, search).subscribe({
+      next: (stmt) => {
+        this.merchantStatementData = stmt;
+        this.isLoadingMerchantStatement = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load merchant statement', err);
+        this.isLoadingMerchantStatement = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  onStatementSearch(): void {
+    if (!this.selectedMerchantForStatement) return;
+    this.loadMerchantStatementData(this.selectedMerchantForStatement.merchantId, this.statementSearchTerm);
+  }
+
+  clearStatementSearch(): void {
+    this.statementSearchTerm = '';
+    if (this.selectedMerchantForStatement) {
+      this.loadMerchantStatementData(this.selectedMerchantForStatement.merchantId);
+    }
+  }
+
+  pollSettlementRequests(): void {
+    if (this.isPollingRequests) return;
+    this.isPollingRequests = true;
+    this.reconciliationService.getSettlementRequests().subscribe({
+      next: (items) => {
+        this.settlementRequests = items || [];
+        this.isPollingRequests = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.isPollingRequests = false;
+      },
+    });
+  }
+
+  pollCaptains(): void {
+    if (this.isPollingCaptains) return;
+    this.isPollingCaptains = true;
+    this.reconciliationService.getCaptains().subscribe({
+      next: (data) => {
+        this.captains = data || [];
+        this.applyFilter();
+        this.isPollingCaptains = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.isPollingCaptains = false;
+      },
+    });
+  }
+
+  pollHistory(): void {
+    if (this.isPollingHistory) return;
+    this.isPollingHistory = true;
+    const req: SettlementHistoryDataTableRequest = {
+      page: this.historyPage,
+      pageSize: this.historyPageSize,
+      searchTerm: this.historySearchTerm,
+      partyFilter: this.historyPartyFilter,
+      fromDate: this.historyFromDate || undefined,
+      toDate: this.historyToDate || undefined,
+      sortColumn: 'CompletedAt',
+      sortDirection: 'DESC',
+    };
+    this.reconciliationService.getSettlementHistoryDataTable(req).subscribe({
+      next: (res) => {
+        this.historyItems = res.items || [];
+        this.historyTotalRecords = res.totalRecords || 0;
+        this.historySummary = res.summary || null;
+        this.isPollingHistory = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.isPollingHistory = false;
+      },
+    });
   }
 
   loadSettlementRequests(): void {
@@ -133,6 +403,8 @@ export class ReconciliationListComponent implements OnInit {
   private finishRequestAction(): void {
     this.processingRequestId = null;
     this.loadSettlementRequests();
+    this.loadMerchantSummary();
+    this.loadMerchants();
     this.loadCaptains();
     this.loadHistory();
     this.notificationSummaryService.refresh();
@@ -140,7 +412,17 @@ export class ReconciliationListComponent implements OnInit {
 
   private failRequestAction(err: any): void {
     this.processingRequestId = null;
-    window.alert(err?.error?.message || err?.error?.title || err?.message || 'تعذر تنفيذ العملية');
+    let msg = 'تعذر تنفيذ العملية';
+    if (typeof err?.error === 'string') {
+      msg = err.error;
+    } else if (err?.error?.message) {
+      msg = err.error.message;
+    } else if (err?.error?.title) {
+      msg = err.error.title;
+    } else if (err?.message && !err.message.includes('Http failure')) {
+      msg = err.message;
+    }
+    window.alert(msg);
     this.cdr.detectChanges();
   }
 
@@ -162,14 +444,130 @@ export class ReconciliationListComponent implements OnInit {
   }
 
   loadHistory(): void {
-    this.reconciliationService.getHistory(50).subscribe({
-      next: (data) => {
-        this.history = data || [];
+    this.isLoadingHistory = true;
+    const req: SettlementHistoryDataTableRequest = {
+      page: this.historyPage,
+      pageSize: this.historyPageSize,
+      searchTerm: this.historySearchTerm,
+      partyFilter: this.historyPartyFilter,
+      fromDate: this.historyFromDate || undefined,
+      toDate: this.historyToDate || undefined,
+      sortColumn: 'CompletedAt',
+      sortDirection: 'DESC',
+    };
+    this.reconciliationService.getSettlementHistoryDataTable(req).subscribe({
+      next: (res) => {
+        this.historyItems = res.items || [];
+        this.historyTotalRecords = res.totalRecords || 0;
+        this.historySummary = res.summary || null;
+        this.isLoadingHistory = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to load settlement history', err);
+        this.isLoadingHistory = false;
+        this.cdr.detectChanges();
       },
+    });
+  }
+
+  onHistoryPartyFilterChange(filter: SettlementHistoryPartyFilter): void {
+    this.historyPartyFilter = filter;
+    this.historyPage = 1;
+    this.loadHistory();
+  }
+
+  onHistoryDateChange(): void {
+    this.historyPage = 1;
+    this.loadHistory();
+  }
+
+  onHistorySearch(): void {
+    this.historyPage = 1;
+    this.loadHistory();
+  }
+
+  clearHistorySearch(): void {
+    this.historySearchTerm = '';
+    this.historyPage = 1;
+    this.loadHistory();
+  }
+
+  clearHistoryFilters(): void {
+    this.historyPartyFilter = SettlementHistoryPartyFilter.All;
+    this.historyFromDate = '';
+    this.historyToDate = '';
+    this.historySearchTerm = '';
+    this.historyPage = 1;
+    this.loadHistory();
+  }
+
+  hasActiveHistoryFilters(): boolean {
+    return this.historyPartyFilter !== SettlementHistoryPartyFilter.All ||
+      !!this.historyFromDate ||
+      !!this.historyToDate ||
+      !!this.historySearchTerm.trim();
+  }
+
+  onHistoryPageChange(page: number): void {
+    this.historyPage = page;
+    this.loadHistory();
+  }
+
+  get historyTotalPages(): number {
+    return Math.ceil(this.historyTotalRecords / this.historyPageSize) || 1;
+  }
+
+  openReceiptModal(content: TemplateRef<any>, item: SettlementHistoryItem): void {
+    this.selectedReceipt = null;
+    this.isLoadingReceipt = true;
+    this.modalService.open(content, { size: 'lg', centered: true, scrollable: true });
+
+    this.reconciliationService.getSettlementReceipt(item.id).subscribe({
+      next: (receipt) => {
+        this.selectedReceipt = receipt;
+        this.isLoadingReceipt = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load settlement receipt', err);
+        this.isLoadingReceipt = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  printReceipt(): void {
+    window.print();
+  }
+
+  printActiveHistory(): void {
+    this.isPrintingHistory = true;
+    const req: SettlementHistoryDataTableRequest = {
+      page: 1,
+      pageSize: 1000,
+      searchTerm: this.historySearchTerm,
+      partyFilter: this.historyPartyFilter,
+      fromDate: this.historyFromDate || undefined,
+      toDate: this.historyToDate || undefined,
+      sortColumn: 'CompletedAt',
+      sortDirection: 'DESC',
+    };
+
+    this.reconciliationService.getSettlementHistoryPrintData(req).subscribe({
+      next: (items) => {
+        this.historyPrintItems = items || [];
+        this.isPrintingHistory = false;
+        this.cdr.detectChanges();
+        setTimeout(() => {
+          window.print();
+        }, 100);
+      },
+      error: (err) => {
+        console.error('Failed to load print dataset', err);
+        this.isPrintingHistory = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -304,7 +702,7 @@ export class ReconciliationListComponent implements OnInit {
   }
 
   getInitials(name?: string): string {
-    if (!name || !name.trim()) return 'C';
+    if (!name || !name.trim()) return 'M';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
@@ -318,5 +716,13 @@ export class ReconciliationListComponent implements OnInit {
 
   printVoucher(batch: any): void {
     window.print();
+  }
+
+  printMerchantStatement(): void {
+    window.print();
+  }
+
+  ngOnDestroy(): void {
+    this.subs.unsubscribe();
   }
 }

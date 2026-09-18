@@ -72,6 +72,7 @@ class CodeInputWidgetState extends State<CodeInputWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     List<Widget> inputList = [];
     for (var i = 0; i < widget.codeLength; i++) {
       final isFocused = focusNodeList[i].hasFocus;
@@ -83,14 +84,16 @@ class CodeInputWidgetState extends State<CodeInputWidget> {
             margin: const EdgeInsets.symmetric(horizontal: 4),
             height: 54,
             decoration: BoxDecoration(
-              color: isFocused ? Colors.white : kGreyBackground,
+              color: isFocused
+                  ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                  : (isDark ? const Color(0xFF0F172A) : kGreyBackground),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isFocused
                     ? kPrimaryOrange
                     : hasValue
                         ? kPrimaryOrange.withOpacity(0.5)
-                        : kCardBorderColor,
+                        : (isDark ? const Color(0xFF334155) : kCardBorderColor),
                 width: isFocused ? 1.8 : 1.1,
               ),
             ),
@@ -111,10 +114,10 @@ class CodeInputWidgetState extends State<CodeInputWidget> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   maxLength: 1,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
-                    color: kCharcoalDark,
+                    color: isDark ? Colors.white : kCharcoalDark,
                   ),
                   showCursor: false,
                   decoration: const InputDecoration(

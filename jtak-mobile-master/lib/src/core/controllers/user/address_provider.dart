@@ -21,6 +21,7 @@ class AddressProvider extends BaseProvider<AddressModel> {
   int stage = 0; // 0 for choose location; 1 for enter title and fullAddress
 
   String? globalMessage;
+  String? lastDeleteError;
   String? locationAddressName;
   bool isGeocodingLocation = false;
   Timer? _geocodeDebounce;
@@ -67,13 +68,40 @@ class AddressProvider extends BaseProvider<AddressModel> {
     );
   }
 
-  Future delete(int id) async {
-    await loadBaseData(
-      loadBody: () async {
-        await _api.deleteRequest('/Address/$id');
-        await loadData();
-      },
-    );
+  Future<bool> delete(int id) async {
+    final originalIndex = dataList.indexWhere((element) => element.id == id);
+    if (originalIndex == -1) {
+      lastDeleteError = 'العنوان غير موجود';
+      return false;
+    }
+
+    final removedItem = dataList[originalIndex];
+    dataList.removeAt(originalIndex);
+    lastDeleteError = null;
+    notifyListeners();
+
+    try {
+      await loadBaseData(
+        loadBody: () async {
+          await _api.deleteRequest('/Address/$id');
+          await loadData();
+        },
+      );
+      lastDeleteError = null;
+      return true;
+    } catch (e) {
+      debugPrint('AddressProvider delete failed for id $id, rolling back: $e');
+      // Rollback: restore address at exact original index
+      if (originalIndex <= dataList.length) {
+        dataList.insert(originalIndex, removedItem);
+      } else {
+        dataList.add(removedItem);
+      }
+      lastDeleteError = 'تعذر حذف العنوان، يرجى المحاولة لاحقاً';
+      globalMessage = lastDeleteError;
+      notifyListeners();
+      return false;
+    }
   }
 
   void mapAnimateToPosision(LatLng latLng) async {

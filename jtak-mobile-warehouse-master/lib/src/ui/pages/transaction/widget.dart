@@ -14,6 +14,7 @@ import 'package:app_jtak_warehouse/src/utils/custom_widgets/messages.dart';
 import 'package:app_jtak_warehouse/src/utils/providers/sol_api.dart';
 import 'package:app_jtak_warehouse/src/utils/utilities/global_var.dart';
 import 'package:app_jtak_warehouse/src/utils/utilities/lunch_url.dart';
+import 'package:app_jtak_warehouse/src/utils/utilities/phone_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -60,7 +61,43 @@ class PaymentSingleItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isReceived = item.handoverDate != null;
+    final isReceived = item.isReceived;
+    final title = item.requestNumber != null
+        ? 'طلب تسوية ${item.requestNumber}'
+        : (item.id != null ? 'دفعة تسوية #${item.id}' : 'دفعة تسوية');
+    final dateString = item.completedAt ?? item.handoverDate ?? item.reviewedAt ?? item.createdDate;
+
+    String statusLabel;
+    Color statusBg;
+    Color statusBorder;
+    Color statusText;
+    Color statusDot;
+
+    if (isReceived) {
+      statusLabel = 'تم الاستلام';
+      statusBg = const Color(0xFFDCFCE7);
+      statusBorder = const Color(0xFF86EFAC);
+      statusText = const Color(0xFF15803D);
+      statusDot = const Color(0xFF16A34A);
+    } else if (item.status == 0) {
+      statusLabel = 'قيد المراجعة';
+      statusBg = const Color(0xFFFEF3C7);
+      statusBorder = const Color(0xFFFCD34D);
+      statusText = const Color(0xFFB45309);
+      statusDot = const Color(0xFFD97706);
+    } else if (item.status == 2) {
+      statusLabel = 'مرفوض';
+      statusBg = const Color(0xFFFEE2E2);
+      statusBorder = const Color(0xFFFCA5A5);
+      statusText = const Color(0xFFB91C1C);
+      statusDot = const Color(0xFFDC2626);
+    } else {
+      statusLabel = 'قيد التسليم';
+      statusBg = const Color(0xFFFFF7ED);
+      statusBorder = const Color(0xFFFFEDD5);
+      statusText = const Color(0xFFC2410C);
+      statusDot = const Color(0xFFEA580C);
+    }
 
     return Material(
       color: Colors.transparent,
@@ -93,52 +130,57 @@ class PaymentSingleItem extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isReceived ? const Color(0xFFDCFCE7) : const Color(0xFFFFF0E8),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: FlippedIcon(
-                            isReceived ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.clock,
-                            size: 18,
-                            color: isReceived ? const Color(0xFF16A34A) : kPrimaryOrange,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'دفعة تسوية #${item.id ?? ""}',
-                              style: GoogleFonts.ibmPlexSansArabic(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1E293B),
-                              ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isReceived ? const Color(0xFFDCFCE7) : const Color(0xFFFFF0E8),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            if (item.handoverDate != null)
-                              Text(
-                                GlobalVar.dateForamt(item.handoverDate, kDateTimeFormat) ?? "",
-                                style: GoogleFonts.ibmPlexSansArabic(
-                                  fontSize: 10.5,
-                                  color: const Color(0xFF94A3B8),
+                            child: FlippedIcon(
+                              isReceived ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.clock,
+                              size: 18,
+                              color: isReceived ? const Color(0xFF16A34A) : kPrimaryOrange,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1E293B),
+                                  ),
                                 ),
-                              ),
-                          ],
-                        ),
-                      ],
+                                if (dateString != null)
+                                  Text(
+                                    GlobalVar.dateForamt(dateString, kDateTimeFormat) ?? "",
+                                    style: GoogleFonts.ibmPlexSansArabic(
+                                      fontSize: 10.5,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isReceived ? const Color(0xFFDCFCE7) : const Color(0xFFFFF7ED),
+                        color: statusBg,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isReceived ? const Color(0xFF86EFAC) : const Color(0xFFFFEDD5),
-                        ),
+                        border: Border.all(color: statusBorder),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -147,17 +189,17 @@ class PaymentSingleItem extends StatelessWidget {
                             width: 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: isReceived ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+                              color: statusDot,
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            isReceived ? 'تم الاستلام' : 'قيد التسليم',
+                            statusLabel,
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: isReceived ? const Color(0xFF15803D) : const Color(0xFFC2410C),
+                              color: statusText,
                             ),
                           ),
                         ],
@@ -207,7 +249,7 @@ class PaymentSingleItem extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (!isReceived)
+                    if (!isReceived && item.status != 0 && item.status != 2)
                       ElevatedButton.icon(
                         onPressed: () => _confirmReceiptWithDialog(context),
                         icon: const FlippedIcon(PhosphorIconsBold.check, size: 14),
@@ -256,7 +298,7 @@ class PaymentSingleItem extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => PayoutReceiptSheet(
         payment: item,
-        onConfirmReceipt: !(item.handoverDate != null)
+        onConfirmReceipt: (!item.isReceived && item.status != 0 && item.status != 2)
             ? () {
                 Navigator.pop(ctx);
                 _confirmReceiptWithDialog(context);
@@ -269,7 +311,8 @@ class PaymentSingleItem extends StatelessWidget {
   void _confirmReceiptWithDialog(BuildContext context) {
     HapticFeedback.lightImpact();
     final formattedAmount = formatPrice(item.amount);
-    final courierName = item.byUser ?? 'مندوب جيتك';
+    final courierName = item.byUser ?? 'إدارة جيتك';
+    final refNumber = item.requestNumber ?? (item.id != null ? '#${item.id}' : '');
 
     showDialog(
       context: context,
@@ -301,7 +344,7 @@ class PaymentSingleItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'هل استلمت بالفعل هذا المبلغ من المندوب؟',
+              'هل استلمت بالفعل هذا المبلغ من الإدارة / المندوب؟',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -335,12 +378,32 @@ class PaymentSingleItem extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (refNumber.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'رقم الطلب / الإيصال:',
+                          style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B)),
+                        ),
+                        Text(
+                          refNumber,
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'المندوب المسلّم:',
+                        'طريقة التسليم:',
                         style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B)),
                       ),
                       Text(
@@ -395,37 +458,50 @@ class PaymentSingleItem extends StatelessWidget {
     HapticFeedback.mediumImpact();
     try {
       final paymentProvider = Provider.of<PaymentProvider>(context, listen: false);
-      if (item.id != null) {
-        final success = await paymentProvider.recivePayment(item.id!);
-        if (success && context.mounted) {
-          try {
-            Provider.of<TransactionsProvider>(context, listen: false).loadBalances();
-          } catch (_) {}
-
-          onReceiptConfirmed?.call();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: const Color(0xFF16A34A),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              content: Row(
-                children: [
-                  const FlippedIcon(PhosphorIconsFill.checkCircle, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'تم تأكيد استلام الدفعة وتحديث الرصيد بنجاح!',
-                    style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+      bool success = false;
+      if (item.isSettlementRequest && item.requestId != null) {
+        success = await paymentProvider.confirmSettlementReceipt(item.requestId!);
+      } else if (item.id != null) {
+        success = await paymentProvider.recivePayment(item.id!);
       }
-    } catch (err) {
+
+      if (success && context.mounted) {
+        try {
+          await Provider.of<TransactionsProvider>(context, listen: false).loadBalances();
+        } catch (_) {}
+
+        onReceiptConfirmed?.call();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            content: Row(
+              children: [
+                const FlippedIcon(PhosphorIconsFill.checkCircle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'تم تأكيد استلام الدفعة وتحديث الرصيد بنجاح!',
+                  style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
       if (context.mounted) {
-        showDialog(context: context, builder: (_) => CustomDialog(message: err.toString()));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'تعذر تأكيد الاستلام: $e',
+              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
+            ),
+          ),
+        );
       }
     }
   }
@@ -863,7 +939,7 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const FlippedIcon(PhosphorIconsBold.package, size: 18),
                 label: Text(
-                  _isLoadingOrder ? 'جاري تحميل الطلب...' : 'عرض تفاصيل الطلب الأصلي #${b.orderId}',
+                  _isLoadingOrder ? 'جارٍ تحميل الطلب...' : 'عرض تفاصيل الطلب الأصلي #${b.orderId}',
                   style: GoogleFonts.ibmPlexSansArabic(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -1080,14 +1156,26 @@ class PayoutReceiptSheet extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildVoucherRow('رقم دفعة التسوية:', '#${payment.id ?? ""}'),
+                _buildVoucherRow('رقم طلب / دفعة التسوية:', payment.requestNumber ?? (payment.id != null ? '#${payment.id}' : '')),
+                if (payment.method != null && payment.method!.isNotEmpty) ...[
+                  const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                  _buildVoucherRow('طريقة الصرف:', payment.method!),
+                ],
+                if (payment.accountDetails != null && payment.accountDetails!.isNotEmpty) ...[
+                  const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                  _buildVoucherRow('تفاصيل الحساب:', payment.accountDetails!),
+                ],
                 if (payment.byUser != null && payment.byUser!.isNotEmpty) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                  _buildVoucherRow('المندوب المسلّم:', payment.byUser!),
+                  _buildVoucherRow('المسلّم / الجهة المسؤولة:', payment.byUser!),
                 ],
-                if (payment.handoverDate != null) ...[
+                if (payment.reviewedAt != null) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                  _buildVoucherRow('تاريخ ووقت الاستلام:', GlobalVar.dateForamt(payment.handoverDate, kDateTimeFormat) ?? ""),
+                  _buildVoucherRow('تاريخ الموافقة والاعتماد:', GlobalVar.dateForamt(payment.reviewedAt, kDateTimeFormat) ?? ""),
+                ],
+                if (payment.completedAt != null || payment.handoverDate != null) ...[
+                  const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                  _buildVoucherRow('تاريخ ووقت الاستلام:', GlobalVar.dateForamt(payment.completedAt ?? payment.handoverDate, kDateTimeFormat) ?? ""),
                 ],
                 if (payment.newBalance != null) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
@@ -1122,7 +1210,8 @@ class PayoutReceiptSheet extends StatelessWidget {
               height: 44,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  final text = 'إيصال تسوية #${payment.id} بمبلغ $formattedAmount ل.س (${isReceived ? "تم الاستلام" : "قيد التسليم"})';
+                  final ref = payment.requestNumber ?? (payment.id != null ? '#${payment.id}' : '');
+                  final text = 'إيصال تسوية $ref بمبلغ $formattedAmount ل.س (${isReceived ? "تم الاستلام" : "قيد التسليم"})';
                   Clipboard.setData(ClipboardData(text: text));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('تم نسخ بيانات الإيصال!'), duration: Duration(seconds: 1)),
@@ -1230,6 +1319,7 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
     super.initState();
     final initialAmt = _hasAvailableBalance ? widget.availableBalance.toInt().toString() : '';
     _amountController = TextEditingController(text: initialAmt);
+    _amountController.addListener(_onAmountChanged);
     _notesController = TextEditingController();
 
     final userPhone = locator<AuthenticationService>().user?.phoneNumber ?? '';
@@ -1245,7 +1335,16 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
   }
 
   @override
+  void didUpdateWidget(covariant SettlementRequestSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.availableBalance != widget.availableBalance) {
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
+    _amountController.removeListener(_onAmountChanged);
     _amountController.dispose();
     _notesController.dispose();
     _syriatelPhoneController.dispose();
@@ -1260,10 +1359,35 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
     super.dispose();
   }
 
+  void _onAmountChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  int _getPresetAmount(double fraction) {
+    if (!_hasAvailableBalance) return 0;
+    if (fraction >= 1.0) return widget.availableBalance.round();
+    return (widget.availableBalance * fraction).round();
+  }
+
+  double get _currentEnteredAmount {
+    final cleanText = _amountController.text.trim().replaceAll(',', '').replaceAll(' ', '');
+    return double.tryParse(cleanText) ?? 0.0;
+  }
+
+  bool _isPresetSelected(double fraction) {
+    if (!_hasAvailableBalance) return false;
+    final current = _currentEnteredAmount;
+    if (current <= 0) return false;
+    final target = _getPresetAmount(fraction).toDouble();
+    return (current - target).abs() < 0.01;
+  }
+
   void _setPresetPercentage(double fraction) {
     if (!_hasAvailableBalance) return;
     HapticFeedback.selectionClick();
-    final amt = (widget.availableBalance * fraction).toInt();
+    final amt = _getPresetAmount(fraction);
     _amountController.text = amt.toString();
     setState(() {});
   }
@@ -1730,13 +1854,25 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
             if (_hasAvailableBalance)
               Row(
                 children: [
-                  _buildQuickChip('كامل الرصيد (100%)', () => _setPresetPercentage(1.0)),
-                  const SizedBox(width: 8),
-                  _buildQuickChip('75%', () => _setPresetPercentage(0.75)),
-                  const SizedBox(width: 8),
-                  _buildQuickChip('50%', () => _setPresetPercentage(0.5)),
-                  const SizedBox(width: 8),
-                  _buildQuickChip('25%', () => _setPresetPercentage(0.25)),
+                  Expanded(
+                    flex: 2,
+                    child: _buildQuickChip('25%', 0.25),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 2,
+                    child: _buildQuickChip('50%', 0.50),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 2,
+                    child: _buildQuickChip('75%', 0.75),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 4,
+                    child: _buildQuickChip('كامل الرصيد (100%)', 1.0),
+                  ),
                 ],
               ),
             const SizedBox(height: 18),
@@ -1760,46 +1896,50 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                     width: isSelected ? 1.5 : 1.0,
                   ),
                 ),
-                child: ListTile(
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                  leading: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFFFECE0) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFFFECE0) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: FlippedIcon(
+                        method['icon'] as IconData,
+                        color: isSelected ? kPrimaryOrange : const Color(0xFF64748B),
+                        size: 18,
+                      ),
                     ),
-                    child: FlippedIcon(
-                      method['icon'] as IconData,
-                      color: isSelected ? kPrimaryOrange : const Color(0xFF64748B),
-                      size: 18,
+                    title: Text(
+                      method['title'] as String,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                        color: isSelected ? const Color(0xFF9A3412) : const Color(0xFF1E293B),
+                      ),
                     ),
-                  ),
-                  title: Text(
-                    method['title'] as String,
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                      color: isSelected ? const Color(0xFF9A3412) : const Color(0xFF1E293B),
+                    subtitle: Text(
+                      method['subtitle'] as String,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: isSelected ? const Color(0xFFC2410C) : const Color(0xFF64748B),
+                      ),
                     ),
-                  ),
-                  subtitle: Text(
-                    method['subtitle'] as String,
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? const Color(0xFFC2410C) : const Color(0xFF64748B),
+                    trailing: FlippedIcon(
+                      isSelected ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.circle,
+                      color: isSelected ? kPrimaryOrange : const Color(0xFFCBD5E1),
+                      size: 20,
                     ),
+                    onTap: _isSubmitting ? null : () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedMethod = index);
+                    },
                   ),
-                  trailing: FlippedIcon(
-                    isSelected ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.circle,
-                    color: isSelected ? kPrimaryOrange : const Color(0xFFCBD5E1),
-                    size: 20,
-                  ),
-                  onTap: _isSubmitting ? null : () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _selectedMethod = index);
-                  },
                 ),
               );
             }),
@@ -1838,10 +1978,10 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                     _buildField(
                       controller: _syriatelPhoneController,
                       label: 'رقم هاتف حساب ${_methods[_selectedMethod]['title']} *',
-                      hint: '09xxxxxxxx',
+                      hint: '9xxxxxxxx',
                       icon: PhosphorIconsRegular.phone,
                       keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [SyrianPhoneInputFormatter()],
                     ),
                   ] else if (_methods[_selectedMethod]['key'] == 'al_haram') ...[
                     _buildField(
@@ -1854,10 +1994,10 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                     _buildField(
                       controller: _alHaramPhoneController,
                       label: 'رقم هاتف المستلم *',
-                      hint: '09xxxxxxxx',
+                      hint: '9xxxxxxxx',
                       icon: PhosphorIconsRegular.phone,
                       keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [SyrianPhoneInputFormatter()],
                     ),
                     const SizedBox(height: 10),
                     _buildField(
@@ -1891,10 +2031,10 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                     _buildField(
                       controller: _cashPhoneController,
                       label: 'رقم هاتف المسؤول في المحل للتنسيق *',
-                      hint: '09xxxxxxxx',
+                      hint: '9xxxxxxxx',
                       icon: PhosphorIconsRegular.phone,
                       keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [SyrianPhoneInputFormatter()],
                     ),
                     const SizedBox(height: 10),
                     _buildField(
@@ -2018,24 +2158,61 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
     );
   }
 
-  Widget _buildQuickChip(String label, VoidCallback onTap) {
+  Widget _buildQuickChip(String label, double fraction) {
+    final isSelected = _isPresetSelected(fraction);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Harmonized with selected payout method card visual styling
+    final selectedBg = isDark ? const Color(0xFF2C1810) : const Color(0xFFFFF0E8);
+    final unselectedBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
+    const selectedBorder = kPrimaryOrange;
+    final unselectedBorder = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+
+    final selectedTextColor = isDark ? const Color(0xFFFF8A65) : const Color(0xFF9A3412);
+    final unselectedTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+
     return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      onTap: _isSubmitting ? null : () => _setPresetPercentage(fraction),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF475569),
+          color: isSelected ? selectedBg : unselectedBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? selectedBorder : unselectedBorder,
+            width: isSelected ? 1.5 : 1.0,
           ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected) ...[
+              FlippedIcon(
+                PhosphorIconsBold.check,
+                size: 13,
+                color: selectedTextColor,
+              ),
+              const SizedBox(width: 3),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 11.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected ? selectedTextColor : unselectedTextColor,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

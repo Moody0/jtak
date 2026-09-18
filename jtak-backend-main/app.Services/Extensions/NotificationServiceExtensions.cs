@@ -340,34 +340,125 @@ namespace App.Shared.Services.Extentions
             await service.SendPushNotification(n, adminIds);
         }
 
+        public static async Task SendSettlementApproved(this INotificationService service,
+                                                        Guid[] userIds,
+                                                        string requestNumber,
+                                                        decimal amount,
+                                                        bool isMerchant)
+        {
+            var titleAr = "تم قبول طلب التسوية";
+            var titleEn = "Settlement request approved";
+            var titleTr = "Mutabakat talebi onaylandı";
+
+            var textAr = isMerchant
+                ? $"تمت الموافقة على طلب التسوية الخاص بك بقيمة {amount:N0} ل.س. وهو الآن بانتظار الاستلام والتأكيد."
+                : $"تمت الموافقة على طلب التسوية الخاص بك بقيمة {amount:N0} ل.س.";
+
+            var textEn = isMerchant
+                ? $"Your settlement request of {amount:N0} SYP has been approved and is awaiting receipt and confirmation."
+                : $"Your settlement request of {amount:N0} SYP has been approved.";
+
+            var textTr = isMerchant
+                ? $"{amount:N0} SYP tutarındaki mutabakat talebiniz onaylandı ve teslim alınmayı bekliyor."
+                : $"{amount:N0} SYP tutarındaki mutabakat talebiniz onaylandı.";
+
+            var n = new Notification
+            {
+                TitleAr = titleAr,
+                TitleEn = titleEn,
+                TitleTr = titleTr,
+                TextAr = textAr,
+                TextEn = textEn,
+                TextTr = textTr,
+                Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
+                NotificationType = NotificationType.Payment
+            };
+            await service.SendPushNotification(n, userIds);
+        }
+
+        public static async Task SendSettlementRejected(this INotificationService service,
+                                                        Guid[] userIds,
+                                                        string requestNumber,
+                                                        decimal amount,
+                                                        string reason = null)
+        {
+            var titleAr = "تم رفض طلب التسوية";
+            var titleEn = "Settlement request rejected";
+            var titleTr = "Mutabakat talebi reddedildi";
+
+            var textAr = string.IsNullOrWhiteSpace(reason)
+                ? $"تم رفض طلب التسوية الخاص بك بقيمة {amount:N0} ل.س."
+                : $"تم رفض طلب التسوية الخاص بك بقيمة {amount:N0} ل.س. السبب: {reason.Trim()}";
+
+            var textEn = string.IsNullOrWhiteSpace(reason)
+                ? $"Your settlement request of {amount:N0} SYP was rejected."
+                : $"Your settlement request of {amount:N0} SYP was rejected. Reason: {reason.Trim()}";
+
+            var textTr = string.IsNullOrWhiteSpace(reason)
+                ? $"{amount:N0} SYP tutarındaki mutabakat talebiniz reddedildi."
+                : $"{amount:N0} SYP tutarındaki mutabakat talebiniz reddedildi. Sebep: {reason.Trim()}";
+
+            var n = new Notification
+            {
+                TitleAr = titleAr,
+                TitleEn = titleEn,
+                TitleTr = titleTr,
+                TextAr = textAr,
+                TextEn = textEn,
+                TextTr = textTr,
+                Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
+                NotificationType = NotificationType.Payment
+            };
+            await service.SendPushNotification(n, userIds);
+        }
+
+        public static async Task SendSettlementCompleted(this INotificationService service,
+                                                         Guid[] userIds,
+                                                         string requestNumber,
+                                                         decimal amount)
+        {
+            var titleAr = "تمت التسوية بنجاح";
+            var titleEn = "Settlement completed";
+            var titleTr = "Mutabakat tamamlandı";
+
+            var textAr = $"تم إتمام تسوية طلبك {requestNumber} بقيمة {amount:N0} ل.س بنجاح.";
+            var textEn = $"Settlement request {requestNumber} of {amount:N0} SYP was completed successfully.";
+            var textTr = $"{requestNumber} numaralı {amount:N0} SYP tutarındaki mutabakat başarıyla tamamlandı.";
+
+            var n = new Notification
+            {
+                TitleAr = titleAr,
+                TitleEn = titleEn,
+                TitleTr = titleTr,
+                TextAr = textAr,
+                TextEn = textEn,
+                TextTr = textTr,
+                Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
+                NotificationType = NotificationType.Payment
+            };
+            await service.SendPushNotification(n, userIds);
+        }
+
         public static async Task SendSettlementRequestStatus(this INotificationService service,
                                                              Guid[] userIds,
                                                              string requestNumber,
                                                              decimal amount,
                                                              string status,
-                                                             string reason = null)
+                                                             string reason = null,
+                                                             bool isMerchant = false)
         {
-            var isCompleted = string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase);
-            var isApproved = string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase);
-            var titleAr = isCompleted ? "تمت التسوية بنجاح" : isApproved ? "تم قبول طلب التسوية" : "تم رفض طلب التسوية";
-            var titleEn = isCompleted ? "Settlement completed" : isApproved ? "Settlement approved" : "Settlement rejected";
-            var textAr = isCompleted
-                ? $"تم إتمام الطلب {requestNumber} بقيمة {amount:N0} ل.س."
-                : isApproved
-                    ? $"تم قبول الطلب {requestNumber} بقيمة {amount:N0} ل.س وهو بانتظار تأكيد الاستلام."
-                    : $"تم رفض الطلب {requestNumber}." + (string.IsNullOrWhiteSpace(reason) ? string.Empty : $" السبب: {reason}");
-            var n = new Notification
+            if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase))
             {
-                TitleAr = titleAr,
-                TitleEn = titleEn,
-                TitleTr = titleEn,
-                TextAr = textAr,
-                TextEn = textAr,
-                TextTr = textAr,
-                Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
-                NotificationType = NotificationType.Order
-            };
-            await service.SendPushNotification(n, userIds);
+                await service.SendSettlementCompleted(userIds, requestNumber, amount);
+            }
+            else if (string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                await service.SendSettlementApproved(userIds, requestNumber, amount, isMerchant);
+            }
+            else
+            {
+                await service.SendSettlementRejected(userIds, requestNumber, amount, reason);
+            }
         }
         //public static async Task SendOrderChanged(this INotificationService service,
         //                                               Guid[] ids,

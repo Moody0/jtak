@@ -54,6 +54,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IInventoryBatchService _batchService;
         private readonly IOrdersUnitOfWork _ouow;
         private readonly IAccountingUnitOfWork _auow;
+        private readonly IAdminAuditService _auditService;
         private readonly IHubContext<TrackingHub> _trackingHub;
 
         public OrdersController(INotificationService notificationService,
@@ -70,6 +71,7 @@ namespace App.ApiControllers.V1.Admin
             IInventoryBatchService batchService,
             ILogger<OrdersController> logger,
             IMapper mapper,
+            IAdminAuditService auditService = null,
             IHubContext<TrackingHub> trackingHub = null)
         {
             _userManager = userManager;
@@ -85,7 +87,97 @@ namespace App.ApiControllers.V1.Admin
             _batchService = batchService;
             _auow = auow;
             _ouow = ouow;
+            _auditService = auditService;
             _trackingHub = trackingHub;
+        }
+
+        /// <summary>
+        /// Global orders summary counts for top status cards
+        /// </summary>
+        [HttpGet]
+        [Route("Summary")]
+        public async Task<ActionResult<AdminOrdersSummaryDto>> Summary()
+        {
+            var placedOrders = await _service.Queryable()
+                .AsNoTracking()
+                .Include(o => o.OrderDetails)
+                .Where(o => o.OrderStatus == OrderStatus.Success && o.DeletionDate == null)
+                .ToListAsync();
+
+            int total = placedOrders.Count;
+            int pendingApproval = 0;
+            int withoutDriver = 0;
+            int readyForDelivery = 0;
+            int inDelivery = 0;
+            int completed = 0;
+            int cancelledRejected = 0;
+
+            foreach (var order in placedOrders)
+            {
+                var details = order.OrderDetails ?? (ICollection<OrderDetail>)Array.Empty<OrderDetail>();
+                bool allTerminal = details.Count > 0 && details.All(d =>
+                    d.OrderDetailStatus == OrderDetailStatus.CustomerCanceled ||
+                    d.OrderDetailStatus == OrderDetailStatus.DeliveryCanceled ||
+                    d.OrderDetailStatus == OrderDetailStatus.MerchantRejected);
+
+                if (allTerminal)
+                {
+                    cancelledRejected++;
+                    continue;
+                }
+
+                var active = details.Where(d =>
+                    d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                    d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                    d.OrderDetailStatus != OrderDetailStatus.MerchantRejected).ToList();
+
+                bool isDelivered = order.DeliveredAt != null || (active.Count > 0 && active.All(d => d.OrderDetailStatus == OrderDetailStatus.Delivered));
+                if (isDelivered)
+                {
+                    completed++;
+                    continue;
+                }
+
+                bool hasAssignedDriver = order.DeliveryId.HasValue &&
+                                         !string.IsNullOrWhiteSpace(order.DeliveryUser) &&
+                                         !order.DeliveryUser.Contains("?");
+
+                if (!hasAssignedDriver)
+                {
+                    withoutDriver++;
+                }
+
+                bool isReady = active.Count > 0 && active.All(d => d.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
+                if (isReady)
+                {
+                    readyForDelivery++;
+                }
+
+                bool isInTransit = active.Any(d => d.OrderDetailStatus == OrderDetailStatus.ShippingStarted);
+                if (isInTransit)
+                {
+                    inDelivery++;
+                }
+
+                bool isPending = !isReady && !isInTransit && (details.Count == 0 || active.Any(d =>
+                    d.OrderDetailStatus == OrderDetailStatus.Pending ||
+                    d.OrderDetailStatus == OrderDetailStatus.CustomerPending));
+                if (isPending)
+                {
+                    pendingApproval++;
+                }
+            }
+
+            return new AdminOrdersSummaryDto
+            {
+                Total = total,
+                PendingApproval = pendingApproval,
+                WithoutDriver = withoutDriver,
+                ReadyForDelivery = readyForDelivery,
+                InDelivery = inDelivery,
+                Completed = completed,
+                CancelledRejected = cancelledRejected
+            };
         }
 
         /// <summary>
@@ -94,42 +186,176 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
-        public async Task<ActionResult<TableResponseModel<OrderDto>>> DataTable([FromBody] MetronicTable request)
+        public async Task<ActionResult<TableResponseModel<OrderDto>>> DataTable([FromBody] MetronicTable request, [FromQuery] string status = null)
         {
-            var lang = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
-            var user = await _userManager.GetUserAsync(User);
-            var isAdmin = await _userManager.IsInRoleAsync(user, AppRoleName.Admin.ToString());
+            var isArchivedQuery = string.Equals(status?.Trim(), "ARCHIVED", StringComparison.OrdinalIgnoreCase);
 
-            var list = await _service.ListMetronicTableQueryable(request,
-                x => new OrderDto
+            var query = _service.Queryable()
+                .AsNoTracking()
+                .Include(x => x.OrderDetails)
+                .Include(x => x.User)
+                .Where(x => x.OrderStatus == OrderStatus.Success);
+
+            if (isArchivedQuery)
+            {
+                query = query.Where(o => o.DeletionDate != null);
+            }
+            else
+            {
+                query = query.Where(o => o.DeletionDate == null);
+
+                // Server-side status filter
+                if (!string.IsNullOrWhiteSpace(status))
                 {
-                    Id = x.Id,
-                    UserId = x.UserId,
-                    DeliveryId = x.DeliveryId,
-                    DeliveryUser = x.DeliveryUser,
-                    DeliveryLat = x.DeliveryLat,
-                    DeliveryLng = x.DeliveryLng,
-                    DeliveryLocationUpdatedAt = x.DeliveryLocationUpdatedAt,
-                    Description = x.Description,
-                    Phonenumber = x.Phonenumber,
-                    OrderStatus = x.OrderStatus,
-                    PurchaseDate = x.PurchaseDate,
-                    CreatedDate = x.CreatedDate,
-                    User = x.User,
-                    Lat = x.Lat,
-                    Lng = x.Lng,
-                    Address = x.Address,
-                    PaymentMethod = x.PaymentMethod,
-                    DeliveryOtp = x.DeliveryOtp,
-                    DeliveredAt = x.DeliveredAt,
-                    OrderDetails = x.OrderDetails.Select(d => d.ToDto()).ToArray()
-                }, x => x.OrderStatus == OrderStatus.Success, x => x.OrderDetails);
-            var merchantIds = list.Items.SelectMany(x => x.OrderDetails).Select(x => x.MerchantId).Distinct().ToArray();
+                    var norm = status.Trim().ToUpperInvariant();
+                    switch (norm)
+                    {
+                        case "PENDING":
+                        case "WAITING_APPROVAL":
+                            query = query.Where(o => o.DeliveredAt == null &&
+                                o.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                        d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                        d.OrderDetailStatus != OrderDetailStatus.MerchantRejected) &&
+                                !o.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
+                                               .All(d => d.OrderDetailStatus == OrderDetailStatus.Delivered) &&
+                                !o.OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.ShippingStarted) &&
+                                !o.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
+                                               .All(d => d.OrderDetailStatus == OrderDetailStatus.ReadyForPickup) &&
+                                (o.OrderDetails.Count == 0 || o.OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.Pending ||
+                                                                                      d.OrderDetailStatus == OrderDetailStatus.CustomerPending)));
+                            break;
+
+                        case "UNASSIGNED":
+                        case "WITHOUT_DRIVER":
+                            query = query.Where(o => o.DeliveredAt == null &&
+                                (!o.DeliveryId.HasValue || string.IsNullOrEmpty(o.DeliveryUser) || o.DeliveryUser.Contains("?")) &&
+                                o.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                        d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                        d.OrderDetailStatus != OrderDetailStatus.MerchantRejected) &&
+                                !o.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
+                                               .All(d => d.OrderDetailStatus == OrderDetailStatus.Delivered));
+                            break;
+
+                        case "READY":
+                        case "READY_FOR_DELIVERY":
+                            query = query.Where(o => o.DeliveredAt == null &&
+                                !o.OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.ShippingStarted) &&
+                                o.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                        d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                        d.OrderDetailStatus != OrderDetailStatus.MerchantRejected) &&
+                                o.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                          d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                          d.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
+                                              .All(d => d.OrderDetailStatus == OrderDetailStatus.ReadyForPickup));
+                            break;
+
+                        case "IN_TRANSIT":
+                        case "IN_DELIVERY":
+                            query = query.Where(o => o.DeliveredAt == null &&
+                                o.OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.ShippingStarted));
+                            break;
+
+                        case "DELIVERED":
+                        case "COMPLETED":
+                            query = query.Where(o => o.DeliveredAt != null ||
+                                (o.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                         d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                         d.OrderDetailStatus != OrderDetailStatus.MerchantRejected) &&
+                                 o.OrderDetails.Where(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
+                                                           d.OrderDetailStatus != OrderDetailStatus.MerchantRejected)
+                                               .All(d => d.OrderDetailStatus == OrderDetailStatus.Delivered)));
+                            break;
+
+                        case "CANCELED":
+                        case "CANCELLED":
+                        case "REJECTED":
+                            query = query.Where(o => o.OrderDetails.Count > 0 &&
+                                o.OrderDetails.All(d => d.OrderDetailStatus == OrderDetailStatus.CustomerCanceled ||
+                                                        d.OrderDetailStatus == OrderDetailStatus.DeliveryCanceled ||
+                                                        d.OrderDetailStatus == OrderDetailStatus.MerchantRejected));
+                            break;
+                    }
+                }
+            }
+
+            // Server-side search filter: strict ID, Customer Name, and Phone matching only
+            if (!string.IsNullOrWhiteSpace(request?.Search))
+            {
+                var term = request.Search.Trim().ToLower();
+                var isNumeric = int.TryParse(term.TrimStart('#'), out var searchId);
+                if (isNumeric)
+                {
+                    query = query.Where(o => o.Id == searchId ||
+                                             (o.Phonenumber != null && o.Phonenumber.Contains(term)) ||
+                                             (o.User != null && o.User.ToLower().Contains(term)));
+                }
+                else
+                {
+                    query = query.Where(o => (o.Phonenumber != null && o.Phonenumber.Contains(term)) ||
+                                             (o.User != null && o.User.ToLower().Contains(term)));
+                }
+            }
+
+            var totalRecords = await query.CountAsync();
+
+            // Server-side sorting
+            var sortField = request?.SortField?.Trim()?.ToLower();
+            var sortAsc = string.Equals(request?.SortOrder, "ASC", StringComparison.OrdinalIgnoreCase);
+
+            query = sortField switch
+            {
+                "id" => sortAsc ? query.OrderBy(x => x.Id) : query.OrderByDescending(x => x.Id),
+                "purchasedate" => sortAsc ? query.OrderBy(x => x.PurchaseDate) : query.OrderByDescending(x => x.PurchaseDate),
+                "createddate" => sortAsc ? query.OrderBy(x => x.CreatedDate) : query.OrderByDescending(x => x.CreatedDate),
+                _ => query.OrderByDescending(x => x.CreatedDate).ThenByDescending(x => x.Id)
+            };
+
+            // Server-side pagination
+            var pageNumber = Math.Max(request?.PageNumber ?? 1, 1);
+            var pageSize = Math.Max(request?.PageSize ?? 10, 1);
+            var pagedOrders = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            var dtoList = pagedOrders.Select(x => new OrderDto
+            {
+                Id = x.Id,
+                UserId = x.UserId,
+                DeliveryId = x.DeliveryId,
+                DeliveryUser = x.DeliveryUser,
+                DeliveryLat = x.DeliveryLat,
+                DeliveryLng = x.DeliveryLng,
+                DeliveryLocationUpdatedAt = x.DeliveryLocationUpdatedAt,
+                Description = x.Description,
+                Phonenumber = x.Phonenumber,
+                OrderStatus = x.OrderStatus,
+                PurchaseDate = x.PurchaseDate,
+                CreatedDate = x.CreatedDate,
+                User = x.User,
+                Lat = x.Lat,
+                Lng = x.Lng,
+                Address = x.Address,
+                PaymentMethod = x.PaymentMethod,
+                DeliveryOtp = x.DeliveryOtp,
+                DeliveredAt = x.DeliveredAt,
+                DeleteReason = x.DeleteReason,
+                DeletedBy = x.DeletedBy,
+                DeletionDate = x.DeletionDate,
+                OrderDetails = x.OrderDetails.Select(d => d.ToDto()).ToArray()
+            }).ToList();
+
+            var merchantIds = dtoList.SelectMany(x => x.OrderDetails).Select(x => x.MerchantId).Distinct().ToArray();
             var merchantKinds = await _merchantService.Queryable()
                 .Where(x => merchantIds.Contains(x.Id))
                 .Select(x => new { x.Id, x.MerchantKind })
                 .ToDictionaryAsync(x => x.Id, x => x.MerchantKind);
-            foreach (var order in list.Items)
+
+            foreach (var order in dtoList)
             {
                 var activeDetails = order.OrderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
                                                                    x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
@@ -147,7 +373,122 @@ namespace App.ApiControllers.V1.Admin
                             ? "الطلب جاهز — عيّن مندوب توصيل"
                             : order.IsJtakMarketOrder ? "طلب جيتك ماركت" : null;
             }
-            return list;
+
+            return new TableResponseModel<OrderDto>
+            {
+                Items = dtoList.ToArray(),
+                TotalRecords = totalRecords
+            };
+        }
+
+        /// <summary>
+        /// Safely archive/soft-delete an order with mandatory reason
+        /// </summary>
+        [HttpPost]
+        [Route("Archive/{id}")]
+        public async Task<ActionResult<bool>> Archive(int id, [FromBody] ArchiveOrderRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.Reason))
+                return BadRequest(ApiErr.Create("سبب الأرشفة إلزامي."));
+
+            var order = await _ouow.Context.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null) return NotFound();
+
+            var beforeState = new
+            {
+                order.Id,
+                order.OrderStatus,
+                order.DeletionDate,
+                order.DeletedBy,
+                order.DeleteReason
+            };
+
+            order.DeletionDate = DateTime.UtcNow;
+            order.DeletedBy = User.GetUserId().ToString();
+            order.DeleteReason = request.Reason.Trim();
+
+            await _ouow.SaveChangesAsync();
+
+            var afterState = new
+            {
+                order.Id,
+                order.OrderStatus,
+                order.DeletionDate,
+                order.DeletedBy,
+                order.DeleteReason
+            };
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Archive",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"أرشفة الطلب #{id} بسبب: {request.Reason.Trim()}",
+                    Result = "Success",
+                    BeforeState = beforeState,
+                    AfterState = afterState
+                });
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Restore an archived order to active list
+        /// </summary>
+        [HttpPost]
+        [Route("Restore/{id}")]
+        public async Task<ActionResult<bool>> Restore(int id)
+        {
+            var order = await _ouow.Context.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null) return NotFound();
+
+            if (order.DeletionDate == null)
+                return true; // Idempotent
+
+            var beforeState = new
+            {
+                order.Id,
+                order.OrderStatus,
+                order.DeletionDate,
+                order.DeletedBy,
+                order.DeleteReason
+            };
+
+            order.DeletionDate = null;
+            order.DeletedBy = null;
+            order.DeleteReason = null;
+
+            await _ouow.SaveChangesAsync();
+
+            var afterState = new
+            {
+                order.Id,
+                order.OrderStatus,
+                order.DeletionDate,
+                order.DeletedBy,
+                order.DeleteReason
+            };
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Restore",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"استعادة الطلب #{id} من الأرشيف",
+                    Result = "Success",
+                    BeforeState = beforeState,
+                    AfterState = afterState
+                });
+            }
+
+            return true;
         }
 
         ///// <summary>                                           
@@ -207,7 +548,22 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<bool>> DeliveryCancel(int id, [FromBody] AdminOrderActionRequestDto dto = null)
         {
             if (string.IsNullOrWhiteSpace(dto?.Reason))
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "Cancel",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"محاولة إلغاء الطلب #{id} بدون سبب",
+                        Result = "Failed",
+                        FailureReason = "يجب تحديد سبب رفض الطلب."
+                    });
+                }
                 return BadRequest(ApiErr.Create("يجب تحديد سبب رفض الطلب."));
+            }
             var order = await _service.FindAsync(id);
             if (order == null) return NotFound();
             if (order.OrderDetails != null && order.OrderDetails.All(x =>
@@ -217,7 +573,22 @@ namespace App.ApiControllers.V1.Admin
                 return true;
             var hadDelivered = order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered);
             if (hadDelivered)
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "Cancel",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"محاولة إلغاء الطلب #{id} الذي تم تسليمه مسبقاً",
+                        Result = "Failed",
+                        FailureReason = "لا يمكن رفض طلب تم تسليمه."
+                    });
+                }
                 return BadRequest(ApiErr.Create("لا يمكن رفض طلب تم تسليمه. استخدم مسار المرتجعات أو التصحيح المالي."));
+            }
             var orderMerchantIds = order.OrderDetails.Select(x => x.MerchantId).Distinct().ToArray();
             var isJtakMarket = await _merchantService.Queryable()
                 .Where(x => orderMerchantIds.Contains(x.Id))
@@ -263,6 +634,21 @@ namespace App.ApiControllers.V1.Admin
                 isJtakMarket ? "جيتك ماركت" : "إدارة جيتك", dto.Reason.Trim());
 
             await _auow.SaveChangesAsync();
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Cancel",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"إلغاء الطلب #{id} بسبب: {dto.Reason.Trim()}",
+                    Result = "Success",
+                    AfterState = new { OrderId = id, Notes = dto.Reason.Trim() }
+                });
+            }
+
             return true;
         }
 
@@ -313,6 +699,20 @@ namespace App.ApiControllers.V1.Admin
                 await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnOrderAccepted", new { orderId = id });
             }
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Approve",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"الموافقة على الطلب #{id} وبدء تجهيزه من المتاجر ({string.Join(", ", merchantIds)})",
+                    Result = "Success",
+                    AfterState = new { OrderId = id, MerchantIds = merchantIds, Reason = dto?.Reason }
+                });
+            }
+
             return true;
         }
 
@@ -321,7 +721,22 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<bool>> Reject(int id, [FromBody] AdminOrderActionRequestDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto?.Reason))
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "Reject",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"محاولة رفض الطلب #{id} بدون سبب",
+                        Result = "Failed",
+                        FailureReason = "يجب تحديد سبب رفض الطلب."
+                    });
+                }
                 return BadRequest(ApiErr.Create("يجب تحديد سبب رفض الطلب."));
+            }
 
             var currentOrder = await _service.FindAsync(id);
             if (currentOrder == null)
@@ -379,6 +794,20 @@ namespace App.ApiControllers.V1.Admin
                 await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnOrderRejected", new { orderId = id, reason = dto.Reason.Trim() });
             }
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Reject",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"رفض الطلب #{id} بسبب: {dto.Reason.Trim()}",
+                    Result = "Success",
+                    AfterState = new { OrderId = id, Reason = dto.Reason.Trim(), RejectedDetailsCount = actionableDetails.Length }
+                });
+            }
+
             return true;
         }
 
@@ -397,6 +826,19 @@ namespace App.ApiControllers.V1.Admin
             {
                 var merchantIds = pendingDetails.Select(x => x.MerchantId).Distinct().ToArray();
                 await _service.MerchantAccept(id, merchantIds);
+            }
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Preparing",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"بدء تجهيز الطلب #{id}",
+                    Result = "Success"
+                });
             }
 
             return true;
@@ -424,6 +866,20 @@ namespace App.ApiControllers.V1.Admin
             {
                 var alreadyReady = currentOrder.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
                 if (alreadyReady) return true;
+
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "Ready",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"فشل نقل الطلب #{id} إلى جاهز للاستلام",
+                        Result = "Failed",
+                        FailureReason = "لا توجد عناصر مقبولة بانتظار تجهيزها في هذا الطلب."
+                    });
+                }
                 return BadRequest(ApiErr.Create("لا توجد عناصر مقبولة بانتظار تجهيزها في هذا الطلب."));
             }
 
@@ -453,6 +909,20 @@ namespace App.ApiControllers.V1.Admin
                 }
             }
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Ready",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"تأكيد جاهزية الطلب #{id} للاستلام من قبل المندوب",
+                    Result = "Success",
+                    AfterState = new { OrderId = id, MerchantIds = merchantIds }
+                });
+            }
+
             return true;
         }
 
@@ -464,7 +934,22 @@ namespace App.ApiControllers.V1.Admin
             if (order == null) return NotFound();
 
             if (!order.DeliveryId.HasValue)
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "ConfirmPickup",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"فشل تأكيد استلام الطلب #{id} لعدم وجود سائق",
+                        Result = "Failed",
+                        FailureReason = "يجب تعيين مندوب توصيل للطلب أولاً."
+                    });
+                }
                 return BadRequest(ApiErr.Create("يجب تعيين مندوب توصيل للطلب أولاً قبل تأكيد الاستلام وبدء الشحن."));
+            }
 
             var readyDetails = order.OrderDetails
                 .Where(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup)
@@ -522,6 +1007,20 @@ namespace App.ApiControllers.V1.Admin
                 await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnShippingStarted", new { orderId = id });
             }
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "ConfirmPickup",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"تأكيد استلام المندوب ({order.DeliveryUser}) للطلب #{id} وبدء التوصيل",
+                    Result = "Success",
+                    AfterState = new { OrderId = id, DriverId = order.DeliveryId, DriverName = order.DeliveryUser, MerchantIds = targetMerchantIds }
+                });
+            }
+
             return true;
         }
 
@@ -548,6 +1047,19 @@ namespace App.ApiControllers.V1.Admin
             var allReadyOrShipping = activeDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup || x.OrderDetailStatus == OrderDetailStatus.ShippingStarted);
             if (!hasInTransit && !allReadyOrShipping)
             {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "Deliver",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"محاولة تسليم إداري غير صالحة للطلب #{id}",
+                        Result = "Failed",
+                        FailureReason = "لا يمكن تسليم الطلب مباشرة وهو في حالة الانتظار أو التجهيز."
+                    });
+                }
                 return BadRequest(ApiErr.Create("لا يمكن تسليم الطلب مباشرة وهو في حالة الانتظار أو التجهيز. يجب تجهيز الطلب وبدء نقله أولاً."));
             }
 
@@ -572,6 +1084,19 @@ namespace App.ApiControllers.V1.Admin
                 var cleanOrderOtp = (currentOrder.DeliveryOtp ?? "").Trim().Replace(" ", "");
                 if (!string.Equals(cleanEnteredOtp, cleanOrderOtp, StringComparison.Ordinal))
                 {
+                    if (_auditService != null)
+                    {
+                        await _auditService.LogAsync(new AdminAuditLogEntry
+                        {
+                            Module = "Orders",
+                            Action = "Deliver",
+                            EntityType = "Order",
+                            EntityId = id.ToString(),
+                            Description = $"فشل التحقق من رمز PIN للتسليم الإداري للطلب #{id}",
+                            Result = "Failed",
+                            FailureReason = "رمز PIN غير مطابق"
+                        });
+                    }
                     return BadRequest(ApiErr.Create("رمز تأكيد الاستلام (PIN) المدخل غير مطابق لرمز الطلب."));
                 }
             }
@@ -579,6 +1104,19 @@ namespace App.ApiControllers.V1.Admin
             {
                 if (string.IsNullOrWhiteSpace(dto?.Notes))
                 {
+                    if (_auditService != null)
+                    {
+                        await _auditService.LogAsync(new AdminAuditLogEntry
+                        {
+                            Module = "Orders",
+                            Action = "Deliver",
+                            EntityType = "Order",
+                            EntityId = id.ToString(),
+                            Description = $"محاولة تسليم إداري للطلب #{id} دون PIN أو ملاحظات",
+                            Result = "Failed",
+                            FailureReason = "ملاحظات التسليم الإداري إلزامية عند عدم توفر PIN"
+                        });
+                    }
                     return BadRequest(ApiErr.Create("في حال التسليم الإداري دون رمز التحقق (PIN)، يجب تدوين ملاحظات/سبب التسليم الإداري."));
                 }
             }
@@ -709,6 +1247,27 @@ namespace App.ApiControllers.V1.Admin
             }
             catch { }
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "Deliver",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"تسليم إداري للطلب #{id} ({deliveryNotes})",
+                    Result = "Success",
+                    AfterState = new
+                    {
+                        OrderId = id,
+                        DeliveredAt = DateTime.UtcNow,
+                        order.PaymentMethod,
+                        dto?.CashResolutionMode,
+                        dto?.Notes
+                    }
+                });
+            }
+
             return true;
         }
 
@@ -764,6 +1323,9 @@ namespace App.ApiControllers.V1.Admin
             var order = await _service.FindAsync(id);
             if (order == null) return NotFound();
 
+            var prevDriverId = order.DeliveryId;
+            var prevDriverName = order.DeliveryUser;
+
             if (order.DeliveryId.HasValue)
             {
                 await _deliveryService.RemoveOrder(order.DeliveryId.Value, id);
@@ -791,6 +1353,21 @@ namespace App.ApiControllers.V1.Admin
                 await _trackingHub.Clients.Group(TrackingHub.FleetDispatchGroup).SendAsync("OnNewAvailableOrder", new { orderId = id });
             }
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "AssignDriver",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"إلغاء تعيين المندوب ({prevDriverName}) للطلب #{id}",
+                    Result = "Success",
+                    BeforeState = new { DriverId = prevDriverId, DriverName = prevDriverName },
+                    AfterState = new { DriverId = (Guid?)null, DriverName = (string)null }
+                });
+            }
+
             return true;
         }
 
@@ -807,15 +1384,48 @@ namespace App.ApiControllers.V1.Admin
             if (order == null)
                 return NotFound();
 
+            var prevDriverId = order.DeliveryId;
+            var prevDriverName = order.DeliveryUser;
+
             var activeDetails = order.OrderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
                                                                x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
                                                                x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).ToArray();
             if (activeDetails.Length == 0 || activeDetails.Any(x => x.OrderDetailStatus != OrderDetailStatus.ReadyForPickup))
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "AssignDriver",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"فشل تعيين مندوب للطلب #{id} لعدم جاهزية الطلب",
+                        Result = "Failed",
+                        FailureReason = "لا يمكن تعيين مندوب قبل أن يؤكد كل تاجر أن الطلب جاهز للاستلام."
+                    });
+                }
                 return BadRequest(ApiErr.Create("لا يمكن تعيين مندوب قبل أن يؤكد كل تاجر أن الطلب جاهز للاستلام."));
+            }
 
             var bestDelivery = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == uid);
             if (bestDelivery == null || !await _userManager.IsInRoleAsync(bestDelivery, AppRoleName.Delivery.ToString()))
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "AssignDriver",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"فشل تعيين مندوب للطلب #{id}",
+                        Result = "Failed",
+                        FailureReason = "المستخدم المحدد ليس مندوب توصيل."
+                    });
+                }
                 return BadRequest(ApiErr.Create("The selected user is not a delivery driver."));
+            }
 
             // Enforce Driver COD Cash Custody Limit (#27: 5,000 SYP limit)
             var floatAcc = await _auow.Context.Accounts.FirstOrDefaultAsync(a =>
@@ -836,11 +1446,24 @@ namespace App.ApiControllers.V1.Admin
 
             if (currentFloat + projectedCod > 5000m)
             {
-                if (projectedCod > 5000m)
+                string errMsg = projectedCod > 5000m
+                    ? $"قيمة الطلب النقدية ({projectedCod:N0} ل.س) تتجاوز الحد الأقصى للعهدة النقدية للمندوب (5,000 ل.س). لا يمكن إسناد هذا الطلب لأي سائق."
+                    : $"إسناد هذا الطلب سيتجاوز الحد الأقصى للعهدة النقدية للسائق (5,000 ل.س). العهدة الحالية: {currentFloat:N0} ل.س، قيمة الطلب: {projectedCod:N0} ل.س.";
+
+                if (_auditService != null)
                 {
-                    return BadRequest(ApiErr.Create($"قيمة الطلب النقدية ({projectedCod:N0} ل.س) تتجاوز الحد الأقصى للعهدة النقدية للمندوب (5,000 ل.س). لا يمكن إسناد هذا الطلب لأي سائق."));
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Orders",
+                        Action = "AssignDriver",
+                        EntityType = "Order",
+                        EntityId = id.ToString(),
+                        Description = $"فشل تعيين السائق {bestDelivery.FullName} للطلب #{id} لتجاوز حد العهدة",
+                        Result = "Failed",
+                        FailureReason = errMsg
+                    });
                 }
-                return BadRequest(ApiErr.Create($"إسناد هذا الطلب سيتجاوز الحد الأقصى للعهدة النقدية للسائق (5,000 ل.س). العهدة الحالية: {currentFloat:N0} ل.س، قيمة الطلب: {projectedCod:N0} ل.س."));
+                return BadRequest(ApiErr.Create(errMsg));
             }
 
             if (order.DeliveryId.HasValue)
@@ -892,6 +1515,22 @@ namespace App.ApiControllers.V1.Admin
 
             // Sending Notification will save to DB
             await _notificationService.SendDeliveryNewOrderRecived(new[] { bestDelivery.Id }, id, order.OrderDetails.ToArray());
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Orders",
+                    Action = "AssignDriver",
+                    EntityType = "Order",
+                    EntityId = id.ToString(),
+                    Description = $"تعيين مندوب التوصيل {order.DeliveryUser} للطلب #{id}",
+                    Result = "Success",
+                    BeforeState = new { DriverId = prevDriverId, DriverName = prevDriverName },
+                    AfterState = new { DriverId = bestDelivery.Id, DriverName = order.DeliveryUser }
+                });
+            }
+
             return true;
         }
 

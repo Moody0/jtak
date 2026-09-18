@@ -134,7 +134,7 @@ class CustomDialog extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        str.main.ok,
+                        _safeStrMainOk(),
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w800,
@@ -149,6 +149,14 @@ class CustomDialog extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _safeStrMainOk() {
+    try {
+      return (GlobalVar.checkString(str.main.ok) ? str.main.ok : 'موافق');
+    } catch (_) {
+      return 'موافق';
+    }
   }
 }
 
@@ -167,6 +175,22 @@ class CustomConfirmationDialog extends StatelessWidget {
     this.yesText,
     this.cancelText,
   });
+
+  static String _safeCancel() {
+    try {
+      return (GlobalVar.checkString(str.main.cancel) ? str.main.cancel : 'إلغاء');
+    } catch (_) {
+      return 'إلغاء';
+    }
+  }
+
+  static String _safeOk() {
+    try {
+      return (GlobalVar.checkString(str.main.ok) ? str.main.ok : 'موافق');
+    } catch (_) {
+      return 'موافق';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +244,7 @@ class CustomConfirmationDialog extends StatelessWidget {
               children: [
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
+                    onTap: () => Navigator.of(context).pop(false),
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -230,7 +254,7 @@ class CustomConfirmationDialog extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          cancelText ?? str.main.cancel,
+                          cancelText ?? _safeCancel(),
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -245,7 +269,7 @@ class CustomConfirmationDialog extends StatelessWidget {
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      Navigator.of(context).pop();
+                      Navigator.of(context).pop(true);
                       yesBTNCallBack();
                     },
                     behavior: HitTestBehavior.opaque,
@@ -257,7 +281,7 @@ class CustomConfirmationDialog extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          yesText ?? str.main.ok,
+                          yesText ?? _safeOk(),
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,

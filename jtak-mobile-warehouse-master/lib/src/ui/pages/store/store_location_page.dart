@@ -35,7 +35,7 @@ class _StoreLocationPageState extends State<StoreLocationPage> {
   double _coverageKm = 5.0; // default 5 km
   bool _isSaving = false;
 
-  final List<double> _presetDistances = [2.0, 5.0, 10.0, 15.0, 20.0];
+  final List<double> _presetDistances = [2.0, 5.0, 10.0, 15.0, 20.0, 30.0];
 
   @override
   void initState() {
@@ -98,7 +98,7 @@ class _StoreLocationPageState extends State<StoreLocationPage> {
       final provider = Provider.of<MerchantProfileProvider>(context, listen: false);
       final p = provider.profile;
 
-      final coverageMeters = (_coverageKm * 1000).round();
+      final coverageMeters = (_coverageKm.clamp(1.0, 30.0) * 1000).round().clamp(0, 30000);
       final latVal = double.tryParse(_latController.text.trim()) ?? p?.lat ?? 0.0;
       final lngVal = double.tryParse(_lngController.text.trim()) ?? p?.lng ?? 0.0;
 

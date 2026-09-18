@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -73,11 +73,11 @@ namespace App.Areas.Admin.Controllers
             {
                 return (await UserManager.GetUsersInRoleAsync(id.ToString())).ListGridAsync(request,
                     item => Mapper.Map<UserDto>(item),
-                    x => x.Email != AppDomainHelper.AdminEmail);
+                    x => x.Email == null || x.Email != AppDomainHelper.AdminEmail);
             }
             else
             {
-                return await _userService.ListDataTable(request, item => Mapper.Map<UserDto>(item), x => x.Email != AppDomainHelper.AdminEmail);
+                return await _userService.ListDataTable(request, item => Mapper.Map<UserDto>(item), x => x.Email == null || x.Email != AppDomainHelper.AdminEmail);
             }
         }
         #endregion

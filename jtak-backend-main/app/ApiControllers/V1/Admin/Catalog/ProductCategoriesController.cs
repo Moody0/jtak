@@ -16,6 +16,7 @@ using System.Globalization;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
+using App.Shared.Services;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -30,16 +31,19 @@ namespace App.ApiControllers.V1.Admin
         private readonly ILogger _logger;
         private readonly IMapper _mapper;
         private readonly IMemoryCache _cache;
+        private readonly IAdminAuditService _auditService;
 
         public ProductCategoriesController(IProductCategoryService service,
             ICatalogUnitOfWork unitOfWork,
-            ILogger<ProductCategoriesController> logger, IMapper mapper, IMemoryCache cache)
+            ILogger<ProductCategoriesController> logger, IMapper mapper, IMemoryCache cache,
+            IAdminAuditService auditService = null)
         {
             _service = service;
             _unitOfWork = unitOfWork;
             _logger = logger;
             _mapper = mapper;
             _cache = cache;
+            _auditService = auditService;
         }
 
         /// <summary>
@@ -79,6 +83,20 @@ namespace App.ApiControllers.V1.Admin
 
             _cache.Remove("ProductCategories");
             _cache.Remove("ProductCategoriesTree");
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Catalog",
+                    Action = "CreateCategory",
+                    EntityType = "ProductCategory",
+                    EntityId = entity.Id.ToString(),
+                    Description = $"إضافة تصنيف جديد: {entity.Title}",
+                    Result = "Success",
+                    AfterState = new { entity.Id, entity.Title, entity.ParentId, entity.Active, entity.Order }
+                });
+            }
 
             return entity.Id;
         }
@@ -135,6 +153,15 @@ namespace App.ApiControllers.V1.Admin
             if (entity == null)
                 return BadRequest(ApiErr.Create("Not Found"));
 
+            var beforeState = new
+            {
+                entity.Id,
+                entity.Title,
+                entity.ParentId,
+                entity.Active,
+                entity.Order
+            };
+
             entity.Title = item.Title;
             entity.Icon = item.Icon;
             entity.ParentId = item.ParentId;
@@ -147,6 +174,28 @@ namespace App.ApiControllers.V1.Admin
 
             _cache.Remove("ProductCategories");
             _cache.Remove("ProductCategoriesTree");
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Catalog",
+                    Action = "EditCategory",
+                    EntityType = "ProductCategory",
+                    EntityId = entity.Id.ToString(),
+                    Description = $"تعديل التصنيف: {entity.Title}",
+                    Result = "Success",
+                    BeforeState = beforeState,
+                    AfterState = new
+                    {
+                        entity.Id,
+                        entity.Title,
+                        entity.ParentId,
+                        entity.Active,
+                        entity.Order
+                    }
+                });
+            }
 
             return entity.Id;
         }
@@ -165,11 +214,42 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create("Not Found"));
 
             if (entity.Products.Any())
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Catalog",
+                        Action = "DeleteCategory",
+                        EntityType = "ProductCategory",
+                        EntityId = id.ToString(),
+                        Description = $"فشل حذف التصنيف {entity.Title} لاحتوائه على منتجات",
+                        Result = "Failed",
+                        FailureReason = "يجب حذف المنتجات المرتبطة بالتصنيف أولاً."
+                    });
+                }
                 return BadRequest(ApiErr.Create("Delete Products First"));
+            }
 
             _service.Delete(entity);
             await _unitOfWork.SaveChangesAsync();
             _logger.LogInformation("Deleted ProductCategory {0} #{1}", entity.GetType().Name, entity.Id);
+
+            _cache.Remove("ProductCategories");
+            _cache.Remove("ProductCategoriesTree");
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Catalog",
+                    Action = "DeleteCategory",
+                    EntityType = "ProductCategory",
+                    EntityId = id.ToString(),
+                    Description = $"حذف التصنيف: {entity.Title}",
+                    Result = "Success"
+                });
+            }
 
             return true;
         }

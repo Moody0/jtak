@@ -11,7 +11,7 @@ import {
   IPaginatorView,
   ISearchView,
 } from 'src/app/_metronic/shared/crud-table';
-import { OrdersService } from '../../services/orders.service';
+import { OrdersService, AdminOrdersSummaryDto } from '../../services/orders.service';
 import { Order } from '../../models/orders.model';
 import { OrderDetailStatus } from '../../models/order-status.enum';
 import { EditDilevry } from './EditDilevry/edit-dilevry.component';
@@ -24,6 +24,7 @@ import { DeleteModalComponent } from 'src/app/modules/shared/components/delete-m
 import { TranslateService } from '@ngx-translate/core';
 
 
+import { ToastrService } from 'ngx-toastr';
 import { NotificationSummaryService } from 'src/app/_metronic/layout/core/notification-summary.service';
 
 @Component({
@@ -45,21 +46,46 @@ export class OrdersListComponent
   searchGroup: FormGroup;
   order: Order;
   lastUpdated = new Date();
-  activeTab: 'ALL' | 'PENDING' | 'READY' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELED' | 'UNASSIGNED' = 'ALL';
+  activeTab: 'ALL' | 'PENDING' | 'READY' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELED' | 'UNASSIGNED' | 'ARCHIVED' = 'ALL';
   expandedOrderIds = new Set<number>();
+  summary: AdminOrdersSummaryDto = {
+    total: 0,
+    pendingApproval: 0,
+    withoutDriver: 0,
+    readyForDelivery: 0,
+    inDelivery: 0,
+    completed: 0,
+    cancelledRejected: 0,
+  };
 
   constructor(
     private fb: FormBuilder,
     public ordersService: OrdersService,
     private modalService: NgbModal,
     private translate: TranslateService,
+    private toastr: ToastrService,
     private notificationSummaryService: NotificationSummaryService
   ) { }
 
+  loadSummary(): void {
+    this.subs.sink = this.ordersService.getSummary().subscribe({
+      next: (res) => {
+        if (res) {
+          this.summary = res;
+        }
+      },
+      error: () => {},
+    });
+  }
 
-  setActiveTab(tab: 'ALL' | 'PENDING' | 'READY' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELED' | 'UNASSIGNED') {
+  setActiveTab(tab: 'ALL' | 'PENDING' | 'READY' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELED' | 'UNASSIGNED' | 'ARCHIVED') {
     this.activeTab = tab;
     this.selection.clear();
+    const paginator = this.ordersService.paginator;
+    paginator.page = 1;
+    const filter = tab === 'ALL' ? {} : { status: tab };
+    this.ordersService.patchState({ filter, paginator });
+    this.loadSummary();
   }
 
   getFilteredOrders(orders: Order[]): Order[] {
@@ -77,11 +103,11 @@ export class OrdersListComponent
         d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
         d.orderDetailStatus !== OrderDetailStatus.MerchantRejected);
 
-      const isDelivered = active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.Delivered);
+      const isDelivered = (active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.Delivered)) || !!o.deliveredAt;
       const isCanceled = allTerminal;
-      const isInTransit = active.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted);
-      const isReady = active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.ReadyForPickup);
-      const isPending = details.length === 0 || active.some(d => d.orderDetailStatus === OrderDetailStatus.Pending || d.orderDetailStatus === OrderDetailStatus.CustomerPending || d.orderDetailStatus === OrderDetailStatus.MerchantAccepted);
+      const isInTransit = !isDelivered && !isCanceled && active.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted);
+      const isReady = !isDelivered && !isCanceled && !isInTransit && active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.ReadyForPickup);
+      const isPending = !isDelivered && !isCanceled && !isInTransit && !isReady && (details.length === 0 || active.some(d => d.orderDetailStatus === OrderDetailStatus.Pending || d.orderDetailStatus === OrderDetailStatus.CustomerPending));
 
       switch (this.activeTab) {
         case 'PENDING':
@@ -119,11 +145,11 @@ export class OrdersListComponent
         d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
         d.orderDetailStatus !== OrderDetailStatus.MerchantRejected);
 
-      const isDelivered = active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.Delivered);
+      const isDelivered = (active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.Delivered)) || !!o.deliveredAt;
       const isCanceled = allTerminal;
-      const isInTransit = active.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted);
-      const isReady = active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.ReadyForPickup);
-      const isPending = details.length === 0 || active.some(d => d.orderDetailStatus === OrderDetailStatus.Pending || d.orderDetailStatus === OrderDetailStatus.CustomerPending || d.orderDetailStatus === OrderDetailStatus.MerchantAccepted);
+      const isInTransit = !isDelivered && !isCanceled && active.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted);
+      const isReady = !isDelivered && !isCanceled && !isInTransit && active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.ReadyForPickup);
+      const isPending = !isDelivered && !isCanceled && !isInTransit && !isReady && (details.length === 0 || active.some(d => d.orderDetailStatus === OrderDetailStatus.Pending || d.orderDetailStatus === OrderDetailStatus.CustomerPending));
 
       if (isDelivered) delivered++;
       else if (isCanceled) canceled++;
@@ -169,6 +195,10 @@ export class OrdersListComponent
   resetFilters() {
     this.activeTab = 'ALL';
     this.clearSearch();
+    const paginator = this.ordersService.paginator;
+    paginator.page = 1;
+    this.ordersService.patchState({ filter: {}, searchTerm: '', paginator });
+    this.loadSummary();
   }
 
   getInitials(name?: string): string {
@@ -182,6 +212,7 @@ export class OrdersListComponent
 
   refreshOrders() {
     this.lastUpdated = new Date();
+    this.loadSummary();
     this.ordersService.fetchPost();
     this.notificationSummaryService.refresh();
   }
@@ -457,8 +488,12 @@ export class OrdersListComponent
   ngOnInit(): void {
     this.ordersService.setDefaults();
     this.searchForm();
+    this.loadSummary();
     this.ordersService.fetchPost();
-    this.subs.sink = interval(5000).subscribe(() => this.ordersService.fetchPost());
+    this.subs.sink = interval(5000).subscribe(() => {
+      this.loadSummary();
+      this.ordersService.fetchPost();
+    });
     this.subs.sink = this.ordersService.isLoading$.subscribe(res => this.isLoading = res);
     this.subs.sink = this.ordersService.items$.subscribe(() => this.notificationSummaryService.refresh());
     this.sorting = this.ordersService.sorting;
@@ -547,8 +582,46 @@ export class OrdersListComponent
     }
   }
 
+  archiveOrder(order: Order): void {
+    if (!order) return;
+    const reason = window.prompt(`أدخل سبب أرشفة / حذف الطلب #${order.id} (إلزامي للتدقيق الإداري):`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+      this.toastr.warning('يرجى كتابة سبب واضح لأرشفة الطلب.');
+      return;
+    }
+    this.ordersService.archive(order.id, reason.trim()).subscribe({
+      next: () => {
+        this.toastr.success(`تمت أرشفة الطلب #${order.id} بنجاح.`);
+        this.refreshOrders();
+      },
+      error: (err: any) => {
+        this.toastr.error(err?.error?.title || err?.error?.detail || err?.message || 'تعذر أرشفة الطلب.');
+      }
+    });
+  }
+
+  restoreOrder(order: Order): void {
+    if (!order) return;
+    if (!window.confirm(`هل أنت متأكد من استعادة الطلب #${order.id} وإعادته إلى قائمة الطلبات النشطة؟`)) {
+      return;
+    }
+    this.ordersService.restore(order.id).subscribe({
+      next: () => {
+        this.toastr.success(`تمت استعادة الطلب #${order.id} بنجاح.`);
+        this.refreshOrders();
+      },
+      error: (err: any) => {
+        this.toastr.error(err?.error?.title || err?.error?.detail || err?.message || 'تعذر استعادة الطلب.');
+      }
+    });
+  }
+
   getOrderOverallStatus(order: Order): { label: string; badgeClass: string; icon: string } {
     const isAr = (this.translate.currentLang || localStorage.getItem('language') || 'ar') === 'ar';
+    if (order.isArchived || order.deletionDate) {
+      return { label: isAr ? 'مؤرشف' : 'Archived', badgeClass: 'badge-light-dark text-gray-700 border border-gray-400', icon: 'fa-archive' };
+    }
     if (!order || !order.orderDetails || order.orderDetails.length === 0) {
       return { label: isAr ? 'طلب جديد' : 'New Order', badgeClass: 'badge-light-warning text-warning', icon: 'fa-clock' };
     }

@@ -13,6 +13,7 @@ import '../../../core/controllers/merchant_profile_provider.dart';
 import '../../../core/services/locator.dart';
 import '../../../core/services/upload_service.dart';
 import '../../../utils/custom_widgets/messages.dart';
+import '../../../utils/utilities/phone_helper.dart';
 
 /// ---------------------------------------------------------------------------
 /// Store Profile Page: Full Control over Brand Logo, Cover Banner, Info & Hours
@@ -65,7 +66,7 @@ class _StoreProfilePageState extends State<StoreProfilePage> {
     _phone2Controller = TextEditingController(text: cached?.phone2 ?? '');
     _addressController = TextEditingController(text: cached?.address ?? '');
     _coverageController = TextEditingController(
-      text: (cached?.shippingCoverageInMeters ?? 5000).toString(),
+      text: ((cached?.shippingCoverageInMeters ?? 5000).clamp(0, 30000)).toString(),
     );
     _isStoreActive = cached?.active ?? true;
 
@@ -98,7 +99,7 @@ class _StoreProfilePageState extends State<StoreProfilePage> {
         _phone1Controller.text = p.phone1;
         _phone2Controller.text = p.phone2;
         _addressController.text = p.address;
-        _coverageController.text = p.shippingCoverageInMeters.toString();
+        _coverageController.text = (p.shippingCoverageInMeters.clamp(0, 30000)).toString();
         _isStoreActive = p.active;
       });
     }
@@ -248,14 +249,15 @@ class _StoreProfilePageState extends State<StoreProfilePage> {
       }
 
       final cleanCoverageStr = _normalizeDigits(_coverageController.text.trim());
-      final coverage = int.tryParse(cleanCoverageStr) ?? 5000;
+      final rawCoverage = int.tryParse(cleanCoverageStr) ?? 5000;
+      final coverage = rawCoverage.clamp(0, 30000);
 
       final success = await profileProv.updateProfile(
         title: _titleController.text.trim(),
         shortDescription: _shortDescController.text.trim(),
         description: _descriptionController.text.trim(),
-        phone1: _normalizeDigits(_phone1Controller.text.trim()),
-        phone2: _normalizeDigits(_phone2Controller.text.trim()),
+        phone1: PhoneHelper.normalizeSyrianLocalPhone(_phone1Controller.text.trim()),
+        phone2: PhoneHelper.normalizeSyrianLocalPhone(_phone2Controller.text.trim()),
         address: _addressController.text.trim(),
         shippingCoverageInMeters: coverage,
         logo: finalLogoId,
@@ -381,16 +383,29 @@ class _StoreProfilePageState extends State<StoreProfilePage> {
                       _buildTextField(
                         controller: _phone1Controller,
                         label: 'رقم الهاتف الأساسي للطلبات *',
-                        hint: '09xxxxxxxx',
+                        hint: '9xxxxxxxx',
                         keyboardType: TextInputType.phone,
-                        validator: (v) => v == null || v.trim().isEmpty ? 'رقم الهاتف مطلوب' : null,
+                        inputFormatters: [
+                          SyrianPhoneInputFormatter(),
+                        ],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'رقم الهاتف مطلوب';
+                          final clean = PhoneHelper.normalizeSyrianLocalPhone(v);
+                          if (clean.length != 9 || !clean.startsWith('9')) {
+                            return 'يرجى إدخال رقم هاتف سوري صحيح (9 أرقام)';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
                       _buildTextField(
                         controller: _phone2Controller,
                         label: 'رقم الواتساب / رقم إضافي',
-                        hint: '09xxxxxxxx',
+                        hint: '9xxxxxxxx',
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          SyrianPhoneInputFormatter(),
+                        ],
                       ),
                     ],
                   ),
@@ -410,7 +425,7 @@ class _StoreProfilePageState extends State<StoreProfilePage> {
                       const SizedBox(height: 14),
                       _buildTextField(
                         controller: _coverageController,
-                        label: 'نطاق التوصيل بالمتر (Shipping Coverage)',
+                        label: 'نطاق التوصيل بالمتر (الحد الأقصى 30,000 متر / 30 كم)',
                         hint: '5000',
                         keyboardType: TextInputType.number,
                         suffixText: 'متر',
@@ -752,6 +767,7 @@ class _StoreProfilePageState extends State<StoreProfilePage> {
     required String hint,
     int maxLines = 1,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
     String? suffixText,
     String? Function(String?)? validator,
   }) {
@@ -771,6 +787,7 @@ class _StoreProfilePageState extends State<StoreProfilePage> {
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           validator: validator,
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13.5,

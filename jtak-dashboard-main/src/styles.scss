@@ -1426,10 +1426,22 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
   display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px;
   background: #ffedd5; color: #ea580c; font-size: 0.88rem; font-weight: 800; flex-shrink: 0;
 }
+.ops-driver-avatar {
+  background: #e0f2fe; color: #0284c7;
+}
 .ops-merchant-amount { color: #0f172a; font-size: 0.95rem; font-weight: 750; }
 .ops-currency-badge {
   display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 6px;
   background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; font-size: 0.72rem; font-weight: 700;
+}
+.ops-entity-phone {
+  color: #64748b; font-size: 0.76rem; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;
+}
+.ops-table-search-box {
+  padding: 10px 16px; border-bottom: 1px solid #f1f5f9; background: #fafbfc;
+}
+.ops-table-search-box .form-control {
+  font-size: 0.8rem; border-radius: 8px; background: #fff;
 }
 
 /* Product Demands Ranking */

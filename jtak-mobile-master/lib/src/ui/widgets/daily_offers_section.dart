@@ -11,6 +11,7 @@ import '../../core/models/banner_model.dart';
 import '../../utils/utilities/global_var.dart';
 import 'clean_shimmer_skeletons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../pages/catalog/catalog_scope.dart';
 import '../pages/catalog/market_page.dart';
 import '../pages/catalog/restaurant_menu_page.dart';
 import '../pages/catalog/restaurants_list_page.dart';
@@ -299,7 +300,7 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
   void _handleBannerTap(BuildContext context, BannerModel banner) async {
     final rawUrl = (banner.url ?? '').trim();
     if (rawUrl.isEmpty || rawUrl == 'none' || rawUrl == 'no_link') {
-      return; // Display only
+      return; // Safe display only / no generic override
     }
 
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
@@ -325,7 +326,7 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
         );
         return;
       }
-    } else if (cleanUrl.startsWith('merchant:') || cleanUrl.startsWith('market:')) {
+    } else if (cleanUrl.startsWith('merchant:') || cleanUrl.startsWith('market:') || cleanUrl.startsWith('store:')) {
       final id = int.tryParse(cleanUrl.split(':').last);
       if (id != null) {
         Navigator.push(
@@ -333,12 +334,26 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
           MaterialPageRoute(
             builder: (context) => MarketPage(
               marketId: id,
-              marketName: (banner.title != null && banner.title!.isNotEmpty) ? banner.title! : 'المتجر',
+              marketName: (banner.title != null && banner.title!.isNotEmpty) ? banner.title! : 'جيتك ماركت - JTAK Market',
             ),
           ),
         );
         return;
       }
+    } else if (cleanUrl.startsWith('category:')) {
+      final catParam = cleanUrl.split(':').last.trim();
+      final catId = int.tryParse(catParam);
+      final scope = CatalogScope.fromCategory(catId, catParam) ?? CatalogScope.forGrocery();
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RestaurantsListPage(
+            catalogScope: scope,
+            title: scope.title,
+          ),
+        ),
+      );
+      return;
     } else if (cleanUrl == 'offers' || cleanUrl == 'promotions') {
       Navigator.push(
         context,
@@ -349,8 +364,19 @@ class _JtakDailyOffersSectionState extends State<JtakDailyOffersSection> {
       return;
     }
 
-    if (widget.onViewAllTap != null) {
-      widget.onViewAllTap!();
+    // Direct numeric ID support: e.g. "12"
+    final directId = int.tryParse(cleanUrl);
+    if (directId != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MarketPage(
+            marketId: directId,
+            marketName: (banner.title != null && banner.title!.isNotEmpty) ? banner.title! : 'جيتك ماركت - JTAK Market',
+          ),
+        ),
+      );
+      return;
     }
   }
 

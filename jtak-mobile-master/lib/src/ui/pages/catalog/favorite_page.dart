@@ -273,7 +273,7 @@ class _FavoritePageState extends State<FavoritePage> with SingleTickerProviderSt
                 children: [
                   const Icon(PhosphorIconsFill.forkKnife, size: 16),
                   const SizedBox(width: 6),
-                  Text('الأطباق ($mealCount)'),
+                  Text('الأصناف ($mealCount)'),
                 ],
               ),
             ),
@@ -329,9 +329,9 @@ class _FavoritePageState extends State<FavoritePage> with SingleTickerProviderSt
             height: MediaQuery.of(context).size.height * 0.65,
             child: _buildEmptyState(
               icon: PhosphorIconsFill.forkKnife,
-              title: 'قائمة أطباقك المفضلة فارغة',
+              title: 'قائمة أصنافك المفضلة فارغة',
               description:
-                  'أضف وجباتك وأطباقك المفضلة هنا لإعادة طلبها بضغطة زر واحدة في أي وقت.',
+                  'أضف وجباتك وأصنافك المفضلة هنا لإعادة طلبها بضغطة زر واحدة في أي وقت.',
             ),
           ),
         ),

@@ -26,6 +26,19 @@ class ProductsProvider extends BaseProvider<ProductModel> {
 
   bool isToggling(int? id) => id != null && _togglingIds.contains(id);
 
+  /// Clear all cached products, categories, filters, and pending prices on account switch
+  void reset() {
+    dataList.clear();
+    categories.clear();
+    allCategories.clear();
+    search = null;
+    selectedCategoryId = null;
+    stockFilter = ProductStockFilter.all;
+    newPricesMap.value = {};
+    _togglingIds.clear();
+    notifyListeners();
+  }
+
   List<ProductModel> get productList => filteredProducts;
 
   int get totalProductsCount => dataList.length;

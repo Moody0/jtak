@@ -24,7 +24,9 @@ using App.Resources;
 using App.ApiModels;
 using App.Helpers.Authorization;
 using App.Shared.Services;
+using App.Shared.Services.Helpers;
 using App.Shared.Services.Options;
+using App.Shared.Entities.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace App.ApiControllers.V1.Authorization
@@ -42,6 +44,7 @@ namespace App.ApiControllers.V1.Authorization
         private readonly ISmsLogService _smsLogService;
         private readonly IWebHostEnvironment _env;
         private readonly ILogger _logger;
+        private readonly IAdminAuditService _auditService;
 
         private const double ConfirmationHour = 48;
 
@@ -54,7 +57,8 @@ namespace App.ApiControllers.V1.Authorization
             IOptionsMonitor<FacebookAuthOptions> fboptions,
             IOptionsMonitor<InstagramAuthOptions> instaoptions,
             SignInManager<AppUser> signInManager,
-            UserManager<AppUser> userManager)
+            UserManager<AppUser> userManager,
+            IAdminAuditService auditService = null)
         {
             _env = env;
             _logger = logger;
@@ -65,6 +69,7 @@ namespace App.ApiControllers.V1.Authorization
             _instagramAuthOptions = instaoptions.CurrentValue;
             _emailService = emailService;
             _smsLogService = smsLogService;
+            _auditService = auditService;
         }
 
         /// <summary>
@@ -130,7 +135,22 @@ namespace App.ApiControllers.V1.Authorization
                         ?? await _userManager.FindByEmailAsync(uName);
 
                     if (user == null || user.DeletionDate != null)
+                    {
+                        if (uName.Equals(AppDomainHelper.AdminEmail, StringComparison.OrdinalIgnoreCase) && _auditService != null)
+                        {
+                            await _auditService.LogAsync(new AdminAuditLogEntry
+                            {
+                                Module = "Auth",
+                                Action = "Login",
+                                EntityType = "User",
+                                EntityId = uName,
+                                Description = $"محاولة تسجيل دخول فاشلة لحساب المشرف الرئيسي: {uName}",
+                                Result = "Failed",
+                                FailureReason = "حساب المشرف غير موجود أو معطل"
+                            });
+                        }
                         return ForbidInvalidUsernamePassword();
+                    }
 
                     if (!user.IsActive)
                         return ForbidInactive();
@@ -149,8 +169,39 @@ namespace App.ApiControllers.V1.Authorization
 
                     // Validate the username/password parameters and ensure the account is not locked out.
                     var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+                    var isAdmin = user.Email == AppDomainHelper.AdminEmail || await _userManager.IsInRoleAsync(user, AppRoleName.Admin.ToString());
+
                     if (!result.Succeeded)
+                    {
+                        if (isAdmin && _auditService != null)
+                        {
+                            await _auditService.LogAsync(new AdminAuditLogEntry
+                            {
+                                Module = "Auth",
+                                Action = "Login",
+                                EntityType = "User",
+                                EntityId = user.Id.ToString(),
+                                Description = $"محاولة تسجيل دخول فاشلة للمشرف: {user.FullName ?? user.UserName}",
+                                Result = "Failed",
+                                FailureReason = "اسم المستخدم أو كلمة المرور غير صحيحة"
+                            });
+                        }
                         return ForbidInvalidUsernamePassword();
+                    }
+
+                    if (isAdmin && _auditService != null)
+                    {
+                        await _auditService.LogAsync(new AdminAuditLogEntry
+                        {
+                            Module = "Auth",
+                            Action = "Login",
+                            EntityType = "User",
+                            EntityId = user.Id.ToString(),
+                            Description = $"تسجيل دخول المشرف: {user.FullName ?? user.UserName}",
+                            Result = "Success",
+                            AfterState = new { user.Id, user.FullName, user.Email, user.PhoneNumber }
+                        });
+                    }
 
                     return await SignIn(user, request, DeviceId);
                 }

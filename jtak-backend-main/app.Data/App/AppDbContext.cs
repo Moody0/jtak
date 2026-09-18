@@ -83,6 +83,30 @@ namespace App.Shared.Data.App
             //}
             #endregion
 
+            builder.Entity<AdminAuditLog>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.Property(x => x.AdminName).HasMaxLength(200);
+                b.Property(x => x.AdminEmail).HasMaxLength(200);
+                b.Property(x => x.Module).HasMaxLength(100);
+                b.Property(x => x.Action).HasMaxLength(100);
+                b.Property(x => x.EntityType).HasMaxLength(100);
+                b.Property(x => x.EntityId).HasMaxLength(200);
+                b.Property(x => x.Description).HasMaxLength(2000);
+                b.Property(x => x.Result).HasMaxLength(50);
+                b.Property(x => x.IpAddress).HasMaxLength(100);
+                b.Property(x => x.UserAgent).HasMaxLength(500);
+                b.Property(x => x.CorrelationId).HasMaxLength(100);
+
+                b.HasIndex(x => x.CreatedDate);
+                b.HasIndex(x => x.AdminUserId);
+                b.HasIndex(x => x.Module);
+                b.HasIndex(x => x.Action);
+                b.HasIndex(x => x.Result);
+                b.HasIndex(x => new { x.EntityType, x.EntityId });
+                b.HasIndex(x => x.CorrelationId);
+            });
+
             base.OnModelCreating(builder);
         }
 
@@ -162,5 +186,6 @@ namespace App.Shared.Data.App
         public DbSet<FavoriteProduct> FavoriteProducts { get; set; }
         public DbSet<ProductReview> ProductReviews { get; set; }
         public DbSet<SupportMessage> SupportMessages { get; set; }
+        public DbSet<AdminAuditLog> AdminAuditLogs { get; set; }
     }
 }

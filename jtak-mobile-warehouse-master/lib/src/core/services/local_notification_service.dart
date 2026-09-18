@@ -22,16 +22,20 @@ class LocalNotificationService {
   }
 
   void initializing() async {
-    androidInitializationSettings = const AndroidInitializationSettings('notification_icon');
-    iosInitializationSettings = const DarwinInitializationSettings();
-    initializationSettings = InitializationSettings(android: androidInitializationSettings, iOS: iosInitializationSettings);
-    await flutterLocalNotificationsPlugin.initialize(
-      settings: initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        onSelectNotification(response.payload);
-      },
-    );
-    _requestIOSPermissions();
+    try {
+      androidInitializationSettings = const AndroidInitializationSettings('notification_icon');
+      iosInitializationSettings = const DarwinInitializationSettings();
+      initializationSettings = InitializationSettings(android: androidInitializationSettings, iOS: iosInitializationSettings);
+      await flutterLocalNotificationsPlugin.initialize(
+        settings: initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          onSelectNotification(response.payload);
+        },
+      );
+      _requestIOSPermissions();
+    } catch (e) {
+      debugPrint('LocalNotificationService initializing note: $e');
+    }
   }
 
   void _requestIOSPermissions() {

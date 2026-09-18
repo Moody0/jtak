@@ -729,48 +729,59 @@ class _SearchPageState extends State<SearchPage> {
     final allowedMerchantIds = widget.scopedMerchantIds?.toSet() ?? <int>{};
     final merchantResults = <Map<String, dynamic>>[];
 
-    if (locator.isRegistered<MarketsProvider>() &&
-        allowedMerchantIds.isNotEmpty) {
+    if (locator.isRegistered<MarketsProvider>()) {
       final marketsProvider = locator<MarketsProvider>();
-      final categoryMerchants = marketsProvider.getCachedCategoryMerchants(
-        _effectiveCategoryId!,
-      );
+      final scopeKind = widget.catalogScope?.kind;
 
-      for (final merchant in marketsProvider.restaurants) {
-        if (allowedMerchantIds.contains(merchant.id) &&
-            (_matchesQuery(merchant.name, query) ||
-                _matchesQuery(merchant.cuisine, query))) {
-          merchantResults.add({
-            'id': merchant.id,
-            'name': merchant.name,
-            'image': merchant.logoUrl,
-            'cover': merchant.coverUrl,
-            'description': merchant.cuisine,
-          });
+      if (scopeKind == CatalogScopeKind.restaurants ||
+          scopeKind == CatalogScopeKind.coffee ||
+          allowedMerchantIds.isNotEmpty) {
+        for (final merchant in marketsProvider.restaurants) {
+          final isAllowed = allowedMerchantIds.isEmpty ||
+              allowedMerchantIds.contains(merchant.id);
+          if (isAllowed &&
+              (_matchesQuery(merchant.name, query) ||
+                  _matchesQuery(merchant.cuisine, query) ||
+                  _matchesQuery(merchant.categoryTag, query))) {
+            merchantResults.add({
+              'id': merchant.id,
+              'name': merchant.name,
+              'image': merchant.logoUrl,
+              'cover': merchant.coverUrl,
+              'description': merchant.cuisine,
+            });
+          }
         }
       }
 
-      final productMerchants = <MarketStoreModel>[
-        ...categoryMerchants,
-        ...marketsProvider.markets,
-      ];
-      final seenMerchantIds = <int>{};
-      for (final merchant in productMerchants) {
-        if (!seenMerchantIds.add(merchant.id)) continue;
-        if (allowedMerchantIds.contains(merchant.id) &&
-            (_matchesQuery(merchant.name, query) ||
-                _matchesQuery(merchant.tagline ?? '', query))) {
-          final effectiveImage = (merchant.logoUrl != null &&
-                  merchant.logoUrl!.isNotEmpty)
-              ? merchant.logoUrl!
-              : (merchant.assetPath ?? '');
-          merchantResults.add({
-            'id': merchant.id,
-            'name': merchant.name,
-            'image': effectiveImage,
-            'cover': effectiveImage,
-            'description': merchant.tagline ?? widget.catalogScope!.title,
-          });
+      if (scopeKind != CatalogScopeKind.restaurants) {
+        final categoryMerchants = _effectiveCategoryId != null
+            ? marketsProvider.getCachedCategoryMerchants(_effectiveCategoryId!)
+            : <MarketStoreModel>[];
+        final productMerchants = <MarketStoreModel>[
+          ...categoryMerchants,
+          ...marketsProvider.markets,
+        ];
+        final seenMerchantIds = <int>{};
+        for (final merchant in productMerchants) {
+          if (!seenMerchantIds.add(merchant.id)) continue;
+          final isAllowed = allowedMerchantIds.isEmpty ||
+              allowedMerchantIds.contains(merchant.id);
+          if (isAllowed &&
+              (_matchesQuery(merchant.name, query) ||
+                  _matchesQuery(merchant.tagline ?? '', query))) {
+            final effectiveImage = (merchant.logoUrl != null &&
+                    merchant.logoUrl!.isNotEmpty)
+                ? merchant.logoUrl!
+                : (merchant.assetPath ?? '');
+            merchantResults.add({
+              'id': merchant.id,
+              'name': merchant.name,
+              'image': effectiveImage,
+              'cover': effectiveImage,
+              'description': merchant.tagline ?? _scopeTitle,
+            });
+          }
         }
       }
     }

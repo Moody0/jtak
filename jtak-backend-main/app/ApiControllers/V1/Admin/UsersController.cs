@@ -38,23 +38,25 @@ namespace App.ApiControllers.V1.Admin
         private readonly ILogger _logger;
         private readonly IMapper _mapper;
         private readonly IWebHostEnvironment _env;
+        private readonly IAdminAuditService _auditService;
 
         public UsersController(UserManager<AppUser> userManager, IUserService service, ITagService tagService, IAppUnitOfWork uow, IMapper mapper, IWebHostEnvironment env, ILogger<UsersController> logger,
                                     RoleManager<SolRole> roleManager,
                                     ITrackableRepository<AppUser> userRepo,
-                                    ITrackableRepository<SolUserRole> userRoleRepo)
+                                    ITrackableRepository<SolUserRole> userRoleRepo,
+                                    IAdminAuditService auditService = null)
         {
             _env = env;
             _service = service;
             _userManager = userManager;
             _tagService = tagService;
             _uow = uow;
-            _uow = uow;
             _logger = logger;
             _mapper = mapper;
             _roleManager = roleManager;
             _userRepo = userRepo;
             _userRoleRepo = userRoleRepo;
+            _auditService = auditService;
         }
 
         /// <summary>
@@ -76,7 +78,7 @@ namespace App.ApiControllers.V1.Admin
             {
                 var query = from userrole in UserRoles
                             join user in Users on userrole.UserId equals user.Id
-                            where userrole.RoleId.Equals(r.Id) && user.DeletionDate == null
+                            where userrole.RoleId.Equals(r.Id) && user.DeletionDate == null && (user.Email == null || user.Email != AppDomainHelper.AdminEmail)
                             select user;
 
                 return await query.ListMetronicTableQueryable(request,
@@ -111,7 +113,7 @@ namespace App.ApiControllers.V1.Admin
                 CountryPhoneCode = item.CountryPhoneCode,
                 Email = item.Email,
                 EmailConfirmed = true
-            }, x => x.Email != AppDomainHelper.AdminEmail && x.DeletionDate == null);
+            }, x => (x.Email == null || x.Email != AppDomainHelper.AdminEmail) && x.DeletionDate == null);
 
             foreach (var item in list.Items)
             {
@@ -165,11 +167,49 @@ namespace App.ApiControllers.V1.Admin
             var password = !string.IsNullOrWhiteSpace(item.Password) ? item.Password.Trim() : "123456";
             var result = await _userManager.CreateAsync(entity, password);
             if (!result.Succeeded)
+            {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Users",
+                        Action = "Create",
+                        EntityType = "User",
+                        EntityId = fullPhone,
+                        Description = $"فشل إنشاء حساب المستخدم: {entity.FullName} ({fullPhone})",
+                        Result = "Failed",
+                        FailureReason = string.Join(", ", result.Errors.Select(e => e.Description))
+                    });
+                }
                 return BadRequest(result);
+            }
 
             var role = item.Role.ToString();
             await _userManager.AddToRoleAsync(entity, role);
             _logger.LogInformation("Created New {0} with role {1}", entity.GetType().Name, role);
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Users",
+                    Action = "Create",
+                    EntityType = "User",
+                    EntityId = entity.Id.ToString(),
+                    Description = $"إنشاء حساب مستخدم جديد: {entity.FullName} ({role})",
+                    Result = "Success",
+                    AfterState = new
+                    {
+                        entity.Id,
+                        entity.FullName,
+                        entity.PhoneNumber,
+                        entity.Email,
+                        Role = role,
+                        entity.IsActive
+                    }
+                });
+            }
+
             return entity.Id;
         }
 
@@ -184,6 +224,19 @@ namespace App.ApiControllers.V1.Admin
         {
             var entity = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
             if (entity == null) return NotFound();
+
+            var currentRoles = await _userManager.GetRolesAsync(entity);
+            var beforeState = new
+            {
+                entity.Id,
+                entity.FullName,
+                entity.PhoneNumber,
+                entity.Email,
+                Roles = currentRoles,
+                entity.IsActive,
+                entity.DefaultLat,
+                entity.DefaultLng
+            };
 
             var countryCode = !string.IsNullOrWhiteSpace(item.CountryPhoneCode)
                 ? item.CountryPhoneCode.Trim()
@@ -224,6 +277,19 @@ namespace App.ApiControllers.V1.Admin
             var res = await _userManager.UpdateAsync(entity);
             if (!res.Succeeded)
             {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Users",
+                        Action = "Edit",
+                        EntityType = "User",
+                        EntityId = id.ToString(),
+                        Description = $"فشل تحديث بيانات المستخدم: {entity.FullName}",
+                        Result = "Failed",
+                        FailureReason = string.Join(", ", res.Errors.Select(e => e.Description))
+                    });
+                }
                 return BadRequest(res);
             }
 
@@ -233,11 +299,22 @@ namespace App.ApiControllers.V1.Admin
                 var passResult = await _userManager.ResetPasswordAsync(entity, token, item.Password.Trim());
                 if (!passResult.Succeeded)
                 {
+                    if (_auditService != null)
+                    {
+                        await _auditService.LogAsync(new AdminAuditLogEntry
+                        {
+                            Module = "Users",
+                            Action = "ResetPassword",
+                            EntityType = "User",
+                            EntityId = id.ToString(),
+                            Description = $"فشل تعيين كلمة مرور المستخدم: {entity.FullName}",
+                            Result = "Failed",
+                            FailureReason = string.Join(", ", passResult.Errors.Select(e => e.Description))
+                        });
+                    }
                     return BadRequest(passResult);
                 }
             }
-
-            var currentRoles = await _userManager.GetRolesAsync(entity);
 
             res = await _userManager.RemoveFromRolesAsync(entity, currentRoles);
 
@@ -252,6 +329,31 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(res);
             }
 
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Users",
+                    Action = "Edit",
+                    EntityType = "User",
+                    EntityId = entity.Id.ToString(),
+                    Description = $"تعديل بيانات المستخدم: {entity.FullName} ({role})",
+                    Result = "Success",
+                    BeforeState = beforeState,
+                    AfterState = new
+                    {
+                        entity.Id,
+                        entity.FullName,
+                        entity.PhoneNumber,
+                        entity.Email,
+                        Role = role,
+                        entity.IsActive,
+                        entity.DefaultLat,
+                        entity.DefaultLng
+                    }
+                });
+            }
+
             return entity.Id;
         }
 
@@ -264,8 +366,23 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<bool>> Enable(Guid id)
         {
             var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
+            if (user == null) return NotFound();
             user.IsActive = true;
             await _userManager.UpdateAsync(user);
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Users",
+                    Action = "Enable",
+                    EntityType = "User",
+                    EntityId = id.ToString(),
+                    Description = $"تفعيل حساب المستخدم: {user.FullName}",
+                    Result = "Success"
+                });
+            }
+
             return true;
         }
 
@@ -278,8 +395,23 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<bool>> Disable(Guid id)
         {
             var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
+            if (user == null) return NotFound();
             user.IsActive = false;
             await _userManager.UpdateAsync(user);
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Users",
+                    Action = "Disable",
+                    EntityType = "User",
+                    EntityId = id.ToString(),
+                    Description = $"تعطيل حساب المستخدم: {user.FullName}",
+                    Result = "Success"
+                });
+            }
+
             return true;
         }
 
@@ -295,11 +427,38 @@ namespace App.ApiControllers.V1.Admin
             if (user == null) return NotFound();
             if (user.Email == AppDomainHelper.AdminEmail)
             {
+                if (_auditService != null)
+                {
+                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    {
+                        Module = "Users",
+                        Action = "Delete",
+                        EntityType = "User",
+                        EntityId = id.ToString(),
+                        Description = $"محاولة حذف المشرف الرئيسي للنظام: {user.FullName}",
+                        Result = "Failed",
+                        FailureReason = "لا يمكن حذف المشرف الرئيسي للنظام."
+                    });
+                }
                 return BadRequest("Cannot delete root admin user");
             }
             user.IsActive = false;
             user.DeletionDate = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Users",
+                    Action = "Delete",
+                    EntityType = "User",
+                    EntityId = id.ToString(),
+                    Description = $"حذف/أرشفة حساب المستخدم: {user.FullName}",
+                    Result = "Success"
+                });
+            }
+
             return true;
         }
 
