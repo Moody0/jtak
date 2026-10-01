@@ -1,4 +1,5 @@
 import { Component, Input, OnDestroy, OnInit, Output, EventEmitter } from '@angular/core';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { Subscription, timer } from 'rxjs';
@@ -100,6 +101,7 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
   private receiptSubscription?: Subscription;
   private receiptPhotoKey = '';
   receiptPhotoUrl: string | null = null;
+  trustedReceiptPhotoUrl: SafeUrl | null = null;
   receiptPhotoError = false;
 
   get isErrand(): boolean {
@@ -144,7 +146,8 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
     public modal: NgbActiveModal,
     private supportService: SupportMessagesService,
     private toastr: ToastrService,
-    public filesService: FilesService
+    public filesService: FilesService,
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -196,6 +199,7 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
     this.receiptSubscription?.unsubscribe();
     if (this.receiptPhotoUrl) URL.revokeObjectURL(this.receiptPhotoUrl);
     this.receiptPhotoUrl = null;
+    this.trustedReceiptPhotoUrl = null;
     this.receiptPhotoError = false;
     if (!key) return;
     // HttpClient attaches the admin bearer token; image tags cannot do that.
@@ -206,6 +210,8 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
           return;
         }
         this.receiptPhotoUrl = URL.createObjectURL(blob);
+        // The URL is a browser-created object URL for the authenticated receipt blob.
+        this.trustedReceiptPhotoUrl = this.sanitizer.bypassSecurityTrustUrl(this.receiptPhotoUrl);
       },
       error: () => this.receiptPhotoError = true,
     });
@@ -216,6 +222,7 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
     if (this.receiptPhotoUrl) {
       URL.revokeObjectURL(this.receiptPhotoUrl);
       this.receiptPhotoUrl = null;
+      this.trustedReceiptPhotoUrl = null;
     }
   }
 

@@ -185,8 +185,8 @@
           </span>
         </div>
         <div *ngIf="receiptPhotoUrl && !receiptPhotoError" class="mt-2">
-          <a [href]="receiptPhotoUrl" target="_blank" rel="noopener noreferrer">
-            <img [src]="receiptPhotoUrl" (error)="onReceiptPhotoError()" alt="صورة فاتورة الشراء" class="errand-receipt-img" />
+          <a [href]="trustedReceiptPhotoUrl" target="_blank" rel="noopener noreferrer">
+            <img [src]="trustedReceiptPhotoUrl" (error)="onReceiptPhotoError()" alt="صورة فاتورة الشراء" class="errand-receipt-img" />
           </a>
         </div>
         <span *ngIf="receiptPhotoError" class="text-danger fs-8 mt-1 d-block">تعذر تحميل صورة الفاتورة أو غير متوفرة على الخادم.</span>

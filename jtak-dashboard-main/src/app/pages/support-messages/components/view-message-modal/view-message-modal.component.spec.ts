@@ -1,4 +1,5 @@
 import { fakeAsync, tick } from '@angular/core/testing';
+import { DomSanitizer } from '@angular/platform-browser';
 import { of, Subject, throwError } from 'rxjs';
 import { ErrandStatus, SupportMessage, SupportMessageStatus } from '../../models/support-message.model';
 import { ViewMessageModalComponent } from './view-message-modal.component';
@@ -8,6 +9,7 @@ describe('Purchase-request admin handoffs', () => {
   let toast: any;
   let component: ViewMessageModalComponent;
   let files: any;
+  let sanitizer: any;
 
   beforeEach(() => {
     service = jasmine.createSpyObj('SupportMessagesService', [
@@ -17,7 +19,9 @@ describe('Purchase-request admin handoffs', () => {
     service.getErrandDriverEarning.and.returnValue(of({ amount: 75 }));
     toast = jasmine.createSpyObj('ToastrService', ['success', 'error']);
     files = jasmine.createSpyObj('FilesService', ['getErrandReceipt']);
-    component = new ViewMessageModalComponent({} as any, service, toast, files);
+    sanitizer = jasmine.createSpyObj('DomSanitizer', ['bypassSecurityTrustUrl']);
+    sanitizer.bypassSecurityTrustUrl.and.callFake((url: string) => `safe:${url}`);
+    component = new ViewMessageModalComponent({} as any, service, toast, files, sanitizer as DomSanitizer);
     component.message = {
       id: 16, status: SupportMessageStatus.New, errandStatus: ErrandStatus.Quoted,
       errandItemPrice: 50, errandDeliveryFee: 10,
@@ -60,6 +64,8 @@ describe('Purchase-request admin handoffs', () => {
     expect(files.getErrandReceipt).toHaveBeenCalledOnceWith(16);
     expect(create).toHaveBeenCalledWith(blob);
     expect(component.receiptPhotoUrl).toBe('blob:private-receipt');
+    expect(sanitizer.bypassSecurityTrustUrl).toHaveBeenCalledOnceWith('blob:private-receipt');
+    expect(component.trustedReceiptPhotoUrl).toBe('safe:blob:private-receipt' as any);
     service.getMessage.and.returnValue(of({ ...component.message }));
     component.refreshErrand();
     expect(files.getErrandReceipt).toHaveBeenCalledTimes(1);
