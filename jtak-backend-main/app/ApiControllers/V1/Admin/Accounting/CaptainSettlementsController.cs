@@ -1,3 +1,6 @@
+using Modules.Accounting.Services;
+using Modules.Shipping.Services;
+using App.Shared.Services.Extentions;
 using App.ApiModels;
 using App.Extensions;
 using App.Orders.Data;
@@ -134,16 +137,22 @@ namespace App.ApiControllers.V1.Admin.Accounting
         private readonly AccountingDbContext _accountingDb;
         private readonly UserManager<AppUser> _userManager;
         private readonly IAdminAuditService _auditService;
+        private readonly ILedgerService _ledgerService;
+        private readonly INotificationService _notifications;
 
         public CaptainSettlementsController(
             OrdersDbContext ordersDb,
             AccountingDbContext accountingDb,
             UserManager<AppUser> userManager,
+            ILedgerService ledgerService,
+            INotificationService notifications = null,
             IAdminAuditService auditService = null)
         {
             _ordersDb = ordersDb ?? throw new ArgumentNullException(nameof(ordersDb));
             _accountingDb = accountingDb ?? throw new ArgumentNullException(nameof(accountingDb));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+            _ledgerService = ledgerService ?? throw new ArgumentNullException(nameof(ledgerService));
+            _notifications = notifications;
             _auditService = auditService;
         }
 
@@ -177,6 +186,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
             [FromQuery] string settlementStatus = "unsettled",
             [FromQuery] string searchTerm = null)
         {
+            await SyncUnpostedSettlementBatchesAsync();
             var drivers = (await _userManager.GetUsersInRoleAsync(AppRoleName.Delivery.ToString())).ToList();
             if (captainId.HasValue && captainId.Value != Guid.Empty)
             {
@@ -440,7 +450,8 @@ namespace App.ApiControllers.V1.Admin.Accounting
             var totalCashCollected = orders.Sum(o => CalculateCashCollected(o));
             var totalDeliveryFees = orders.Sum(o => o.DeliveryFee);
             var totalCaptainEarnings = orders.Sum(o => CalculateCaptainEarning(o));
-            var netDueToCompany = totalCashCollected - totalCaptainEarnings;
+            var wagesToOffset = Math.Min(totalCashCollected, totalCaptainEarnings);
+            var netDueToCompany = totalCashCollected - wagesToOffset;
 
             foreach (var order in orders)
             {
@@ -449,7 +460,96 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 order.SettlementBatchId = batchCode;
             }
 
-            // Create persistent DailySettlementBatch
+            // 1. Post double-entry accounting ledger transaction
+            Guid settlementTxnId = Guid.Empty;
+            if (totalCashCollected > 0 || totalCaptainEarnings > 0)
+            {
+                var floatAcc = await _ledgerService.GetOrCreateUserAccountAsync(
+                    request.CaptainId,
+                    AccountType.Asset,
+                    SystemAccountCodes.CaptainCashFloatPrefix,
+                    $"Cash Float - {driver.FullName ?? driver.UserName}",
+                    "SYP");
+
+                var wagesAcc = await _ledgerService.GetOrCreateUserAccountAsync(
+                    request.CaptainId,
+                    AccountType.Liability,
+                    SystemAccountCodes.CaptainEarningsPrefix,
+                    $"Earnings - {driver.FullName ?? driver.UserName}",
+                    "SYP");
+
+                var vaultAcc = await _ledgerService.GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.CompanyMainVault,
+                    "Company Cash Vault",
+                    AccountType.Asset,
+                    "SYP");
+
+                var txnRequest = new PostTransactionRequest
+                {
+                    ReferenceType = "CaptainSettlement",
+                    ReferenceId = batchCode,
+                    IdempotencyKey = $"SettlementBatch-{batchCode}",
+                    Description = $"تسوية وردية الكابتن {driver.FullName ?? driver.UserName} - دفعة {batchCode}",
+                    Entries = new List<PostLedgerEntryRequest>()
+                };
+
+                if (netDueToCompany > 0)
+                {
+                    txnRequest.Entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = vaultAcc.Id,
+                        Debit = netDueToCompany,
+                        Credit = 0m,
+                        Currency = "SYP",
+                        Memo = $"توريد نقدي لخزينة الشركة من الكابتن {driver.FullName ?? driver.UserName} - تسوية {batchCode}"
+                    });
+                }
+
+                if (wagesToOffset > 0)
+                {
+                    txnRequest.Entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = wagesAcc.Id,
+                        Debit = wagesToOffset,
+                        Credit = 0m,
+                        Currency = "SYP",
+                        Memo = $"اقتطاع مستحقات توصيل الكابتن {driver.FullName ?? driver.UserName} من العهدة - تسوية {batchCode}"
+                    });
+                }
+
+                if (totalCashCollected > 0)
+                {
+                    txnRequest.Entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = floatAcc.Id,
+                        Debit = 0m,
+                        Credit = totalCashCollected,
+                        Currency = "SYP",
+                        Memo = $"تفريغ وتسوية عهدة الكابتن {driver.FullName ?? driver.UserName} - تسوية {batchCode}"
+                    });
+                }
+
+                if (txnRequest.Entries.Count > 0)
+                {
+                    var txnDto = await _ledgerService.PostTransactionAsync(txnRequest);
+                    settlementTxnId = txnDto.Id;
+                }
+            }
+
+            // 2. Record payment in Payments table so it appears in driver's payment history
+            var payment = new Payment
+            {
+                ByUserId = request.CaptainId,
+                ByUser = driver.FullName ?? driver.UserName,
+                ToUserId = adminId != Guid.Empty ? adminId : Guid.NewGuid(),
+                ToUser = adminName,
+                Amount = netDueToCompany > 0 ? netDueToCompany : totalCashCollected,
+                NewBalance = 0m,
+                HandoverDate = nowUtc
+            };
+            _accountingDb.Payments.Add(payment);
+
+            // 3. Create persistent DailySettlementBatch
             var batch = new DailySettlementBatch
             {
                 Id = Guid.NewGuid(),
@@ -460,7 +560,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 TotalWagesEarned = totalCaptainEarnings,
                 NetCashRemitted = netDueToCompany,
                 HandledByAdminId = adminId,
-                SettlementTransactionId = Guid.NewGuid(),
+                SettlementTransactionId = settlementTxnId != Guid.Empty ? settlementTxnId : Guid.NewGuid(),
                 IsLocked = true,
                 Notes = request.Notes ?? $"تسوية عدد {orders.Count} طلب للكابتن {driver.FullName ?? driver.UserName}"
             };
@@ -469,6 +569,22 @@ namespace App.ApiControllers.V1.Admin.Accounting
 
             await _ordersDb.SaveChangesAsync();
             await _accountingDb.SaveChangesAsync();
+
+            // 4. Send realtime push notification to driver app
+            if (_notifications != null)
+            {
+                try
+                {
+                    await _notifications.SendSettlementCompleted(
+                        new[] { driver.Id },
+                        batchCode,
+                        totalCashCollected > 0 ? totalCashCollected : netDueToCompany);
+                }
+                catch
+                {
+                    // Notification push should never fail the settlement
+                }
+            }
 
             var receipt = new SettlementBatchReceiptDto
             {
@@ -651,5 +767,158 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 _ => "غير محدد"
             };
         }
-    }
+    
+        /// <summary>
+        /// Explicit endpoint to re-sync unposted legacy batches into double-entry ledger
+        /// </summary>
+        [HttpPost("SyncUnpostedBatches")]
+        public async Task<ActionResult<int>> SyncUnpostedBatches()
+        {
+            var count = await SyncUnpostedSettlementBatchesAsync();
+            return Ok(count);
+        }
+
+        private async Task<int> SyncUnpostedSettlementBatchesAsync()
+        {
+            try
+            {
+                var unpostedBatches = await _accountingDb.DailySettlementBatches
+                    .Where(b => !_accountingDb.JournalTransactions.Any(jt => jt.Id == b.SettlementTransactionId))
+                    .ToListAsync();
+
+                if (unpostedBatches.Count == 0) return 0;
+
+                var vaultAcc = await _ledgerService.GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.CompanyMainVault,
+                    "Company Cash Vault",
+                    AccountType.Asset,
+                    "SYP");
+
+                int synced = 0;
+                foreach (var batch in unpostedBatches)
+                {
+                    try
+                    {
+                        var driver = await _userManager.FindByIdAsync(batch.CaptainUserId.ToString());
+                        var driverName = driver?.FullName ?? driver?.UserName ?? $"الكابتن {batch.CaptainUserId}";
+
+                        var wagesToOffset = Math.Min(batch.TotalCashCollected, batch.TotalWagesEarned);
+                        var netDueToCompany = batch.NetCashRemitted > 0 ? batch.NetCashRemitted : (batch.TotalCashCollected - wagesToOffset);
+
+                        var floatAcc = await _ledgerService.GetOrCreateUserAccountAsync(
+                            batch.CaptainUserId,
+                            AccountType.Asset,
+                            SystemAccountCodes.CaptainCashFloatPrefix,
+                            $"Cash Float - {driverName}",
+                            "SYP");
+
+                        var wagesAcc = await _ledgerService.GetOrCreateUserAccountAsync(
+                            batch.CaptainUserId,
+                            AccountType.Liability,
+                            SystemAccountCodes.CaptainEarningsPrefix,
+                            $"Earnings - {driverName}",
+                            "SYP");
+
+                        var txnRequest = new PostTransactionRequest
+                        {
+                            ReferenceType = "CaptainSettlement",
+                            ReferenceId = batch.BatchCode,
+                            IdempotencyKey = $"SettlementBatch-{batch.BatchCode}",
+                            Description = $"تسوية وردية الكابتن {driverName} - دفعة {batch.BatchCode} - مزامنة تلقائية",
+                            Entries = new List<PostLedgerEntryRequest>()
+                        };
+
+                        if (netDueToCompany > 0)
+                        {
+                            txnRequest.Entries.Add(new PostLedgerEntryRequest
+                            {
+                                AccountId = vaultAcc.Id,
+                                Debit = netDueToCompany,
+                                Credit = 0m,
+                                Currency = "SYP",
+                                Memo = $"توريد نقدي لخزينة الشركة من الكابتن {driverName} - تسوية {batch.BatchCode}"
+                            });
+                        }
+
+                        if (wagesToOffset > 0)
+                        {
+                            txnRequest.Entries.Add(new PostLedgerEntryRequest
+                            {
+                                AccountId = wagesAcc.Id,
+                                Debit = wagesToOffset,
+                                Credit = 0m,
+                                Currency = "SYP",
+                                Memo = $"اقتطاع مستحقات توصيل الكابتن {driverName} من العهدة - تسوية {batch.BatchCode}"
+                            });
+                        }
+
+                        if (batch.TotalCashCollected > 0)
+                        {
+                            txnRequest.Entries.Add(new PostLedgerEntryRequest
+                            {
+                                AccountId = floatAcc.Id,
+                                Debit = 0m,
+                                Credit = batch.TotalCashCollected,
+                                Currency = "SYP",
+                                Memo = $"تفريغ وتسوية عهدة الكابتن {driverName} - تسوية {batch.BatchCode}"
+                            });
+                        }
+
+                        if (txnRequest.Entries.Count > 0)
+                        {
+                            var txnDto = await _ledgerService.PostTransactionAsync(txnRequest);
+                            batch.SettlementTransactionId = txnDto.Id;
+                        }
+
+                        var hasPayment = await _accountingDb.Payments.AnyAsync(p =>
+                            p.ByUserId == batch.CaptainUserId &&
+                            p.Amount == (batch.NetCashRemitted > 0 ? batch.NetCashRemitted : batch.TotalCashCollected) &&
+                            p.HandoverDate >= batch.BatchDate.AddMinutes(-5) &&
+                            p.HandoverDate <= batch.BatchDate.AddMinutes(5));
+
+                        if (!hasPayment)
+                        {
+                            var adminUser = await _userManager.FindByIdAsync(batch.HandledByAdminId.ToString());
+                            var adminName = adminUser?.FullName ?? adminUser?.UserName ?? "مسؤول النظام";
+                            _accountingDb.Payments.Add(new Payment
+                            {
+                                ByUserId = batch.CaptainUserId,
+                                ByUser = driverName,
+                                ToUserId = batch.HandledByAdminId != Guid.Empty ? batch.HandledByAdminId : Guid.NewGuid(),
+                                ToUser = adminName,
+                                Amount = batch.NetCashRemitted > 0 ? batch.NetCashRemitted : batch.TotalCashCollected,
+                                NewBalance = 0m,
+                                HandoverDate = batch.BatchDate
+                            });
+                        }
+
+                        await _accountingDb.SaveChangesAsync();
+                        synced++;
+
+                        if (_notifications != null && driver != null)
+                        {
+                            try
+                            {
+                                await _notifications.SendSettlementCompleted(
+                                    new[] { driver.Id },
+                                    batch.BatchCode,
+                                    batch.TotalCashCollected > 0 ? batch.TotalCashCollected : batch.NetCashRemitted);
+                            }
+                            catch { }
+                        }
+                    }
+                    catch
+                    {
+                        // Continue with next batch
+                    }
+                }
+
+                return synced;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+}
 }

@@ -30,6 +30,7 @@ class InfiniteListview<T> extends StatelessWidget {
         return loadDataFun();
       },
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: padding,
         itemCount: modelProvider.dataList.length + 1,
         itemBuilder: (ctx, index) {

@@ -33,6 +33,7 @@ namespace Modules.Accounting.Services
         public async Task<SettlementBalanceDto> GetCaptainBalanceAsync(Guid captainUserId, string currency = "SYP")
         {
             currency = NormalizeCurrency(currency);
+            await SyncUnpostedCaptainBatchesAsync(captainUserId, currency);
             var gross = await _ledger.GetUserCashFloatBalanceAsync(captainUserId, currency);
             var activeAmounts = await _context.SettlementRequests
                 .Where(x => x.RequestedByUserId == captainUserId &&
@@ -79,6 +80,7 @@ namespace Modules.Accounting.Services
         public async Task<CaptainEarningsWalletDto> GetCaptainEarningsAsync(Guid captainUserId, string currency = "SYP")
         {
             currency = NormalizeCurrency(currency);
+            await SyncUnpostedCaptainBatchesAsync(captainUserId, currency);
             var entries = await _context.LedgerEntries.AsNoTracking()
                 .Where(x => x.Account.OwnerUserId == captainUserId &&
                             x.Account.Type == AccountType.Liability &&
@@ -650,5 +652,129 @@ namespace Modules.Accounting.Services
                 Amount = a.Amount
             }).ToList() ?? new List<SettlementMerchantAllocationDto>()
         };
-    }
+    
+        private async Task SyncUnpostedCaptainBatchesAsync(Guid captainUserId, string currency = "SYP")
+        {
+            try
+            {
+                var unpostedBatches = await _context.DailySettlementBatches
+                    .Where(b => b.CaptainUserId == captainUserId &&
+                                !_context.JournalTransactions.Any(jt => jt.Id == b.SettlementTransactionId))
+                    .ToListAsync();
+
+                if (unpostedBatches.Count == 0) return;
+
+                currency = NormalizeCurrency(currency);
+                var vaultAcc = await _ledger.GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.CompanyMainVault,
+                    "Company Cash Vault",
+                    AccountType.Asset,
+                    currency);
+
+                var floatAcc = await _ledger.GetOrCreateUserAccountAsync(
+                    captainUserId,
+                    AccountType.Asset,
+                    SystemAccountCodes.CaptainCashFloatPrefix,
+                    $"Cash Float {captainUserId}",
+                    currency);
+
+                var wagesAcc = await _ledger.GetOrCreateUserAccountAsync(
+                    captainUserId,
+                    AccountType.Liability,
+                    SystemAccountCodes.CaptainEarningsPrefix,
+                    $"Earnings {captainUserId}",
+                    currency);
+
+                foreach (var batch in unpostedBatches)
+                {
+                    try
+                    {
+                        var wagesToOffset = Math.Min(batch.TotalCashCollected, batch.TotalWagesEarned);
+                        var netDueToCompany = batch.NetCashRemitted > 0 ? batch.NetCashRemitted : (batch.TotalCashCollected - wagesToOffset);
+
+                        var txnRequest = new PostTransactionRequest
+                        {
+                            ReferenceType = "CaptainSettlement",
+                            ReferenceId = batch.BatchCode,
+                            IdempotencyKey = $"SettlementBatch-{batch.BatchCode}",
+                            Description = $"تسوية وردية الكابتن {captainUserId} - دفعة {batch.BatchCode} - مزامنة تلقائية",
+                            Entries = new List<PostLedgerEntryRequest>()
+                        };
+
+                        if (netDueToCompany > 0)
+                        {
+                            txnRequest.Entries.Add(new PostLedgerEntryRequest
+                            {
+                                AccountId = vaultAcc.Id,
+                                Debit = netDueToCompany,
+                                Credit = 0m,
+                                Currency = currency,
+                                Memo = $"توريد نقدي لخزينة الشركة - تسوية {batch.BatchCode}"
+                            });
+                        }
+
+                        if (wagesToOffset > 0)
+                        {
+                            txnRequest.Entries.Add(new PostLedgerEntryRequest
+                            {
+                                AccountId = wagesAcc.Id,
+                                Debit = wagesToOffset,
+                                Credit = 0m,
+                                Currency = currency,
+                                Memo = $"اقتطاع مستحقات توصيل الكابتن من العهدة - تسوية {batch.BatchCode}"
+                            });
+                        }
+
+                        if (batch.TotalCashCollected > 0)
+                        {
+                            txnRequest.Entries.Add(new PostLedgerEntryRequest
+                            {
+                                AccountId = floatAcc.Id,
+                                Debit = 0m,
+                                Credit = batch.TotalCashCollected,
+                                Currency = currency,
+                                Memo = $"تفريغ وتسوية عهدة الكابتن - تسوية {batch.BatchCode}"
+                            });
+                        }
+
+                        if (txnRequest.Entries.Count > 0)
+                        {
+                            var txnDto = await _ledger.PostTransactionAsync(txnRequest);
+                            batch.SettlementTransactionId = txnDto.Id;
+                        }
+
+                        var hasPayment = await _context.Payments.AnyAsync(p =>
+                            p.ByUserId == batch.CaptainUserId &&
+                            p.Amount == (batch.NetCashRemitted > 0 ? batch.NetCashRemitted : batch.TotalCashCollected) &&
+                            p.HandoverDate >= batch.BatchDate.AddMinutes(-5) &&
+                            p.HandoverDate <= batch.BatchDate.AddMinutes(5));
+
+                        if (!hasPayment)
+                        {
+                            _context.Payments.Add(new Payment
+                            {
+                                ByUserId = batch.CaptainUserId,
+                                ByUser = "الكابتن",
+                                ToUserId = batch.HandledByAdminId != Guid.Empty ? batch.HandledByAdminId : Guid.NewGuid(),
+                                ToUser = "المسؤول المالي",
+                                Amount = batch.NetCashRemitted > 0 ? batch.NetCashRemitted : batch.TotalCashCollected,
+                                NewBalance = 0m,
+                                HandoverDate = batch.BatchDate
+                            });
+                        }
+
+                        await _context.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to auto-sync unposted batch {BatchCode} for captain {CaptainId}", batch.BatchCode, captainUserId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error syncing unposted batches for captain {CaptainId}", captainUserId);
+            }
+        }
+}
 }
