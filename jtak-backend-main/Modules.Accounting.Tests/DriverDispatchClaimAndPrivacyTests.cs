@@ -584,6 +584,88 @@ namespace Modules.Accounting.Tests
                 (await ordersDb.OrderDispatchOffers.AsNoTracking().SingleAsync(x => x.OrderId == order.Id)).Status);
         }
 
+        [Theory]
+        [InlineData(OrderDetailStatus.MerchantAccepted)]
+        [InlineData(OrderDetailStatus.ReadyForPickup)]
+        public async Task AssignedDriver_CannotDeclineAcceptedOrder(OrderDetailStatus detailStatus)
+        {
+            using var ordersDb = CreateInMemoryOrdersContext();
+            using var accountingDb = CreateInMemoryAccountingContext();
+            using var shippingDb = CreateInMemoryShippingContext();
+            var deliveryService = CreateDeliveryService(shippingDb);
+            var driverId = Guid.NewGuid();
+            var order = new Order
+            {
+                OrderStatus = OrderStatus.Success,
+                DeliveryId = driverId,
+                DeliveryUser = "Captain",
+                OrderDetails = new List<OrderDetail>
+                {
+                    new OrderDetail { MerchantId = 10, ProductId = 1, Quantity = 1, OrderDetailStatus = detailStatus }
+                }
+            };
+            ordersDb.Orders.Add(order);
+            await ordersDb.SaveChangesAsync();
+
+            var orderService = new Mock<IOrderService>();
+            orderService.Setup(x => x.FindAsync(order.Id)).ReturnsAsync(order);
+            var controller = CreateOrdersController(
+                ordersDb, accountingDb, shippingDb, deliveryService, orderService: orderService.Object);
+            SetDriverContext(controller, driverId);
+
+            var response = await controller.DeliveryDecline(order.Id);
+
+            Assert.IsType<ConflictObjectResult>(response.Result);
+            var unchanged = await ordersDb.Orders.Include(x => x.OrderDetails).SingleAsync(x => x.Id == order.Id);
+            Assert.Equal(driverId, unchanged.DeliveryId);
+            Assert.Equal(detailStatus, unchanged.OrderDetails.Single().OrderDetailStatus);
+        }
+
+        [Fact]
+        public async Task Driver_CannotDeclineOfferAfterMerchantPreparation()
+        {
+            using var ordersDb = CreateInMemoryOrdersContext();
+            using var accountingDb = CreateInMemoryAccountingContext();
+            using var shippingDb = CreateInMemoryShippingContext();
+            var deliveryService = CreateDeliveryService(shippingDb);
+            var driverId = Guid.NewGuid();
+            var now = DateTime.UtcNow;
+            var order = new Order
+            {
+                OrderStatus = OrderStatus.Success,
+                CourierMatchingStartedAtUtc = now.AddSeconds(-15),
+                CourierMatchingDeadlineAtUtc = now.AddMinutes(2),
+                CourierMatchingRound = 1,
+                OrderDetails = new List<OrderDetail>
+                {
+                    new OrderDetail { MerchantId = 10, ProductId = 1, Quantity = 1, OrderDetailStatus = OrderDetailStatus.ReadyForPickup }
+                }
+            };
+            ordersDb.Orders.Add(order);
+            await ordersDb.SaveChangesAsync();
+            var offer = new OrderDispatchOffer
+            {
+                OrderId = order.Id,
+                DriverId = driverId,
+                MatchingRound = 1,
+                WaveNumber = 1,
+                OfferedAtUtc = now.AddSeconds(-10),
+                ExpiresAtUtc = now.AddSeconds(15),
+                Status = OrderDispatchOfferStatus.Offered
+            };
+            ordersDb.OrderDispatchOffers.Add(offer);
+            await ordersDb.SaveChangesAsync();
+
+            var controller = CreateOrdersController(ordersDb, accountingDb, shippingDb, deliveryService);
+            SetDriverContext(controller, driverId);
+
+            var response = await controller.DeclineOffer(order.Id);
+
+            Assert.IsType<ConflictObjectResult>(response.Result);
+            Assert.Equal(OrderDispatchOfferStatus.Offered,
+                (await ordersDb.OrderDispatchOffers.SingleAsync(x => x.Id == offer.Id)).Status);
+        }
+
         [Fact]
         public async Task OfflineDriver_DoesNotReceiveAvailableOrders()
         {

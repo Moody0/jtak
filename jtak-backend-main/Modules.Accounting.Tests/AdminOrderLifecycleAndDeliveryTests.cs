@@ -186,43 +186,25 @@ namespace Modules.Accounting.Tests
             Assert.Equal("إلغاء إداري بناء على طلب المتجر", loaded.Notes);
         }
 
-        // 6. Driver decline returns the order to courier assignment instead of canceling it
-        [Fact]
-        public async Task Test06_DriverDecline_ReleasesAssignmentAndKeepsOrderActive()
+        // Once a courier accepts an order, decline is unavailable regardless of preparation state.
+        [Theory]
+        [InlineData(OrderDetailStatus.MerchantAccepted)]
+        [InlineData(OrderDetailStatus.ReadyForPickup)]
+        public async Task Test06_DriverCannotDeclineAnAcceptedOrder(OrderDetailStatus detailStatus)
         {
             using var context = CreateInMemoryOrdersContext();
             var service = CreateOrderService(context);
-            var order = await SeedOrderWithDetailsAsync(context, OrderDetailStatus.ReadyForPickup);
+            var order = await SeedOrderWithDetailsAsync(context, detailStatus);
             var driverId = Guid.NewGuid();
             order.DeliveryId = driverId;
             order.DeliveryUser = "Captain Reham";
             await context.SaveChangesAsync();
 
-            var declined = await service.DeliveryDeclineOrder(order.Id, driverId);
+            await Assert.ThrowsAsync<Exception>(() => service.DeliveryDeclineOrder(order.Id, driverId));
 
-            Assert.Null(declined.DeliveryId);
-            Assert.Null(declined.DeliveryUser);
-            Assert.Equal(OrderDetailStatus.ReadyForPickup, declined.OrderDetails.Single().OrderDetailStatus);
-            Assert.Empty(await context.OrderStatusChangeLogs
-                .Where(x => x.OrderId == order.Id && x.OrderDetailStatus == OrderDetailStatus.DeliveryCanceled)
-                .ToListAsync());
-        }
-
-        [Fact]
-        public async Task DriverDeclineBeforePreparation_PreservesMerchantAcceptedStatus()
-        {
-            using var context = CreateInMemoryOrdersContext();
-            var service = CreateOrderService(context);
-            var order = await SeedOrderWithDetailsAsync(context, OrderDetailStatus.MerchantAccepted);
-            var driverId = Guid.NewGuid();
-            order.DeliveryId = driverId;
-            order.DeliveryUser = "Captain Reham";
-            await context.SaveChangesAsync();
-
-            var declined = await service.DeliveryDeclineOrder(order.Id, driverId);
-
-            Assert.Null(declined.DeliveryId);
-            Assert.Equal(OrderDetailStatus.MerchantAccepted, declined.OrderDetails.Single().OrderDetailStatus);
+            var unchanged = await service.FindAsync(order.Id);
+            Assert.Equal(driverId, unchanged.DeliveryId);
+            Assert.Equal(detailStatus, unchanged.OrderDetails.Single().OrderDetailStatus);
         }
 
         // 7. Invalid status transition rejected

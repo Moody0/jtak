@@ -1387,6 +1387,15 @@ namespace App.ApiControllers.V1.Delivery
             var uid = User.GetUserId();
             if (!uid.HasValue) return Unauthorized();
             var now = DateTime.UtcNow;
+            var hasPreparedItems = await _ouow.Context.Orders
+                .Where(x => x.Id == id)
+                .AnyAsync(x => x.OrderDetails.Any(detail =>
+                    detail.OrderDetailStatus == OrderDetailStatus.ReadyForPickup ||
+                    detail.OrderDetailStatus == OrderDetailStatus.ShippingStarted ||
+                    detail.OrderDetailStatus == OrderDetailStatus.Delivered));
+            if (hasPreparedItems)
+                return Conflict(ApiErr.Create("الطلب جاهز للاستلام من المتجر ولا يمكن رفض عرضه."));
+
             var currentRound = await _ouow.Context.Orders
                 .Where(x => x.Id == id && !x.CourierMatchingCompletedAtUtc.HasValue &&
                             x.CourierMatchingDeadlineAtUtc > now &&
@@ -1422,47 +1431,13 @@ namespace App.ApiControllers.V1.Delivery
             if (existingOrder.DeliveryId != uid.Value)
                 return Forbid();
 
-            if (existingOrder.OrderStatus != OrderStatus.Success)
-                return BadRequest(ApiErr.Create("الطلب لم يعد نشطاً."));
+            if (existingOrder.OrderDetails.Any(x =>
+                    x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup ||
+                    x.OrderDetailStatus == OrderDetailStatus.ShippingStarted ||
+                    x.OrderDetailStatus == OrderDetailStatus.Delivered))
+                return Conflict(ApiErr.Create("الطلب جاهز للاستلام أو بدأ توصيله، ولا يمكن رفضه. تواصل مع الدعم عند وجود مشكلة."));
 
-            if (existingOrder.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered))
-                return BadRequest(ApiErr.Create("لا يمكن رفض طلب تم تسليمه بالفعل."));
-            if (existingOrder.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted))
-                return BadRequest(ApiErr.Create("بعد استلام الطلب من المتجر، يرجى التواصل مع الدعم لإعادة تعيينه."));
-
-            // Declining an assignment must unassign the courier and make the
-            // order claimable again; it must not cancel the customer's order.
-            await _service.DeliveryDeclineOrder(id, uid.Value);
-
-            var nowUtc = DateTime.UtcNow;
-            existingOrder.CourierMatchingRound = Math.Max(1, existingOrder.CourierMatchingRound + 1);
-            existingOrder.CourierMatchingStartedAtUtc = nowUtc;
-            existingOrder.CourierMatchingDeadlineAtUtc = nowUtc.AddMinutes(3);
-            existingOrder.CourierMatchingCompletedAtUtc = null;
-            await _ouow.SaveChangesAsync();
-
-            try
-            {
-                await _deliveryService.RemoveOrder(uid.Value, id);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Failed to remove declined order {OrderId} from courier route", id);
-            }
-
-            try
-            {
-                await _trackingHub.Clients.Group($"order_{id}").SendAsync(
-                    "OnDriverUnassigned", new { orderId = id, driverId = uid.Value });
-                await _trackingHub.Clients.Group(TrackingHub.FleetDispatchGroup).SendAsync(
-                    "OnNewAvailableOrder", new { orderId = id });
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Failed to broadcast declined order {OrderId}", id);
-            }
-
-            return Ok(true);
+            return Conflict(ApiErr.Create("لا يمكن رفض طلب بعد استلامه. تواصل مع الدعم لإعادة التعيين عند الضرورة."));
         }
 
         private CanonicalOrderMoneyDto CalculateCanonicalMoney(

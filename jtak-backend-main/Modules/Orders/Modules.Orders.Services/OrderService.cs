@@ -307,22 +307,13 @@ namespace Modules.Orders.Services
             if (order == null || order.DeliveryId != driverId)
                 throw new Exception("You cannot decline this order!");
 
-            if (order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered))
-                throw new Exception("لا يمكن إلغاء أو رفض طلب تم تسليمه بالفعل.");
-            if (order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted))
-                throw new Exception("بعد استلام الطلب من المتجر، يجب إعادة تعيينه عبر الدعم.");
+            if (order.OrderDetails.Any(x =>
+                    x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup ||
+                    x.OrderDetailStatus == OrderDetailStatus.ShippingStarted ||
+                    x.OrderDetailStatus == OrderDetailStatus.Delivered))
+                throw new Exception("الطلب جاهز للاستلام أو بدأ توصيله، ولا يمكن رفضه. تواصل مع الدعم عند وجود مشكلة.");
 
-            order.DeliveryId = null;
-            order.DeliveryUser = null;
-            order.DeliveryLat = null;
-            order.DeliveryLng = null;
-            order.DeliveryLocationUpdatedAt = null;
-
-            // Unassigning a courier is not a merchant-preparation transition.
-            // Preserve MerchantAccepted before preparation and ReadyForPickup
-            // after preparation; the dispatch service starts a new matching round.
-            await _uow.SaveChangesAsync();
-            return order;
+            throw new Exception("لا يمكن رفض طلب بعد استلامه. تواصل مع الدعم لإعادة التعيين عند الضرورة.");
         }
 
         public async Task<Order> MerchantAccept(int orderId, params int[] merchantIds)
