@@ -483,12 +483,7 @@ namespace App.ApiControllers.V1.Delivery
                       AND (DeliveryId IS NULL OR DeliveryId = '00000000-0000-0000-0000-000000000000')
                       AND OrderStatus = {(int)OrderStatus.Success}
                       AND (
-                          EXISTS (
-                              SELECT 1 FROM Orders_OrderDetails AS d
-                              WHERE d.OrderId = o.Id
-                                AND d.OrderDetailStatus = {(int)OrderDetailStatus.ReadyForPickup}
-                          )
-                          OR (
+                          (
                               o.CourierMatchingStartedAtUtc IS NOT NULL
                               AND o.CourierMatchingCompletedAtUtc IS NULL
                               AND o.CourierMatchingDeadlineAtUtc > {now}
@@ -496,8 +491,18 @@ namespace App.ApiControllers.V1.Delivery
                                   SELECT 1 FROM Orders_OrderDispatchOffers AS offer
                                   WHERE offer.OrderId = o.Id AND offer.DriverId = {uid.Value}
                                     AND offer.MatchingRound = o.CourierMatchingRound
-                                    AND offer.Status = {(byte)OrderDispatchOfferStatus.Offered}
-                                    AND offer.ExpiresAtUtc > {now}
+                                    AND offer.Status IN ({(byte)OrderDispatchOfferStatus.Offered}, {(byte)OrderDispatchOfferStatus.TimedOut})
+                              )
+                          )
+                          OR (
+                              (o.CourierMatchingStartedAtUtc IS NULL
+                               OR o.CourierMatchingCompletedAtUtc IS NOT NULL
+                               OR o.CourierMatchingDeadlineAtUtc IS NULL
+                               OR o.CourierMatchingDeadlineAtUtc <= {now})
+                              AND EXISTS (
+                                  SELECT 1 FROM Orders_OrderDetails AS d
+                                  WHERE d.OrderId = o.Id
+                                    AND d.OrderDetailStatus = {(int)OrderDetailStatus.ReadyForPickup}
                               )
                           )
                       )");
@@ -518,16 +523,23 @@ namespace App.ApiControllers.V1.Delivery
                 lock (_claimLock)
                 {
                     var freshOrder = _ouow.Context.Orders.FirstOrDefault(x => x.Id == id);
+                    var freshNow = DateTime.UtcNow;
+                    var freshIsInCourierMatching = freshOrder != null &&
+                                                   freshOrder.CourierMatchingStartedAtUtc.HasValue &&
+                                                   !freshOrder.CourierMatchingCompletedAtUtc.HasValue &&
+                                                   freshOrder.CourierMatchingDeadlineAtUtc > freshNow;
+                    var freshHasClaimableOffer = freshIsInCourierMatching &&
+                                                 _ouow.Context.OrderDispatchOffers.Any(o =>
+                                                     o.OrderId == id && o.DriverId == uid.Value &&
+                                                     o.MatchingRound == freshOrder.CourierMatchingRound &&
+                                                     (o.Status == OrderDispatchOfferStatus.Offered ||
+                                                      o.Status == OrderDispatchOfferStatus.TimedOut));
+                    var freshHasLegacyReadyDetails = freshOrder != null &&
+                                                     freshOrder.OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
                     if (freshOrder != null &&
                         (!freshOrder.DeliveryId.HasValue || freshOrder.DeliveryId.Value == Guid.Empty) &&
                         freshOrder.OrderStatus == OrderStatus.Success &&
-                        (freshOrder.OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.ReadyForPickup) ||
-                         (freshOrder.CourierMatchingStartedAtUtc.HasValue &&
-                          !freshOrder.CourierMatchingCompletedAtUtc.HasValue &&
-                          freshOrder.CourierMatchingDeadlineAtUtc > DateTime.UtcNow &&
-                          _ouow.Context.OrderDispatchOffers.Any(o => o.OrderId == id && o.DriverId == uid.Value &&
-                              o.MatchingRound == freshOrder.CourierMatchingRound &&
-                              o.Status == OrderDispatchOfferStatus.Offered && o.ExpiresAtUtc > DateTime.UtcNow))))
+                        (freshIsInCourierMatching ? freshHasClaimableOffer : freshHasLegacyReadyDetails))
                     {
                         freshOrder.DeliveryId = uid.Value;
                         freshOrder.DeliveryUser = courierName;
@@ -550,7 +562,14 @@ namespace App.ApiControllers.V1.Delivery
 
             if (!claimWon)
             {
-                return BadRequest(ApiErr.Create("تم استلام هذا الطلب بالفعل من قبل كابتن آخر."));
+                var assignedDriverId = await _ouow.Context.Orders.AsNoTracking()
+                    .Where(x => x.Id == id)
+                    .Select(x => x.DeliveryId)
+                    .FirstOrDefaultAsync();
+                if (assignedDriverId.HasValue && assignedDriverId.Value != Guid.Empty && assignedDriverId.Value != uid.Value)
+                    return BadRequest(ApiErr.Create("تم استلام هذا الطلب بالفعل من قبل كابتن آخر."));
+
+                return BadRequest(ApiErr.Create("تغيرت حالة الطلب ولم يعد متاحاً للاستلام. حدّث قائمة الطلبات وحاول مجدداً."));
             }
 
             // Create shipping route idempotently

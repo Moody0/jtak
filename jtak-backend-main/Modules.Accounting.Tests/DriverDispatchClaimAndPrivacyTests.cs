@@ -513,8 +513,10 @@ namespace Modules.Accounting.Tests
             Assert.Null((await ordersDb.Orders.FirstAsync(x => x.Id == order.Id)).DeliveryId);
         }
 
-        [Fact]
-        public async Task Driver_CanClaimTimedOutOfferUntilMatchingWindowEnds()
+        [Theory]
+        [InlineData(OrderDispatchOfferStatus.TimedOut)]
+        [InlineData(OrderDispatchOfferStatus.Offered)]
+        public async Task Driver_CanClaimExpiredOfferUntilMatchingWindowEnds(OrderDispatchOfferStatus offerStatus)
         {
             var dbName = Guid.NewGuid().ToString();
             using var ordersConnection = new SqliteConnection("Data Source=:memory:");
@@ -548,7 +550,7 @@ namespace Modules.Accounting.Tests
                         Quantity = 1,
                         SinglePrice = 12000m,
                         SingleFinalPrice = 12000m,
-                        OrderDetailStatus = OrderDetailStatus.ReadyForPickup
+                        OrderDetailStatus = OrderDetailStatus.MerchantAccepted
                     }
                 }
             };
@@ -563,7 +565,7 @@ namespace Modules.Accounting.Tests
                 OfferedAtUtc = now.AddSeconds(-26),
                 ExpiresAtUtc = now.AddSeconds(-1),
                 RespondedAtUtc = now,
-                Status = OrderDispatchOfferStatus.TimedOut
+                Status = offerStatus
             });
             await ordersDb.SaveChangesAsync();
 
