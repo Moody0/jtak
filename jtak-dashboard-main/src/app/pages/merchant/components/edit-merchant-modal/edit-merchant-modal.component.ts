@@ -471,7 +471,9 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
     formValues.shortDescription = desc;
 
     const selectedOwner = this.merchantUsers.find((u) => u.id === formValues.ownerId);
-    const ownerName = (selectedOwner?.fullName || this.formGroup.get('ownerName')?.value || '').toString().trim();
+    // The merchant display name can intentionally differ from the linked login account name.
+    // Preserve an administrator's explicit edit; use the account name only as a fallback.
+    const ownerName = (this.formGroup.get('ownerName')?.value || selectedOwner?.fullName || '').toString().trim();
     formValues.ownerName = ownerName;
     formValues.owner = ownerName;
 

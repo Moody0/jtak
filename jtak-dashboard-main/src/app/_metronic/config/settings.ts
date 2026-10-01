@@ -29,7 +29,6 @@ export const ApplicationRoutes = Object.freeze({
   PrivacyPolicy: 'pages/PrivacyPolicy',
   Terms: 'pages/TermsAndConditions',
   PaymentTerms: 'pages/PaymentPolicy',
-  About: 'pages/About',
   AuditLogs: 'audit-logs',
 });
 
@@ -130,11 +129,6 @@ export const ApplicationMenu = [
     icon: 'fas fa-file-contract',
   },
   {
-    path: ApplicationRoutes.About,
-    label: 'MENU.ABOUT',
-    icon: 'fas fa-info-circle',
-  },
-  {
     path: ApplicationRoutes.RestaurantCategories,
     label: 'MENU.RESTAURANT_CATEGORIES',
     icon: 'fas fa-utensils',
@@ -220,7 +214,7 @@ export const ApplicationMenuGroups = [
     label: 'MENU.GROUPS.SYSTEM',
     description: 'MENU.GROUP_DESCRIPTIONS.SYSTEM',
     icon: 'fas fa-cog',
-    items: [menuItem(ApplicationRoutes.Terms), menuItem(ApplicationRoutes.PrivacyPolicy), menuItem(ApplicationRoutes.PaymentTerms), menuItem(ApplicationRoutes.About), menuItem(ApplicationRoutes.AuditLogs)],
+    items: [menuItem(ApplicationRoutes.Terms), menuItem(ApplicationRoutes.PrivacyPolicy), menuItem(ApplicationRoutes.PaymentTerms), menuItem(ApplicationRoutes.AuditLogs)],
   },
 ];
 

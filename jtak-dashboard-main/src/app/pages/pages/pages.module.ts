@@ -20,6 +20,11 @@ import { NgxEditorModule } from 'ngx-editor';
     NgxEditorModule,
     RouterModule.forChild([
       {
+        path: 'About',
+        redirectTo: '/dashboard',
+        pathMatch: 'full',
+      },
+      {
         path: ':id',
         component: PageComponent,
       }

@@ -334,12 +334,9 @@
               <!-- Reviewer / Customer -->
               <td class="td-customer">
                 <div class="d-flex align-items-center gap-2">
-                  <div class="reviewer-avatar">
-                    <span>{{ getReviewerInitials(item.reviewerName) }}</span>
-                  </div>
                   <div class="d-flex flex-column">
                     <span class="reviewer-name-text">
-                      {{ item.reviewerName || 'عميل مسجل' }}
+                      {{ cleanReviewerName(item.reviewerName) || 'عميل مسجل' }}
                     </span>
                     <span class="reviewer-id-sub font-monospace" *ngIf="item.reviewerId">
                       ID: {{ item.reviewerId }}
@@ -488,11 +485,8 @@
         <div class="summary-tile">
           <span class="tile-label">العميل المقيّم</span>
           <div class="d-flex align-items-center gap-2 mt-2">
-            <div class="reviewer-avatar">
-              <span>{{ getReviewerInitials(selectedReview.reviewerName) }}</span>
-            </div>
             <div class="d-flex flex-column">
-              <strong class="tile-main-text">{{ selectedReview.reviewerName || 'عميل مسجل' }}</strong>
+              <strong class="tile-main-text">{{ cleanReviewerName(selectedReview.reviewerName) || 'عميل مسجل' }}</strong>
               <small class="text-muted font-monospace" *ngIf="selectedReview.reviewerId">ID: {{ selectedReview.reviewerId }}</small>
             </div>
           </div>

@@ -14,6 +14,7 @@ export interface DriverCashAdvanceHistoryItem {
   amount: number;
   reference: string;
   description: string;
+  reason: string;
 }
 
 export interface DriverCashAdvanceOverview {

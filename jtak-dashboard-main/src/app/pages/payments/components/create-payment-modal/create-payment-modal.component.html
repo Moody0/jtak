@@ -13,50 +13,53 @@
 
         <div class="col-md-4">
           <div class="mb-3">
-            <label for="byUser" class="form-label fw-bold mb-2">{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</label>
-            <ng-select placeholder="اختر مندوب التوصيل" formControlName="byUser" appendTo="body"
+            <label for="byUser" class="form-label fw-bold mb-2">{{ 'PAYMENTS_PAGE.DRIVER_LABEL' | translate }}</label>
+            <ng-select [placeholder]="'PAYMENTS_PAGE.DRIVER_PLACEHOLDER' | translate" formControlName="byUser" appendTo="body"
             (change)="changedDelivery($event)">
               <ng-option [value]="i" *ngFor="let i of deliveries">
                 {{ i.fullName }}
               </ng-option>
             </ng-select>
-            <span *ngIf="deliveryBalance !== 0" class="badge badge-light-primary mt-1">الرصيد: {{ deliveryBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            <span *ngIf="deliveryBalance !== 0" class="badge badge-light-primary mt-1">{{ 'PAYMENTS_PAGE.DRIVER_BALANCE' | translate }}: {{ deliveryBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
         </div>
         <div class="col-md-4">
           <div class="mb-3">
-            <label for="toUser" class="form-label fw-bold mb-2">{{ 'MERCHANTS_PAGE.TITLE' | translate }}</label>
-            <ng-select placeholder="اختر المتجر" formControlName="toUser" appendTo="body"
+            <label for="toUser" class="form-label fw-bold mb-2">{{ 'PAYMENTS_PAGE.MERCHANT_LABEL' | translate }}</label>
+            <ng-select [placeholder]="'PAYMENTS_PAGE.MERCHANT_PLACEHOLDER' | translate" formControlName="toUser" appendTo="body"
             (change)="changedMerchant($event)">
               <ng-option [value]="i" *ngFor="let i of merchants">
                 {{ i.fullName }}
               </ng-option>
             </ng-select>
-            <span *ngIf="merchantBalance !== 0" class="badge badge-light-warning mt-1">الرصيد: {{ merchantBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            <span *ngIf="merchantBalance !== 0" class="badge badge-light-warning mt-1">{{ 'PAYMENTS_PAGE.MERCHANT_BALANCE' | translate }}: {{ merchantBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
         </div>
 
         <div class="col-md-4">
           <div class="mb-3">
-            <label for="amount" class="form-label fw-bold mb-2">{{ 'PAYMENTS_PAGE.COL_AMOUNT' | translate }}</label>
+            <label for="amount" class="form-label fw-bold mb-2">{{ 'PAYMENTS_PAGE.AMOUNT_LABEL' | translate }}</label>
             <app-input-container [control]="formGroup.controls.amount">
               <input
                 type="number"
                 class="form-control form-control-solid"
                 formControlName="amount"
                 id="amount"
-                [placeholder]="'PAYMENTS_PAGE.COL_AMOUNT' | translate"
+                [placeholder]="'PAYMENTS_PAGE.AMOUNT_PLACEHOLDER' | translate"
                 #input
               />
             </app-input-container>
           </div>
         </div>
         <div class="col-12 mt-2">
-          <div class="alert alert-light-warning d-flex align-items-center p-3 mb-0">
-            <i class="fas fa-info-circle text-warning fs-4 me-2"></i>
-            <span class="fs-7 text-dark">
-              عند إضافة دفعة، أنت تقر باستلام كامل الرصيد من السائق، وتسليمه المبلغ المسجل كعهدة ليسلمها إلى التاجر.
-            </span>
+          <div class="alert alert-light-warning p-3 mb-0" role="note">
+            <div class="d-flex align-items-center fw-bold mb-2">
+              <i class="fas fa-info-circle text-warning fs-4 me-2" aria-hidden="true"></i>
+              {{ 'PAYMENTS_PAGE.CREATE_HELP_TITLE' | translate }}
+            </div>
+            <p class="fs-7 text-dark mb-0">
+              {{ 'PAYMENTS_PAGE.CREATE_HELP' | translate }}
+            </p>
           </div>
         </div>
       </div>

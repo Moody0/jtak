@@ -285,4 +285,65 @@
     </div>
   </div>
 
+  <section class="ops-table-card driver-advance-audit">
+    <div class="driver-advance-audit-header">
+      <div>
+        <h3>{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_TITLE' | translate }}</h3>
+        <p>{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_DESC' | translate }}</p>
+      </div>
+      <button type="button" class="ops-btn-refresh" (click)="loadDriverCashAdvances()" [disabled]="isLoadingDriverCashAdvances">
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoadingDriverCashAdvances"></i>
+        <span>{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_REFRESH' | translate }}</span>
+      </button>
+    </div>
+
+    <div *ngIf="isLoadingDriverCashAdvances" class="driver-advance-audit-state">
+      <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      {{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_LOADING' | translate }}
+    </div>
+
+    <div *ngIf="driverCashAdvancesError && !isLoadingDriverCashAdvances" class="alert alert-danger m-3">
+      <span>{{ driverCashAdvancesError | translate }}</span>
+      <button type="button" class="btn btn-sm btn-light-danger ms-2" (click)="loadDriverCashAdvances()">
+        {{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_RETRY' | translate }}
+      </button>
+    </div>
+
+    <div class="table-responsive" *ngIf="driverCashAdvances && !isLoadingDriverCashAdvances">
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th>{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_REF' | translate }}</th>
+            <th>{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_DRIVER' | translate }}</th>
+            <th class="text-end">{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_AMOUNT' | translate }}</th>
+            <th>{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_REASON' | translate }}</th>
+            <th>{{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_DATE' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let advance of driverCashAdvances.recentAdvances">
+            <td>
+              <div class="ops-payment-ref">
+                <span class="ref-num">{{ advance.transactionNumber }}</span>
+                <span class="ref-date text-muted">{{ advance.reference }}</span>
+              </div>
+            </td>
+            <td>{{ advance.driverName }}</td>
+            <td class="text-end">
+              <span class="amount-val fw-bold text-success">{{ advance.amount | number:'1.0-2' }}</span>
+              <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            </td>
+            <td class="driver-advance-reason">{{ advance.reason || advance.description }}</td>
+            <td>{{ advance.postedAt | date:'yyyy/MM/dd, h:mm a' }}</td>
+          </tr>
+          <tr *ngIf="driverCashAdvances.recentAdvances.length === 0">
+            <td colspan="5" class="text-center py-6 text-muted">
+              {{ 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_EMPTY' | translate }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
 </div>

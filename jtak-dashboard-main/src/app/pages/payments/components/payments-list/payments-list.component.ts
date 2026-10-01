@@ -15,6 +15,8 @@ import { paymentsService } from '../../services/payments.service';
 import { CreatePaymentModalComponent } from '../create-payment-modal/create-payment-modal.component';
 import { DriverCashAdvanceModalComponent } from '../driver-cash-advance-modal/driver-cash-advance-modal.component';
 import { Payment } from '../../models/payments.model';
+import { DriverCashAdvanceOverview } from '../../models/driver-cash-advance.model';
+import { DriverCashAdvancesService } from '../../services/driver-cash-advances.service';
 
 // Financial Payments & Settlements Component
 @Component({
@@ -36,6 +38,9 @@ export class PaymentsListComponent
   kpiTransactions = 0;
   kpiAvgPayment = 0;
   kpiUniqueMerchants = 0;
+  driverCashAdvances: DriverCashAdvanceOverview | null = null;
+  isLoadingDriverCashAdvances = false;
+  driverCashAdvancesError = '';
 
   paginator: PaginatorState;
   sorting: SortState;
@@ -44,13 +49,15 @@ export class PaymentsListComponent
     private fb: UntypedFormBuilder,
     public paymentsService: paymentsService,
     private modalService: NgbModal,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private cashAdvancesService: DriverCashAdvancesService
   ) {}
 
   ngOnInit(): void {
     this.paymentsService.setDefaults();
     this.searchForm();
     this.paymentsService.fetchPost();
+    this.loadDriverCashAdvances();
 
     this.subs.sink = this.paymentsService.isLoading$.subscribe(
       (res) => (this.isLoading = res)
@@ -150,6 +157,22 @@ export class PaymentsListComponent
   refresh(): void {
     this.selection.clear();
     this.paymentsService.fetchPost();
+    this.loadDriverCashAdvances();
+  }
+
+  loadDriverCashAdvances(): void {
+    this.isLoadingDriverCashAdvances = true;
+    this.driverCashAdvancesError = '';
+    this.cashAdvancesService.getOverview().subscribe({
+      next: (overview) => {
+        this.driverCashAdvances = overview;
+        this.isLoadingDriverCashAdvances = false;
+      },
+      error: () => {
+        this.driverCashAdvancesError = 'PAYMENTS_PAGE.DRIVER_ADVANCE_AUDIT_ERROR';
+        this.isLoadingDriverCashAdvances = false;
+      },
+    });
   }
 
   ngOnDestroy(): void {

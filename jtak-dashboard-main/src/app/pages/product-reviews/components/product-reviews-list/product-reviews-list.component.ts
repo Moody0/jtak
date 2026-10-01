@@ -246,14 +246,11 @@ export class productReviewsListComponent
     }
   }
 
-  getReviewerInitials(name: string): string {
-    const trimmed = (name || '').trim();
-    if (!trimmed) return 'U';
-    const parts = trimmed.split(' ').filter(Boolean);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return trimmed.slice(0, 2).toUpperCase();
+  cleanReviewerName(name: string): string {
+    return String(name || '')
+      .replace(/[\u200e\u200f\u061c]/gu, '')
+      .replace(/^\s*ع[\u064b-\u065f\u0670\u0640]*م[\u064b-\u065f\u0670\u0640]*(?:\s+|$)/u, '')
+      .trim();
   }
 
   copyText(text: string, label: string = 'النص'): void {

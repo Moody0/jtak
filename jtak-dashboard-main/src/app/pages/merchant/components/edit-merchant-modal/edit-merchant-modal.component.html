@@ -88,71 +88,91 @@
               </div>
 
               <div class="col-12" *ngIf="item?.id">
-                <div class="p-4 rounded border bg-light-warning">
-                  <div class="d-flex align-items-start gap-3 mb-3">
-                    <i class="fas fa-key text-warning fs-2 mt-1"></i>
-                    <div>
-                      <h4 class="mb-1">تغيير كلمة مرور حساب التاجر</h4>
-                      <p class="text-muted mb-1">
-                        {{ getSelectedMerchantOwner()?.fullName || 'لا يوجد حساب تاجر مرتبط بهذا المتجر' }}
-                        <span *ngIf="getSelectedMerchantOwner()?.phoneNumber">
-                          • {{ getSelectedMerchantOwner()?.phoneNumber }}
-                        </span>
-                      </p>
-                      <small class="text-muted">
-                        أدخل كلمة مرور جديدة بعد التحقق من هوية صاحب المتجر. لن تظهر كلمة المرور الحالية هنا.
-                      </small>
+                <section class="merchant-password-card" aria-labelledby="merchantPasswordTitle">
+                  <header class="merchant-password-header">
+                    <span class="merchant-password-icon"><i class="fas fa-key" aria-hidden="true"></i></span>
+                    <div class="merchant-password-heading">
+                      <h4 id="merchantPasswordTitle">تغيير كلمة مرور حساب التاجر</h4>
+                      <p>سيتم تحديث كلمة مرور الحساب المرتبط بالمتجر فور الحفظ.</p>
                     </div>
-                  </div>
+                  </header>
 
-                  <div class="row g-3" *ngIf="getSelectedMerchantOwner(); else noMerchantOwner">
-                    <div class="col-md-5">
-                      <label for="newMerchantPassword" class="form-label fw-bold">كلمة المرور الجديدة</label>
-                      <input
-                        id="newMerchantPassword"
-                        type="password"
-                        class="form-control"
-                        autocomplete="new-password"
-                        minlength="6"
-                        placeholder="6 أحرف على الأقل"
-                        [value]="newMerchantPassword"
-                        (input)="newMerchantPassword = $any($event.target).value"
-                      />
+                  <div class="merchant-password-form" *ngIf="getSelectedMerchantOwner() as owner; else noMerchantOwner">
+                    <div class="merchant-password-account">
+                      <span>الحساب المستهدف</span>
+                      <strong>{{ owner.fullName || 'حساب التاجر' }}</strong>
+                      <small dir="ltr" *ngIf="owner.phoneNumber">{{ owner.phoneNumber }}</small>
                     </div>
-                    <div class="col-md-5">
-                      <label for="confirmMerchantPassword" class="form-label fw-bold">تأكيد كلمة المرور</label>
-                      <input
-                        id="confirmMerchantPassword"
-                        type="password"
-                        class="form-control"
-                        autocomplete="new-password"
-                        placeholder="أعد إدخال كلمة المرور"
-                        [value]="confirmMerchantPassword"
-                        (input)="confirmMerchantPassword = $any($event.target).value"
-                      />
+
+                    <div class="merchant-password-fields">
+                      <div class="merchant-password-field">
+                        <label for="newMerchantPassword">كلمة المرور الجديدة</label>
+                        <input
+                          id="newMerchantPassword"
+                          type="password"
+                          dir="ltr"
+                          class="form-control"
+                          autocomplete="new-password"
+                          minlength="6"
+                          placeholder="ستة أحرف على الأقل"
+                          [value]="newMerchantPassword"
+                          (input)="newMerchantPassword = $any($event.target).value"
+                          [attr.aria-invalid]="newMerchantPassword.length > 0 && newMerchantPassword.trim().length < 6"
+                        />
+                        <small [class.text-danger]="newMerchantPassword.length > 0 && newMerchantPassword.trim().length < 6">
+                          يجب ألا تقل كلمة المرور عن 6 أحرف.
+                        </small>
+                      </div>
+                      <div class="merchant-password-field">
+                        <label for="confirmMerchantPassword">تأكيد كلمة المرور</label>
+                        <input
+                          id="confirmMerchantPassword"
+                          type="password"
+                          dir="ltr"
+                          class="form-control"
+                          autocomplete="new-password"
+                          placeholder="أعد كتابة كلمة المرور الجديدة"
+                          [value]="confirmMerchantPassword"
+                          (input)="confirmMerchantPassword = $any($event.target).value"
+                          [attr.aria-invalid]="confirmMerchantPassword.length > 0 && newMerchantPassword !== confirmMerchantPassword"
+                        />
+                        <small *ngIf="confirmMerchantPassword.length > 0 && newMerchantPassword !== confirmMerchantPassword" class="text-danger">
+                          كلمتا المرور غير متطابقتين.
+                        </small>
+                        <small *ngIf="confirmMerchantPassword.length === 0 || newMerchantPassword === confirmMerchantPassword">
+                          أعد إدخال كلمة المرور للتأكد من صحتها.
+                        </small>
+                      </div>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
+
+                    <div class="merchant-password-actions">
+                      <span>لا تظهر كلمة المرور الحالية في لوحة الإدارة.</span>
                       <button
                         type="button"
-                        class="btn btn-warning w-100"
+                        class="btn btn-primary"
                         [disabled]="passwordResetting || newMerchantPassword.trim().length < 6 || newMerchantPassword !== confirmMerchantPassword"
                         (click)="resetMerchantPassword()"
                       >
                         <ng-container *ngIf="!passwordResetting; else resettingPassword">
-                          <i class="fas fa-key me-1"></i> تغييرها
+                          <i class="fas fa-key me-2" aria-hidden="true"></i> حفظ كلمة المرور الجديدة
                         </ng-container>
                         <ng-template #resettingPassword>
-                          <span class="spinner-border spinner-border-sm me-1"></span> جارٍ التغيير
+                          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span> جارٍ التحديث
                         </ng-template>
                       </button>
                     </div>
                   </div>
+
                   <ng-template #noMerchantOwner>
-                    <div class="alert alert-warning mb-0">
-                      اربط حساب التاجر بهذا المتجر أولاً قبل تغيير كلمة المرور.
+                    <div class="merchant-password-empty">
+                      <i class="fas fa-user-lock" aria-hidden="true"></i>
+                      <div>
+                        <strong>لا يوجد حساب تاجر مرتبط</strong>
+                        <span>اختر حسابًا نشطًا في حقل «حساب تطبيق التاجر» أعلاه أولًا.</span>
+                      </div>
                     </div>
                   </ng-template>
-                </div>
+                </section>
               </div>
 
               <!-- Activity Kind Selector Cards -->

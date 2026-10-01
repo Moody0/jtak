@@ -73,7 +73,7 @@
             <div class="history-icon"><i class="fas fa-hand-holding-usd"></i></div>
             <div class="history-main">
               <strong>{{ advance.driverName }}</strong>
-              <small>{{ advance.description }} · {{ advance.postedAt | date:'yyyy/MM/dd, h:mm a' }}</small>
+              <small>{{ advance.reason || advance.description }} · {{ advance.postedAt | date:'yyyy/MM/dd, h:mm a' }}</small>
               <small class="text-muted">{{ advance.transactionNumber }}</small>
             </div>
             <strong class="history-amount">{{ advance.amount | number:'1.0-2' }} ل.س</strong>

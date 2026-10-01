@@ -237,7 +237,7 @@
               <!-- Original Price (USD) -->
               <div class="col-md-6">
                 <label for="productPriceUsd" class="form-label fw-bold mb-2">
-                  السعر الأصلي بالدولار ($)
+                  سعر المتجر الأساسي بالدولار ($)
                   <span class="text-danger" *ngIf="formGroup.get('merchantId')?.value">*</span>
                 </label>
                 <div class="input-group" dir="ltr">
@@ -255,10 +255,14 @@
                   />
                   <span class="input-group-text bg-light fw-bold text-dark">$</span>
                 </div>
-                <div id="productPriceUsdHelp" class="d-flex align-items-center justify-content-between mt-1">
-                  <span class="fs-9 text-muted">حتى منزلتين عشريتين</span>
-                  <span class="badge badge-light-primary fs-9" *ngIf="formGroup.get('priceUsd')?.value as pUsd">
-                    ~ {{ toLocalPrice(pUsd) | number:'1.0-0' }} ل.س
+                <div id="productPriceUsdHelp" class="d-flex flex-column align-items-start gap-1 mt-2">
+                  <span class="fs-9 text-muted">أدخل السعر بالدولار، بحد أقصى رقمين بعد الفاصلة (مثال: 0.41).</span>
+                  <span class="fs-9 text-muted" *ngIf="formGroup.get('priceUsd')?.value as pUsd">
+                    ما يعادله بالسعر الأساسي: نحو {{ toLocalPrice(pUsd) | number:'1.0-0' }} ل.س
+                    (سعر الصرف: 1 دولار = {{ exchangeRate | number:'1.0-2' }} ل.س)
+                  </span>
+                  <span class="badge badge-light-primary fs-9" *ngIf="customerPricePreview as pricePreview">
+                    السعر المتوقع للعميل بعد العمولة والخصم إن وُجد: {{ pricePreview.salePrice | number:'1.0-0' }} ل.س
                   </span>
                 </div>
               </div>
