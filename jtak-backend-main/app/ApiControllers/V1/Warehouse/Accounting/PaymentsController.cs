@@ -112,13 +112,11 @@ namespace App.ApiControllers.V1.Warehouse
             if (payment == null)
                 return NotFound("The specified payment was not found!");
 
-            // Receiving a payment is idempotent. A retry after a successful request
-            // must not decrease the courier balance a second time.
-            if (payment.HandoverDate.HasValue)
-            {
-                if (transaction != null) await transaction.CommitAsync();
-                return true;
-            }
+            // Keep the ledger posting idempotent, but always check it. Older payment
+            // rows can already be marked as handed over while missing their ledger
+            // entry; returning early here leaves the merchant payable and courier
+            // cash custody unreconciled forever.
+            var wasAlreadyHandedOver = payment.HandoverDate.HasValue;
 
             //var deliveryBalance = await _balanceService.GetBalance(payment.ByUserId);
             //var oldDeliveryBalance = deliveryBalance?.Amount ?? 0;
@@ -148,18 +146,23 @@ namespace App.ApiControllers.V1.Warehouse
                     dUser);
             }
 
-            var oldMerchantBalance = (await _balanceService.GetBalance(payment.ToUserId))?.Amount ?? 0;
+            if (!wasAlreadyHandedOver)
+            {
+                var oldMerchantBalance = (await _balanceService.GetBalance(payment.ToUserId))?.Amount ?? 0;
 
-            payment.HandoverDate = DateTime.UtcNow;
-            payment.NewBalance = Math.Max(0m, oldMerchantBalance - payment.Amount);
+                payment.HandoverDate = DateTime.UtcNow;
+                payment.NewBalance = Math.Max(0m, oldMerchantBalance - payment.Amount);
 
-            // Update delivery and warehouse user balances
-            await _balanceService.DecreaseAppBalance(payment.ByUserId, payment.Amount, dUser);
-            await _balanceService.DecreaseAppBalance(payment.ToUserId, payment.Amount, mUser);
+                // Update legacy balance mirrors only on the first confirmation. The
+                // ledger service above uses Payment-{id} as its idempotency key.
+                await _balanceService.DecreaseAppBalance(payment.ByUserId, payment.Amount, dUser);
+                await _balanceService.DecreaseAppBalance(payment.ToUserId, payment.Amount, mUser);
+            }
 
             await _auow.SaveChangesAsync();
             if (transaction != null) await transaction.CommitAsync();
-            await _notificationService.SendPaymentRecived(new[] { payment.ByUserId }, payment.Id, payment.Amount);
+            if (!wasAlreadyHandedOver)
+                await _notificationService.SendPaymentRecived(new[] { payment.ByUserId }, payment.Id, payment.Amount);
 
             return true;
         }

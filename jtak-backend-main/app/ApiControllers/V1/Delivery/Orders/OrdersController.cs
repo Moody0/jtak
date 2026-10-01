@@ -358,7 +358,8 @@ namespace App.ApiControllers.V1.Delivery
                        x.CourierMatchingDeadlineAtUtc > nowUtc &&
                        _ouow.Context.OrderDispatchOffers.Any(o => o.OrderId == x.Id &&
                            o.DriverId == uid.Value && o.MatchingRound == x.CourierMatchingRound &&
-                           o.Status == OrderDispatchOfferStatus.Offered && o.ExpiresAtUtc > nowUtc))) &&
+                           (o.Status == OrderDispatchOfferStatus.Offered ||
+                            o.Status == OrderDispatchOfferStatus.TimedOut)))) &&
                      (x.PurchaseDate != null ? x.PurchaseDate > dayStart : x.CreatedDate > dayStart),
                 x => x.OrderDetails);
 
@@ -408,12 +409,13 @@ namespace App.ApiControllers.V1.Delivery
             var isInCourierMatching = order.CourierMatchingStartedAtUtc.HasValue &&
                                       !order.CourierMatchingCompletedAtUtc.HasValue &&
                                       order.CourierMatchingDeadlineAtUtc > DateTime.UtcNow;
-            var hasActiveOffer = isInCourierMatching && await _ouow.Context.OrderDispatchOffers.AnyAsync(x =>
+            var hasClaimableOffer = isInCourierMatching && await _ouow.Context.OrderDispatchOffers.AnyAsync(x =>
                 x.OrderId == id && x.DriverId == uid.Value &&
                 x.MatchingRound == order.CourierMatchingRound &&
-                x.Status == OrderDispatchOfferStatus.Offered && x.ExpiresAtUtc > DateTime.UtcNow);
+                (x.Status == OrderDispatchOfferStatus.Offered ||
+                 x.Status == OrderDispatchOfferStatus.TimedOut));
             var hasLegacyReadyDetails = order.OrderDetails.Any(d => d.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
-            if ((isInCourierMatching && !hasActiveOffer) || (!isInCourierMatching && !hasLegacyReadyDetails))
+            if ((isInCourierMatching && !hasClaimableOffer) || (!isInCourierMatching && !hasLegacyReadyDetails))
                 return BadRequest(ApiErr.Create("لم يتم إرسال عرض استلام صالح لهذا الطلب إلى حسابك."));
 
             var courier = await _userManager.FindByIdAsync(uid.Value.ToString());
@@ -624,7 +626,9 @@ namespace App.ApiControllers.V1.Delivery
                 var acceptedAt = DateTime.UtcNow;
                 await _ouow.Context.OrderDispatchOffers
                     .Where(x => x.OrderId == id && x.MatchingRound == order.CourierMatchingRound &&
-                                x.DriverId == uid.Value && x.Status == OrderDispatchOfferStatus.Offered)
+                                x.DriverId == uid.Value &&
+                                (x.Status == OrderDispatchOfferStatus.Offered ||
+                                 x.Status == OrderDispatchOfferStatus.TimedOut))
                     .ExecuteUpdateAsync(update => update
                         .SetProperty(x => x.Status, OrderDispatchOfferStatus.Accepted)
                         .SetProperty(x => x.RespondedAtUtc, (DateTime?)acceptedAt));
@@ -1364,9 +1368,19 @@ namespace App.ApiControllers.V1.Delivery
             var uid = User.GetUserId();
             if (!uid.HasValue) return Unauthorized();
             var now = DateTime.UtcNow;
+            var currentRound = await _ouow.Context.Orders
+                .Where(x => x.Id == id && !x.CourierMatchingCompletedAtUtc.HasValue &&
+                            x.CourierMatchingDeadlineAtUtc > now &&
+                            (x.DeliveryId == null || x.DeliveryId == Guid.Empty))
+                .Select(x => (int?)x.CourierMatchingRound)
+                .FirstOrDefaultAsync();
+            if (!currentRound.HasValue) return Ok(true);
+
             var offer = await _ouow.Context.OrderDispatchOffers.FirstOrDefaultAsync(x =>
                 x.OrderId == id && x.DriverId == uid.Value &&
-                x.Status == OrderDispatchOfferStatus.Offered && x.ExpiresAtUtc > now);
+                x.MatchingRound == currentRound.Value &&
+                (x.Status == OrderDispatchOfferStatus.Offered ||
+                 x.Status == OrderDispatchOfferStatus.TimedOut));
             if (offer == null) return Ok(true); // Idempotent for an expired/stale offer.
 
             offer.Status = OrderDispatchOfferStatus.Declined;

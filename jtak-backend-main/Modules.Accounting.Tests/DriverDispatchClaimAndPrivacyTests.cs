@@ -13,6 +13,7 @@ using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -510,6 +511,75 @@ namespace Modules.Accounting.Tests
             var error = Assert.IsType<ApiErr>(badRequest.Value);
             Assert.Contains("يجب بدء وردية التوصيل", string.Join("; ", error.Errors));
             Assert.Null((await ordersDb.Orders.FirstAsync(x => x.Id == order.Id)).DeliveryId);
+        }
+
+        [Fact]
+        public async Task Driver_CanClaimTimedOutOfferUntilMatchingWindowEnds()
+        {
+            var dbName = Guid.NewGuid().ToString();
+            using var ordersConnection = new SqliteConnection("Data Source=:memory:");
+            await ordersConnection.OpenAsync();
+            var ordersOptions = new DbContextOptionsBuilder<OrdersDbContext>()
+                .UseSqlite(ordersConnection).Options;
+            using var ordersDb = new OrdersDbContext(ordersOptions, null);
+            await ordersDb.Database.EnsureCreatedAsync();
+            using var accountingDb = CreateInMemoryAccountingContext(dbName);
+            using var shippingDb = CreateInMemoryShippingContext(dbName);
+            var deliveryService = CreateDeliveryService(shippingDb);
+            var driverId = Guid.NewGuid();
+            await deliveryService.SetDutyStatus(driverId, true);
+
+            var now = DateTime.UtcNow;
+            var order = new Order
+            {
+                OrderStatus = OrderStatus.Success,
+                DeliveryId = null,
+                DeliveryFee = 3000m,
+                PaymentMethod = Modules.Orders.Entities.PaymentMethod.PayOnDelivery,
+                CourierMatchingStartedAtUtc = now.AddSeconds(-30),
+                CourierMatchingDeadlineAtUtc = now.AddMinutes(2).AddSeconds(30),
+                CourierMatchingRound = 1,
+                OrderDetails = new List<OrderDetail>
+                {
+                    new OrderDetail
+                    {
+                        MerchantId = 10,
+                        ProductId = 100,
+                        Quantity = 1,
+                        SinglePrice = 12000m,
+                        SingleFinalPrice = 12000m,
+                        OrderDetailStatus = OrderDetailStatus.ReadyForPickup
+                    }
+                }
+            };
+            ordersDb.Orders.Add(order);
+            await ordersDb.SaveChangesAsync();
+            ordersDb.OrderDispatchOffers.Add(new OrderDispatchOffer
+            {
+                OrderId = order.Id,
+                DriverId = driverId,
+                MatchingRound = 1,
+                WaveNumber = 1,
+                OfferedAtUtc = now.AddSeconds(-26),
+                ExpiresAtUtc = now.AddSeconds(-1),
+                RespondedAtUtc = now,
+                Status = OrderDispatchOfferStatus.TimedOut
+            });
+            await ordersDb.SaveChangesAsync();
+
+            var controller = CreateOrdersController(ordersDb, accountingDb, shippingDb, deliveryService);
+            SetDriverContext(controller, driverId);
+
+            var response = await controller.ClaimOrder(order.Id);
+
+            var claimError = response.Result is BadRequestObjectResult badRequest &&
+                             badRequest.Value is ApiErr apiError
+                ? string.Join("; ", apiError.Errors)
+                : response.Result?.ToString();
+            Assert.True(response.Value, claimError);
+            Assert.Equal(driverId, (await ordersDb.Orders.SingleAsync(x => x.Id == order.Id)).DeliveryId);
+            Assert.Equal(OrderDispatchOfferStatus.Accepted,
+                (await ordersDb.OrderDispatchOffers.AsNoTracking().SingleAsync(x => x.OrderId == order.Id)).Status);
         }
 
         [Fact]

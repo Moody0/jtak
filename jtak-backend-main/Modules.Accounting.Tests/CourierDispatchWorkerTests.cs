@@ -38,6 +38,7 @@ public class CourierDispatchWorkerTests
         public readonly Mock<INotificationService> Notification = new();
         public readonly Mock<IInventoryBatchService> Inventory = new();
         public readonly Guid DriverId = Guid.NewGuid();
+        public readonly Guid SecondDriverId = Guid.NewGuid();
         public readonly DeliveryStatus DriverStatus = new()
         {
             IsOnline = true,
@@ -71,6 +72,13 @@ public class CourierDispatchWorkerTests
                 .ReturnsAsync(new[] { (34.73m, 36.71m, 10) });
             Delivery.Setup(x => x.GetOnlineDeliveryIds()).ReturnsAsync(new[] { DriverId });
             Delivery.Setup(x => x.GetDeliveryStatus(DriverId)).ReturnsAsync(DriverStatus);
+            Delivery.Setup(x => x.GetDeliveryStatus(SecondDriverId)).ReturnsAsync(new DeliveryStatus
+            {
+                IsOnline = true,
+                LastLocationUpdatedAt = DateTime.UtcNow,
+                Loc = (34.74m, 36.72m),
+                PendingOrders = new List<ShippingOrderDto>()
+            });
         }
 
         public async Task<int> SeedOrderAsync(bool accepted = true, Guid? customerId = null, int merchantId = 10)
@@ -80,8 +88,10 @@ public class CourierDispatchWorkerTests
             var now = DateTime.UtcNow;
             var order = new Order
             {
-                UserId = customerId ?? Guid.NewGuid(), OrderStatus = OrderStatus.Success,
-                AccountingLastError = "", PurchaseDate = now,
+                UserId = customerId ?? Guid.NewGuid(),
+                OrderStatus = OrderStatus.Success,
+                AccountingLastError = "",
+                PurchaseDate = now,
                 CourierMatchingStartedAtUtc = accepted ? now : null,
                 CourierMatchingDeadlineAtUtc = accepted ? now.AddMinutes(3) : null,
                 CourierMatchingRound = accepted ? 1 : 0,
@@ -103,8 +113,9 @@ public class CourierDispatchWorkerTests
         public Task DispatchAsync() => new CourierDispatchWorker(Services,
             NullLogger<CourierDispatchWorker>.Instance).ScheduledTask(CancellationToken.None);
 
-        public async Task AssertVisibleToDriverAsync(int orderId)
+        public async Task AssertVisibleToDriverAsync(int orderId, Guid? driverId = null, bool expectLiveOffer = true)
         {
+            var visibleDriverId = driverId ?? DriverId;
             using var scope = Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
             var uow = new OrdersUnitOfWork(db);
@@ -123,14 +134,14 @@ public class CourierDispatchWorkerTests
                 HttpContext = new DefaultHttpContext
                 {
                     User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                    { new Claim(ClaimTypes.NameIdentifier, DriverId.ToString()) }, "Test"))
+                    { new Claim(ClaimTypes.NameIdentifier, visibleDriverId.ToString()) }, "Test"))
                 }
             };
             var result = await controller.PostAvailable(new MetronicTable
             { PageNumber = 0, PageSize = 50, SortField = "id", SortOrder = "desc" });
             var offer = Assert.Single(result.Value.Items);
             Assert.Equal(orderId, offer.Id);
-            Assert.NotNull(offer.OfferExpiresAtUtc);
+            Assert.Equal(expectLiveOffer, offer.OfferExpiresAtUtc.HasValue);
         }
 
         public async Task<OrderDispatchOffer[]> OffersAsync()
@@ -255,6 +266,43 @@ public class CourierDispatchWorkerTests
         Assert.Null(offer.RespondedAtUtc);
         Assert.True(offer.ExpiresAtUtc > DateTime.UtcNow);
         await fixture.AssertVisibleToDriverAsync(id);
+    }
+
+    [Fact]
+    public async Task TimedOutDriverOffer_RemainsVisibleWhileNextWaveIsDispatched()
+    {
+        using var fixture = new Fixture();
+        var orderId = await fixture.SeedOrderAsync();
+        fixture.Delivery.Setup(x => x.GetOnlineDeliveryIds())
+            .ReturnsAsync(new[] { fixture.DriverId, fixture.SecondDriverId });
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+            var now = DateTime.UtcNow;
+            db.OrderDispatchOffers.Add(new OrderDispatchOffer
+            {
+                OrderId = orderId,
+                DriverId = fixture.DriverId,
+                MatchingRound = 1,
+                WaveNumber = 1,
+                OfferedAtUtc = now.AddSeconds(-26),
+                ExpiresAtUtc = now.AddSeconds(-1),
+                Status = OrderDispatchOfferStatus.Offered
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await fixture.DispatchAsync();
+
+        var offers = await fixture.OffersAsync();
+        Assert.Equal(2, offers.Length);
+        Assert.Contains(offers, x => x.DriverId == fixture.DriverId &&
+                                     x.Status == OrderDispatchOfferStatus.TimedOut);
+        Assert.Contains(offers, x => x.DriverId == fixture.SecondDriverId &&
+                                     x.Status == OrderDispatchOfferStatus.Offered &&
+                                     x.ExpiresAtUtc > DateTime.UtcNow);
+        await fixture.AssertVisibleToDriverAsync(orderId, fixture.DriverId, expectLiveOffer: false);
     }
 
     [Theory]
