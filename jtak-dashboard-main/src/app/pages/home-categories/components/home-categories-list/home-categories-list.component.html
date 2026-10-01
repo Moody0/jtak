@@ -638,41 +638,24 @@
                         </div>
                         <div class="col-md-6">
                           <label class="form-label fw-semibold text-gray-700">القسم داخل هذا المتجر <span class="text-danger">*</span></label>
-                          <ng-select
-                            [items]="getCategoriesForMerchant(tile.merchantId, tile.productCategoryId)"
-                            appendTo="body"
-                            bindLabel="displayLabel"
-                            bindValue="id"
+                          <select
+                            class="form-select form-select-sm"
                             [(ngModel)]="tile.productCategoryId"
                             (ngModelChange)="onTargetChange(tile)"
-                            [searchFn]="categorySearchFn"
-                            [searchable]="true"
-                            placeholder="🔍 ابحث عن القسم داخل المتجر..."
-                            [notFoundText]="tile.merchantId ? 'لا توجد أقسام بمنتجات مسعّرة في هذا المتجر' : 'اختر المتجر أولاً'"
-                            [clearable]="false"
+                            [disabled]="!tile.merchantId"
                           >
-                            <ng-template ng-label-tmp let-item="item">
-                              <span class="fw-bold text-dark">{{ item.displayLabel }}</span>
-                              <span *ngIf="isCategoryInMerchant(tile.merchantId, item.id)" class="badge badge-light-success ms-2 fs-8">متوفر بمنتجات مسعّرة</span>
-                              <span *ngIf="!isCategoryInMerchant(tile.merchantId, item.id)" class="badge badge-light-warning ms-2 fs-8" title="لا توجد منتجات مسعّرة (أكبر من 0) لهذا المتجر">بدون منتجات مسعّرة</span>
-                            </ng-template>
-                            <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
-                              <div class="d-flex align-items-center justify-content-between py-1 w-100">
-                                <div>
-                                  <div class="fw-bold text-dark">{{ item.displayLabel }}</div>
-                                  <small class="text-muted fs-8">
-                                    <span *ngIf="isCategoryInMerchant(tile.merchantId, item.id)" class="text-success fw-semibold">
-                                      <i class="fas fa-check-circle text-success fs-9 me-1"></i>يحتوي على منتجات مسعّرة ومتاحة للطلب
-                                    </span>
-                                    <span *ngIf="!isCategoryInMerchant(tile.merchantId, item.id)" class="text-warning">
-                                      <i class="fas fa-info-circle text-warning fs-9 me-1"></i>لا توجد منتجات مسعّرة (سعرها 0 أو لم تضف للمتجر)
-                                    </span>
-                                  </small>
-                                </div>
-                                <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
-                              </div>
-                            </ng-template>
-                          </ng-select>
+                            <option [ngValue]="null" disabled>
+                              {{ tile.merchantId ? 'اختر قسماً من المتجر' : 'اختر المتجر أولاً' }}
+                            </option>
+                            <option
+                              *ngFor="let category of getCategoriesForMerchant(tile.merchantId, tile.productCategoryId)"
+                              [ngValue]="category.id"
+                            >
+                              {{ category.displayLabel }} —
+                              {{ isCategoryInMerchant(tile.merchantId, category.id) ? 'متوفر بمنتجات مسعّرة' : 'بدون منتجات مسعّرة' }}
+                              (#{{ category.id }})
+                            </option>
+                          </select>
                           <small class="form-text text-muted">تظهر هنا فقط الأقسام التي تحتوي منتجات مسعّرة ومتاحة في المتجر المختار.</small>
                         </div>
                       </div>
