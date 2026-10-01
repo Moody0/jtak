@@ -1094,11 +1094,22 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
   .logo-minimize {
     display: none;
-    height: 28px !important;
-    max-height: 28px !important;
+    height: 26px !important;
+    max-height: 26px !important;
     width: auto !important;
-    max-width: 28px !important;
+    max-width: 32px !important;
     object-fit: contain;
+  }
+
+  body[data-kt-aside-minimize="on"] &,
+  html[data-kt-aside-minimize="on"] & {
+    .logo-default {
+      display: none !important;
+    }
+    .logo-minimize {
+      display: block !important;
+      margin: 0 auto !important;
+    }
   }
 }
 
@@ -2753,4 +2764,9 @@ app-auth > div > .flex-center.flex-column-auto { position: relative; background:
 .ops-empty-icon,
 .ops-empty-state span {
   color: var(--jtak-muted-strong) !important;
+}
+
+/* Ensure horizontal scrollbar never appears in aside or minimized aside */
+#kt_aside, .aside, .aside-menu, #kt_aside_menu_wrapper, .jtak-nav, #kt_aside_menu {
+  overflow-x: hidden !important;
 }
