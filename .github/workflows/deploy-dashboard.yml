@@ -11,6 +11,10 @@ on:
       - 'tools/deploy-dashboard-helper.cjs'
   workflow_dispatch:
 
+concurrency:
+  group: deploy-dashboard-production
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     name: Build & Deploy Dashboard
@@ -40,7 +44,7 @@ jobs:
         run: |
           npm install --no-save basic-ftp
 
-      - name: 🧹 Clean Rogue Server Directories & Check State
+      - name: 🧹 Clean Rogue Server Directories
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -61,7 +65,6 @@ jobs:
           exclude: |
             **/.git*
             **/.git*/**
-            **/web.config
             **/.htaccess
             **/*.map
 
