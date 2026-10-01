@@ -131,41 +131,49 @@ namespace App.ApiControllers.V1.Admin
                 ProductCategory = x.ProductCategory != null ? x.ProductCategory.Title : string.Empty,
                 Active = x.Active,
                 MerchantId = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => (int?)mp.MerchantId)
                     .FirstOrDefault(),
                 Merchant = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty)
                     .FirstOrDefault(),
                 MerchantTitle = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty)
                     .FirstOrDefault(),
                 Price = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.MerchantPrice)
                     .FirstOrDefault(),
                 PriceUsd = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.PriceUsd)
                     .FirstOrDefault(),
                 OriginalPrice = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.OriginalPrice)
                     .FirstOrDefault(),
                 Discount = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.Discount)
                     .FirstOrDefault(),
                 ProfitOutOfMerchantPricePercent = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.ProfitOutOfMerchantPricePercent)
