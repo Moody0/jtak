@@ -13,7 +13,7 @@ on:
 jobs:
   build-and-deploy:
     name: Build & Deploy Backend
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: ⬇️ Checkout Repository
         uses: actions/checkout@v4
