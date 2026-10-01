@@ -58,6 +58,13 @@ extends TableService<Balance> implements OnDestroy {
     return this.http.get<any>(environment.apiUrl + '/Admin/Settings/ErrandDriverEarning');
   }
 
+  getDeliveryCoverage(): Observable<any> {
+    return this.http.get<any>(environment.apiUrl + '/Admin/Settings/DeliveryCoverage');
+  }
+  saveDeliveryCoverage(setting: {radiusKm: number}): Observable<any> {
+    return this.http.put<any>(environment.apiUrl + '/Admin/Settings/DeliveryCoverage', setting);
+  }
+
   saveErrandDriverEarning(setting: any): Observable<any> {
     return this.http.put<any>(environment.apiUrl + '/Admin/Settings/ErrandDriverEarning', setting);
   }

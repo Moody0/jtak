@@ -22,7 +22,8 @@
     <div class="jtak-workspace-children" *ngIf="group.items.length > 1 && expandedGroupId === group.id">
       <a *ngFor="let item of group.items" class="jtak-workspace-child"
         [class.is-active]="activeItemPath === item.path" [routerLink]="'/' + item.path">
-        <span [translate]="item.label"></span>
+        <span class="child-indicator" aria-hidden="true"></span>
+        <span class="child-title" [translate]="item.label"></span>
         <span class="jtak-child-count" *ngIf="getBadgeCount(item.path) > 0">{{ getFormattedBadge(item.path) }}</span>
       </a>
     </div>

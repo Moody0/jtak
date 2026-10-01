@@ -39,9 +39,19 @@
   </div>
   <!-- end::Logo -->
 
+  <!-- begin::Desktop Live Status Pill -->
+  <div class="d-none d-lg-flex align-items-center flex-grow-1">
+    <div class="jtak-header-status-pill">
+      <span class="jtak-live-dot" aria-hidden="true"></span>
+      <span class="jtak-header-status-text">{{ 'HEADER.WORKSPACE_NAME' | translate }}</span>
+      <span class="jtak-header-status-badge">{{ 'HEADER.LIVE_STATUS' | translate }}</span>
+    </div>
+  </div>
+  <!-- end::Desktop Live Status Pill -->
+
   <!-- begin::Wrapper -->
   <div
-    class="d-flex align-items-stretch justify-content-end flex-lg-grow-1"
+    class="d-flex align-items-stretch justify-content-end flex-shrink-0"
   >
     <div class="d-flex align-items-stretch flex-shrink-0">
       <app-topbar class="d-flex align-items-stretch flex-shrink-0"></app-topbar>

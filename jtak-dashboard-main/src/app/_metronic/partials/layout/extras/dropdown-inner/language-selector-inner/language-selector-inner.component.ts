@@ -6,7 +6,9 @@ import { TranslationService } from '../../../../../../modules/i18n/translation.s
 interface LanguageFlag {
   lang: string;
   name: string;
-  flag: string;
+  nativeName: string;
+  code: string;
+  flag?: string;
   active?: boolean;
 }
 
@@ -25,16 +27,21 @@ export class LanguageSelectorComponent implements OnInit {
   language: LanguageFlag;
   languages: LanguageFlag[] = [
     {
-      lang: 'en',
-      name: 'English',
-      flag: './assets/media/flags/united-states.svg',
-    },
-    {
       lang: 'ar',
       name: 'العربية',
+      nativeName: 'Arabic',
+      code: 'AR',
       flag: './assets/media/flags/syria.svg',
     },
+    {
+      lang: 'en',
+      name: 'English',
+      nativeName: 'الإنجليزية',
+      code: 'EN',
+      flag: './assets/media/flags/united-states.svg',
+    },
   ];
+
   constructor(
     private translationService: TranslationService,
     private router: Router
@@ -44,17 +51,17 @@ export class LanguageSelectorComponent implements OnInit {
     this.setSelectedLanguage();
     this.router.events
       .pipe(filter((event) => event instanceof NavigationStart))
-      .subscribe((event) => {
+      .subscribe(() => {
         this.setSelectedLanguage();
       });
   }
 
-  setLanguageWithRefresh(lang:string) {
+  setLanguageWithRefresh(lang: string) {
     this.setLanguage(lang);
     window.location.reload();
   }
 
-  setLanguage(lang:string) {
+  setLanguage(lang: string) {
     this.languages.forEach((language: LanguageFlag) => {
       if (language.lang === lang) {
         language.active = true;
@@ -67,6 +74,6 @@ export class LanguageSelectorComponent implements OnInit {
   }
 
   setSelectedLanguage(): any {
-    this.setLanguage(this.translationService.getSelectedLanguage());
+    this.setLanguage(this.translationService.getSelectedLanguage() || 'ar');
   }
 }

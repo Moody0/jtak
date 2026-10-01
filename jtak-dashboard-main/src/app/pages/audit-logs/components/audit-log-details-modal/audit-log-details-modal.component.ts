@@ -88,8 +88,110 @@ export class AuditLogDetailsModalComponent implements OnInit {
     homeFeaturedCategoryIds: 'أقسام الواجهة المميزة',
     HomeFeaturedCategoryIds: 'أقسام الواجهة المميزة',
     homeFeaturedProductIds: 'منتجات الواجهة المميزة',
-    HomeFeaturedProductIds: 'منتجات الواجهة المميزة'
+    HomeFeaturedProductIds: 'منتجات الواجهة المميزة',
+    batchId: 'معرّف الدفعة',
+    BatchId: 'معرّف الدفعة',
+    captainId: 'معرّف الكابتن',
+    CaptainId: 'معرّف الكابتن',
+    captainName: 'اسم الكابتن',
+    CaptainName: 'اسم الكابتن',
+    compensationType: 'طريقة الاحتساب',
+    CompensationType: 'طريقة الاحتساب',
+    compensationTypeDisplay: 'نموذج أجر الكابتن',
+    CompensationTypeDisplay: 'نموذج أجر الكابتن',
+    handledByAdminName: 'المشرف المعتمد',
+    HandledByAdminName: 'المشرف المعتمد',
+    netDueToCompany: 'المبلغ المستحق للشركة (ل.س)',
+    NetDueToCompany: 'المبلغ المستحق للشركة (ل.س)',
+    totalOrders: 'إجمالي الطلبات',
+    TotalOrders: 'إجمالي الطلبات',
+    totalCashCollected: 'المحصل نقداً (ل.س)',
+    TotalCashCollected: 'المحصل نقداً (ل.س)',
+    totalEarnings: 'استحقاق الكابتن (ل.س)',
+    TotalEarnings: 'استحقاق الكابتن (ل.س)',
+    status: 'الحالة',
+    Status: 'الحالة'
   };
+
+  getModuleLabel(module?: string): string {
+    const labels: { [key: string]: string } = {
+      Orders: 'الطلبات',
+      Settlements: 'التسويات والمالية',
+      Merchants: 'التجار والشركاء',
+      Users: 'المستخدمون والمناديب',
+      Catalog: 'الكتالوج والمنتجات',
+      Banners: 'الإعلانات والبنرات',
+      Settings: 'إعدادات النظام',
+      Auth: 'المصادقة والدخول',
+      System: 'النظام',
+    };
+    return labels[module || ''] || module || '—';
+  }
+
+  getActionLabel(action?: string): string {
+    const labels: { [key: string]: string } = {
+      Create: 'إنشاء',
+      Update: 'تعديل',
+      Delete: 'حذف',
+      Archive: 'أرشفة',
+      Restore: 'استعادة',
+      Approve: 'موافقة وقبول',
+      Reject: 'رفض',
+      Pay: 'صرف مالي',
+      Deliver: 'تسليم',
+      AssignDriver: 'تعيين مندوب',
+      Login: 'تسجيل الدخول',
+      Logout: 'تسجيل الخروج',
+      Execute: 'تنفيذ',
+      ConfirmCaptainSettlement: 'اعتماد تسوية الكابتن',
+      BatchSettlement: 'تسوية مجمعة',
+      DisableUser: 'تعطيل مستخدم',
+      EnableUser: 'تفعيل مستخدم',
+      ResetPassword: 'إعادة تعيين كلمة المرور',
+      ChangeStatus: 'تغيير الحالة',
+    };
+    return labels[action || ''] || action || '—';
+  }
+
+  getEntityLabel(entityType?: string): string {
+    const labels: { [key: string]: string } = {
+      Order: 'طلب',
+      Merchant: 'متجر',
+      Product: 'منتج',
+      User: 'مستخدم',
+      Delivery: 'مندوب توصيل',
+      Driver: 'مندوب توصيل',
+      SettlementRequest: 'طلب تسوية',
+      CaptainSettlementBatch: 'دفعة تسوية كابتن',
+      CaptainSettlement: 'تسوية كابتن',
+      Payment: 'دفعة مالية',
+      Banner: 'إعلان',
+      Category: 'تصنيف',
+      Settings: 'إعدادات',
+      Auth: 'جلسة دخول',
+    };
+    return labels[entityType || ''] || entityType || '—';
+  }
+
+  getResultLabel(result?: string): string {
+    if (!result) return '—';
+    const r = result.toLowerCase();
+    if (r === 'success') return 'ناجحة';
+    if (r === 'failure' || r === 'failed') return 'فاشلة';
+    if (r === 'warning') return 'تحذير';
+    if (r === 'forbidden') return 'مرفوضة / صلاحيات';
+    return result;
+  }
+
+  getAdminInitials(name?: string): string {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return 'A';
+    const parts = trimmed.split(' ').filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return trimmed.slice(0, 2).toUpperCase();
+  }
 
   constructor(
     public activeModal: NgbActiveModal,

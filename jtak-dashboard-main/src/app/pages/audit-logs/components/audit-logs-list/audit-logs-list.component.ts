@@ -44,9 +44,10 @@ export class AuditLogsListComponent
   selectedResult: string = '';
   fromDate: string = '';
   toDate: string = '';
+  copiedId: string | null = null;
 
   readonly modules = [
-    { value: '', label: 'AUDIT_LOGS_PAGE.FILTER_ALL' },
+    { value: '', label: 'كافة الأقسام' },
     { value: 'Orders', label: 'الطلبات' },
     { value: 'Settlements', label: 'التسويات والمالية' },
     { value: 'Merchants', label: 'التجار والشركاء' },
@@ -58,7 +59,7 @@ export class AuditLogsListComponent
   ];
 
   readonly actions = [
-    { value: '', label: 'AUDIT_LOGS_PAGE.FILTER_ALL' },
+    { value: '', label: 'كافة الإجراءات' },
     { value: 'Create', label: 'إنشاء' },
     { value: 'Update', label: 'تعديل' },
     { value: 'Delete', label: 'حذف' },
@@ -69,12 +70,18 @@ export class AuditLogsListComponent
     { value: 'Pay', label: 'صرف مالي' },
     { value: 'Deliver', label: 'تسليم' },
     { value: 'AssignDriver', label: 'تعيين مندوب' },
+    { value: 'ConfirmCaptainSettlement', label: 'اعتماد تسوية كابتن' },
+    { value: 'BatchSettlement', label: 'تسوية مجمعة' },
+    { value: 'DisableUser', label: 'تعطيل مستخدم' },
+    { value: 'EnableUser', label: 'تفعيل مستخدم' },
+    { value: 'ResetPassword', label: 'إعادة تعيين كلمة المرور' },
+    { value: 'ChangeStatus', label: 'تغيير الحالة' },
   ];
 
   readonly results = [
-    { value: '', label: 'AUDIT_LOGS_PAGE.FILTER_ALL' },
-    { value: 'Success', label: 'AUDIT_LOGS_PAGE.RESULT_SUCCESS' },
-    { value: 'Failed', label: 'AUDIT_LOGS_PAGE.RESULT_FAILED' },
+    { value: '', label: 'كافة الحالات' },
+    { value: 'Success', label: 'ناجحة' },
+    { value: 'Failed', label: 'فاشلة' },
   ];
 
   constructor(
@@ -256,9 +263,15 @@ export class AuditLogsListComponent
       Pay: 'صرف مالي',
       Deliver: 'تسليم',
       AssignDriver: 'تعيين مندوب',
-      Login: 'تسجيل الدخول',
-      Logout: 'تسجيل الخروج',
+      Login: 'تسجيل دخول',
+      Logout: 'تسجيل خروج',
       Execute: 'تنفيذ',
+      ConfirmCaptainSettlement: 'اعتماد تسوية الكابتن',
+      BatchSettlement: 'تسوية مجمعة',
+      DisableUser: 'تعطيل مستخدم',
+      EnableUser: 'تفعيل مستخدم',
+      ResetPassword: 'إعادة تعيين كلمة المرور',
+      ChangeStatus: 'تغيير الحالة',
     };
     return labels[action || ''] || action || '—';
   }
@@ -272,10 +285,13 @@ export class AuditLogsListComponent
       Delivery: 'مندوب توصيل',
       Driver: 'مندوب توصيل',
       SettlementRequest: 'طلب تسوية',
+      CaptainSettlementBatch: 'دفعة تسوية كابتن',
+      CaptainSettlement: 'تسوية كابتن',
       Payment: 'دفعة مالية',
       Banner: 'إعلان',
       Category: 'تصنيف',
       Settings: 'إعدادات',
+      Auth: 'جلسة دخول',
     };
     return labels[entityType || ''] || entityType || '—';
   }
@@ -340,22 +356,63 @@ export class AuditLogsListComponent
     modalRef.componentInstance.log = log;
   }
 
+  copyText(text: string, id: string, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    this.copiedId = id;
+    setTimeout(() => {
+      if (this.copiedId === id) {
+        this.copiedId = null;
+      }
+    }, 2000);
+  }
+
+  getModuleIcon(module?: string): string {
+    switch (module?.toLowerCase()) {
+      case 'orders':
+        return 'fas fa-shopping-bag';
+      case 'settlements':
+        return 'fas fa-hand-holding-usd';
+      case 'merchants':
+        return 'fas fa-store';
+      case 'users':
+        return 'fas fa-users-cog';
+      case 'catalog':
+        return 'fas fa-boxes';
+      case 'banners':
+        return 'fas fa-images';
+      case 'settings':
+        return 'fas fa-sliders-h';
+      case 'auth':
+        return 'fas fa-key';
+      default:
+        return 'fas fa-shield-alt';
+    }
+  }
+
   getModuleBadgeClass(module: string): string {
     switch (module?.toLowerCase()) {
       case 'orders':
-        return 'badge-light-primary text-primary';
+        return 'badge-module-orders';
       case 'settlements':
-        return 'badge-light-success text-success';
+        return 'badge-module-settlements';
       case 'merchants':
-        return 'badge-light-warning text-warning';
+        return 'badge-module-merchants';
       case 'catalog':
-        return 'badge-light-info text-info';
+        return 'badge-module-catalog';
       case 'users':
-        return 'badge-light-dark text-dark';
+        return 'badge-module-users';
       case 'banners':
-        return 'badge-light-secondary text-secondary';
+        return 'badge-module-banners';
+      case 'auth':
+        return 'badge-module-auth';
+      case 'settings':
+        return 'badge-module-settings';
       default:
-        return 'badge-light-primary text-primary';
+        return 'badge-module-default';
     }
   }
 
@@ -364,17 +421,25 @@ export class AuditLogsListComponent
       case 'create':
       case 'approve':
       case 'restore':
-        return 'badge-light-success text-success';
+      case 'enableuser':
+        return 'badge-action-success';
       case 'delete':
       case 'reject':
-        return 'badge-light-danger text-danger';
+      case 'disableuser':
+        return 'badge-action-danger';
       case 'archive':
-        return 'badge-light-warning text-warning';
+      case 'resetpassword':
+        return 'badge-action-warning';
       case 'update':
       case 'pay':
-        return 'badge-light-info text-info';
+      case 'batchsettlement':
+      case 'confirmcaptainsettlement':
+        return 'badge-action-info';
+      case 'login':
+      case 'logout':
+        return 'badge-action-auth';
       default:
-        return 'badge-light-secondary text-secondary';
+        return 'badge-action-default';
     }
   }
 

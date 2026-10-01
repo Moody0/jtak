@@ -1,16 +1,544 @@
-.json-code-block {
-  max-height: 360px;
-  overflow-y: auto;
-  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.825rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-all;
-  padding: 0.5rem;
-  border-radius: 6px;
-  background-color: rgba(0, 0, 0, 0.03);
+// =============================================================================
+// JTAK Operations - Audit Log Details Modal Stylesheet
+// Modern Minimalist Enterprise UI (Zero Shadows, Alexandria Font, High Density)
+// Strict Color System: Slate Neutral + JTAK Warm Orange (#ea580c)
+// =============================================================================
+
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
 }
 
-.mw-200px {
-  max-width: 200px;
+.audit-modal-wrapper {
+  border-radius: 14px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+// =============================================================================
+// Modal Header
+// =============================================================================
+.modal-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 16px 22px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .jtak-modal-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .modal-icon-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 11px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #2563eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .modal-kicker {
+      display: block;
+      font-size: 0.65rem;
+      font-weight: 750;
+      text-transform: uppercase;
+      color: #94a3b8;
+      letter-spacing: 0.05em;
+    }
+
+    .modal-title {
+      font-size: 1.05rem !important;
+      font-weight: 800 !important;
+      color: #0f172a !important;
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .modal-meta-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+
+      .meta-date {
+        font-size: 0.72rem;
+        color: #64748b;
+        font-weight: 600;
+      }
+
+      .meta-id-pill {
+        font-size: 0.69rem;
+        font-weight: 750;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        padding: 1px 7px;
+        border-radius: 5px;
+        font-family: monospace;
+      }
+
+      .meta-correlation-pill {
+        font-size: 0.69rem;
+        font-weight: 700;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #16a34a;
+        padding: 1px 7px;
+        border-radius: 5px;
+        font-family: monospace;
+      }
+    }
+  }
+
+  .btn-close {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    background-color: #f8fafc !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%2364748b'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 11px !important;
+    border: 1px solid #cbd5e1 !important;
+    opacity: 0.85 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      opacity: 1 !important;
+      background-color: #fee2e2 !important;
+      border-color: #fca5a5 !important;
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ef4444'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e") !important;
+    }
+  }
+}
+
+// =============================================================================
+// Modal Body
+// =============================================================================
+.modal-body {
+  padding: 20px 22px !important;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+// Information Summary Tiles
+.audit-info-tile {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  height: 100%;
+
+  .tile-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 750;
+    color: #0f172a;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .tile-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.77rem;
+
+      .info-label {
+        color: #64748b;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+
+      .info-value {
+        font-weight: 700;
+      }
+
+      .badge-module {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        font-size: 0.73rem;
+        font-weight: 750;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+
+      .badge-success-result {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+        font-size: 0.73rem;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+
+      .badge-danger-result {
+        background: #fff1f2;
+        color: #be123c;
+        border: 1px solid #fecdd3;
+        font-size: 0.73rem;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+
+      .badge-warning-result {
+        background: #fffbeb;
+        color: #b45309;
+        border: 1px solid #fde68a;
+        font-size: 0.73rem;
+        font-weight: 800;
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+
+      .badge-ip {
+        background: #f1f5f9;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        font-size: 0.73rem;
+        padding: 2px 7px;
+        border-radius: 5px;
+      }
+
+      .info-entity {
+        font-size: 0.76rem;
+        text-align: left;
+        direction: ltr;
+      }
+
+      .info-useragent {
+        max-width: 220px;
+        color: #475569;
+        font-size: 0.72rem;
+      }
+
+      .admin-avatar-mini {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #2563eb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 800;
+      }
+    }
+  }
+}
+
+// Description Box
+.audit-description-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+
+  .desc-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 750;
+    color: #0f172a;
+    margin-bottom: 6px;
+  }
+
+  .desc-content {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #334155;
+    line-height: 1.5;
+  }
+}
+
+// Diff Section
+.audit-diff-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+
+  .diff-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+
+    span.fw-bold {
+      font-size: 0.84rem;
+      color: #0f172a;
+    }
+
+    .diff-tabs-group {
+      .btn-diff-tab {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        color: #475569;
+        font-size: 0.74rem;
+        font-weight: 700;
+        padding: 5px 12px;
+        transition: all 0.12s ease;
+        box-shadow: none !important;
+
+        &:hover:not(.active) {
+          background: #f1f5f9;
+          color: #0f172a;
+        }
+
+        &.active {
+          background: #ea580c !important;
+          border-color: #ea580c !important;
+          color: #ffffff !important;
+
+          i {
+            color: #ffffff !important;
+          }
+        }
+      }
+    }
+  }
+
+  .diff-table-container {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+
+    .diff-table {
+      margin-bottom: 0;
+      width: 100%;
+
+      thead tr th {
+        background: #f8fafc;
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #475569;
+        padding: 9px 12px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+
+        &.diff-row-changed {
+          background: #fffdfa;
+        }
+
+        td {
+          padding: 8px 12px;
+          vertical-align: middle;
+          font-size: 0.77rem;
+        }
+      }
+
+      .diff-field-label {
+        display: block;
+        color: #0f172a;
+        font-size: 0.78rem;
+      }
+
+      .diff-field-key {
+        font-size: 0.68rem;
+        color: #94a3b8;
+      }
+
+      .diff-val-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.73rem;
+        word-break: break-all;
+        max-width: 260px;
+
+        &.diff-val-before {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          color: #64748b;
+
+          &.is-changed {
+            background: #fff1f2;
+            border-color: #fecdd3;
+            color: #be123c;
+          }
+        }
+
+        &.diff-val-after {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          color: #64748b;
+
+          &.is-changed {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+            color: #047857;
+          }
+        }
+      }
+
+      .badge-diff-changed {
+        background: #fef3c7;
+        color: #b45309;
+        border: 1px solid #fde68a;
+        font-size: 0.7rem;
+        font-weight: 750;
+      }
+
+      .badge-diff-same {
+        background: #f1f5f9;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        font-size: 0.7rem;
+        font-weight: 600;
+      }
+    }
+  }
+
+  // JSON Diff Boxes
+  .json-box {
+    border-radius: 8px;
+    overflow: hidden;
+    height: 100%;
+
+    &.json-box-before {
+      border: 1px solid #fecdd3;
+      background: #fff8f8;
+
+      .json-box-header {
+        background: #ffe4e6;
+        border-bottom: 1px solid #fecdd3;
+      }
+    }
+
+    &.json-box-after {
+      border: 1px solid #a7f3d0;
+      background: #f6fef9;
+
+      .json-box-header {
+        background: #d1fae5;
+        border-bottom: 1px solid #a7f3d0;
+      }
+    }
+
+    .json-box-header {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+
+      .btn-copy-json {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: none !important;
+
+        &:hover {
+          background: #f8fafc;
+          color: #0f172a;
+        }
+      }
+    }
+
+    .json-box-body {
+      padding: 10px;
+
+      .json-code {
+        margin: 0;
+        font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.75rem;
+        line-height: 1.45;
+        max-height: 340px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: #1e293b;
+      }
+
+      .json-empty {
+        text-align: center;
+        padding: 24px;
+        font-size: 0.76rem;
+        color: #94a3b8;
+        font-style: italic;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Modal Footer
+// =============================================================================
+.modal-footer {
+  background: #f8fafc !important;
+  border-top: 1px solid #e2e8f0 !important;
+  padding: 12px 22px !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .footer-meta-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-light-slate {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #334155 !important;
+    font-weight: 700 !important;
+    padding: 7px 18px !important;
+    border-radius: 8px !important;
+    font-size: 0.82rem !important;
+
+    &:hover {
+      background: #f1f5f9 !important;
+      border-color: #94a3b8 !important;
+      color: #0f172a !important;
+    }
+  }
 }

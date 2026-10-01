@@ -2,16 +2,16 @@
   <!-- Quick Shortcuts -->
   <div class="d-none d-md-flex align-items-center gap-1 me-1">
     <a routerLink="/orders" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_ORDERS' | translate" routerLinkActive="active">
-      <i class="fas fa-shopping-bag fs-6"></i>
+      <i class="fas fa-shopping-bag"></i>
     </a>
     <a routerLink="/products" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_PRODUCTS' | translate" routerLinkActive="active">
-      <i class="fas fa-box fs-6"></i>
+      <i class="fas fa-box"></i>
     </a>
     <a routerLink="/reconciliation" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_RECONCILIATION' | translate" routerLinkActive="active">
-      <i class="fas fa-cash-register fs-6"></i>
+      <i class="fas fa-cash-register"></i>
     </a>
     <button type="button" class="btn btn-icon btn-sm jtak-topbar-action-btn" (click)="toggleFullscreen()" [title]="'HEADER.FULLSCREEN' | translate">
-      <i class="fas" [ngClass]="isFullscreen() ? 'fa-compress' : 'fa-expand'" style="font-size: 0.9rem;"></i>
+      <i class="fas" [ngClass]="isFullscreen() ? 'fa-compress' : 'fa-expand'"></i>
     </button>
   </div>
 
@@ -32,7 +32,7 @@
       </div>
       <i class="fas fa-chevron-down jtak-user-chevron" aria-hidden="true"></i>
     </div>
-    <div ngbDropdownMenu class="dropdown-menu p-2 shadow-lg border-0 rounded-3 dropdown-menu-anim-up w-275px">
+    <div ngbDropdownMenu class="dropdown-menu jtak-user-menu p-2 border border-gray-200 rounded-3 dropdown-menu-anim-up w-275px">
       <app-user-inner></app-user-inner>
     </div>
   </div>
