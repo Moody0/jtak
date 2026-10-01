@@ -1,0 +1,48 @@
+name: Deploy Backend to Production
+
+on:
+  push:
+    branches:
+      - release/jtak-production
+      - main
+    paths:
+      - 'jtak-backend-main/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 🔨 Publish .NET Backend
+        run: |
+          dotnet publish jtak-backend-main/app/app.csproj -c Release -o ./publish-backend --no-self-contained
+
+      - name: 🚀 Deploy via FTP to api.jtak.app
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ vars.FTP_BACKEND_DIR || 'api.jtak.app/' }}
+          local-dir: ./publish-backend/
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/appsettings*.json
+            **/web.config
+            **/FileCenter/**
+            **/uploads/**
+            **/logs/**
+            **/keys/**
+            **/*.pdb

@@ -1,0 +1,52 @@
+name: Deploy Dashboard to Production
+
+on:
+  push:
+    branches:
+      - release/jtak-production
+      - main
+    paths:
+      - 'jtak-dashboard-main/**'
+      - '.github/workflows/deploy-dashboard.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: 📦 Install Dependencies
+        working-directory: ./jtak-dashboard-main
+        run: |
+          npm install --legacy-peer-deps
+
+      - name: 🔨 Build Angular Dashboard (Production)
+        working-directory: ./jtak-dashboard-main
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: |
+          npm run build
+
+      - name: 🚀 Deploy via FTP to dash.jtak.app
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ vars.FTP_DASHBOARD_DIR || 'dash.jtak.app/' }}
+          local-dir: ./jtak-dashboard-main/dist/dashboard/
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/web.config
+            **/.htaccess
+            **/*.map
