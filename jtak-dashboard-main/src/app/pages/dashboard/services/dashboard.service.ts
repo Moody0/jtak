@@ -58,6 +58,19 @@ extends TableService<Balance> implements OnDestroy {
     return this.http.get<any>(environment.apiUrl + '/Admin/Settings/ErrandDriverEarning');
   }
 
+  getJtakMarketDeliveryFee(): Observable<{amount: number}> {
+    return this.http.get<{amount: number}>(environment.apiUrl + '/Admin/Settings/JtakMarketDeliveryFee');
+  }
+  getJtakMarketCourierPay(): Observable<{mode: number, rate: number}> {
+    return this.http.get<{mode: number, rate: number}>(environment.apiUrl + '/Admin/Settings/JtakMarketCourierPay');
+  }
+  saveJtakMarketCourierPay(setting: {mode: number, rate: number}): Observable<{mode: number, rate: number}> {
+    return this.http.put<{mode: number, rate: number}>(environment.apiUrl + '/Admin/Settings/JtakMarketCourierPay', setting);
+  }
+  saveJtakMarketDeliveryFee(setting: {amount: number}): Observable<{amount: number}> {
+    return this.http.put<{amount: number}>(environment.apiUrl + '/Admin/Settings/JtakMarketDeliveryFee', setting);
+  }
+
   getDeliveryCoverage(): Observable<any> {
     return this.http.get<any>(environment.apiUrl + '/Admin/Settings/DeliveryCoverage');
   }

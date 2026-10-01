@@ -2,6 +2,8 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { DashboardComponent } from './dashboard.component';
+import { JtakDeliveryFeeComponent } from './jtak-delivery-fee.component';
+import { JtakCourierPayComponent } from './jtak-courier-pay.component';
 import { DeliveryCoverageComponent } from './delivery-coverage.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
@@ -9,7 +11,7 @@ import { CRUDTableModule } from 'src/app/_metronic/shared/crud-table';
 import { TranslationModule } from 'src/app/modules/i18n/translation.module';
 
 @NgModule({
-  declarations: [DashboardComponent, DeliveryCoverageComponent],
+  declarations: [DashboardComponent, DeliveryCoverageComponent, JtakDeliveryFeeComponent, JtakCourierPayComponent],
   imports: [
     CommonModule,
     FormsModule,

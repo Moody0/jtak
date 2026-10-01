@@ -154,15 +154,17 @@
         </div>
       </div>
 
-      <!-- Card B: Customer Delivery Pricing -->
+      <app-jtak-delivery-fee></app-jtak-delivery-fee>
+      <app-jtak-courier-pay></app-jtak-courier-pay>
+      <!-- Card B: Physical-store Customer Delivery Pricing -->
       <div class="ops-config-card">
         <div class="ops-config-header">
           <div class="ops-config-icon">
             <i class="fas fa-route"></i>
           </div>
           <div>
-            <h3 class="ops-config-title">تسعير التوصيل للزبائن</h3>
-            <p class="ops-config-desc">أجرة التوصيل المحتسبة في التطبيق بناءً على مسافة المسار الحقيقية</p>
+            <h3 class="ops-config-title">تسعير توصيل المتاجر حسب المسافة</h3>
+            <p class="ops-config-desc">للمطاعم والمقاهي والمتاجر ذات الموقع الفعلي: المسافة المباشرة بين المتجر وعنوان الزبون، وليست مسافة الطريق. جيتك ماركت له أجرة ثابتة مستقلة.</p>
           </div>
         </div>
 
@@ -171,7 +173,7 @@
           <div class="ops-toggle-box">
             <div class="form-check form-switch d-flex align-items-center justify-content-between p-0 m-0">
               <label class="form-check-label" for="freeDeliveryToggle">
-                تفعيل عرض التوصيل المجاني للزبائن
+                تفعيل التوصيل المجاني لجميع المتاجر، بما فيها جيتك ماركت
               </label>
               <input class="form-check-input ms-0" type="checkbox" id="freeDeliveryToggle"
                 [(ngModel)]="driverPricing.isFreeDeliveryEnabled" />

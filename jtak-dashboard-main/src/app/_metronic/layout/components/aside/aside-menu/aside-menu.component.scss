@@ -275,6 +275,20 @@
       color: #94a3b8 !important;
       position: relative !important;
       overflow: visible !important;
+
+      > i,
+      > span:not(.menu-badge) {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+        text-align: center !important;
+        width: 100% !important;
+        height: 100% !important;
+        color: inherit !important;
+      }
     }
 
     &:hover {

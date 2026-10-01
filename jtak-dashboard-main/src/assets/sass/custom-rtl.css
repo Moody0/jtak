@@ -339,19 +339,39 @@ html[data-kt-aside-minimize="on"] #kt_aside_toggle .svg-icon {
   display: none;
 }
 
-/* Minimized Logo Header: show logo mark and center toggle */
+/* Minimized Logo Header: show logo mark and center toggle vertically separated */
 body[data-kt-aside-minimize="on"] .aside .aside-logo,
 html[data-kt-aside-minimize="on"] .aside .aside-logo {
+  height: 84px !important;
+  min-height: 84px !important;
+  max-height: 84px !important;
+  display: flex !important;
   flex-direction: column !important;
-  justify-content: center !important;
   align-items: center !important;
-  padding: 8px 4px !important;
-  gap: 4px !important;
+  justify-content: center !important;
+  padding: 10px 0 !important;
+  gap: 8px !important;
+  position: relative !important;
+  overflow: visible !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .aside-logo a,
+html[data-kt-aside-minimize="on"] .aside .aside-logo a {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 28px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
 }
 
 body[data-kt-aside-minimize="on"] .aside .aside-logo .logo-default,
 html[data-kt-aside-minimize="on"] .aside .aside-logo .logo-default {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
   max-width: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
@@ -360,21 +380,62 @@ html[data-kt-aside-minimize="on"] .aside .aside-logo .logo-default {
 body[data-kt-aside-minimize="on"] .aside .aside-logo .logo-minimize,
 html[data-kt-aside-minimize="on"] .aside .aside-logo .logo-minimize {
   display: block !important;
-  height: 26px !important;
-  max-height: 26px !important;
-  max-width: 32px !important;
+  height: 24px !important;
+  max-height: 24px !important;
+  width: auto !important;
+  max-width: 28px !important;
   opacity: 1 !important;
   margin: 0 auto !important;
+  object-fit: contain !important;
 }
 
 body[data-kt-aside-minimize="on"] #kt_aside_toggle,
 html[data-kt-aside-minimize="on"] #kt_aside_toggle {
   position: static !important;
-  margin: 0 auto !important;
+  top: auto !important;
+  bottom: auto !important;
   left: auto !important;
   right: auto !important;
-  width: 24px !important;
-  height: 24px !important;
+  transform: none !important;
+  margin: 0 auto !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  z-index: 10 !important;
+}
+
+body[data-kt-aside-minimize="on"] #kt_aside_toggle:hover,
+html[data-kt-aside-minimize="on"] #kt_aside_toggle:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+body[data-kt-aside-minimize="on"] #kt_aside_toggle .svg-icon,
+html[data-kt-aside-minimize="on"] #kt_aside_toggle .svg-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: rotate(0deg) !important;
+}
+
+[dir="ltr"] body[data-kt-aside-minimize="on"] #kt_aside_toggle .svg-icon,
+[dir="ltr"] html[data-kt-aside-minimize="on"] #kt_aside_toggle .svg-icon {
+  transform: rotate(180deg) !important;
 }
 
 /* Navigation Group & Items */
@@ -525,7 +586,7 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
   color: #ffffff !important;
   background-color: #e53935 !important;
   border-radius: 10px !important;
-  box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4) !important;
+  box-shadow: none !important;
   border: none !important;
   z-index: 2 !important;
   letter-spacing: -0.2px !important;
@@ -560,58 +621,192 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
 .aside .jtak-nav .menu-item .menu-link.active .menu-icon .menu-badge {
   background-color: #ffffff !important;
   color: #d32f2f !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+  box-shadow: none !important;
   font-weight: 800 !important;
 }
 
-/* Minimized Menu Link overrides */
-body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link,
-html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link {
-  margin: 2px 8px !important;
-  padding: 0 14px !important;
-  justify-content: flex-start !important;
-  overflow: visible !important;
+/* =========================================================================
+   COLLAPSED / MINIMIZED SIDEBAR MENU ITEMS & ICONS (Exact 44px Centering)
+   ========================================================================= */
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav {
+  padding: 10px 0 20px !important;
+  overflow-x: hidden !important;
 }
 
+body[data-kt-aside-minimize="on"] .aside .jtak-nav-group,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav-group {
+  margin-bottom: 6px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav-label,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
+  display: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-workspace-toggle,
+html[data-kt-aside-minimize="on"] .aside .jtak-workspace-toggle,
+body[data-kt-aside-minimize="on"] .aside .jtak-workspace-children,
+html[data-kt-aside-minimize="on"] .aside .jtak-workspace-children {
+  display: none !important;
+}
+
+/* Minimized Workspace Item Row (44x44px Box Centered) */
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  border: 1px solid transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  transition: all 0.2s ease !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row:hover,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row:hover,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item:hover,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row.is-active,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row.is-active,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active {
+  background-color: #ea580c !important;
+  border-color: #ea580c !important;
+  box-shadow: none !important;
+}
+
+/* Minimized Menu Link (44x44px Centered Inside Row) */
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row .jtak-workspace-link,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.jtak-workspace-row .jtak-workspace-link {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  text-decoration: none !important;
+}
+
+/* Minimized Menu Icon (Exact Center) */
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon,
 html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  flex: 0 0 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.15rem !important;
+  color: #94a3b8 !important;
   position: relative !important;
+  overflow: visible !important;
   margin-inline-end: 0 !important;
   margin-inline-start: 0 !important;
-  flex: 0 0 26px !important;
-  width: 26px !important;
-  overflow: visible !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item:hover .menu-link .menu-icon,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item:hover .menu-link .menu-icon {
+  color: #ffffff !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active .menu-link .menu-icon,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active .menu-link .menu-icon,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-icon,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-icon {
+  color: #ffffff !important;
+}
+
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon > i,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon > span:not(.menu-badge),
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon > i,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon > span:not(.menu-badge) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  font-size: 1.15rem !important;
+  text-align: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  color: inherit !important;
 }
 
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-title,
 html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-title {
+  display: none !important;
+  width: 0 !important;
   max-width: 0 !important;
   opacity: 0 !important;
   margin: 0 !important;
-  transform: translateX(8px) !important;
+  padding: 0 !important;
   pointer-events: none !important;
 }
 
-/* Collapsed Sidebar: compact badge attached to menu icon (NOT display: none) */
+/* Collapsed Sidebar: compact badge attached to menu icon */
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge,
 html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
 html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
   display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   position: absolute !important;
-  top: -6px !important;
+  top: 2px !important;
   transform: none !important;
-  min-width: 17px !important;
-  height: 17px !important;
-  padding: 0 3px !important;
-  font-size: 0.62rem !important;
+  min-width: 16px !important;
+  height: 16px !important;
+  padding: 0 4px !important;
+  font-size: 0.6rem !important;
   font-weight: 800 !important;
   line-height: 1 !important;
   color: #ffffff !important;
   background-color: #e53935 !important;
-  border-radius: 9px !important;
-  border: 1.5px solid #1e1e2d !important;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 8px !important;
+  border: 1.5px solid #111a2b !important;
+  box-shadow: none !important;
   z-index: 5 !important;
   pointer-events: none !important;
 }
@@ -620,7 +815,7 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-i
 [dir="rtl"] body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge,
 [dir="rtl"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
 [dir="rtl"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
-  left: -6px !important;
+  left: 2px !important;
   right: auto !important;
 }
 
@@ -628,7 +823,7 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-i
 [dir="ltr"] body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge,
 [dir="ltr"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
 [dir="ltr"] html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
-  right: -6px !important;
+  right: 2px !important;
   left: auto !important;
 }
 
@@ -646,13 +841,18 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link .menu-i
   display: inline !important;
 }
 
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active .menu-badge,
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-badge,
+body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active .menu-icon .menu-badge,
 body[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-icon .menu-badge,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active .menu-badge,
 html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-badge,
+html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item.is-active .menu-icon .menu-badge,
 html[data-kt-aside-minimize="on"] .aside .jtak-nav .menu-item .menu-link.active .menu-icon .menu-badge {
   background-color: #ffffff !important;
-  color: #d32f2f !important;
-  border-color: #FF5722 !important;
+  color: #ea580c !important;
+  border-color: #ea580c !important;
+  box-shadow: none !important;
 }
 
 body[data-kt-aside-minimize="on"] .aside .jtak-system-state,
