@@ -138,6 +138,9 @@
                     {{ role[1] }}
                   </ng-option>
                 </ng-select>
+                <small class="form-text text-muted d-block mt-2" *ngIf="formGroup.get('role')?.value === 2">
+                  بعد إنشاء حساب التاجر، اربطه بملف متجر من صفحة التجار ليتمكن من إدارة متجره.
+                </small>
               </div>
 
               <!-- Password -->
@@ -156,6 +159,124 @@
                     placeholder="{{ item?.id ? 'اترك الحقل فارغاً للإبقاء على الحالية' : '6 أحرف على الأقل' }}"
                   />
                 </app-input-container>
+              </div>
+
+              <!-- Driver Cash Custody Limit -->
+              <div class="col-md-6" *ngIf="isDeliveryRole">
+                <label for="maxCashFloat" class="form-label fw-bold mb-2">
+                  الحد الأعلى لعهدة السائق
+                  <span class="text-danger">*</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.maxCashFloat">
+                  <div class="input-group">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      class="form-control"
+                      formControlName="maxCashFloat"
+                      id="maxCashFloat"
+                      placeholder="5000"
+                    />
+                    <span class="input-group-text">ل.س</span>
+                  </div>
+                </app-input-container>
+                <small class="text-muted">
+                  أعلى مبلغ نقدي يمكن أن يبقى مع السائق قبل إيقاف إسناد طلبات نقدية جديدة.
+                </small>
+              </div>
+
+              <!-- Driver Compensation Model & Rate (Only for Delivery Drivers: role === 3) -->
+              <div class="col-12" *ngIf="isDeliveryRole">
+                <div class="p-4 rounded-3 border bg-light-primary border-primary border-dashed">
+                  <div class="d-flex align-items-center gap-2 mb-3">
+                    <i class="fas fa-hand-holding-usd text-primary fs-5"></i>
+                    <h5 class="fw-bolder text-gray-900 mb-0">نظام محاسبة واستحقاق الكابتن</h5>
+                  </div>
+
+                  <div class="row g-3">
+                    <!-- Compensation Model Select -->
+                    <div class="col-md-6">
+                      <label for="captainCompensationType" class="form-label fw-bold mb-1">
+                        طريقة احتساب أجر الكابتن:
+                        <span class="text-danger">*</span>
+                      </label>
+                      <select
+                        class="form-select form-select-solid fw-bold"
+                        id="captainCompensationType"
+                        formControlName="captainCompensationType"
+                        (change)="onCompensationTypeChange($any($event.target).value)"
+                      >
+                        <option [value]="0">1. موظف براتب شهري (0 على الطلب)</option>
+                        <option [value]="1">2. حسب الكيلومتر (سعر لكل 1 كم)</option>
+                        <option [value]="2">3. نسبة من أجرة التوصيل (نسبة مئوية %)</option>
+                      </select>
+                      <small class="text-muted d-block mt-1">
+                        تُثبّت طريقة الحساب والاستحقاق داخل كل طلب عند قبوله.
+                      </small>
+                    </div>
+
+                    <!-- Per Kilometer Rate Input (when type === 1) -->
+                    <div class="col-md-6" *ngIf="captainCompensationType === 1">
+                      <label for="captainRateKm" class="form-label fw-bold mb-1">
+                        سعر الكيلومتر الواحد للكابتن:
+                        <span class="text-danger">*</span>
+                      </label>
+                      <div class="input-group">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          class="form-control fw-bold"
+                          formControlName="captainRate"
+                          id="captainRateKm"
+                          placeholder="25"
+                        />
+                        <span class="input-group-text bg-white fw-bold">ل.س / كم</span>
+                      </div>
+                      <small class="text-muted d-block mt-1">
+                        مثال: إذا المسافة 4 كم والسعر 25 ل.س، يستحق الكابتن 100 ل.س.
+                      </small>
+                    </div>
+
+                    <!-- Percentage Rate Input (when type === 2) -->
+                    <div class="col-md-6" *ngIf="captainCompensationType === 2">
+                      <label for="captainRatePercent" class="form-label fw-bold mb-1">
+                        نسبة الكابتن من أجرة التوصيل:
+                        <span class="text-danger">*</span>
+                      </label>
+                      <div class="input-group">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          class="form-control fw-bold"
+                          formControlName="captainRate"
+                          id="captainRatePercent"
+                          placeholder="60"
+                        />
+                        <span class="input-group-text bg-white fw-bold">%</span>
+                      </div>
+                      <small class="text-muted d-block mt-1">
+                        تحسب من أجرة التوصيل الأصلية (مثلاً 60% من 180 = 108 ل.س) حتى لو كان التوصيل مجانياً للزبون.
+                      </small>
+                    </div>
+
+                    <!-- Salaried Employee Info Card (when type === 0) -->
+                    <div class="col-md-6" *ngIf="captainCompensationType === 0">
+                      <div class="alert alert-light-primary p-3 mb-0 fs-7 border border-primary border-opacity-25 rounded-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                          <i class="fas fa-user-tie text-primary"></i>
+                          <strong class="text-primary">كابتن موظف براتب شهري</strong>
+                        </div>
+                        <span class="text-muted">
+                          لا يأخذ الكابتن أجرة على الطلبات، ويُسلّم كامل المبالغ المستلمة من الزبائن للشركة، ثم تُجرى معه تسوية دورية بالراتب.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- Active Status Switch Card -->

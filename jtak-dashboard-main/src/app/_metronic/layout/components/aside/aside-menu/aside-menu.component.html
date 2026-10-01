@@ -1,20 +1,29 @@
 <nav class="jtak-nav" aria-label="Main navigation">
   <section class="jtak-nav-group" *ngFor="let group of applicationMenuGroups">
-    <div class="menu-content jtak-nav-label" [translate]="group.label"></div>
-    <div class="menu-item" *ngFor="let item of group.items">
-      <a class="menu-link without-sub" [routerLink]="'/' + item.path" routerLinkActive="active">
+    <div class="menu-item jtak-workspace-row" [class.is-active]="activeWorkspaceId === group.id">
+      <a class="menu-link jtak-workspace-link" [routerLink]="'/' + group.items[0].path"
+        [attr.title]="group.description | translate" [attr.aria-current]="activeWorkspaceId === group.id ? 'page' : null">
         <span class="menu-icon" aria-hidden="true">
-          <span [class]="item.icon"></span>
-          <span
-            class="menu-badge"
-            *ngIf="getBadgeCount(item.path) > 0"
-            [attr.aria-label]="getBadgeCount(item.path) + ' pending items'"
-          >
-            <span class="badge-text badge-text--expanded">{{ getFormattedBadge(item.path) }}</span>
-            <span class="badge-text badge-text--collapsed">{{ getCollapsedBadge(item.path) }}</span>
+          <span [class]="group.icon"></span>
+          <span class="menu-badge" *ngIf="getWorkspaceBadgeCount(group) > 0">
+            <span class="badge-text badge-text--expanded">{{ getWorkspaceBadgeCount(group) }}</span>
+            <span class="badge-text badge-text--collapsed">{{ getWorkspaceBadgeCount(group) }}</span>
           </span>
         </span>
-        <span class="menu-title" [translate]="item.label"></span>
+        <span class="menu-title" [translate]="group.label"></span>
+      </a>
+      <button *ngIf="group.items.length > 1" type="button" class="jtak-workspace-toggle"
+        [attr.aria-label]="(group.label | translate) + ' — ' + ((expandedGroupId === group.id ? 'MENU.HIDE_PAGES' : 'MENU.SHOW_PAGES') | translate)"
+        [attr.aria-expanded]="expandedGroupId === group.id"
+        (click)="toggleGroup(group.id)">
+        <i class="fas fa-chevron-down" [class.is-open]="expandedGroupId === group.id" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="jtak-workspace-children" *ngIf="group.items.length > 1 && expandedGroupId === group.id">
+      <a *ngFor="let item of group.items" class="jtak-workspace-child"
+        [class.is-active]="activeItemPath === item.path" [routerLink]="'/' + item.path">
+        <span [translate]="item.label"></span>
+        <span class="jtak-child-count" *ngIf="getBadgeCount(item.path) > 0">{{ getFormattedBadge(item.path) }}</span>
       </a>
     </div>
   </section>

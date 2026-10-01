@@ -194,14 +194,15 @@ namespace Modules.Accounting.Services
                 else
                 {
                     // Captain Settlement Request
-                    var captainFloatAccount = $"{SystemAccountCodes.CaptainCashFloatPrefix}{req.RequestedByUserId}";
+                    var earningsPayout = req.PartyType == SettlementPartyType.CaptainEarnings;
+                    var captainFloatAccount = $"{(earningsPayout ? SystemAccountCodes.CaptainEarningsPrefix : SystemAccountCodes.CaptainCashFloatPrefix)}{req.RequestedByUserId}";
                     return new SettlementReceiptDto
                     {
                         Id = req.Id.ToString(),
                         ReceiptNumber = $"REC-{req.RequestNumber}",
                         RequestNumber = req.RequestNumber,
-                        PartyType = SettlementPartyType.Captain,
-                        ReceiptTitle = "إيصال توريد نقدية وتسوية عهدة مندوب",
+                        PartyType = req.PartyType,
+                        ReceiptTitle = earningsPayout ? "إيصال صرف مستحقات سائق" : "إيصال توريد نقدية وتسوية عهدة مندوب",
                         PartyName = req.RequestedByName,
                         Phone = req.RequestedByPhone,
                         DriverId = req.RequestedByUserId,
@@ -214,12 +215,12 @@ namespace Modules.Accounting.Services
                         CompletedAt = req.CompletedAt ?? req.ReviewedAt ?? req.CreatedDate,
                         ApprovedBy = approvedByName ?? "المسؤول المالي",
                         ConfirmedBy = confirmedByName,
-                        CaptainCashFloatAccount = captainFloatAccount,
+                        CaptainCashFloatAccount = earningsPayout ? null : captainFloatAccount,
                         PayoutSourceAccount = "1000 - خزينة الشركة الرئيسية",
-                        DestinationAccount = "1000 - خزينة الشركة الرئيسية",
+                        DestinationAccount = earningsPayout ? captainFloatAccount : "1000 - خزينة الشركة الرئيسية",
                         JournalTransactionNumber = journalTxnNumber ?? "قيد مسجل في دفتر الأستاذ",
                         JournalTransactionId = req.LedgerTransactionId,
-                        OperationType = "نقدية موردة / تسوية عهدة كابتن",
+                        OperationType = earningsPayout ? "صرف مستحقات سائق" : "نقدية موردة / تسوية عهدة كابتن",
                         Notes = req.Notes,
                         GeneratedAt = DateTime.UtcNow
                     };
@@ -365,7 +366,7 @@ namespace Modules.Accounting.Services
                 }
                 else
                 {
-                    destAccount = $"{SystemAccountCodes.CaptainCashFloatPrefix}{req.RequestedByUserId}";
+                    destAccount = $"{(req.PartyType == SettlementPartyType.CaptainEarnings ? SystemAccountCodes.CaptainEarningsPrefix : SystemAccountCodes.CaptainCashFloatPrefix)}{req.RequestedByUserId}";
                 }
 
                 string approvedBy = req.ReviewedByAdminId.HasValue && userMap.TryGetValue(req.ReviewedByAdminId.Value, out var aName)
@@ -397,7 +398,7 @@ namespace Modules.Accounting.Services
                     PartyName = partyName,
                     Phone = req.RequestedByPhone,
                     MerchantId = merchantId,
-                    DriverId = req.PartyType == SettlementPartyType.Captain ? req.RequestedByUserId : null,
+                    DriverId = req.PartyType != SettlementPartyType.Merchant ? req.RequestedByUserId : null,
                     Amount = req.Amount,
                     Currency = req.Currency ?? "SYP",
                     Method = FormatMethodLabel(req.Method) ?? (req.PartyType == SettlementPartyType.Merchant ? "صندوق الخزينة النقدي" : "نقداً - الخزينة"),
@@ -412,7 +413,8 @@ namespace Modules.Accounting.Services
                     JournalTransactionNumber = txnNumber,
                     JournalTransactionId = req.LedgerTransactionId,
                     Notes = req.Notes,
-                    OperationType = req.PartyType == SettlementPartyType.Merchant ? "تسوية مستحقات تاجر" : "توريد نقدية عهدة كابتن"
+                    OperationType = req.PartyType == SettlementPartyType.Merchant ? "تسوية مستحقات تاجر"
+                        : req.PartyType == SettlementPartyType.CaptainEarnings ? "صرف مستحقات سائق" : "توريد نقدية عهدة كابتن"
                 });
             }
 
@@ -489,18 +491,25 @@ namespace Modules.Accounting.Services
             }
             else if (partyFilter == SettlementHistoryPartyFilter.Captain)
             {
-                query = query.Where(x => x.PartyType == SettlementPartyType.Captain);
+                query = query.Where(x => x.PartyType == SettlementPartyType.Captain || x.PartyType == SettlementPartyType.CaptainEarnings);
             }
 
             // 2. Date Filter
             if (fromDate.HasValue)
             {
-                var start = fromDate.Value.Date;
+                // Date-only requests represent a full local calendar day. The
+                // dashboard sends explicit UTC boundaries for local dates so
+                // records around midnight are not shifted into the next day.
+                var start = fromDate.Value.Kind == DateTimeKind.Utc
+                    ? fromDate.Value
+                    : fromDate.Value.Date;
                 query = query.Where(x => x.CompletedAt >= start);
             }
             if (toDate.HasValue)
             {
-                var end = toDate.Value.Date.AddDays(1).AddTicks(-1);
+                var end = toDate.Value.Kind == DateTimeKind.Utc
+                    ? toDate.Value
+                    : toDate.Value.Date.AddDays(1).AddTicks(-1);
                 query = query.Where(x => x.CompletedAt <= end);
             }
 
@@ -525,7 +534,7 @@ namespace Modules.Accounting.Services
         private static SettlementHistorySummaryDto CalculateSummary(List<SettlementHistoryItemDto> items)
         {
             var merchants = items.Where(x => x.PartyType == SettlementPartyType.Merchant).ToList();
-            var drivers = items.Where(x => x.PartyType == SettlementPartyType.Captain).ToList();
+            var drivers = items.Where(x => x.PartyType == SettlementPartyType.Captain || x.PartyType == SettlementPartyType.CaptainEarnings).ToList();
 
             return new SettlementHistorySummaryDto
             {
@@ -600,6 +609,7 @@ namespace Modules.Accounting.Services
         {
             if (string.IsNullOrWhiteSpace(method)) return "نقداً من الخزينة";
             var m = method.ToLowerInvariant();
+            if (m == "cash_driver_payout") return "صرف أرباح سائق نقداً من الخزينة";
             if (m.Contains("bank") || m.Contains("transfer")) return "حوالة بنكية";
             if (m.Contains("safe") || m == "cash_safe") return "صندوق الخزينة النقدي";
             if (m.Contains("vault") || m == "cash" || m == "cash_hand") return "نقداً - الخزينة الرئيسية";

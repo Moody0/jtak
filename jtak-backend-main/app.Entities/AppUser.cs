@@ -26,6 +26,26 @@ namespace App.Shared.Entities
         public decimal DefaultLat { get; set; }
         public decimal DefaultLng { get; set; }
 
+        /// <summary>
+        /// Maximum COD cash float this delivery driver may hold before taking
+        /// another order. Configured per driver by an administrator.
+        /// </summary>
+        public decimal MaxCashFloat { get; set; } = 5000000m;
+
+        /// <summary>
+        /// Compensation model for delivery captains:
+        /// 0 = SalariedEmployee (موظف), 1 = PerKilometer (حسب الكيلومتر), 2 = Percentage (نسبة من أجرة التوصيل).
+        /// </summary>
+        public CaptainCompensationType CaptainCompensationType { get; set; } = CaptainCompensationType.SalariedEmployee;
+
+        /// <summary>
+        /// Rate associated with captain compensation:
+        /// For PerKilometer: Amount in SYP per km (e.g. 25 SYP / km).
+        /// For Percentage: Percentage of original delivery fee (e.g. 60%).
+        /// For SalariedEmployee: 0.
+        /// </summary>
+        public decimal CaptainRate { get; set; } = 0m;
+
 
         public bool IsActive { get; set; } = true;
         public string Topics { get; set; }
@@ -117,6 +137,10 @@ namespace App.Shared.Entities
 
         public decimal DefaultLat { get; set; } = 37.05637741088867m;
         public decimal DefaultLng { get; set; } = 37.33407211303711m;
+
+        public decimal? MaxCashFloat { get; set; }
+        public CaptainCompensationType? CaptainCompensationType { get; set; }
+        public decimal? CaptainRate { get; set; }
 
         public Guid UserTopicId { get; set; }
     }

@@ -1,106 +1,137 @@
-<div class="ops-merchants-container">
+<div class="merchants-container">
 
-  <!-- 1. Operations Utility Bar -->
-  <div class="ops-utility-bar">
-    <div class="ops-utility-left">
-      <div class="ops-live-pulse-badge">
-        <span class="ops-pulse-dot"></span>
-        <span>{{ 'MERCHANTS_PAGE.LIVE_OPERATIONS' | translate }}</span>
+  <!-- 1. Merchants Header -->
+  <div class="merchants-header">
+    <div class="merchants-header-right">
+      <div class="merchants-header-icon">
+        <i class="fas fa-store"></i>
       </div>
-      <span class="ops-sync-meta">
-        <i class="fas fa-store text-muted me-1"></i>
-        <span>{{ 'MERCHANTS_PAGE.TOTAL_RECORDS' | translate }}:</span>
-        <strong>{{ totalRecords | number }}</strong>
-      </span>
+      <div class="merchants-header-meta">
+        <h2 class="merchants-header-title">إدارة التجار والمتاجر</h2>
+        <span class="merchants-header-subtitle">
+          إجمالي السجلات: <strong>{{ totalRecords | number }}</strong> متجر مسجل في النظام
+          <span class="text-success ms-1">({{ kpiActive | number }} متجر نشط حالياً)</span>
+        </span>
+      </div>
     </div>
-    <div class="ops-utility-right">
-      <button type="button" class="ops-btn-refresh" (click)="refresh()" [disabled]="isLoading">
+    <div class="merchants-header-actions">
+      <button type="button" class="btn merchants-btn-refresh" (click)="refresh()" [disabled]="isLoading" title="تحديث القائمة">
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>{{ 'MERCHANTS_PAGE.REFRESH' | translate }}</span>
       </button>
-      <button type="button" class="ops-btn-primary" (click)="create()">
-        <i class="fas fa-plus"></i>
-        <span>{{ 'MERCHANTS_PAGE.ADD_MERCHANT' | translate }}</span>
+      <button type="button" class="btn btn-primary merchants-btn-add" (click)="create()">
+        <i class="fas fa-plus text-white"></i>
+        <span class="text-white">{{ 'MERCHANTS_PAGE.ADD_MERCHANT' | translate }}</span>
       </button>
     </div>
   </div>
 
-  <!-- 2. Real System Operational KPI Cards -->
+  <!-- 2. Operational KPI Cards Strip (Zero shadows, medium rounded, Alexandria font) -->
   <div class="row g-3">
     <!-- Total Registered Merchants -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-total">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'MERCHANTS_PAGE.KPI_TOTAL' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-store"></i></div>
+      <div
+        class="merchants-kpi-card"
+        role="button"
+        (click)="filterByStatus('all'); filterByKind('all')"
+        [class.active]="selectedStatus === 'all' && selectedKind === 'all'"
+      >
+        <div class="merchants-kpi-header">
+          <span class="merchants-kpi-label">{{ 'MERCHANTS_PAGE.KPI_TOTAL' | translate }}</span>
+          <div class="merchants-kpi-icon merchants-kpi-icon--slate"><i class="fas fa-store"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value">{{ kpiTotal | number }}</span>
-          <span class="ops-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_TOTAL_SUB' | translate }}</span>
+        <div class="merchants-kpi-body">
+          <span class="merchants-kpi-value">{{ kpiTotal | number }}</span>
+          <span class="merchants-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_TOTAL_SUB' | translate }}</span>
         </div>
       </div>
     </div>
 
     <!-- Active Stores -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-active">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'MERCHANTS_PAGE.KPI_ACTIVE' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-check-circle"></i></div>
+      <div
+        class="merchants-kpi-card"
+        role="button"
+        (click)="filterByStatus('active')"
+        [class.active]="selectedStatus === 'active'"
+      >
+        <div class="merchants-kpi-header">
+          <span class="merchants-kpi-label">{{ 'MERCHANTS_PAGE.KPI_ACTIVE' | translate }}</span>
+          <div class="merchants-kpi-icon merchants-kpi-icon--emerald"><i class="fas fa-check-circle"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value text-success">{{ kpiActive | number }}</span>
-          <span class="ops-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_ACTIVE_SUB' | translate }}</span>
+        <div class="merchants-kpi-body">
+          <span class="merchants-kpi-value text-success">{{ kpiActive | number }}</span>
+          <span class="merchants-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_ACTIVE_SUB' | translate }}</span>
         </div>
       </div>
     </div>
 
     <!-- Groceries & Supermarkets -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-grocery">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'MERCHANTS_PAGE.KPI_GROCERY' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-shopping-basket"></i></div>
+      <div
+        class="merchants-kpi-card"
+        role="button"
+        (click)="filterByKind(1)"
+        [class.active]="selectedKind === 1"
+      >
+        <div class="merchants-kpi-header">
+          <span class="merchants-kpi-label">{{ 'MERCHANTS_PAGE.KPI_GROCERY' | translate }}</span>
+          <div class="merchants-kpi-icon merchants-kpi-icon--blue"><i class="fas fa-shopping-basket"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value text-primary">{{ kpiGrocery | number }}</span>
-          <span class="ops-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_GROCERY_SUB' | translate }}</span>
+        <div class="merchants-kpi-body">
+          <span class="merchants-kpi-value text-primary">{{ kpiGrocery | number }}</span>
+          <span class="merchants-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_GROCERY_SUB' | translate }}</span>
         </div>
       </div>
     </div>
 
     <!-- Restaurants & Specialty Stores -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-restaurants">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'MERCHANTS_PAGE.KPI_RESTAURANTS' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-utensils"></i></div>
+      <div
+        class="merchants-kpi-card"
+        role="button"
+        (click)="filterByKind(0)"
+        [class.active]="selectedKind === 0"
+      >
+        <div class="merchants-kpi-header">
+          <span class="merchants-kpi-label">{{ 'MERCHANTS_PAGE.KPI_RESTAURANTS' | translate }}</span>
+          <div class="merchants-kpi-icon merchants-kpi-icon--purple"><i class="fas fa-utensils"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value text-purple">{{ kpiRestaurants | number }}</span>
-          <span class="ops-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_RESTAURANTS_SUB' | translate }}</span>
+        <div class="merchants-kpi-body">
+          <span class="merchants-kpi-value text-purple">{{ kpiRestaurants | number }}</span>
+          <span class="merchants-kpi-unit">{{ 'MERCHANTS_PAGE.KPI_RESTAURANTS_SUB' | translate }}</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 3. Consolidated Search & Filter Panel -->
-  <div class="ops-filter-panel">
-    <div class="ops-filter-row">
+  <!-- 3. Consolidated Search & Filter Panel (RTL-aware, zero-collision) -->
+  <div class="merchants-filter-panel">
+    <div class="merchants-filter-row">
       <!-- Search Input -->
-      <div class="ops-search-box" [formGroup]="searchGroup">
-        <i class="fas fa-search ops-search-icon"></i>
+      <div class="merchants-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search merchants-search-icon"></i>
         <input
           type="text"
-          class="ops-search-input"
+          class="form-control merchants-search-input"
           [placeholder]="'MERCHANTS_PAGE.SEARCH_PLACEHOLDER' | translate"
           formControlName="searchTerm"
         />
+        <button
+          type="button"
+          class="merchants-search-clear"
+          *ngIf="searchGroup.get('searchTerm')?.value"
+          (click)="clearSearch()"
+          title="مسح البحث"
+        >
+          <i class="fas fa-times"></i>
+        </button>
       </div>
 
       <!-- Activity Kind Dropdown -->
-      <div class="ops-filter-dropdown">
+      <div class="merchants-filter-select-wrapper">
         <select
+          class="form-select merchants-filter-select"
           [ngModel]="selectedKind"
           (ngModelChange)="filterByKind($event)"
           aria-label="Filter by Activity Kind"
@@ -108,13 +139,15 @@
           <option value="all">{{ 'MERCHANTS_PAGE.ALL_TYPES' | translate }}</option>
           <option [ngValue]="1">🛒 {{ 'MERCHANTS_PAGE.TYPE_GROCERY' | translate }}</option>
           <option [ngValue]="0">🍽️ {{ 'MERCHANTS_PAGE.TYPE_RESTAURANT' | translate }}</option>
+          <option [ngValue]="3">🏪 {{ 'MERCHANTS_PAGE.TYPE_OTHER' | translate }}</option>
         </select>
       </div>
 
-      <!-- Status Filter Tabs -->
-      <div class="ops-status-tabs" role="tablist">
+      <!-- Status Filter Segmented Tabs -->
+      <div class="merchants-status-tabs" role="tablist">
         <button
           type="button"
+          class="merchants-tab-btn"
           [class.active]="selectedStatus === 'all'"
           (click)="filterByStatus('all')"
         >
@@ -122,18 +155,20 @@
         </button>
         <button
           type="button"
+          class="merchants-tab-btn"
           [class.active]="selectedStatus === 'active'"
           (click)="filterByStatus('active')"
         >
-          <i class="fas fa-check-circle text-success me-1"></i>
+          <span class="status-tab-dot status-tab-dot--active"></span>
           {{ 'MERCHANTS_PAGE.STATUS_ACTIVE' | translate }}
         </button>
         <button
           type="button"
+          class="merchants-tab-btn"
           [class.active]="selectedStatus === 'disabled'"
           (click)="filterByStatus('disabled')"
         >
-          <i class="fas fa-ban text-danger me-1"></i>
+          <span class="status-tab-dot status-tab-dot--disabled"></span>
           {{ 'MERCHANTS_PAGE.STATUS_DISABLED' | translate }}
         </button>
       </div>
@@ -141,47 +176,48 @@
   </div>
 
   <!-- 4. Merchants Table Card -->
-  <div class="ops-table-card" *ngIf="service.items$ | async as rawItems">
+  <div class="merchants-table-card" *ngIf="service.items$ | async as rawItems">
     <!-- Filtered visible items -->
     <ng-container *ngIf="getDisplayedItems(rawItems) as items">
 
       <!-- Bulk Action Bar -->
-      <div class="ops-bulk-bar" *ngIf="selection.count > 0">
-        <div class="ops-bulk-count">
+      <div class="merchants-bulk-bar" *ngIf="selection.count > 0">
+        <div class="merchants-bulk-count">
+          <i class="fas fa-check-circle me-1 text-primary"></i>
           <strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}
         </div>
-        <div class="ops-bulk-actions">
+        <div class="merchants-bulk-actions">
           <button
             type="button"
-            class="btn btn-sm btn-light-primary"
+            class="btn btn-sm merchants-bulk-btn btn-export"
             (click)="selection.exportSelected(items, 'merchants')"
           >
             <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
           </button>
           <button
             type="button"
-            class="btn btn-sm btn-light-success"
+            class="btn btn-sm merchants-bulk-btn btn-enable"
             (click)="bulkSetStatus(items, true)"
           >
             <i class="fas fa-check-circle me-1"></i> {{ 'MERCHANTS_PAGE.ENABLE' | translate }}
           </button>
           <button
             type="button"
-            class="btn btn-sm btn-light-warning"
+            class="btn btn-sm merchants-bulk-btn btn-disable"
             (click)="bulkSetStatus(items, false)"
           >
             <i class="fas fa-ban me-1"></i> {{ 'MERCHANTS_PAGE.DISABLE' | translate }}
           </button>
           <button
             type="button"
-            class="btn btn-sm btn-light-danger"
+            class="btn btn-sm merchants-bulk-btn btn-delete"
             (click)="bulkDelete(items)"
           >
             <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
           </button>
           <button
             type="button"
-            class="btn btn-sm btn-link text-muted"
+            class="btn btn-sm btn-link text-muted merchants-bulk-clear"
             (click)="selection.clear()"
           >
             {{ 'COMMON.CLEAR' | translate }}
@@ -191,7 +227,7 @@
 
       <!-- High-Density Responsive Table -->
       <div class="table-responsive">
-        <table class="ops-table">
+        <table class="merchants-table">
           <thead>
             <tr>
               <th scope="col" class="table-select-cell" style="width: 44px;">
@@ -204,14 +240,14 @@
                   (change)="selection.toggleAll(items, $any($event.target).checked)"
                 />
               </th>
-              <th scope="col" style="width: 65px;">
-                <span role="button" (click)="sort('id')">
+              <th scope="col" style="width: 70px;">
+                <span class="sortable-header" role="button" (click)="sort('id')">
                   {{ 'MERCHANTS_PAGE.COL_ID' | translate }}
                   <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
                 </span>
               </th>
-              <th scope="col">
-                <span role="button" (click)="sort('title')">
+              <th scope="col" style="width: 380px; min-width: 260px;">
+                <span class="sortable-header" role="button" (click)="sort('title')">
                   {{ 'MERCHANTS_PAGE.COL_NAME_MARKET' | translate }}
                   <app-sort-icon column="title" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
                 </span>
@@ -225,7 +261,7 @@
               <th scope="col" style="width: 110px; text-align: center;">
                 {{ 'MERCHANTS_PAGE.COL_STATUS' | translate }}
               </th>
-              <th scope="col" style="width: 200px; text-align: center;">
+              <th scope="col" style="width: 300px; min-width: 280px; text-align: center;">
                 {{ 'MERCHANTS_PAGE.COL_ACTIONS' | translate }}
               </th>
             </tr>
@@ -248,14 +284,14 @@
 
               <!-- ID -->
               <td>
-                <span class="fw-bold text-muted fs-7">#{{ merchant.id }}</span>
+                <span class="merchants-id-badge">#{{ merchant.id }}</span>
               </td>
 
-              <!-- Merchant Identity (Logo + Name + Description + Address) -->
+              <!-- Merchant Identity (Logo + Name + Description + Address + Meta Tags) -->
               <td>
-                <div class="ops-merchant-cell">
+                <div class="merchants-cell">
                   <div
-                    class="ops-merchant-logo-box"
+                    class="merchants-logo-box"
                     [ngClass]="getMerchantTypeInfo(merchant).badgeClass"
                   >
                     <img
@@ -271,29 +307,29 @@
                     ></i>
                   </div>
 
-                  <div class="ops-merchant-meta">
-                    <span class="ops-merchant-title">
+                  <div class="merchants-meta">
+                    <span class="merchants-title">
                       {{ merchant.title }}
                     </span>
 
-                    <span class="ops-merchant-desc" *ngIf="merchant.shortDescription">
+                    <span class="merchants-desc" *ngIf="merchant.shortDescription">
                       {{ merchant.shortDescription }}
                     </span>
 
-                    <span class="ops-merchant-address" *ngIf="merchant.address">
+                    <span class="merchants-address" *ngIf="merchant.address">
                       <i class="fas fa-map-marker-alt"></i>
                       <span>{{ merchant.address }}</span>
                     </span>
 
-                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                      <span class="badge bg-light-primary text-primary fs-9 py-1 px-2" *ngIf="merchant.deliveryTime">
-                        <i class="fas fa-clock me-1"></i>{{ merchant.deliveryTime }}
+                    <div class="merchants-tags-row" *ngIf="merchant.deliveryTime || merchant.deliveryFee !== undefined || merchant.minOrderAmount">
+                      <span class="merchants-tag tag-delivery-time" *ngIf="merchant.deliveryTime">
+                        <i class="fas fa-clock"></i><span>{{ merchant.deliveryTime }}</span>
                       </span>
-                      <span class="badge bg-light-success text-success fs-9 py-1 px-2" *ngIf="merchant.deliveryFee !== undefined && merchant.deliveryFee !== null">
-                        <i class="fas fa-motorcycle me-1"></i>{{ merchant.deliveryFee === 0 ? 'توصيل مجاني' : (merchant.deliveryFee | number) + ' ل.س' }}
+                      <span class="merchants-tag tag-delivery-fee" *ngIf="merchant.deliveryFee !== undefined && merchant.deliveryFee !== null">
+                        <i class="fas fa-motorcycle"></i><span>{{ merchant.deliveryFee === 0 ? 'توصيل مجاني' : (merchant.deliveryFee | number) + ' ل.س' }}</span>
                       </span>
-                      <span class="badge bg-light-warning text-warning fs-9 py-1 px-2" *ngIf="merchant.minOrderAmount">
-                        <i class="fas fa-shopping-basket me-1"></i>حد أدنى {{ merchant.minOrderAmount | number }} ل.س
+                      <span class="merchants-tag tag-min-order" *ngIf="merchant.minOrderAmount">
+                        <i class="fas fa-shopping-basket"></i><span>حد أدنى {{ merchant.minOrderAmount | number }} ل.س</span>
                       </span>
                     </div>
                   </div>
@@ -302,17 +338,17 @@
 
               <!-- Contact & Phone -->
               <td>
-                <div class="ops-contact-cell">
+                <div class="merchants-contact-cell">
                   <a
                     *ngIf="merchant.phone1"
                     [href]="'tel:' + merchant.phone1"
-                    class="ops-phone-pill"
+                    class="merchants-phone-pill"
                     title="اتصال مباشر"
                   >
                     <i class="fas fa-phone-alt"></i>
                     <span>{{ merchant.phone1 }}</span>
                   </a>
-                  <span class="ops-phone-secondary" *ngIf="merchant.phone2">
+                  <span class="merchants-phone-secondary" *ngIf="merchant.phone2">
                     {{ merchant.phone2 }}
                   </span>
                 </div>
@@ -322,7 +358,7 @@
               <td>
                 <div class="d-flex flex-column gap-1">
                   <span
-                    class="ops-kind-badge"
+                    class="merchants-kind-badge"
                     [ngClass]="getMerchantTypeInfo(merchant).badgeClass"
                   >
                     <i [class]="getMerchantTypeInfo(merchant).icon"></i>
@@ -340,7 +376,7 @@
               <!-- Status -->
               <td style="text-align: center;">
                 <span
-                  class="ops-status-pill"
+                  class="merchants-status-pill"
                   [class.status-active]="merchant.active"
                   [class.status-disabled]="!merchant.active"
                 >
@@ -352,13 +388,13 @@
               </td>
 
               <!-- Actions Group & Workspace -->
-              <td style="text-align: center;">
-                <div class="ops-actions-group">
+              <td style="width: 300px; min-width: 280px; text-align: center;">
+                <div class="merchants-actions-group">
                   <!-- Workspace Management Button -->
                   <a
                     [routerLink]="['/merchants', merchant.id, 'overview']"
                     (click)="rememberMerchant(merchant)"
-                    class="ops-btn-workspace"
+                    class="merchants-btn-workspace"
                     title="فتح مساحة عمل وإدارة المتجر"
                   >
                     <i class="fas fa-desktop"></i>
@@ -368,7 +404,7 @@
                   <!-- Toggle Status -->
                   <button
                     type="button"
-                    class="ops-btn-action"
+                    class="merchants-btn-action"
                     [class.btn-toggle-disable]="merchant.active"
                     [class.btn-toggle-active]="!merchant.active"
                     (click)="changeStatus(merchant)"
@@ -380,7 +416,7 @@
                   <!-- Edit -->
                   <button
                     type="button"
-                    class="ops-btn-action btn-edit"
+                    class="merchants-btn-action btn-edit"
                     (click)="edit(merchant)"
                     title="تعديل بيانات المتجر"
                   >
@@ -390,7 +426,7 @@
                   <!-- Delete -->
                   <button
                     type="button"
-                    class="ops-btn-action btn-delete"
+                    class="merchants-btn-action btn-delete"
                     (click)="delete(merchant.id)"
                     title="حذف المتجر"
                   >
@@ -403,15 +439,15 @@
             <!-- Empty State -->
             <tr *ngIf="items.length === 0">
               <td colspan="7" class="text-center py-10">
-                <div class="d-flex flex-column align-items-center justify-content-center">
-                  <div style="width: 60px; height: 60px; border-radius: 50%; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #94a3b8; font-size: 24px;">
+                <div class="merchants-empty-state">
+                  <div class="merchants-empty-icon">
                     <i class="fas fa-store-slash"></i>
                   </div>
-                  <h5 class="text-dark fw-bold mb-1">{{ 'MERCHANTS_PAGE.EMPTY_TITLE' | translate }}</h5>
-                  <p class="text-muted fs-7 mb-3">{{ 'MERCHANTS_PAGE.EMPTY_DESC' | translate }}</p>
+                  <h5 class="merchants-empty-title">{{ 'MERCHANTS_PAGE.EMPTY_TITLE' | translate }}</h5>
+                  <p class="merchants-empty-desc">{{ 'MERCHANTS_PAGE.EMPTY_DESC' | translate }}</p>
                   <button
                     type="button"
-                    class="btn btn-sm btn-light-primary"
+                    class="btn merchants-btn-reset"
                     (click)="searchGroup.get('searchTerm')?.setValue(''); selectedKind = 'all'; selectedStatus = 'all';"
                   >
                     <i class="fas fa-redo me-1"></i> {{ 'MERCHANTS_PAGE.RESET_FILTERS' | translate }}
@@ -426,7 +462,7 @@
     </ng-container>
 
     <!-- Table Footer with Paginator -->
-    <div class="ops-table-footer">
+    <div class="merchants-table-footer">
       <app-paginator
         class="d-flex justify-content-between align-items-center flex-wrap"
         [paginator]="paginator"

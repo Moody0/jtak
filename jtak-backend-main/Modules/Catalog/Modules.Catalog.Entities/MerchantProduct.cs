@@ -1,3 +1,4 @@
+using System;
 using Solf.Base;
 
 namespace Modules.Catalog.Entities
@@ -8,19 +9,19 @@ namespace Modules.Catalog.Entities
         public Merchant Merchant { get; set; }
         public int ProductId { get; set; }
         public Product Product { get; set; }
-
         /// <summary>
         /// Contracted profit percent
         /// </summary>
         public decimal ProfitOutOfMerchantPricePercent { get; set; }
 
         /// <summary>
-        /// Merchant asking price for selling products (including contracted profit percent)
+        /// Merchant's quoted base price before the platform markup.
         /// </summary>
         public decimal MerchantPrice { get; set; }
 
         /// <summary>
-        /// Additional Percent of profite for the app administration
+        /// Retained for compatibility with existing databases. Product-level
+        /// additional profit is retired and this value is no longer read or written.
         /// </summary>
         public decimal AdditionalProfitPercent { get; set; }
 
@@ -42,10 +43,17 @@ namespace Modules.Catalog.Entities
         /// currency leave it null and are never repriced.
         /// </summary>
         public decimal? PriceUsd { get; set; }
+
+        /// <summary>
+        /// Maximum quantity of this menu item a customer may order in one order.
+        /// Used by restaurants; null uses the platform default.
+        /// </summary>
+        public int? MaxOrderQuantity { get; set; }
     }
     public class MerchantProductDto
     {
         public int MerchantId { get; set; }
+        public int MerchantKind { get; set; }
         public int ProductId { get; set; }
         public string Product { get; set; }
         public string ProductBarcode { get; set; }
@@ -58,6 +66,8 @@ namespace Modules.Catalog.Entities
         public int? ProductCategoryId { get; set; }
         public bool ProductActive { get; set; }
         public bool ProductIsFeatured { get; set; }
+        public bool HasRestaurantAssignment { get; set; }
+        public bool HasJtakMarketAssignment { get; set; }
         public int? CategoryParentId { get; set; }
         public bool CategoryActive { get; set; }
         public string CategoryIcon { get; set; }
@@ -66,8 +76,8 @@ namespace Modules.Catalog.Entities
         /// Contracted profit percent
         /// </summary>
         public decimal ProfitOutOfMerchantPricePercent { get; set; }
-        public decimal ProfitOutOfMerchantPrice => (MerchantPrice * ProfitOutOfMerchantPricePercent / 100);
-        public decimal MerchantProfit => MerchantPrice - ProfitOutOfMerchantPrice;
+        public decimal ProfitOutOfMerchantPrice => Math.Round(MerchantPrice * ProfitOutOfMerchantPricePercent / 100m, 0, MidpointRounding.AwayFromZero);
+        public decimal MerchantProfit => MerchantPrice;
 
         /// <summary>
         /// Normal asking price specified by the merchant
@@ -85,39 +95,38 @@ namespace Modules.Catalog.Entities
         public decimal? PriceUsd { get; set; }
 
         /// <summary>
-        /// Additional Profit Percent specified by the admins, to be added to merchant prices
-        /// </summary>
-        public decimal AdditionalProfitPercent { get; set; }
-        public decimal AdditionalProfit => (MerchantPrice * AdditionalProfitPercent / 100);
-
-        /// <summary>
-        /// Fake discount, added to the sale price not subtracted
+        /// Savings amount used to calculate the compare-at price. The merchant
+        /// price and additional profit remain the amount charged after discount.
         /// </summary>
         public decimal Discount { get; set; }
 
-        /// <summary>
-        /// Selling Price Before discount
-        /// </summary>
-        public decimal Price => Discount + MerchantPrice + AdditionalProfit;
+        /// <summary>Restaurant per-order quantity limit; null uses the platform default.</summary>
+        public int? MaxOrderQuantity { get; set; }
 
         /// <summary>
-        /// Final Selling Price After discount
+        /// Compare-at price before discount
         /// </summary>
-        public decimal FinalPrice => MerchantPrice + AdditionalProfit;
+        public decimal Price => Discount + FinalPrice;
+
+        /// <summary>
+        /// Selling price charged after discount
+        /// </summary>
+        public decimal FinalPrice => MerchantPrice + ProfitOutOfMerchantPrice;
     }
     public class MerchantProductAssignDto
     {
         public int ProductId { get; set; }
         public decimal ProfitOutOfMerchantPricePercent { get; set; }
         public decimal MerchantPrice { get; set; }
-        public decimal AdditionalProfitPercent { get; set; }
         public decimal Discount { get; set; }
         public decimal? OriginalPrice { get; set; }
         public decimal? PriceUsd { get; set; }
+        public int? MaxOrderQuantity { get; set; }
     }
     public class MerchantProductPriceDto
     {
         public int ProductId { get; set; }
         public decimal MerchantPrice { get; set; }
+        public int? MaxOrderQuantity { get; set; }
     }
 }

@@ -8,9 +8,10 @@ import { CRUDTableModule } from 'src/app/_metronic/shared/crud-table';
 import { SupportMessagesRoutingModule } from './support-messages-routing.module';
 import { SupportMessagesListComponent } from './components/support-messages-list/support-messages-list.component';
 import { ViewMessageModalComponent } from './components/view-message-modal/view-message-modal.component';
+import { ErrandRequestsListComponent } from './components/errand-requests-list/errand-requests-list.component';
 
 @NgModule({
-  declarations: [SupportMessagesListComponent, ViewMessageModalComponent],
+  declarations: [SupportMessagesListComponent, ViewMessageModalComponent, ErrandRequestsListComponent],
   imports: [
     CommonModule,
     FormsModule,

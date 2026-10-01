@@ -1,9 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { SubSink } from 'subsink';
+import { timer } from 'rxjs';
 import {
   IPaginatorView,
   ISearchView,
@@ -36,13 +37,13 @@ export class SupportMessagesListComponent
     resolvedCount: 0,
   };
 
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
   paginator: PaginatorState;
   sorting: SortState = new SortState();
   isLoading: boolean = false;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public supportService: SupportMessagesService,
     private modalService: NgbModal,
     private toastr: ToastrService,
@@ -58,6 +59,12 @@ export class SupportMessagesListComponent
     // DataTable is a POST endpoint; using fetch() sends an unsupported GET
     // and leaves the page empty even when messages exist.
     this.supportService.fetchPost();
+    // New “طلبات” requests enter this queue while it is open. Keep it fresh
+    // without asking staff to press the refresh button.
+    this.subs.sink = timer(10000, 10000).subscribe(() => {
+      this.supportService.fetchPost();
+      this.loadStats();
+    });
   }
 
   loadStats(): void {
@@ -81,6 +88,10 @@ export class SupportMessagesListComponent
 
   search(searchTerm: string): void {
     this.supportService.patchState({ searchTerm });
+  }
+
+  clearSearch(): void {
+    this.searchGroup.get('searchTerm')?.setValue('');
   }
 
   filterByStatus(status: SupportMessageStatus | null): void {

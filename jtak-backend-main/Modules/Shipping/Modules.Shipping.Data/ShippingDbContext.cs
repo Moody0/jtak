@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -54,6 +54,20 @@ namespace App.Shipping.Data
             //}
 
             #endregion
+
+            builder.Entity<ShippingOrder>(b =>
+            {
+                // One logical pickup per merchant and one logical drop-off per
+                // order, regardless of retries or which driver attempted it.
+                b.HasIndex(x => new { x.OrderId, x.StopType, x.MerchantId }).IsUnique();
+            });
+
+            builder.Entity<DeliveryDriverDuty>(b =>
+            {
+                b.HasKey(x => x.DriverId);
+                b.Property(x => x.Lat).HasColumnType("decimal(18,9)");
+                b.Property(x => x.Lng).HasColumnType("decimal(18,9)");
+            });
 
             base.OnModelCreating(builder);
         }
@@ -120,5 +134,6 @@ namespace App.Shipping.Data
 
         public DbSet<GenericSetting> Settings { get; set; }
         public DbSet<ShippingOrder> ShippingOrders { get; set; }
+        public DbSet<DeliveryDriverDuty> DriverDuties { get; set; }
     }
 }

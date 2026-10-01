@@ -56,8 +56,13 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
-        public async Task<ActionResult<TableResponseModel<BannerDto>>> DataTable([FromBody] MetronicTable request) =>
-            await _service.ListMetronicTableQueryable(request, x => new BannerDto
+        public async Task<ActionResult<TableResponseModel<BannerDto>>> DataTable([FromBody] MetronicTable request)
+        {
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
+            return await _service.ListMetronicTableQueryable(request, x => new BannerDto
             {
                 Id = x.Id,
                 Title = x.Title,
@@ -68,6 +73,7 @@ namespace App.ApiControllers.V1.Admin
                 BannerLocation = x.BannerLocation,
                 Active = x.Active
             });
+        }
 
 
         /// <summary>

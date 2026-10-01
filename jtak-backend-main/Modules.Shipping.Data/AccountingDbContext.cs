@@ -119,6 +119,26 @@ namespace Modules.Accounting.Data
                     b.HasIndex(x => new { x.OrderId, x.MerchantId }).IsUnique();
                 });
 
+                builder.Entity<ReconciliationBatch>(b =>
+                {
+                    b.HasIndex(r => r.BatchNumber).IsUnique();
+                    b.HasIndex(r => r.Status);
+                    b.Property(r => r.TotalFinancialAdjustmentDebit).HasPrecision(18, 2);
+                    b.Property(r => r.TotalFinancialAdjustmentCredit).HasPrecision(18, 2);
+                    b.HasMany(r => r.StagedCorrections)
+                     .WithOne(c => c.Batch)
+                     .HasForeignKey(c => c.BatchId)
+                     .OnDelete(DeleteBehavior.Cascade);
+                });
+
+                builder.Entity<ReconciliationStagedCorrection>(b =>
+                {
+                    b.HasIndex(c => new { c.BatchId, c.IssueType });
+                    b.HasIndex(c => c.Status);
+                    b.HasIndex(c => c.OrderId);
+                    b.Property(c => c.AdjustmentAmount).HasPrecision(18, 2);
+                });
+
                 base.OnModelCreating(builder);
             }
 
@@ -192,5 +212,7 @@ namespace Modules.Accounting.Data
             public DbSet<DailySettlementBatch> DailySettlementBatches { get; set; }
             public DbSet<SettlementRequest> SettlementRequests { get; set; }
             public DbSet<SettlementRequestMerchantAllocation> SettlementRequestMerchantAllocations { get; set; }
+            public DbSet<ReconciliationBatch> ReconciliationBatches { get; set; }
+            public DbSet<ReconciliationStagedCorrection> ReconciliationStagedCorrections { get; set; }
         }
     }

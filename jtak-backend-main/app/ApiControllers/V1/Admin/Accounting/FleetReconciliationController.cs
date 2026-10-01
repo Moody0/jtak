@@ -21,6 +21,7 @@ using Modules.Catalog.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using App.Shared.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -48,6 +49,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IBalanceService _balanceService;
         private readonly AccountingDbContext _accountingDb;
         private readonly IAdminAuditService _auditService;
+        private readonly IConfiguration _configuration;
 
         public FleetReconciliationController(
             IEodReconciliationService reconciliationService,
@@ -58,7 +60,8 @@ namespace App.ApiControllers.V1.Admin
             ILedgerService ledgerService,
             IBalanceService balanceService,
             AccountingDbContext accountingDb,
-            IAdminAuditService auditService = null)
+            IAdminAuditService auditService = null,
+            IConfiguration configuration = null)
         {
             _reconciliationService = reconciliationService ?? throw new ArgumentNullException(nameof(reconciliationService));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
@@ -69,6 +72,7 @@ namespace App.ApiControllers.V1.Admin
             _balanceService = balanceService;
             _accountingDb = accountingDb;
             _auditService = auditService;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -157,6 +161,12 @@ namespace App.ApiControllers.V1.Admin
         [HttpPost("ReconcileDeliveredOrders")]
         public async Task<ActionResult<DeliveredOrderReconciliationSummaryDto>> ReconcileDeliveredOrders([FromQuery] int lookbackDays = 30)
         {
+            var enableLegacy = _configuration?.GetValue<bool>("Features:EnableLegacyReconciliation") ?? false;
+            if (!enableLegacy)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiErr.Create("Manual order reconciliation is paused pending canonical money contract rollout. Set Features:EnableLegacyReconciliation to true to bypass."));
+            }
+
             var cutoff = DateTime.UtcNow.AddDays(-Math.Abs(lookbackDays));
             var deliveredOrders = await _orderService.Queryable()
                 .Include(o => o.OrderDetails)

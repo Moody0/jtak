@@ -26,6 +26,7 @@ using App.Orders.Data;
 using Modules.Shipping.Entities;
 using Microsoft.AspNetCore.SignalR;
 using App.Shared.Services.Hubs;
+using App.Shared.Services.Pricing;
 
 namespace App.ApiControllers.V1.Warehouse
 {
@@ -45,6 +46,8 @@ namespace App.ApiControllers.V1.Warehouse
         private readonly IDeliveryService _deliveryService;
         private readonly IOrderDetailService _orderDetailService;
         private readonly IInventoryBatchService _batchService;
+        private readonly IOrderTransitionService _transitionService;
+        private readonly IOrderMoneyCalculationService _moneyCalculationService;
         private readonly IHubContext<TrackingHub> _trackingHub;
 
         public OrdersController(IOrdersUnitOfWork unitOfWork,
@@ -57,6 +60,8 @@ namespace App.ApiControllers.V1.Warehouse
             IDeliveryService deliveryService,
             IInventoryBatchService batchService,
             IMapper mapper,
+            IOrderTransitionService transitionService = null,
+            IOrderMoneyCalculationService moneyCalculationService = null,
             IHubContext<TrackingHub> trackingHub = null)
         {
             _uow = unitOfWork;
@@ -69,6 +74,8 @@ namespace App.ApiControllers.V1.Warehouse
             _orderDetailService = orderDetailService;
             _deliveryService = deliveryService;
             _batchService = batchService;
+            _transitionService = transitionService;
+            _moneyCalculationService = moneyCalculationService;
             _trackingHub = trackingHub;
         }
 
@@ -81,8 +88,14 @@ namespace App.ApiControllers.V1.Warehouse
         public async Task<ActionResult<TableResponseModel<OrderDto>>> PostMine([FromBody] MetronicTable request)
         {
             var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
             var mids = await _merchantService.GetMerchantIds(uid.Value);
-            var threeDaysAgo = DateTime.UtcNow.AddDays(-3);
+
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
+
             var orders = await _service.ListMetronicTableQueryable(request,
                 x => new OrderDto
                 {
@@ -99,19 +112,28 @@ namespace App.ApiControllers.V1.Warehouse
                     Lng = x.Lng,
                     Address = x.Address,
                     PaymentMethod = x.PaymentMethod,
+                    DeliveryFee = x.DeliveryFee,
+                    MoneySnapshotVersion = x.MoneySnapshotVersion,
+                    CaptainEarning = x.CaptainEarning,
                     DeliveryId = x.DeliveryId,
+                    CourierMatchingStartedAtUtc = x.CourierMatchingStartedAtUtc,
+                    CourierMatchingDeadlineAtUtc = x.CourierMatchingDeadlineAtUtc,
+                    CourierMatchingCompletedAtUtc = x.CourierMatchingCompletedAtUtc,
                     DeliveryUser = x.DeliveryUser,
                     DeliveryNotes = x.DeliveryNotes,
-                    DeliveryOtp = x.DeliveryOtp,
                     DeliveredAt = x.DeliveredAt,
                     OrderDetails = x.OrderDetails.Where(d => mids.Contains(d.MerchantId)).Select(d => d.ToDto()).ToArray()
                 }, x =>
                 x.OrderDetails.Any(d => mids.Contains(d.MerchantId))
-                && x.OrderStatus == OrderStatus.Success
-                && x.PurchaseDate > threeDaysAgo, x => x.OrderDetails);
+                && x.OrderStatus == OrderStatus.Success, x => x.OrderDetails);
 
             if (orders?.Items != null && orders.Items.Length > 0)
             {
+                foreach (var ord in orders.Items)
+                {
+                    ord.Money = ResolveMerchantMoney(ord);
+                }
+
                 var deliveryIds = orders.Items
                     .Where(x => x.DeliveryId.HasValue && x.DeliveryId.Value != Guid.Empty)
                     .Select(x => x.DeliveryId.Value)
@@ -146,12 +168,59 @@ namespace App.ApiControllers.V1.Warehouse
         [Route("Accept/{id}")]
         public async Task<ActionResult<bool>> MerchantAccept(int id, [FromBody] OrderActionRequestDto dto = null)
         {
-            var merchantIds = await _merchantService.GetMerchantIds(User.GetUserId().Value);
+            var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
+            var merchantIds = await _merchantService.GetMerchantIds(uid.Value);
             var currentOrder = await _service.FindAsync(id);
             if (currentOrder == null)
                 return NotFound();
-            var order = await _service.MerchantAccept(id, merchantIds);
-            var firstDetail = order.OrderDetails.FirstOrDefault(x => merchantIds.Contains(x.MerchantId));
+
+            var matchingDetails = currentOrder.OrderDetails.Where(x => merchantIds.Contains(x.MerchantId)).ToList();
+            if (!matchingDetails.Any())
+                return NotFound();
+
+            if (_transitionService != null)
+            {
+                foreach (var mid in merchantIds)
+                {
+                    if (currentOrder.OrderDetails.Any(x => x.MerchantId == mid))
+                    {
+                        await _transitionService.TransitionMerchantOrderAsync(id, mid, OrderDetailStatus.MerchantAccepted, dto?.Reason, uid.Value);
+                    }
+                }
+            }
+            else
+            {
+                await _service.MerchantAccept(id, merchantIds);
+            }
+
+            // Matching starts only after every active item from this (single) merchant
+            // has been accepted. The three-minute clock is server-owned.
+            var acceptedOrder = await _service.FindAsync(id);
+            var activeDetails = acceptedOrder?.OrderDetails?.Where(x =>
+                x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).ToArray() ?? Array.Empty<OrderDetail>();
+            if (acceptedOrder != null && activeDetails.Length > 0 &&
+                activeDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted) &&
+                (!acceptedOrder.DeliveryId.HasValue || acceptedOrder.DeliveryId == Guid.Empty) &&
+                !acceptedOrder.CourierMatchingStartedAtUtc.HasValue)
+            {
+                var matchingStarted = DateTime.UtcNow;
+                acceptedOrder.CourierMatchingRound = Math.Max(1, acceptedOrder.CourierMatchingRound + 1);
+                acceptedOrder.CourierMatchingStartedAtUtc = matchingStarted;
+                acceptedOrder.CourierMatchingDeadlineAtUtc = matchingStarted.AddMinutes(3);
+                acceptedOrder.CourierMatchingCompletedAtUtc = null;
+                await _uow.SaveChangesAsync();
+                if (_trackingHub != null)
+                    await _trackingHub.Clients.Group($"order_{id}").SendAsync("OnCourierMatchingStarted", new
+                    {
+                        orderId = id,
+                        deadlineAtUtc = acceptedOrder.CourierMatchingDeadlineAtUtc
+                    });
+            }
+
+            var firstDetail = matchingDetails.FirstOrDefault();
             var currentMerchant = firstDetail != null ? await _merchantService.FindAsync(firstDetail.MerchantId) : null;
             var acceptedMerchantTitle = currentMerchant?.MerchantKind == MerchantKind.DarkStore
                 ? "جيتك ماركت"
@@ -167,36 +236,61 @@ namespace App.ApiControllers.V1.Warehouse
         [Route("Reject/{id}")]
         public async Task<ActionResult<bool>> MerchantReject(int id, [FromBody] OrderActionRequestDto dto = null)
         {
-            var merchantIds = await _merchantService.GetMerchantIds(User.GetUserId().Value);
+            var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
+            var merchantIds = await _merchantService.GetMerchantIds(uid.Value);
 
             var order = await _service.FindAsync(id);
             if (order == null)
                 return NotFound();
+            if (order.CourierMatchingCompletedAtUtc.HasValue &&
+                order.DeliveryId.HasValue && order.DeliveryId != Guid.Empty)
+                return Conflict(ApiErr.Create("تم تأكيد استلام الطلب من السائق، لا يمكن رفضه الآن."));
             if (string.IsNullOrWhiteSpace(dto?.Reason))
                 return BadRequest(ApiErr.Create("يجب تحديد سبب رفض الطلب."));
 
             var customerIds = new[] { order.UserId };
 
             var merchantOrderDetails = order.OrderDetails
-                .Where(x => merchantIds.Contains(x.MerchantId) && x.OrderDetailStatus == OrderDetailStatus.Pending)
+                .Where(x => merchantIds.Contains(x.MerchantId) && 
+                            (x.OrderDetailStatus == OrderDetailStatus.Pending || 
+                             x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted))
                 .ToArray();
+
             if (merchantOrderDetails.Length == 0)
+            {
+                var alreadyRejected = order.OrderDetails.Any(x => merchantIds.Contains(x.MerchantId) && x.OrderDetailStatus == OrderDetailStatus.MerchantRejected);
+                if (alreadyRejected)
+                    return Ok(true); // Idempotent
+
                 return BadRequest(ApiErr.Create("تم اتخاذ قرار بشأن هذا الطلب مسبقاً ولا يمكن رفضه الآن."));
+            }
 
             // Release reservation for this merchant's items
-            foreach (var mod in merchantOrderDetails)
+            foreach (var mid in merchantIds)
             {
-                await _batchService.ReleaseReservationAsync(id, mod.Id, reason: dto.Reason);
+                if (order.OrderDetails.Any(x => x.MerchantId == mid))
+                {
+                    await _batchService.ReleaseReservationAsync(id, reason: dto.Reason, merchantId: mid);
+                    if (_transitionService != null)
+                    {
+                        await _transitionService.TransitionMerchantOrderAsync(id, mid, OrderDetailStatus.MerchantRejected, dto.Reason, User.GetUserId());
+                    }
+                    else
+                    {
+                        var detailsForMid = merchantOrderDetails.Where(x => x.MerchantId == mid).ToArray();
+                        foreach (var mod in detailsForMid)
+                        {
+                            mod.OrderDetailStatus = OrderDetailStatus.MerchantRejected;
+                            mod.Warning = dto.Reason.Trim();
+                        }
+                        _service.Log(id, OrderDetailStatus.MerchantRejected, detailsForMid);
+                        await _uow.SaveChangesAsync();
+                    }
+                }
             }
 
-            // Update Merchant Order Detail Statuses
-            foreach (var merchantOrderdetail in merchantOrderDetails)
-            {
-                merchantOrderdetail.OrderDetailStatus = OrderDetailStatus.MerchantRejected;
-                merchantOrderdetail.Warning = dto.Reason.Trim();
-            }
             order.Notes = dto.Reason.Trim();
-            _service.Log(id, OrderDetailStatus.MerchantRejected, merchantOrderDetails);
             await _uow.SaveChangesAsync();
 
             // A merchant rejection is final for that merchant's part of the order.
@@ -224,6 +318,7 @@ namespace App.ApiControllers.V1.Warehouse
         public async Task<ActionResult<OrderDto>> Get(int id)
         {
             var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
             var mids = await _merchantService.GetMerchantIds(uid.Value);
             var order = await _service.Queryable()
                                       .Include(x => x.OrderDetails)
@@ -248,29 +343,22 @@ namespace App.ApiControllers.V1.Warehouse
                 Lat = order.Lat,
                 Lng = order.Lng,
                 Address = order.Address,
+                PaymentMethod = order.PaymentMethod,
+                DeliveryFee = order.DeliveryFee,
+                MoneySnapshotVersion = order.MoneySnapshotVersion,
+                CaptainEarning = order.CaptainEarning,
                 DeliveryId = order.DeliveryId,
+                CourierMatchingStartedAtUtc = order.CourierMatchingStartedAtUtc,
+                CourierMatchingDeadlineAtUtc = order.CourierMatchingDeadlineAtUtc,
+                CourierMatchingCompletedAtUtc = order.CourierMatchingCompletedAtUtc,
                 DeliveryUser = order.DeliveryUser,
                 DeliveryNotes = order.DeliveryNotes,
-                DeliveryOtp = order.DeliveryOtp,
                 DeliveredAt = order.DeliveredAt,
                 OrderDetails = order.OrderDetails.Where(d => mids.Contains(d.MerchantId))
-                                    .Select(d => new OrderDetailDto
-                                    {
-                                        Id = d.Id,
-                                        Quantity = d.Quantity,
-                                        ProductId = d.ProductId,
-                                        ProductTitle = d.ProductTitle,
-                                        ProductUnit = d.ProductUnit,
-                                        ProductImage = d.ProductImage,
-                                        MerchantId = d.MerchantId,
-                                        MerchantTitle = d.MerchantTitle,
-                                        SinglePrice = d.SinglePrice,
-                                        SingleFinalPrice = d.SingleFinalPrice,
-                                        Currency = d.Currency,
-                                        OrderId = d.OrderId,
-                                        OrderDetailStatus = d.OrderDetailStatus
-                                    }).ToArray()
+                                    .Select(d => d.ToDto()).ToArray()
             };
+
+            result.Money = ResolveMerchantMoney(result);
 
             if (order.DeliveryId.HasValue)
             {
@@ -291,6 +379,28 @@ namespace App.ApiControllers.V1.Warehouse
             return result;
         }
 
+        private CanonicalOrderMoneyDto ResolveMerchantMoney(OrderDto order)
+        {
+            if (_moneyCalculationService == null) return null;
+            var details = order.OrderDetails ?? Array.Empty<OrderDetailDto>();
+            var commissions = details.GroupBy(x => x.MerchantId).Select(g => new MerchantCommissionInfo
+            {
+                MerchantId = g.Key,
+                MerchantTitle = g.FirstOrDefault()?.MerchantTitle,
+                CommissionRatePercent = g.FirstOrDefault()?.CommissionRatePercent ?? 0m,
+                IsDarkStore = g.All(x => x.IsPlatformOwnedSnapshot)
+            });
+            return _moneyCalculationService.CalculateOrderMoney(
+                details,
+                order.DeliveryFee,
+                order.PaymentMethod,
+                merchantCommissionInfos: commissions,
+                captainEarning: order.MoneySnapshotVersion > 0 ? order.CaptainEarning : order.DeliveryFee,
+                currency: details.FirstOrDefault()?.Currency.ToString() ?? "SYP",
+                commissionIsMarkup: order.MoneySnapshotVersion == 2,
+                commissionIsPercentageOfGross: order.MoneySnapshotVersion >= 3);
+        }
+
         /// <summary>
         /// Mark order as prepared and ready for courier pickup
         /// </summary>
@@ -298,14 +408,43 @@ namespace App.ApiControllers.V1.Warehouse
         [Route("Ready/{id}")]
         public async Task<ActionResult<bool>> MarkReady(int id, [FromBody] OrderActionRequestDto dto = null)
         {
-            var merchantIds = await _merchantService.GetMerchantIds(User.GetUserId().Value);
-            var order = await _service.MerchantMarkReady(id, merchantIds);
+            var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
+            var merchantIds = await _merchantService.GetMerchantIds(uid.Value);
+            var order = await _service.FindAsync(id);
             if (order == null) return NotFound();
 
-            // Deduct reserved stock upon readiness scoped strictly to this merchant's items
-            foreach (var mid in merchantIds)
+            if (order.CourierMatchingStartedAtUtc.HasValue &&
+                (!order.DeliveryId.HasValue || order.DeliveryId == Guid.Empty))
             {
-                await _batchService.DeductReservedStockAsync(id, merchantId: mid);
+                return Conflict(ApiErr.Create("سيبدأ تجهيز الطلب بعد تأكيد استلامه من أحد سائقي التوصيل."));
+            }
+
+            var wasAvailableToDrivers =
+                (!order.DeliveryId.HasValue || order.DeliveryId.Value == Guid.Empty) &&
+                order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
+
+            var matchingDetails = order.OrderDetails.Where(x => merchantIds.Contains(x.MerchantId)).ToList();
+            if (!matchingDetails.Any()) return NotFound();
+
+            if (_transitionService != null)
+            {
+                foreach (var mid in merchantIds)
+                {
+                    if (order.OrderDetails.Any(x => x.MerchantId == mid))
+                    {
+                        await _transitionService.TransitionMerchantOrderAsync(id, mid, OrderDetailStatus.ReadyForPickup, dto?.Reason, uid.Value);
+                        await _batchService.DeductReservedStockAsync(id, merchantId: mid);
+                    }
+                }
+            }
+            else
+            {
+                await _service.MerchantMarkReady(id, merchantIds);
+                foreach (var mid in merchantIds)
+                {
+                    await _batchService.DeductReservedStockAsync(id, merchantId: mid);
+                }
             }
 
             var currentMerchant = merchantIds.Length > 0 ? await _merchantService.FindAsync(merchantIds[0]) : null;
@@ -315,6 +454,25 @@ namespace App.ApiControllers.V1.Warehouse
 
             if (order.DeliveryId.HasValue)
                 await _notificationService.SendDeliveryOrderReadyForPickup(new[] { order.DeliveryId.Value }, id, merchantTitle);
+            else
+            {
+                var latestOrder = await _service.Queryable()
+                    .Include(x => x.OrderDetails)
+                    .FirstOrDefaultAsync(x => x.Id == id);
+                var isAvailableToDrivers = latestOrder != null &&
+                    (!latestOrder.DeliveryId.HasValue || latestOrder.DeliveryId.Value == Guid.Empty) &&
+                    latestOrder.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup);
+
+                if (!wasAvailableToDrivers && isAvailableToDrivers)
+                {
+                    var onlineDrivers = await _deliveryService.GetOnlineDeliveryIds();
+                    if (onlineDrivers.Length > 0)
+                    {
+                        await _notificationService.SendDeliveryNewOrderRecived(
+                            onlineDrivers, id, latestOrder.OrderDetails.ToArray());
+                    }
+                }
+            }
 
             var admins = (await _userManager.GetUsersInRoleAsync(AppRoleName.Admin.ToString())).Where(x => x.IsActive).Select(x => x.Id).ToArray();
             if (admins.Length > 0)
@@ -402,6 +560,9 @@ namespace App.ApiControllers.V1.Warehouse
 
             var order = await _service.FindAsync(id);
             if (order == null) return NotFound();
+            if (order.CourierMatchingStartedAtUtc.HasValue &&
+                (!order.DeliveryId.HasValue || order.DeliveryId == Guid.Empty))
+                return Conflict(ApiErr.Create("لا يمكن بدء تجهيز الطلب قبل تأكيد استلامه من سائق."));
 
             var detail = order.OrderDetails.FirstOrDefault(d => d.Id == dto.OrderDetailId);
             if (detail == null)
@@ -426,6 +587,9 @@ namespace App.ApiControllers.V1.Warehouse
 
             var order = await _service.FindAsync(id);
             if (order == null) return NotFound();
+            if (order.CourierMatchingStartedAtUtc.HasValue &&
+                (!order.DeliveryId.HasValue || order.DeliveryId == Guid.Empty))
+                return Conflict(ApiErr.Create("لا يمكن تجهيز الطلب قبل تأكيد استلامه من سائق."));
 
             // Verify that all batch-managed reservations for this merchant's order details are picked
             var reservations = await _batchService.GetOrderReservationsAsync(id);

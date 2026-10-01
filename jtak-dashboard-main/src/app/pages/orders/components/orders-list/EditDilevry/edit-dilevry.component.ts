@@ -5,7 +5,7 @@ import {
   OnDestroy,
   ChangeDetectorRef,
 } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormArray, UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable, pipe } from 'rxjs';
@@ -25,12 +25,12 @@ export class EditDilevry implements OnInit, OnDestroy {
   private subs = new SubSink();
   @Input() item: Order;
   isLoading$: Observable<boolean>;
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
   deliviries: User[] = [];
 
   constructor(
     private service: UsersService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     private toasterService: ToastrService,
     private orderService: OrdersService,
@@ -75,13 +75,16 @@ export class EditDilevry implements OnInit, OnDestroy {
 
     this.subs.sink = this.orderService
       .setDelievry(id, uid)
-      .pipe(
-        tap(() => {
+      .subscribe({
+        next: () => {
           this.toasterService.success(uid === '00000000-0000-0000-0000-000000000000' ? 'Order returned to Available Pool' : 'Delivery Captain Updated');
           this.modal.close();
-        })
-      )
-      .subscribe();
+        },
+        error: (err: any) => {
+          const errMsg = err?.error?.title || err?.error?.detail || err?.error?.message || err?.message || 'تعذر تعيين مندوب التوصيل.';
+          this.toasterService.error(errMsg);
+        }
+      });
   }
 
   ngOnDestroy(): void {

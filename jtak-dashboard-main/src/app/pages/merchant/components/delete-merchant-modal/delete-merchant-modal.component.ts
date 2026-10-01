@@ -19,13 +19,12 @@ export class DeleteMerchantModalComponent implements OnInit {
   ngOnInit(): void {
   }
 
-  delete() {
+  delete(): void {
     if (this.id) {
-      this.service
-          .delete(this.id).subscribe({
-            next: () => this.modal.close(),
-            error: () => this.modal.dismiss()
-          });
+      this.service.delete(this.id).subscribe({
+        next: () => this.modal.close(true),
+        error: () => this.modal.dismiss(),
+      });
     }
   }
 }

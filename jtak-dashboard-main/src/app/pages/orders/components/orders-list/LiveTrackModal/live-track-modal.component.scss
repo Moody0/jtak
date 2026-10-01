@@ -1,3 +1,12 @@
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+
+  *, .card, .btn, .badge, .telemetry-card {
+    box-shadow: none !important;
+  }
+}
+
 .live-track-header {
   border-bottom: 1px solid #e2e8f0;
 }

@@ -18,6 +18,11 @@ namespace Modules.Accounting.Entities
     public class PaymentDto
     {
         public int Id { get; set; }
+        public string ReferenceNumber { get; set; }
+        public string PaymentType { get; set; }
+        public string Currency { get; set; }
+        public string Status { get; set; }
+        public bool IsSettlement { get; set; }
         public Guid ToUserId { get; set; }
         public string ToUser { get; set; }
         public Guid ByUserId { get; set; }

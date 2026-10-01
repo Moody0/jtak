@@ -169,7 +169,7 @@
           <thead>
             <tr class="ops-table-header text-muted fs-8">
               <th scope="col" style="min-width: 200px;">التاجر والمالك</th>
-              <th scope="col" style="width: 130px;">الهاتف</th>
+              <th scope="col" style="width: 145px; min-width: 140px;">الهاتف</th>
               <th scope="col" style="width: 90px;" class="text-center">الطلبات</th>
               <th scope="col" style="width: 120px;" class="text-end">إجمالي المبيعات</th>
               <th scope="col" style="width: 110px;" class="text-end">حصة جيتك</th>
@@ -285,7 +285,7 @@
 
               <!-- 11. Action: Account Statement Modal Button -->
               <td class="text-center">
-                <button type="button" class="btn btn-sm btn-light-primary fw-bold px-3 py-1 d-inline-flex align-items-center gap-1"
+                <button type="button" class="btn btn-sm ops-btn-statement-action"
                   (click)="openMerchantStatement(merchantStatementModal, m)" title="عرض كشف الحساب المالي المفصل وتاريخ التسويات">
                   <i class="fas fa-file-invoice-dollar"></i>
                   <span>كشف الحساب</span>
@@ -450,6 +450,36 @@
                   </button>
                 </ng-container>
                 <i *ngIf="request.status === requestStatus.Completed" class="fas fa-check-circle text-success fs-4"></i>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="ops-orders-card mb-4">
+      <div class="px-4 py-3 border-bottom">
+        <h4 class="mb-1">طلبات صرف أرباح السائقين</h4>
+        <div class="text-muted fs-8">مستحقات السائق منفصلة عن عهدة الكاش. الموافقة تحجز المبلغ فقط؛ تأكيد الدفع الفعلي يخصمه من المستحقات والخزينة. لا تخصم أجراً سبق تسويته من العهدة.</div>
+      </div>
+      <div class="table-responsive">
+        <table class="table ops-orders-table align-middle mb-0">
+          <thead><tr class="ops-table-header text-muted fs-8">
+            <th>رقم الطلب</th><th>السائق</th><th>المبلغ المطلوب</th><th>الحالة</th><th>التاريخ</th><th>الإجراء</th>
+          </tr></thead>
+          <tbody>
+            <tr *ngIf="driverEarningsRequests.length === 0"><td colspan="6" class="text-center text-muted py-4">لا توجد طلبات صرف أرباح</td></tr>
+            <tr *ngFor="let request of driverEarningsRequests">
+              <td>{{ request.requestNumber }}</td>
+              <td><strong>{{ request.requestedByName }}</strong><div dir="ltr">{{ request.requestedByPhone }}</div></td>
+              <td>{{ request.amount | number:'1.0-2' }} ل.س</td>
+              <td>{{ requestStatusLabel(request.status) }}<div class="text-danger" *ngIf="request.rejectionReason">{{ request.rejectionReason }}</div></td>
+              <td>{{ request.createdDate | date:'short' }}</td>
+              <td>
+                <button *ngIf="request.status === requestStatus.Pending" class="btn btn-sm btn-success me-1" (click)="acceptSettlementRequest(request)" [disabled]="processingRequestId !== null">موافقة دون صرف</button>
+                <button *ngIf="request.status === requestStatus.Approved" class="btn btn-sm btn-primary me-1" (click)="completeDriverEarnings(request)" [disabled]="processingRequestId !== null">تأكيد دفع المستحقات</button>
+                <button *ngIf="request.status === requestStatus.Pending || request.status === requestStatus.Approved" class="btn btn-sm btn-light-danger" (click)="rejectSettlementRequest(request)" [disabled]="processingRequestId !== null">رفض وإلغاء الحجز</button>
+                <button *ngIf="request.status === requestStatus.Completed" class="btn btn-sm btn-light" (click)="openSettlementRequestReceipt(settlementReceiptModal, request)">إيصال الصرف</button>
               </td>
             </tr>
           </tbody>
@@ -699,7 +729,7 @@
       <div class="col-xl-4 col-md-4 col-sm-12">
         <div class="ops-kpi-card ops-kpi-card--success">
           <div class="ops-kpi-card-header">
-            <span class="ops-kpi-card-label">توريدات وتسويات المناديب</span>
+            <span class="ops-kpi-card-label">عمليات تسوية وصرف المناديب</span>
             <div class="ops-kpi-card-icon ops-kpi-card-icon--success">
               <i class="fas fa-motorcycle"></i>
             </div>
@@ -708,7 +738,7 @@
             {{ (historySummary?.driverCompletedAmount || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">
-            إجمالي <strong>{{ historySummary?.driverCompletedCount || 0 }}</strong> عملية توريد نقدية مسجلة بالخزينة
+            إجمالي <strong>{{ historySummary?.driverCompletedCount || 0 }}</strong> عملية توريد أو صرف (ليس صافي النقد بالخزينة)
           </div>
         </div>
       </div>
@@ -775,7 +805,7 @@
               <th scope="col" style="width: 140px;">المرجع / الطلب</th>
               <th scope="col" style="width: 95px;" class="text-center">النوع</th>
               <th scope="col" style="min-width: 170px;">الطرف والمستفيد</th>
-              <th scope="col" style="width: 120px;">الهاتف</th>
+              <th scope="col" style="width: 145px; min-width: 140px;">الهاتف</th>
               <th scope="col" style="width: 130px;" class="text-end">المبلغ المكتمل</th>
               <th scope="col" style="width: 140px;">طريقة الصرف</th>
               <th scope="col" style="width: 130px;">الحساب المحاسبي</th>
@@ -916,30 +946,74 @@
 <!-- MODAL: MERCHANT FINANCIAL STATEMENT & SETTLEMENT HISTORY -->
 <!-- ========================================================================= -->
 <ng-template #merchantStatementModal let-modal>
-  <div class="modal-header border-bottom py-3">
-    <div class="d-flex align-items-center gap-3">
-      <div class="ops-avatar bg-light-primary text-primary">
-        <i class="fas fa-file-invoice-dollar fs-4"></i>
+  <div id="merchant-statement-print-area" class="merchant-statement-print-area">
+    <!-- Official Print Header (Visible ONLY when printed) -->
+    <div class="merchant-statement-print-header d-none d-print-block">
+      <div class="d-flex justify-content-between align-items-start border-bottom border-2 pb-3 mb-3">
+        <div class="text-start">
+          <h2 class="fw-bolder mb-1 text-dark">جيتك للخدمات اللوجستية والتوصيل السريع</h2>
+          <div class="fs-7 text-muted fw-bold">JTAK Express Logistics • الإدارة المالية والحسابات العامة</div>
+          <div class="mt-2">
+            <span class="badge bg-dark text-white fs-7 px-3 py-1">
+              كشف حساب مالي تفصيلي للتاجر — {{ selectedMerchantForStatement?.merchantTitle }}
+            </span>
+          </div>
+        </div>
+        <div class="text-end fs-8">
+          <div class="mb-1"><strong>تاريخ الطباعة:</strong> {{ printDate | date:'d MMMM y, h:mm a' }}</div>
+          <div class="mb-1"><strong>العملة الرسمية:</strong> ليرة سورية (SYP)</div>
+          <div><strong>حالة الحساب:</strong> <span class="text-success fw-bold">نشط ومعتمد</span></div>
+        </div>
       </div>
-      <div>
-        <h4 class="modal-title font-weight-bolder text-dark mb-0">
-          كشف الحساب المالي للتاجر — {{ selectedMerchantForStatement?.merchantTitle }}
-        </h4>
-        <div class="d-flex align-items-center gap-2 mt-1">
-          <span class="badge badge-light-secondary font-monospace">الحساب: 2010-VND-{{ selectedMerchantForStatement?.merchantId }}</span>
-          <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.ownerName">المالك: {{ selectedMerchantForStatement?.ownerName }}</span>
-          <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.phone" dir="ltr">الهاتف: {{ selectedMerchantForStatement?.phone }}</span>
+
+      <!-- Merchant & Account Info Grid -->
+      <div class="print-merchant-meta-grid p-3 mb-3 border rounded bg-light fs-8">
+        <div class="row g-2">
+          <div class="col-4">
+            <span class="text-muted d-block fs-9">اسم المتجر / التاجر:</span>
+            <strong class="text-dark fs-7">{{ selectedMerchantForStatement?.merchantTitle }}</strong>
+          </div>
+          <div class="col-3">
+            <span class="text-muted d-block fs-9">رقم الحساب المالي:</span>
+            <strong class="font-monospace text-dark">2010-VND-{{ selectedMerchantForStatement?.merchantId }}</strong>
+          </div>
+          <div class="col-3">
+            <span class="text-muted d-block fs-9">اسم المالك / المسؤول:</span>
+            <strong class="text-dark">{{ selectedMerchantForStatement?.ownerName || '-' }}</strong>
+          </div>
+          <div class="col-2">
+            <span class="text-muted d-block fs-9">رقم الهاتف:</span>
+            <strong class="text-dark" dir="ltr">{{ selectedMerchantForStatement?.phone || '-' }}</strong>
+          </div>
         </div>
       </div>
     </div>
-    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
-  </div>
 
-  <div class="modal-body p-4">
-    <!-- Real-time Balance Strip -->
-    <div class="row g-2 mb-4">
+    <!-- Screen Modal Header (Hidden when printed) -->
+    <div class="modal-header border-bottom py-3 merchant-statement-screen-header">
+      <div class="d-flex align-items-center gap-3">
+        <div class="ops-avatar bg-light-primary text-primary">
+          <i class="fas fa-file-invoice-dollar fs-4"></i>
+        </div>
+        <div>
+          <h4 class="modal-title font-weight-bolder text-dark mb-0">
+            كشف الحساب المالي للتاجر — {{ selectedMerchantForStatement?.merchantTitle }}
+          </h4>
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <span class="badge badge-light-secondary font-monospace">الحساب: 2010-VND-{{ selectedMerchantForStatement?.merchantId }}</span>
+            <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.ownerName">المالك: {{ selectedMerchantForStatement?.ownerName }}</span>
+            <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.phone" dir="ltr">الهاتف: {{ selectedMerchantForStatement?.phone }}</span>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+    </div>
+
+    <div class="modal-body p-4 merchant-statement-screen-body">
+      <!-- Real-time Balance Strip -->
+      <div class="row g-2 mb-4 merchant-statement-kpi-row">
       <div class="col-md-3 col-sm-6">
-        <div class="p-3 rounded bg-light border">
+        <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--primary">
           <span class="text-muted fs-8 d-block">رصيد الذمم الإجمالي (الدفتر)</span>
           <strong class="fs-5 text-dark" [ngClass]="(merchantStatementData?.currentBalance || 0) > 0 ? 'text-success' : 'text-dark'">
             {{ (merchantStatementData?.currentBalance || selectedMerchantForStatement?.currentVendorPayableBalance || 0) | number:'1.0-0' }} ل.س
@@ -947,7 +1021,7 @@
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
-        <div class="p-3 rounded bg-light-warning border border-warning border-dashed">
+        <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--warning">
           <span class="text-muted fs-8 d-block">المبالغ المحجوزة للتسوية</span>
           <strong class="fs-5 text-warning">
             {{ (merchantStatementData?.reservedAmount || selectedMerchantForStatement?.reservedSettlementAmount || 0) | number:'1.0-0' }} ل.س
@@ -955,7 +1029,7 @@
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
-        <div class="p-3 rounded bg-light-success border border-success border-dashed">
+        <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--success">
           <span class="text-muted fs-8 d-block">المتاح للتسوية والصرف</span>
           <strong class="fs-5 text-success">
             {{ (merchantStatementData?.availableAmount || selectedMerchantForStatement?.availableSettlementAmount || 0) | number:'1.0-0' }} ل.س
@@ -963,7 +1037,7 @@
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
-        <div class="p-3 rounded bg-light-info border border-info border-dashed">
+        <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--info">
           <span class="text-muted fs-8 d-block">معتمد بانتظار استلام التاجر</span>
           <strong class="fs-5 text-info">
             {{ (merchantStatementData?.approvedAwaitingReceiptAmount || selectedMerchantForStatement?.approvedAwaitingPayoutAmount || 0) | number:'1.0-0' }} ل.س
@@ -1194,15 +1268,38 @@
         </table>
       </div>
     </div>
-  </div>
-
-  <div class="modal-footer border-top py-2 d-flex justify-content-between">
-    <button type="button" class="btn btn-sm btn-light-primary" (click)="printMerchantStatement()">
-      <i class="fas fa-print me-1"></i> طباعة كشف الحساب
-    </button>
-    <button type="button" class="btn btn-sm btn-secondary" (click)="modal.close()">
-      {{ 'COMMON.CLOSE' | translate }}
-    </button>
+    </div>
+    <!-- Official Print Signatures Footer (Visible ONLY when printed) -->
+    <div class="merchant-statement-print-footer d-none d-print-block mt-2 pt-1">
+      <div class="row text-center fs-8">
+        <div class="col-4">
+          <span class="fw-bold text-dark d-block mb-0 fs-8">إعداد وتدقيق المحاسب المالي</span>
+          <span class="text-muted fs-9 d-block">Accountant Verification</span>
+          <div class="mt-3 pt-1 border-top border-dark w-75 mx-auto"></div>
+        </div>
+        <div class="col-4">
+          <span class="fw-bold text-dark d-block mb-0 fs-8">استلام ومطابقة التاجر / المفوض</span>
+          <span class="text-muted fs-9 d-block">Merchant Confirmation</span>
+          <div class="mt-3 pt-1 border-top border-dark w-75 mx-auto"></div>
+        </div>
+        <div class="col-4">
+          <span class="fw-bold text-dark d-block mb-0 fs-8">اعتماد الإدارة المالية العامة</span>
+          <span class="text-muted fs-9 d-block">Financial Management Approval</span>
+          <div class="mt-3 pt-1 border-top border-dark w-75 mx-auto"></div>
+        </div>
+      </div>
+      <div class="text-center text-muted fs-9 mt-2 pt-1 border-top">
+        وثيقة مالية رسمية صادرة آلياً من النظام المحاسبي لمنصة جيتك (JTAK Express) — تُعتبر معتمدة بعد التوقيع والختم.
+      </div>
+    </div>
+    <div class="modal-footer border-top py-2 d-flex justify-content-between merchant-statement-modal-actions">
+      <button type="button" class="btn btn-sm btn-light-primary" (click)="printMerchantStatement()">
+        <i class="fas fa-print me-1"></i> طباعة كشف الحساب
+      </button>
+      <button type="button" class="btn btn-sm btn-secondary" (click)="modal.close()">
+        {{ 'COMMON.CLOSE' | translate }}
+      </button>
+    </div>
   </div>
 </ng-template>
 
@@ -1281,7 +1378,7 @@
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <strong *ngIf="settleDiscrepancy === 0"><i class="fas fa-check-circle mr-1 me-1"></i> تطابق تام: النقد المستلم يطابق صافي المبلغ المتوقع تماماً.</strong>
-            <strong *ngIf="settleDiscrepancy < 0"><i class="fas fa-exclamation-triangle mr-1 me-1"></i> عجز نقدي: السائق لديه عجز بمقدار {{ (settleDiscrepancy * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. سيتم قيده كعجز صندوق.</strong>
+            <strong *ngIf="settleDiscrepancy < 0"><i class="fas fa-exclamation-triangle mr-1 me-1"></i> عجز نقدي: السائق لديه عجز بمقدار {{ (settleDiscrepancy * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. اختر طريقة معالجته أدناه.</strong>
             <strong *ngIf="settleDiscrepancy > 0"><i class="fas fa-plus-circle mr-1 me-1"></i> فائض نقدي: السائق سلّم زيادة بمقدار {{ settleDiscrepancy | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. سيتم قيده كفائض صندوق.</strong>
           </div>
           <span class="badge badge-white font-weight-bolder font-size-sm py-2 px-3">
@@ -1291,12 +1388,21 @@
       </div>
 
       <!-- Discrepancy Reason (Conditional) -->
+      <div class="form-group mb-4" *ngIf="settleDiscrepancy < 0">
+        <label class="fw-bold">معالجة العجز النقدي</label>
+        <select class="form-select" [(ngModel)]="shortageTreatment">
+          <option value="retain_driver_debt">يبقى المبلغ مستحقاً على عهدة المندوب</option>
+          <option value="write_off">شطب العجز كمصروف تتحمله الشركة</option>
+        </select>
+        <div class="text-muted mt-2">الإبقاء لا يشطب المبلغ الناقص. الشطب يخفض عهدة المندوب ويسجل خسارة على الشركة، ويتطلب قراراً وسبباً من الإدارة.</div>
+      </div>
       <div class="form-group mb-4" *ngIf="settleDiscrepancy !== 0">
         <label class="font-weight-bolder text-danger mb-2">سبب الفارق المالي <span class="text-danger">*</span></label>
         <input
           type="text"
           class="form-control form-control-solid"
           [(ngModel)]="settleReason"
+          maxlength="400"
           placeholder="مثال: فكة مفقودة مع العميل، ورقة نقدية تالفة، إكرامية..."
         />
         <span class="form-text text-danger font-size-xs">حقل إلزامي عند عدم تطابق النقد الفعلي مع صافي التوريد المتوقع.</span>
@@ -1331,20 +1437,74 @@
 
 <!-- MODAL: CAPTAIN LEDGER STATEMENT -->
 <ng-template #statementModal let-modal>
-  <div class="modal-header">
-    <h4 class="modal-title font-weight-bolder text-dark">
-      <i class="fas fa-book-open text-primary mr-2 me-2"></i> كشف حساب السائق المالي
-    </h4>
-    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+  <div class="modal-header border-bottom py-3 no-print">
+    <div class="d-flex align-items-center gap-3">
+      <div class="ops-avatar bg-light-primary text-primary">
+        <i class="fas fa-book-open fs-4"></i>
+      </div>
+      <div>
+        <h4 class="modal-title font-weight-bolder text-dark mb-0">
+          كشف حساب السائق المالي
+        </h4>
+        <span class="text-muted fs-8 font-monospace">{{ selectedCaptain?.captainName || statementDetails?.captainName }}</span>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-sm btn-primary" (click)="printDriverStatement()" [disabled]="isLoadingStatement || !statementDetails">
+        <i class="fas fa-print me-1"></i> طباعة كشف الحساب
+      </button>
+      <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+    </div>
   </div>
-  <div class="modal-body">
+  <div class="modal-body p-4">
     <div *ngIf="isLoadingStatement" class="text-center py-5">
       <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
       <p class="mt-2 text-muted">{{ 'COMMON.LOADING' | translate }}</p>
     </div>
 
-    <div *ngIf="!isLoadingStatement && statementDetails">
-      <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded">
+    <div *ngIf="!isLoadingStatement && statementDetails" id="driver-statement-print-area" class="driver-statement-print-area">
+      <!-- Official Print Header (Visible ONLY when printed) -->
+      <div class="driver-statement-print-header d-none d-print-block">
+        <div class="d-flex justify-content-between align-items-start border-bottom border-2 pb-3 mb-3">
+          <div class="text-start">
+            <h2 class="fw-bolder mb-1 text-dark">جيتك للخدمات اللوجستية والتوصيل السريع</h2>
+            <div class="fs-7 text-muted fw-bold">JTAK Express Logistics • الإدارة المالية وإدارة العمليات</div>
+            <div class="mt-2">
+              <span class="badge bg-dark text-white fs-7 px-3 py-1">كشف حساب السائق المالي والعهد النقدية</span>
+            </div>
+          </div>
+          <div class="text-end fs-8">
+            <div class="mb-1"><strong>تاريخ الطباعة:</strong> {{ printDate | date:'d MMMM y, h:mm a' }}</div>
+            <div class="mb-1"><strong>العملة الرسمية:</strong> ليرة سورية (SYP)</div>
+            <div><strong>حالة الحساب:</strong> <span class="text-success fw-bold">نشط ومطابق</span></div>
+          </div>
+        </div>
+
+        <!-- Driver Info Grid -->
+        <div class="print-driver-meta-grid p-3 mb-3 border rounded bg-light fs-8">
+          <div class="row g-2">
+            <div class="col-4">
+              <span class="text-muted d-block fs-9">اسم السائق / الكابتن:</span>
+              <strong class="text-dark fs-7">{{ statementDetails?.captainName }}</strong>
+            </div>
+            <div class="col-3">
+              <span class="text-muted d-block fs-9">معرف السائق (ID):</span>
+              <strong class="font-monospace text-dark fs-9">{{ statementDetails?.captainUserId }}</strong>
+            </div>
+            <div class="col-2">
+              <span class="text-muted d-block fs-9">رقم الهاتف:</span>
+              <strong class="text-dark" dir="ltr">{{ formatPhoneNumber(selectedCaptain?.phoneNumber) || '-' }}</strong>
+            </div>
+            <div class="col-3 text-end">
+              <span class="text-muted d-block fs-9">صافي التوريد المتوقع:</span>
+              <strong class="text-primary fs-7">{{ statementDetails?.expectedNetCashDue | number: '1.0-0' }} ل.س</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen Driver Card (Hidden in Print) -->
+      <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded screen-driver-card">
         <div>
           <h5 class="font-weight-bolder mb-0 text-dark">{{ statementDetails.captainName }}</h5>
           <span class="text-muted font-size-xs font-family-monospace">{{ statementDetails.captainUserId }}</span>
@@ -1355,18 +1515,18 @@
         </div>
       </div>
 
-      <h6 class="font-weight-bolder text-primary mb-3">كشف حساب العهدة النقدية (الأموال المحصلة في عهدة السائق)</h6>
-      <div class="table-responsive mb-5">
+      <h6 class="font-weight-bolder text-primary mb-2">كشف حساب العهدة النقدية (الأموال المحصلة في عهدة السائق)</h6>
+      <div class="table-responsive mb-2">
         <table class="table table-bordered table-sm font-size-sm">
           <thead class="thead-light">
             <tr>
-              <th>{{ 'COMMON.DATE' | translate }}</th>
-              <th>رقم الحركة</th>
-              <th>النوع</th>
-              <th class="text-end">مدين (المحصل)</th>
-              <th class="text-end">دائن (المسدد)</th>
-              <th class="text-end">الرصيد التراكمي</th>
-              <th>البيان</th>
+              <th style="width: 14%;">{{ 'COMMON.DATE' | translate }}</th>
+              <th style="width: 22%;">رقم الحركة</th>
+              <th style="width: 12%;">النوع</th>
+              <th style="width: 10%;" class="text-end">مدين (المحصل)</th>
+              <th style="width: 10%;" class="text-end">دائن (المسدد)</th>
+              <th style="width: 12%;" class="text-end">الرصيد التراكمي</th>
+              <th style="width: 20%;">البيان</th>
             </tr>
           </thead>
           <tbody>
@@ -1386,18 +1546,18 @@
         </table>
       </div>
 
-      <h6 class="font-weight-bolder text-info mb-3">كشف أجور واستحقاقات السائق (الأجور المستحقة للسائق)</h6>
-      <div class="table-responsive">
+      <h6 class="font-weight-bolder text-info mb-2">كشف أجور واستحقاقات السائق (الأجور المستحقة للسائق)</h6>
+      <div class="table-responsive mb-2">
         <table class="table table-bordered table-sm font-size-sm">
           <thead class="thead-light">
             <tr>
-              <th>{{ 'COMMON.DATE' | translate }}</th>
-              <th>رقم الحركة</th>
-              <th>النوع</th>
-              <th class="text-end">مدين (المدفوع)</th>
-              <th class="text-end">دائن (المستحق)</th>
-              <th class="text-end">الرصيد التراكمي</th>
-              <th>البيان</th>
+              <th style="width: 14%;">{{ 'COMMON.DATE' | translate }}</th>
+              <th style="width: 22%;">رقم الحركة</th>
+              <th style="width: 12%;">النوع</th>
+              <th style="width: 10%;" class="text-end">مدين (المدفوع)</th>
+              <th style="width: 10%;" class="text-end">دائن (المستحق)</th>
+              <th style="width: 12%;" class="text-end">الرصيد التراكمي</th>
+              <th style="width: 20%;">البيان</th>
             </tr>
           </thead>
           <tbody>
@@ -1416,10 +1576,37 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Official Driver Statement Signatures Footer (Visible ONLY when printed) -->
+      <div class="driver-statement-print-footer d-none d-print-block mt-2 pt-1">
+        <div class="row text-center fs-8">
+          <div class="col-4">
+            <span class="fw-bold text-dark d-block mb-0 fs-8">إعداد وتدقيق المحاسب المالي</span>
+            <span class="text-muted fs-9 d-block">Accountant Verification</span>
+            <div class="mt-3 pt-1 border-top border-dark w-75 mx-auto"></div>
+          </div>
+          <div class="col-4">
+            <span class="fw-bold text-dark d-block mb-0 fs-8">استلام ومطابقة السائق / الكابتن</span>
+            <span class="text-muted fs-9 d-block">Captain Acknowledgment</span>
+            <div class="mt-3 pt-1 border-top border-dark w-75 mx-auto"></div>
+          </div>
+          <div class="col-4">
+            <span class="fw-bold text-dark d-block mb-0 fs-8">اعتماد الإدارة المالية والعمليات</span>
+            <span class="text-muted fs-9 d-block">Operations & Finance Approval</span>
+            <div class="mt-3 pt-1 border-top border-dark w-75 mx-auto"></div>
+          </div>
+        </div>
+        <div class="text-center text-muted fs-9 mt-2 pt-1 border-top">
+          وثيقة مالية رسمية صادرة آلياً من النظام المحاسبي لمنصة جيتك (JTAK Express) — تُعتبر معتمدة بعد التوقيع والختم.
+        </div>
+      </div>
     </div>
   </div>
-  <div class="modal-footer">
-    <button type="button" class="btn btn-secondary" (click)="modal.close()">{{ 'COMMON.CLOSE' | translate }}</button>
+  <div class="modal-footer d-flex justify-content-between no-print">
+    <button type="button" class="btn btn-sm btn-primary" (click)="printDriverStatement()" [disabled]="isLoadingStatement || !statementDetails">
+      <i class="fas fa-print me-1"></i> طباعة كشف الحساب
+    </button>
+    <button type="button" class="btn btn-sm btn-secondary" (click)="modal.close()">{{ 'COMMON.CLOSE' | translate }}</button>
   </div>
 </ng-template>
 
@@ -1478,9 +1665,9 @@
       <div class="ops-receipt-amount-box text-center p-3 rounded mb-4 bg-light border border-2 border-primary">
         <span class="text-muted fs-8 fw-bold d-block text-uppercase">المبلغ المسدد / المورد الصافي</span>
         <div class="fs-2x fw-bolder text-primary">
-          {{ selectedReceipt.amount | number: '1.0-0' }} <span class="fs-4">{{ selectedReceipt.currency || 'ل.س' }}</span>
+          {{ selectedReceipt.amount | number: '1.0-2' }} <span class="fs-4">{{ selectedReceipt.currency || 'ل.س' }}</span>
         </div>
-        <span class="text-muted fs-9">تمت معالجة القيد المحاسبي بالكامل وترحيله إلى الخزينة</span>
+        <span class="text-muted fs-9">تم تسجيل حركة الصرف أو التوريد في دفتر الأستاذ</span>
       </div>
 
       <!-- Receipt Metadata Grid -->
@@ -1503,7 +1690,7 @@
         <div class="col-6 col-md-4">
           <div class="p-2 border rounded bg-white">
             <span class="text-muted fs-9 d-block">طريقة الصرف / القبض:</span>
-            <strong class="text-dark">{{ selectedReceipt.method || 'نقداً من الخزينة' }}</strong>
+            <strong class="text-dark">{{ formatSettlementMethod(selectedReceipt.method) }}</strong>
           </div>
         </div>
 
@@ -1517,7 +1704,7 @@
         <div class="col-6 col-md-4">
           <div class="p-2 border rounded bg-white">
             <span class="text-muted fs-9 d-block">حساب الذمم / العهدة:</span>
-            <strong class="text-primary font-monospace fs-8">{{ selectedReceipt.vendorPayableAccount || selectedReceipt.captainCashFloatAccount || selectedReceipt.destinationAccount || '-' }}</strong>
+            <strong class="text-primary font-monospace" style="font-size: 7.2pt; word-break: break-all; display: block;">{{ selectedReceipt.vendorPayableAccount || selectedReceipt.captainCashFloatAccount || selectedReceipt.destinationAccount || '-' }}</strong>
           </div>
         </div>
 

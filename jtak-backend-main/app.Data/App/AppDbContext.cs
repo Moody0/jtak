@@ -30,6 +30,13 @@ namespace App.Shared.Data.App
             }
 
             builder.Entity<RolePermission>().HasKey(c => new { c.AppRoleId, c.SolPermissionKey });
+            builder.Entity<Notification>(b =>
+            {
+                b.Property(x => x.DispatchKey).HasMaxLength(64).IsRequired(false);
+                b.Property(x => x.AudienceApp).HasMaxLength(16).IsRequired(false);
+                b.HasIndex(x => x.DispatchKey).IsUnique();
+                b.HasIndex(x => new { x.PushSentAtUtc, x.PushNextAttemptAtUtc, x.PushLockedUntilUtc });
+            });
             builder.Entity<FavoriteProduct>().HasKey(c => new { c.UserId, c.ProductId });
             builder.Entity<Testimonial>().HasMany(a => a.Translations).WithOne(p => p.Core).HasForeignKey(pt => pt.CoreId).OnDelete(DeleteBehavior.Cascade);
 
@@ -48,6 +55,45 @@ namespace App.Shared.Data.App
             //builder.Entity<SolUserToken>().Property(p => p.Name).HasMaxLength(375);
             builder.Entity<AppUserLogin>().Property(p => p.LoginProvider).HasMaxLength(300);
             builder.Entity<AppUserLogin>().Property(p => p.ProviderKey).HasMaxLength(300);
+
+            builder.Entity<AppUser>().Property(p => p.MaxCashFloat).HasColumnType("decimal(65,30)");
+            builder.Entity<AppUser>().Property(p => p.CaptainRate).HasColumnType("decimal(65,30)");
+            builder.Entity<SupportMessage>(b =>
+            {
+                b.HasIndex(x => x.ErrandRequestKey).IsUnique();
+                b.Property(x => x.ErrandStatus).IsConcurrencyToken();
+                b.Property(x => x.ErrandQuoteExpiresAt).IsConcurrencyToken();
+                b.Property(x => x.ErrandItemPrice).HasColumnType("decimal(18,2)");
+                b.Property(x => x.ErrandDeliveryFee).HasColumnType("decimal(18,2)");
+                b.Property(x => x.ErrandDriverEarning).HasColumnType("decimal(18,2)");
+                b.Property(x => x.ErrandPurchaseCost).HasColumnType("decimal(18,2)");
+                b.Property(x => x.ErrandReceiptPhotoToken).HasMaxLength(255);
+                b.Property(x => x.ErrandCashCollected).HasColumnType("decimal(18,2)");
+                b.Property(x => x.ErrandRefundAmount).HasColumnType("decimal(18,2)");
+                b.Property(x => x.ErrandReceiptReference).HasMaxLength(200);
+                b.Property(x => x.ErrandDeliveryCode).HasMaxLength(6);
+                b.Property(x => x.ErrandReturnReason).HasMaxLength(500);
+                b.Property(x => x.ErrandItemsJson).HasColumnType("longtext");
+                b.Property(x => x.ErrandPickupPlace).HasMaxLength(250);
+                b.Property(x => x.ErrandPickupLatitude).HasColumnType("decimal(10,7)");
+                b.Property(x => x.ErrandPickupLongitude).HasColumnType("decimal(10,7)");
+                b.Property(x => x.ErrandUnavailableReason).HasMaxLength(500);
+            });
+            builder.Entity<ErrandStatusEvent>(b =>
+            {
+                b.HasKey(x => x.Id);
+                b.HasIndex(x => new { x.SupportMessageId, x.CreatedDate });
+                b.Property(x => x.ActorRole).HasMaxLength(32);
+                b.Property(x => x.Note).HasMaxLength(500);
+                b.HasOne<SupportMessage>().WithMany().HasForeignKey(x => x.SupportMessageId).OnDelete(DeleteBehavior.Cascade);
+            });
+            builder.Entity<PendingPhoneSignup>(b =>
+            {
+                b.HasKey(x => x.PhoneNumber);
+                b.Property(x => x.PhoneNumber).HasMaxLength(16).IsRequired();
+                b.Property(x => x.Code).HasMaxLength(6).IsRequired();
+                b.HasIndex(x => x.ExpiresAt);
+            });
             
             builder.Entity<SolUserToken>().Property(p => p.LoginProvider).HasMaxLength(300);
             builder.Entity<SolUserToken>().Property(p => p.Name).HasMaxLength(300);
@@ -172,6 +218,7 @@ namespace App.Shared.Data.App
 
 
         public DbSet<SmsLog> SmsLogs { get; set; }
+        public DbSet<PendingPhoneSignup> PendingPhoneSignups { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<GenericSetting> Settings { get; set; }
         public DbSet<Faq> Faqs { get; set; }
@@ -186,6 +233,7 @@ namespace App.Shared.Data.App
         public DbSet<FavoriteProduct> FavoriteProducts { get; set; }
         public DbSet<ProductReview> ProductReviews { get; set; }
         public DbSet<SupportMessage> SupportMessages { get; set; }
+        public DbSet<ErrandStatusEvent> ErrandStatusEvents { get; set; }
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; }
     }
 }

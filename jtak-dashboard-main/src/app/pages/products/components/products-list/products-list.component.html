@@ -1,106 +1,116 @@
 <div class="ops-products-container">
 
-  <!-- 1. Operations Utility Bar -->
-  <div class="ops-utility-bar">
-    <div class="ops-utility-left">
-      <div class="ops-live-pulse-badge">
-        <span class="ops-pulse-dot"></span>
-        <span>{{ 'PRODUCTS_PAGE.LIVE_OPERATIONS' | translate }}</span>
+  <!-- 1. Products Header -->
+  <div class="products-header">
+    <div class="products-header-right">
+      <div class="products-header-icon">
+        <i class="fas fa-boxes"></i>
       </div>
-      <span class="ops-sync-meta">
-        <i class="fas fa-database text-muted me-1"></i>
-        <span>{{ 'PRODUCTS_PAGE.TOTAL_RECORDS' | translate }}:</span>
-        <strong>{{ totalRecords | number }}</strong>
-      </span>
+      <div class="products-header-meta">
+        <h2 class="products-header-title">كتالوج المنتجات المركزي</h2>
+        <span class="products-header-subtitle">
+          إجمالي السجلات: <strong>{{ totalRecords | number }}</strong> صنف مسجل في النظام
+        </span>
+      </div>
     </div>
-    <div class="ops-utility-right">
-      <button type="button" class="ops-btn-refresh" (click)="refresh()" [disabled]="isLoading">
+    <div class="products-header-actions">
+      <button type="button" class="btn products-btn-refresh" (click)="refresh()" [disabled]="isLoading" title="تحديث القائمة">
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
-        <span>{{ 'PRODUCTS_PAGE.REFRESH' | translate }}</span>
+        <span>تحديث البيانات</span>
       </button>
-      <button type="button" class="ops-btn-primary" (click)="create()">
-        <i class="fas fa-plus"></i>
-        <span>{{ 'PRODUCTS_PAGE.ADD_PRODUCT' | translate }}</span>
+      <button type="button" class="btn btn-primary products-btn-add" (click)="create()">
+        <i class="fas fa-plus text-white"></i>
+        <span class="text-white">إضافة منتج</span>
       </button>
     </div>
   </div>
 
-  <!-- 2. Real System Operational KPI Cards -->
+  <!-- 2. Operational KPI Cards Strip (Zero shadows, medium rounded, Alexandria font) -->
   <div class="row g-3">
     <!-- Total Catalog Products -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-total">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_TOTAL' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-boxes"></i></div>
+      <div class="products-kpi-card">
+        <div class="products-kpi-header">
+          <span class="products-kpi-label">{{ 'PRODUCTS_PAGE.KPI_TOTAL' | translate }}</span>
+          <div class="products-kpi-icon products-kpi-icon--slate"><i class="fas fa-boxes"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value">{{ totalRecords | number }}</span>
-          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_TOTAL_SUB' | translate }}</span>
+        <div class="products-kpi-body">
+          <span class="products-kpi-value">{{ totalRecords | number }}</span>
+          <span class="products-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_TOTAL_SUB' | translate }}</span>
         </div>
       </div>
     </div>
 
     <!-- Sourcing Stores & Merchants -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-merchants">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_MERCHANTS' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-store"></i></div>
+      <div class="products-kpi-card">
+        <div class="products-kpi-header">
+          <span class="products-kpi-label">{{ 'PRODUCTS_PAGE.KPI_MERCHANTS' | translate }}</span>
+          <div class="products-kpi-icon products-kpi-icon--emerald"><i class="fas fa-store"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value text-success">{{ kpiMerchantsCount | number }}</span>
-          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_MERCHANTS_SUB' | translate }}</span>
+        <div class="products-kpi-body">
+          <span class="products-kpi-value text-success">{{ kpiMerchantsCount | number }}</span>
+          <span class="products-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_MERCHANTS_SUB' | translate }}</span>
         </div>
       </div>
     </div>
 
     <!-- Catalog Departments & Subcategories -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-categories">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_CATEGORIES' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-sitemap"></i></div>
+      <div class="products-kpi-card">
+        <div class="products-kpi-header">
+          <span class="products-kpi-label">{{ 'PRODUCTS_PAGE.KPI_CATEGORIES' | translate }}</span>
+          <div class="products-kpi-icon products-kpi-icon--blue"><i class="fas fa-sitemap"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value text-primary">{{ kpiCategoriesCount | number }}</span>
-          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_CATEGORIES_SUB' | translate }}</span>
+        <div class="products-kpi-body">
+          <span class="products-kpi-value text-primary">{{ kpiCategoriesCount | number }}</span>
+          <span class="products-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_CATEGORIES_SUB' | translate }}</span>
         </div>
       </div>
     </div>
 
     <!-- Catalog Health & Readiness -->
     <div class="col-xl-3 col-sm-6">
-      <div class="ops-kpi-card kpi-status">
-        <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'PRODUCTS_PAGE.KPI_STATUS' | translate }}</span>
-          <div class="ops-kpi-icon"><i class="fas fa-shield-alt"></i></div>
+      <div class="products-kpi-card">
+        <div class="products-kpi-header">
+          <span class="products-kpi-label">{{ 'PRODUCTS_PAGE.KPI_STATUS' | translate }}</span>
+          <div class="products-kpi-icon products-kpi-icon--amber"><i class="fas fa-shield-alt"></i></div>
         </div>
-        <div class="ops-kpi-body">
-          <span class="ops-kpi-value text-warning">{{ kpiCatalogHealth }}</span>
-          <span class="ops-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_STATUS_SUB' | translate }}</span>
+        <div class="products-kpi-body">
+          <span class="products-kpi-value text-warning">{{ kpiCatalogHealth }}</span>
+          <span class="products-kpi-unit">{{ 'PRODUCTS_PAGE.KPI_STATUS_SUB' | translate }}</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 3. Consolidated Search & Filter Panel -->
-  <div class="ops-filter-panel">
-    <div class="ops-filter-row">
+  <!-- 3. Consolidated Search & Filter Panel (RTL-aware, zero-collision) -->
+  <div class="products-filter-panel">
+    <div class="products-filter-row">
       <!-- Search Input -->
-      <div class="ops-search-box" [formGroup]="searchGroup">
-        <i class="fas fa-search ops-search-icon"></i>
+      <div class="products-search-box" [formGroup]="searchGroup">
+        <i class="fas fa-search products-search-icon"></i>
         <input
           type="text"
-          class="ops-search-input"
+          class="form-control products-search-input"
           [placeholder]="'PRODUCTS_PAGE.SEARCH_PLACEHOLDER' | translate"
           formControlName="searchTerm"
         />
+        <button
+          type="button"
+          class="btn products-search-clear"
+          *ngIf="searchGroup.get('searchTerm')?.value"
+          (click)="clearSearch()"
+          title="مسح البحث"
+        >
+          <i class="fas fa-times"></i>
+        </button>
       </div>
 
       <!-- Category Filter Dropdown -->
-      <div class="ops-filter-dropdown">
+      <div class="products-filter-dropdown">
         <select
+          class="form-select products-category-select"
           [ngModel]="selectedCategoryId"
           (ngModelChange)="filterByCategory($event)"
           aria-label="Filter by Category"
@@ -112,44 +122,60 @@
         </select>
       </div>
 
-      <!-- Status Filter Tabs -->
-      <div class="ops-status-tabs" role="tablist">
+      <!-- Status Filter Tabs (Segmented Pills) -->
+      <div class="products-status-pills" role="tablist">
         <button
           type="button"
-          [class.active]="selectedStatus === 'all'"
+          class="products-pill"
+          [class.is-active]="selectedStatus === 'all'"
           (click)="filterByStatus('all')"
         >
-          {{ 'PRODUCTS_PAGE.ALL_STATUS' | translate }}
+          <span>{{ 'PRODUCTS_PAGE.ALL_STATUS' | translate }}</span>
         </button>
         <button
           type="button"
-          [class.active]="selectedStatus === 'active'"
+          class="products-pill"
+          [class.is-active]="selectedStatus === 'active'"
           (click)="filterByStatus('active')"
         >
-          <i class="fas fa-check-circle me-1" style="color: #ea580c;"></i>
-          {{ 'PRODUCTS_PAGE.STATUS_ACTIVE' | translate }}
+          <span class="products-pill-dot products-pill-dot--green"></span>
+          <span>{{ 'PRODUCTS_PAGE.STATUS_ACTIVE' | translate }}</span>
         </button>
         <button
           type="button"
-          [class.active]="selectedStatus === 'disabled'"
+          class="products-pill"
+          [class.is-active]="selectedStatus === 'disabled'"
           (click)="filterByStatus('disabled')"
         >
-          <i class="fas fa-ban text-danger me-1"></i>
-          {{ 'PRODUCTS_PAGE.STATUS_DISABLED' | translate }}
+          <span class="products-pill-dot products-pill-dot--red"></span>
+          <span>{{ 'PRODUCTS_PAGE.STATUS_DISABLED' | translate }}</span>
         </button>
       </div>
     </div>
   </div>
 
+  <!-- Active Category Filter Breadcrumb Notice -->
+  <div *ngIf="selectedCategoryId" class="d-flex flex-wrap align-items-center gap-2 mb-2 px-1">
+    <span class="fw-bold text-dark fs-7">أصناف التصنيف: {{ getSelectedCategoryLabel() }}</span>
+    <button type="button" class="btn btn-sm products-btn-reset-cat" (click)="filterByCategory(null)">
+      عرض كل المنتجات
+    </button>
+  </div>
+
   <!-- 4. Products Table Card -->
-  <div class="ops-table-card">
+  <div class="products-table-card">
     <ng-container *ngIf="service.items$ | async as rawItems">
+      <div *ngIf="isLoading && selectedCategoryId" class="text-center py-10" role="status">
+        <i class="fas fa-spinner fa-spin fs-2 text-primary mb-3"></i>
+        <p class="mb-0 text-muted">جارٍ تحميل أصناف التصنيف...</p>
+      </div>
+
       <!-- Bulk Selection Bar -->
-      <div class="ops-bulk-bar" *ngIf="selection.count > 0" role="region" aria-label="Bulk actions">
-        <div class="ops-bulk-count">
+      <div class="products-bulk-bar" *ngIf="selection.count > 0" role="region" aria-label="Bulk actions">
+        <div class="products-bulk-count">
           <span>تم تحديد <strong>{{ selection.count }}</strong> منتج</span>
         </div>
-        <div class="ops-bulk-actions">
+        <div class="products-bulk-actions">
           <button type="button" class="btn btn-sm btn-light-success" (click)="bulkSetStatus(rawItems, true)">
             <i class="fas fa-check-circle me-1"></i> {{ 'PRODUCTS_PAGE.ENABLE' | translate }}
           </button>
@@ -169,8 +195,8 @@
       </div>
 
       <!-- Table Body -->
-      <div class="table-responsive">
-        <table class="table ops-table align-middle">
+      <div class="table-responsive" *ngIf="!isLoading || !selectedCategoryId">
+        <table class="table products-table align-middle">
           <thead>
             <tr>
               <th scope="col" style="width: 44px;">
@@ -183,7 +209,7 @@
                   (change)="selection.toggleAll(getDisplayedItems(rawItems), $any($event.target).checked)"
                 />
               </th>
-              <th scope="col" style="width: 90px;">
+              <th scope="col" style="width: 85px;">
                 {{ 'PRODUCTS_PAGE.COL_ID' | translate }}
                 <app-sort-icon
                   column="id"
@@ -192,7 +218,7 @@
                   (sort)="sort($event)"
                 ></app-sort-icon>
               </th>
-              <th scope="col">
+              <th scope="col" class="min-w-220px">
                 {{ 'PRODUCTS_PAGE.COL_PRODUCT' | translate }}
                 <app-sort-icon
                   column="title"
@@ -201,7 +227,7 @@
                   (sort)="sort($event)"
                 ></app-sort-icon>
               </th>
-              <th scope="col">
+              <th scope="col" class="min-w-180px">
                 {{ 'PRODUCTS_PAGE.COL_CATEGORY' | translate }}
                 <app-sort-icon
                   column="productCategory"
@@ -210,13 +236,13 @@
                   (sort)="sort($event)"
                 ></app-sort-icon>
               </th>
-              <th scope="col">
+              <th scope="col" class="min-w-200px">
                 {{ 'PRODUCTS_PAGE.COL_RELATION' | translate }}
               </th>
-              <th scope="col" style="width: 110px;">
+              <th scope="col" style="width: 100px;">
                 {{ 'PRODUCTS_PAGE.COL_STATUS' | translate }}
               </th>
-              <th scope="col" style="width: 120px; text-align: center;">
+              <th scope="col" style="width: 140px; text-align: center;">
                 {{ 'PRODUCTS_PAGE.COL_ACTIONS' | translate }}
               </th>
             </tr>
@@ -239,13 +265,13 @@
 
               <!-- ID -->
               <td>
-                <span class="badge badge-light fw-bold fs-8 text-muted">#{{ product.id }}</span>
+                <span class="products-id-badge">#{{ product.id }}</span>
               </td>
 
-              <!-- Product Thumbnail & Details (Clean Unobstructed Photography) -->
+              <!-- Product Thumbnail & Details -->
               <td>
-                <div class="ops-product-cell">
-                  <div class="ops-product-thumb">
+                <div class="products-cell-main">
+                  <div class="products-thumb">
                     <img
                       *ngIf="product.photos"
                       [src]="filesService.getFile(product.photos, 64, 64)"
@@ -253,12 +279,12 @@
                       loading="lazy"
                       (error)="onImageError($event)"
                     />
-                    <div *ngIf="!product.photos" class="ops-thumb-fallback">
+                    <div *ngIf="!product.photos" class="products-thumb-fallback">
                       <i class="fas fa-box-open"></i>
                     </div>
                   </div>
-                  <div class="ops-product-meta">
-                    <span class="ops-product-title">
+                  <div class="products-meta">
+                    <span class="products-title">
                       {{ product.title }}
                       <i
                         *ngIf="product.isFeatured"
@@ -266,11 +292,11 @@
                         title="منتج مميز وموصى به بالتطبيق"
                       ></i>
                     </span>
-                    <div class="ops-product-sub">
-                      <span class="ops-unit-badge" *ngIf="product.unit">
-                        <i class="fas fa-balance-scale me-1 fs-9"></i> {{ product.unit }}
+                    <div class="products-sub-meta">
+                      <span class="products-unit-tag" *ngIf="product.unit">
+                        <i class="fas fa-balance-scale me-1"></i> {{ product.unit }}
                       </span>
-                      <span class="ops-desc-snippet" *ngIf="product.description" [title]="product.description">
+                      <span class="products-desc-snippet" *ngIf="product.description" [title]="product.description">
                         {{ product.description }}
                       </span>
                     </div>
@@ -280,33 +306,33 @@
 
               <!-- Category & Hierarchy with Smart Subcategory Resolution -->
               <td>
-                <div class="ops-cat-cell" *ngIf="getCategoryBadge(product) as catBadge">
+                <div class="products-cat-cell" *ngIf="getCategoryBadge(product) as catBadge">
                   <!-- Root Category Department -->
-                  <span class="ops-cat-root-badge">
+                  <span class="products-cat-root-badge">
                     <i class="fas fa-folder me-1"></i> {{ catBadge.parent }}
                   </span>
 
                   <!-- Explicit Subcategory -->
-                  <span class="ops-cat-sub-badge" *ngIf="!catBadge.isRootOnly">
+                  <span class="products-cat-sub-badge" *ngIf="!catBadge.isRootOnly">
                     <i class="fas fa-angle-left rtl-flip me-1"></i>
                     <strong>{{ catBadge.sub }}</strong>
                   </span>
 
                   <!-- Inferred Smart Suggestion (1-Click Apply) -->
                   <div
-                    class="ops-suggested-chip"
+                    class="products-suggested-chip"
                     *ngIf="catBadge.isRootOnly && catBadge.isSuggested"
                     (click)="applySuggestedSubcategory(product, catBadge.sub, $event)"
                     title="اقتراح ذكي بناءً على بيانات الصنف - انقر للاعتماد الفوري"
                   >
                     <i class="fas fa-lightbulb text-warning me-1"></i>
                     <span>{{ catBadge.sub }}</span>
-                    <span class="ops-apply-btn"><i class="fas fa-check"></i></span>
+                    <span class="products-apply-btn"><i class="fas fa-check"></i></span>
                   </div>
 
                   <!-- Needs Subcategory Warning -->
                   <span
-                    class="ops-cat-warn-chip"
+                    class="products-cat-warn-chip"
                     *ngIf="catBadge.isRootOnly && !catBadge.isSuggested"
                     (click)="edit(product)"
                     title="يرجى فتح المنتج وإسناده لتصنيف فرعي دقيق"
@@ -319,13 +345,16 @@
 
               <!-- Sourcing & Store Linkage & Publication State -->
               <td>
-                <div class="ops-merchant-cell" *ngIf="getMerchantInfo(product) as mInfo">
+                <div class="products-merchant-cell" *ngIf="getMerchantInfo(product) as mInfo">
                   <!-- Linked Store / Brand -->
                   <ng-container *ngIf="mInfo.isAssigned">
-                    <span class="ops-merchant-tag">
+                    <span class="products-merchant-tag">
                       <i class="fas fa-store-alt text-primary"></i>
                       <span>{{ mInfo.name }}</span>
                     </span>
+                    <small class="text-muted d-block mt-1" *ngIf="mInfo.id">
+                      <i class="fas fa-link me-1"></i>معرّف المتجر #{{ mInfo.id }}
+                    </small>
                     <div class="d-flex align-items-center gap-2 mt-1">
                       <span
                         *ngIf="getPublicationInfo(product) as pubInfo"
@@ -340,26 +369,18 @@
                         {{ pubInfo.label }}
                         <span *ngIf="pubInfo.priceDisplay" class="ms-1 fw-bold">({{ pubInfo.priceDisplay }})</span>
                       </span>
-                      <a
-                        [routerLink]="['/inventory-batches']"
-                        [queryParams]="{ productId: product.id }"
-                        class="ops-batch-link"
-                        title="استعراض دفعات المخزون وتواريخ الصلاحية لهذا المنتج"
-                      >
-                        <i class="fas fa-layer-group"></i>
-                      </a>
                     </div>
                   </ng-container>
 
                   <!-- Unassigned Store / Global Catalog -->
                   <ng-container *ngIf="!mInfo.isAssigned">
-                    <span class="ops-unassigned-tag">
+                    <span class="products-unassigned-tag">
                       <i class="fas fa-store-slash text-muted"></i>
                       <span>{{ mInfo.name }}</span>
                     </span>
                     <button
                       type="button"
-                      class="ops-assign-btn mt-1"
+                      class="btn products-assign-btn mt-1"
                       (click)="edit(product)"
                       title="فتح لتحديد المتجر وسعر البيع"
                     >
@@ -373,7 +394,7 @@
               <!-- Status -->
               <td>
                 <span
-                  class="ops-status-pill"
+                  class="products-status-pill"
                   [ngClass]="product.active ? 'status-active' : 'status-disabled'"
                 >
                   <span class="status-dot"></span>
@@ -383,11 +404,11 @@
 
               <!-- Actions Cluster -->
               <td>
-                <div class="ops-actions-group justify-content-center">
+                <div class="products-actions-group justify-content-center">
                   <!-- Edit Modal Trigger -->
                   <button
                     type="button"
-                    class="ops-btn-action btn-edit"
+                    class="btn products-action-btn products-action-btn--edit"
                     (click)="edit(product)"
                     title="تعديل تفاصيل الصنف والهيكل والوسائط"
                   >
@@ -397,21 +418,21 @@
                   <!-- Toggle Popular Quick Action -->
                   <button
                     type="button"
-                    class="ops-btn-action"
-                    [ngClass]="product.isFeatured ? 'btn-flame-active' : 'btn-flame-inactive'"
+                    class="btn products-action-btn"
+                    [ngClass]="product.isFeatured ? 'products-action-btn--featured' : 'products-action-btn--unfeatured'"
                     [disabled]="isUpdatingFeatured(product.id)"
                     (click)="togglePopular(product)"
                     [title]="product.isFeatured ? 'مميز (الأكثر طلباً) — اضغط للإلغاء' : 'غير مميز — اضغط للتمييز (الأكثر طلباً)'"
                     [attr.aria-label]="product.isFeatured ? 'مميز الأكثر طلباً' : 'غير مميز'"
                   >
-                    <i class="fas" [ngClass]="isUpdatingFeatured(product.id) ? 'fa-spinner fa-spin' : 'fa-fire-alt'"></i>
+                    <i class="fas" [ngClass]="isUpdatingFeatured(product.id) ? 'fa-spinner fa-spin' : 'fa-star'"></i>
                   </button>
 
                   <!-- Toggle Active / Disabled -->
                   <button
                     type="button"
-                    class="ops-btn-action"
-                    [ngClass]="product.active ? 'btn-status-active' : 'btn-status-disabled'"
+                    class="btn products-action-btn"
+                    [ngClass]="product.active ? 'products-action-btn--active' : 'products-action-btn--disabled'"
                     [disabled]="isUpdatingStatus(product.id)"
                     (click)="changeStatus(product.active, product.id)"
                     [title]="product.active ? 'نشط — اضغط للتعطيل' : 'غير نشط — اضغط للتفعيل'"
@@ -423,7 +444,7 @@
                   <!-- Delete Product Row Action -->
                   <button
                     type="button"
-                    class="ops-btn-action btn-delete-row"
+                    class="btn products-action-btn products-action-btn--delete"
                     (click)="delete(product.id)"
                     title="حذف المنتج وأرشفته بأمان"
                   >
@@ -436,10 +457,14 @@
             <!-- Empty State -->
             <tr *ngIf="getDisplayedItems(rawItems).length === 0">
               <td colspan="7" class="text-center py-10">
-                <div class="text-muted">
-                  <i class="fas fa-box-open fs-1 mb-3 text-muted"></i>
-                  <p class="fs-6 fw-bold mb-1">لا توجد منتجات مطابقة لخيارات البحث أو التصفية الحالية</p>
-                  <small>جرب تغيير معايير البحث أو تصفية التصنيفات أو إعادة تعيين الفلاتر.</small>
+                <div class="products-empty-state">
+                  <div class="products-empty-icon">
+                    <i class="fas fa-box-open"></i>
+                  </div>
+                  <h4 class="products-empty-title">لا توجد منتجات مطابقة لخيارات البحث أو التصفية</h4>
+                  <p class="products-empty-desc">
+                    جرّب تغيير معايير البحث أو اختيار تصنيف مختلف أو إعادة ضبط الفلاتر.
+                  </p>
                 </div>
               </td>
             </tr>
@@ -448,7 +473,7 @@
       </div>
 
       <!-- Paginator Footer -->
-      <div class="ops-table-footer">
+      <div class="products-table-footer" *ngIf="!isLoading || !selectedCategoryId">
         <app-paginator
           class="d-flex justify-content-between align-items-center flex-wrap"
           [paginator]="paginator"

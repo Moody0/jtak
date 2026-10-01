@@ -29,6 +29,22 @@ namespace Modules.Accounting.Entities
         public string CaptainName { get; set; }
         public decimal DeliveryFee { get; set; }
         public bool TotalsIncludeDeliveryFee { get; set; }
+        /// <summary>
+        /// Backward-compatible transport flag. New callers must always send
+        /// CaptainEarning explicitly; platform delivery revenue is calculated
+        /// as DeliveryFee - CaptainEarning.
+        /// </summary>
+        public bool DeliveryFeeIsPlatformRevenue { get; set; }
+        /// <summary>
+        /// Explicit cash collected by the courier (for COD). If null, defaults to
+        /// total product cash + delivery fee (if not included in totals).
+        /// </summary>
+        public decimal? ActualCashCollected { get; set; }
+        /// <summary>
+        /// Explicit captain earning credited to the driver's earnings account,
+        /// independent of platform delivery fee revenue.
+        /// </summary>
+        public decimal? CaptainEarning { get; set; }
         public string Currency { get; set; } = "SYP";
         public bool IsCod { get; set; } = true;
         public bool IsCompanyCash { get; set; } = false;

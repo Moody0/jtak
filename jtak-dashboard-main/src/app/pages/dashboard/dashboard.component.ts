@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { ISortView, IPaginatorView, ISearchView, PaginatorState, SortState } from 'src/app/_metronic/shared/crud-table';
 import { SubSink } from 'subsink';
@@ -27,8 +27,8 @@ isDriverLoading: boolean;
 dashboardLoading = true;
 lastUpdated = new Date();
 totalRecords: number;
-searchGroup: FormGroup;
-driverSearchGroup: FormGroup;
+searchGroup: UntypedFormGroup;
+driverSearchGroup: UntypedFormGroup;
   public data: Dashboard = {
     billsCount: 0,
     jTakAdditionalOrdersValue: 0,
@@ -43,7 +43,7 @@ driverSearchGroup: FormGroup;
   public balances: Balance[] = [];
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public service: DashboardService,
     public driverBalancesService: DriverBalancesService,
     public ordersService: OrdersService,
@@ -277,6 +277,161 @@ driverSearchGroup: FormGroup;
     });
   }
 
+  driverPricing: any = {
+    mode: 0,
+    fixedAmount: 5000,
+    distanceBaseFee: 2000,
+    distanceRatePerUnit: 1000,
+    unit: 0,
+    minEarning: 3000,
+    maxEarning: 0,
+    isFreeDeliveryEnabled: false,
+    customerRatePerKm: 45,
+    minDeliveryFee: 50
+  };
+  isSavingDriverPricing: boolean = false;
+  driverPricingSaveSuccess: boolean = false;
+  driverPricingSaveError: boolean = false;
+  driverPricingLoading: boolean = true;
+  simulatedDistance: number = 4.5;
+  errandDriverEarning = 0;
+  errandDriverEarningLoading = true;
+  isSavingErrandDriverEarning = false;
+  errandDriverEarningSaveSuccess = false;
+  errandDriverEarningSaveError = false;
+
+  loadErrandDriverEarning() {
+    this.errandDriverEarningLoading = true;
+    this.subs.sink = this.service.getErrandDriverEarning().subscribe({
+      next: (setting: any) => {
+        this.errandDriverEarning = Number(setting?.amount ?? 0);
+        this.errandDriverEarningLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.errandDriverEarningLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  saveErrandDriverEarning() {
+    if (!Number.isFinite(Number(this.errandDriverEarning)) || Number(this.errandDriverEarning) <= 0) {
+      this.errandDriverEarningSaveError = true;
+      return;
+    }
+    this.isSavingErrandDriverEarning = true;
+    this.errandDriverEarningSaveSuccess = false;
+    this.errandDriverEarningSaveError = false;
+    this.subs.sink = this.service.saveErrandDriverEarning({ amount: Number(this.errandDriverEarning) }).subscribe({
+      next: () => {
+        this.isSavingErrandDriverEarning = false;
+        this.errandDriverEarningSaveSuccess = true;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.isSavingErrandDriverEarning = false;
+        this.errandDriverEarningSaveError = true;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  loadDriverPricing() {
+    this.driverPricingLoading = true;
+    this.subs.sink = this.service.getDriverPricing().subscribe({
+      next: (pricing: any) => {
+        if (pricing) {
+          this.driverPricing = {
+            mode: pricing.mode ?? 0,
+            fixedAmount: pricing.fixedAmount ?? 5000,
+            distanceBaseFee: pricing.distanceBaseFee ?? 2000,
+            distanceRatePerUnit: pricing.distanceRatePerUnit ?? 1000,
+            unit: pricing.unit ?? 0,
+            minEarning: pricing.minEarning ?? 3000,
+            maxEarning: pricing.maxEarning ?? 0,
+            isFreeDeliveryEnabled: !!pricing.isFreeDeliveryEnabled,
+            customerRatePerKm: pricing.customerRatePerKm ?? 45,
+            minDeliveryFee: pricing.minDeliveryFee ?? 50
+          };
+        }
+        this.driverPricingLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.driverPricingLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  saveDriverPricing() {
+    this.isSavingDriverPricing = true;
+    this.driverPricingSaveSuccess = false;
+    this.driverPricingSaveError = false;
+
+    const payload = {
+      mode: Number(this.driverPricing.mode),
+      fixedAmount: Number(this.driverPricing.fixedAmount || 0),
+      distanceBaseFee: Number(this.driverPricing.distanceBaseFee || 0),
+      distanceRatePerUnit: Number(this.driverPricing.distanceRatePerUnit || 0),
+      unit: Number(this.driverPricing.unit || 0),
+      minEarning: Number(this.driverPricing.minEarning || 0),
+      maxEarning: Number(this.driverPricing.maxEarning || 0),
+      isFreeDeliveryEnabled: !!this.driverPricing.isFreeDeliveryEnabled,
+      customerRatePerKm: Number(this.driverPricing.customerRatePerKm ?? 45),
+      minDeliveryFee: Number(this.driverPricing.minDeliveryFee ?? 50)
+    };
+
+    this.subs.sink = this.service.saveDriverPricing(payload).subscribe({
+      next: () => {
+        this.isSavingDriverPricing = false;
+        this.driverPricingSaveSuccess = true;
+        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.driverPricingSaveSuccess = false;
+          this.cdr.detectChanges();
+        }, 3500);
+      },
+      error: () => {
+        this.isSavingDriverPricing = false;
+        this.driverPricingSaveError = true;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  get simulatedDriverPayout(): number {
+    if (!this.driverPricing) return 0;
+    if (Number(this.driverPricing.mode) === 0) {
+      return Number(this.driverPricing.fixedAmount || 0);
+    }
+    const dist = Math.max(0, Number(this.simulatedDistance || 0));
+    const base = Number(this.driverPricing.distanceBaseFee || 0);
+    const rate = Number(this.driverPricing.distanceRatePerUnit || 0);
+    let total = base + (dist * rate);
+    const min = Number(this.driverPricing.minEarning || 0);
+    const max = Number(this.driverPricing.maxEarning || 0);
+    if (min > 0) total = Math.max(min, total);
+    if (max > 0) total = Math.min(max, total);
+    return Math.round(total);
+  }
+
+  get simulatedCustomerDeliveryFee(): number {
+    if (!this.driverPricing) return 0;
+    if (this.driverPricing.isFreeDeliveryEnabled) return 0;
+    return this.simulatedOriginalDeliveryFee;
+  }
+
+  get simulatedOriginalDeliveryFee(): number {
+    if (!this.driverPricing) return 0;
+    const dist = Math.max(0, Number(this.simulatedDistance || 0));
+    const rate = Number(this.driverPricing.customerRatePerKm ?? 45);
+    const minFee = Number(this.driverPricing.minDeliveryFee ?? 50);
+    const calculated = dist * rate;
+    return Math.max(minFee, Math.round(calculated));
+  }
+
   refreshDashboard(): void {
     this.dashboardLoading = true;
     this.service.getDashboard().subscribe({
@@ -366,6 +521,8 @@ driverSearchGroup: FormGroup;
     this.searchForm();
     this.loadSettings();
     this.loadFeaturedCategories();
+    this.loadDriverPricing();
+    this.loadErrandDriverEarning();
     this.refreshDashboard();
     this.subs.sink = this.service.isLoading$.subscribe(res => this.isLoading = res);
     this.subs.sink = this.driverBalancesService.isLoading$.subscribe(res => this.isDriverLoading = res);

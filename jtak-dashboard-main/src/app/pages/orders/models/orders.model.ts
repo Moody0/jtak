@@ -14,11 +14,13 @@ export interface Order extends BaseModel {
     lat: number;
     lng: number;
     price: number;
+    deliveryFee?: number;
+    grandTotal?: number;
     orderDetails: OrdersDetail[];
     createdDate: string;
     paymentMethod: number;
-    deliveryOtp?: string;
     deliveredAt?: string;
+    accountingStatus?: number;
     isJtakMarketOrder?: boolean;
     requiresMerchantDecision?: boolean;
     canAdminApprove?: boolean;
@@ -30,6 +32,19 @@ export interface Order extends BaseModel {
     deletedBy?: string;
     deletionDate?: string;
     isArchived?: boolean;
+    deliveryOtp?: string;
+
+    // Phase 6 Canonical Aggregate Status & Partial Fulfillment
+    aggregateStatus?: number;
+    aggregateStatusKey?: string;
+    aggregateStatusArabic?: string;
+    aggregateStatusEnglish?: string;
+    originalGrandTotal?: number;
+    adjustedGrandTotal?: number;
+    rejectedItemsTotal?: number;
+    acceptedItemsCount?: number;
+    rejectedItemsCount?: number;
+    hasPartialFulfillment?: boolean;
 }
 
 export interface ShippingStopProgress {
@@ -77,4 +92,3 @@ export interface OrderStatusHistoryItem {
     driverName?: string;
     details?: string;
 }
-

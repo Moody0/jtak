@@ -68,7 +68,11 @@ namespace Modules.Catalog.Services
         private async Task<ProductCategoryDto[]> LoadProductCategoriesTree()
         {
             ProductCategories = await LoadProductCategories();
-            var rootCats = ProductCategories.Values.Where(x => x.ParentId == null).OrderBy(x => x.Order).ToArray();
+            var rootCats = ProductCategories.Values
+                .Where(x => x.ParentId == null)
+                .OrderBy(x => x.Order)
+                .ThenBy(x => x.Id)
+                .ToArray();
             for (int i = 0; i < rootCats.Length; i++)
             {
                 LoadChildren(ref rootCats[i]);
@@ -79,7 +83,11 @@ namespace Modules.Catalog.Services
         private void LoadChildren(ref ProductCategoryDto cat)
         {
             var pcatId = cat.Id;
-            cat.SubCategories = ProductCategories.Values.Where(x => x.ParentId == pcatId).ToArray();
+            cat.SubCategories = ProductCategories.Values
+                .Where(x => x.ParentId == pcatId)
+                .OrderBy(x => x.Order)
+                .ThenBy(x => x.Id)
+                .ToArray();
             if (ScanDepth < 10)
             {
                 ScanDepth++;

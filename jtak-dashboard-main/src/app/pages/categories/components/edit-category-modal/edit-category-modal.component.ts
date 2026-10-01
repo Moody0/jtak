@@ -1,5 +1,5 @@
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable } from 'rxjs';
@@ -29,14 +29,14 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
   @Input() item: Category;
   parentCategories: Category[] = [];
   isLoading$: Observable<boolean>;
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
   userRoles = Object.entries(AppUserRoleMap);
 
   orderPresets: number[] = [0, 1, 2, 3, 4, 5, 10];
 
   constructor(
     private service: CategoriesService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     public filesService: FilesService,
     private toasterService: ToastrService

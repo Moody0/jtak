@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -40,6 +40,10 @@ namespace App.Shared.Services
 
         Task QueuePushNotification(Notification n, Guid[] recivers, bool saveNotification = true, bool suppressedNotification = false);
         Task SendPushNotification(Notification n, Guid[] recivers, bool saveNotification = true, bool suppressedNotification = false);
+        Task RetryPendingNotificationsAsync(CancellationToken cancellationToken);
+        bool IsCampaignPushConfigured();
+        Task<CampaignPushResult> SendCampaignNotification(Notification notification, Guid[] recipients);
+        Task<int> DeleteCampaignNotifications(int[] notificationIds);
 
         Task SendSignalRNotification(Guid uid, Notification n);
         Task SendChatMessageNotificationAsync(Guid uid, object c);
@@ -50,8 +54,20 @@ namespace App.Shared.Services
         Guid GetUserTopic(Guid uid);
 
     }
-    public class NotificationService : SolService<Notification, NotificationDto>, INotificationService
+
+    public class CampaignPushResult
     {
+        public int RecipientAccounts { get; set; }
+        public int AcceptedLanguages { get; set; }
+        public int FailedLanguages { get; set; }
+        public string FailureCode { get; set; }
+        public bool HistoryRetained { get; set; }
+    }
+
+    public partial class NotificationService : SolService<Notification, NotificationDto>, INotificationService
+    {
+        private static readonly object FirebaseInitLock = new object();
+        private const string DefaultFirebaseCredentialsFile = "jtak-339412-firebase-adminsdk-fyug6-170c77def3.json";
         private SolAppOptions AppOptions { get; }
         private NotificationOptions Options { get; }
         private readonly UserManager<AppUser> _userManager;
@@ -84,6 +100,174 @@ namespace App.Shared.Services
         }
 
         public string DefaultNotificationGroup { get; } = "all";
+
+        public bool IsCampaignPushConfigured()
+        {
+            try
+            {
+                EnsureFirebaseMessaging();
+                return true;
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "Campaign push is not configured");
+                return false;
+            }
+        }
+
+        public async Task<CampaignPushResult> SendCampaignNotification(Notification notification, Guid[] recipients)
+        {
+            if (notification == null || !new[] { "all", "campaign_delivery", "campaign_warehouse" }.Contains(notification.Topic))
+                throw new ArgumentException("Invalid campaign audience topic", nameof(notification));
+
+            // Check Firebase before writing the campaign, so a missing credential
+            // cannot create a misleading entry that appears to have been sent.
+            var recipientIds = (recipients ?? Array.Empty<Guid>()).Distinct().ToArray();
+            var messaging = EnsureFirebaseMessaging();
+
+            Repository.Insert(notification);
+            await _unitOfWork.SaveChangesAsync();
+            if (recipientIds.Length > 0)
+            {
+                _nmRepo.Insert(recipientIds.Select(id => new NotificationMessage
+                {
+                    NotificationId = notification.Id,
+                    UserId = id
+                }));
+                await _unitOfWork.SaveChangesAsync();
+            }
+
+            var result = new CampaignPushResult { RecipientAccounts = recipientIds.Length };
+            foreach (var lang in AppOptions.SupportedLanguages.Distinct())
+            {
+                try
+                {
+                    var imageUrl = string.IsNullOrEmpty(notification.Image) ? null : AppDomainHelper.ApiUrl + notification.Image;
+                    var eventTimestamp = notification.CreatedDate > DateTime.UnixEpoch
+                        ? notification.CreatedDate
+                        : DateTime.UtcNow;
+                    var message = new FirebaseAdmin.Messaging.Message
+                    {
+                        Topic = $"{notification.Topic}_{lang}",
+                        Notification = new FirebaseAdmin.Messaging.Notification
+                        {
+                            Title = notification.GetTitle(lang),
+                            Body = notification.GetText(lang),
+                            ImageUrl = imageUrl
+                        },
+                        Data = notification.GetPayload(lang),
+                        Android = new FirebaseAdmin.Messaging.AndroidConfig
+                        {
+                            Priority = FirebaseAdmin.Messaging.Priority.High,
+                            Notification = new FirebaseAdmin.Messaging.AndroidNotification
+                            {
+                                Sound = "default",
+                                Icon = "notification_icon",
+                                Priority = FirebaseAdmin.Messaging.NotificationPriority.MAX,
+                                EventTimestamp = eventTimestamp
+                            }
+                        },
+                        Apns = new FirebaseAdmin.Messaging.ApnsConfig
+                        {
+                            Aps = new FirebaseAdmin.Messaging.Aps { Sound = "default", MutableContent = true },
+                            FcmOptions = new FirebaseAdmin.Messaging.ApnsFcmOptions { ImageUrl = imageUrl }
+                        }
+                    };
+                    await messaging.SendAsync(message);
+                    result.AcceptedLanguages++;
+                }
+                catch (Exception e)
+                {
+                    result.FailedLanguages++;
+                    result.FailureCode ??= e is FirebaseAdmin.Messaging.FirebaseMessagingException firebaseError
+                        ? firebaseError.MessagingErrorCode.ToString()
+                        : "UnexpectedFirebaseError";
+                    _logger.LogError(e, "Campaign push failed for {AudienceTopic} / {Language}", notification.Topic, lang);
+                }
+            }
+
+            // Do not leave a campaign in the visible in-app history when FCM
+            // rejected every language. The server logs retain the detailed
+            // Firebase exception for diagnosis; the API only returns a safe code.
+            if (result.AcceptedLanguages == 0)
+            {
+                try
+                {
+                    await DeleteCampaignNotifications(new[] { notification.Id });
+                }
+                catch (Exception e)
+                {
+                    result.HistoryRetained = true;
+                    _logger.LogError(e, "Failed to remove undelivered campaign {NotificationId} from history", notification.Id);
+                }
+            }
+
+            return result;
+        }
+
+        public async Task<int> DeleteCampaignNotifications(int[] notificationIds)
+        {
+            var ids = (notificationIds ?? Array.Empty<int>()).Where(id => id > 0).Distinct().ToArray();
+            if (ids.Length == 0) return 0;
+
+            var context = _unitOfWork.Context;
+            var campaigns = await context.Notifications
+                .Where(n => ids.Contains(n.Id) && n.NotificationType == NotificationType.GlobalNotification)
+                .ToListAsync();
+            if (campaigns.Count == 0) return 0;
+
+            var campaignIds = campaigns.Select(n => n.Id).ToArray();
+            var messageLinks = await context.Set<NotificationMessage>()
+                .Where(link => campaignIds.Contains(link.NotificationId))
+                .ToListAsync();
+
+            context.Set<NotificationMessage>().RemoveRange(messageLinks);
+            context.Notifications.RemoveRange(campaigns);
+            await _unitOfWork.SaveChangesAsync();
+            return campaigns.Count;
+        }
+
+        public static FirebaseAdmin.Messaging.FirebaseMessaging EnsureFirebaseMessaging()
+        {
+            if (FirebaseApp.DefaultInstance == null)
+            {
+                lock (FirebaseInitLock)
+                {
+                    if (FirebaseApp.DefaultInstance == null)
+                    {
+                        var configuredPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+                        GoogleCredential credential;
+                        if (!string.IsNullOrWhiteSpace(configuredPath))
+                        {
+                            var credentialPath = Path.IsPathRooted(configuredPath)
+                                ? configuredPath
+                                : Path.GetFullPath(configuredPath, AppContext.BaseDirectory);
+                            if (!File.Exists(credentialPath))
+                            {
+                                throw new FileNotFoundException(
+                                    "The Firebase service-account file configured by GOOGLE_APPLICATION_CREDENTIALS was not found.",
+                                    credentialPath);
+                            }
+
+                            credential = GoogleCredential.FromFile(credentialPath);
+                        }
+                        else
+                        {
+                            var defaultCredentialPath = Path.Combine(AppContext.BaseDirectory, DefaultFirebaseCredentialsFile);
+                            credential = File.Exists(defaultCredentialPath)
+                                ? GoogleCredential.FromFile(defaultCredentialPath)
+                                : GoogleCredential.GetApplicationDefault();
+                        }
+                        FirebaseApp.Create(new AppOptions
+                        {
+                            Credential = credential,
+                            ProjectId = "jtak-339412"
+                        });
+                    }
+                }
+            }
+            return FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance;
+        }
 
 
         public async Task<Notification[]> GetNotifications(Guid? uid, DateTime? fromDate = null, DateTime? updateBefore = null, DateTime? updateAfter = null)
@@ -192,26 +376,58 @@ namespace App.Shared.Services
 
         public async Task SendPushNotification(Notification n, Guid[] recivers, bool saveNotification = true, bool suppressedNotification = false)
         {
-            try
-            {
-                var currentDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location); ;
-                string path = currentDir + "/jtak-339412-firebase-adminsdk-fyug6-170c77def3.json";
-                if (FirebaseApp.DefaultInstance == null)
-                    FirebaseApp.Create(new AppOptions() { Credential = GoogleCredential.FromFile(path) });
+            recivers = recivers?.Where(x => x != Guid.Empty).Distinct().ToArray() ?? Array.Empty<Guid>();
 
-                if (saveNotification)
+            if (saveNotification && !suppressedNotification && !string.IsNullOrWhiteSpace(n.EventKey) &&
+                string.IsNullOrWhiteSpace(n.Topic))
+            {
+                await SendActionNotificationAsync(n, recivers);
+                return;
+            }
+
+            if (recivers.Length == 0 && string.IsNullOrWhiteSpace(n.Topic))
+            {
+                _logger.LogWarning("Notification {NotificationType} has no valid recipients or topic, skipping dispatch", n.NotificationType);
+                return;
+            }
+
+            // Persist first so an in-app notification is not lost when the
+            // Firebase credential/service is temporarily unavailable.
+            if (saveNotification)
+            {
+                try
                 {
                     Repository.Insert(n);
                     await _unitOfWork.SaveChangesAsync();
-                    // Not working !
-                    _nmRepo.Insert(recivers.Select(x => new NotificationMessage { NotificationId = n.Id, UserId = x }));
-                    await _unitOfWork.SaveChangesAsync();
-                    //await _nmRepo.BulkInsertAsync(n.Id, recivers);
+                    if (recivers.Length > 0)
+                    {
+                        _nmRepo.Insert(recivers.Select(x => new NotificationMessage { NotificationId = n.Id, UserId = x }));
+                        await _unitOfWork.SaveChangesAsync();
+                    }
                 }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Failed to persist notification {NotificationType}", n.NotificationType);
+                    try
+                    {
+                        _unitOfWork.Context.ChangeTracker.Clear();
+                    }
+                    catch
+                    {
+                        // Defensive context reset
+                    }
+                }
+            }
+
+            FirebaseAdmin.Messaging.FirebaseMessaging messaging;
+            try
+            {
+                messaging = EnsureFirebaseMessaging();
             }
             catch (Exception e)
             {
-                _logger.LogError(e.ToString());
+                _logger.LogError(e, "Failed to initialize Firebase for notification {NotificationType}", n.NotificationType);
+                return;
             }
             /****************************************************************************************************/
 
@@ -230,12 +446,27 @@ namespace App.Shared.Services
                         var dataPayload = n.GetPayload(lang);
                         var imgUrl = string.IsNullOrEmpty(n.Image) ? null : AppDomainHelper.ApiUrl + n.Image;
                         var notif = suppressedNotification ? null : new FirebaseAdmin.Messaging.Notification { Title = n.GetTitle(lang), Body = n.GetText(lang), ImageUrl = imgUrl };
+                        var eventTimestamp = n.CreatedDate > DateTime.UnixEpoch
+                            ? n.CreatedDate
+                            : DateTime.UtcNow;
                         // Image config for iOS APNS
-                        var android = new FirebaseAdmin.Messaging.AndroidConfig { Notification = new FirebaseAdmin.Messaging.AndroidNotification { Sound = "default" } };
+                        var android = new FirebaseAdmin.Messaging.AndroidConfig
+                        {
+                            // New delivery orders are time-sensitive; wake the
+                            // device promptly even when it is dozing.
+                            Priority = FirebaseAdmin.Messaging.Priority.High,
+                            Notification = new FirebaseAdmin.Messaging.AndroidNotification
+                            {
+                                Sound = "default",
+                                Icon = "notification_icon",
+                                Priority = FirebaseAdmin.Messaging.NotificationPriority.MAX,
+                                EventTimestamp = eventTimestamp
+                            }
+                        };
                         var apns = new FirebaseAdmin.Messaging.ApnsConfig { Aps = new FirebaseAdmin.Messaging.Aps { MutableContent = true, Sound = "default" }, FcmOptions = new FirebaseAdmin.Messaging.ApnsFcmOptions { ImageUrl = imgUrl } };
 
                         var msg = new FirebaseAdmin.Messaging.Message { Notification = notif, Data = dataPayload, Topic = $"{topic}_{lang}", Apns = apns, Android = android };
-                        var result = await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance.SendAsync(msg);
+                        var result = await messaging.SendAsync(msg);
                     }
 
                     //var dataPayload2 = n.GetPayload("ar");

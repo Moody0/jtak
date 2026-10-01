@@ -1,97 +1,240 @@
-// Edit Product Modal Two-Column Architecture & Live App Preview
+// =============================================================================
+// JTAK Operations - Product Add / Edit Modal & Live Mobile App Preview
+// Modern Minimalist Enterprise UI (No Shadows, Alexandria Font, Medium Rounded)
+// Strict Color System: Slate Neutral + JTAK Warm Orange + Clean Semantics
+// =============================================================================
 
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  // Zero-shadow enforcement across the modal
+  *,
+  .preview-phone-card,
+  .customer-app-card,
+  .photo-item-card,
+  .unit-preset-pill,
+  .discount-preset-pill,
+  .setting-toggle,
+  .btn,
+  .badge,
+  .form-control,
+  .form-select,
+  .alert {
+    box-shadow: none !important;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Two-Column Architecture: Left Form + Right Mobile Preview
+// -----------------------------------------------------------------------------
 .product-editor-layout {
   display: flex;
   gap: 24px;
   align-items: flex-start;
+  padding: 4px 20px 20px;
 
-  @media (max-width: 991px) {
-    flex-direction: column;
+  @media (max-width: 991.98px) {
+    flex-direction: column-reverse;
+    gap: 16px;
   }
 }
 
 .product-form-column {
-  flex: 1 1 62%;
+  flex: 1 1 0;
   min-width: 0;
+  width: 100%;
 }
 
 .product-preview-column {
-  flex: 0 0 330px;
+  flex: 0 0 310px;
+  width: 310px;
+  max-width: 100%;
   position: sticky;
   top: 16px;
 
-  @media (max-width: 991px) {
+  @media (max-width: 991.98px) {
     flex: 1 1 100%;
     width: 100%;
+    max-width: 360px;
     position: static;
+    margin: 0 auto;
   }
 }
 
-// Unit Quick Selection Chips
-.unit-presets-row {
+// -----------------------------------------------------------------------------
+// Form Sections
+// -----------------------------------------------------------------------------
+.edit-section {
+  padding: 20px 0;
+  border-bottom: 1px solid #e2e8f0;
+  min-width: 0;
+
+  &--last {
+    border-bottom: none;
+    padding-bottom: 8px;
+  }
+
+  .row > [class*='col-'] {
+    min-width: 0;
+  }
+
+  .form-control,
+  ng-select {
+    min-width: 0;
+  }
+
+  .form-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 6px;
+  }
+}
+
+.edit-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #ea580c;
+    font-size: 0.76rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  h3 {
+    font-size: 0.92rem;
+    font-weight: 750;
+    color: #0f172a;
+    margin: 0;
+    line-height: 1.25;
+  }
+
+  p {
+    font-size: 0.74rem;
+    color: #64748b;
+    margin: 2px 0 0;
+    line-height: 1.35;
+  }
+}
+
+// Form Control Defaults
+.form-control {
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.84rem;
+  color: #0f172a;
+  background: #ffffff;
+  padding: 9px 12px;
+  transition: all 0.15s ease;
+
+  &:focus {
+    border-color: #ea580c;
+    outline: none;
+  }
+
+  &::placeholder {
+    color: #94a3b8;
+    font-size: 0.82rem;
+  }
+}
+
+.input-group {
+  .form-control {
+    border-radius: 0 8px 8px 0;
+  }
+
+  .input-group-text {
+    border-radius: 8px 0 0 8px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.85rem;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Quick Unit & Discount Presets Row
+// -----------------------------------------------------------------------------
+.unit-presets-row,
+.discount-presets-row {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-top: 8px;
   flex-wrap: wrap;
+}
 
-  .unit-preset-pill {
-    padding: 3px 10px;
-    border-radius: 6px;
-    border: 1px solid #e2e8f0;
-    background: #f8fafc;
-    color: #475569;
-    font-size: 0.74rem;
-    font-weight: 650;
-    cursor: pointer;
-    transition: all 0.15s ease;
+.unit-preset-pill,
+.discount-preset-pill {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.74rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.15s ease;
 
-    &:hover {
-      background: #ffffff;
-      border-color: #cbd5e1;
-      color: #0f172a;
-    }
+  &:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+  }
 
-    &.active {
-      background: #fff7ed;
-      border-color: #fed7aa;
-      color: #ea580c;
-      font-weight: 750;
-    }
+  &.active {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #ea580c;
+    font-weight: 750;
   }
 }
 
-// Visual Category Hierarchy Box
+// -----------------------------------------------------------------------------
+// Category Hierarchy Breadcrumb Box
+// -----------------------------------------------------------------------------
 .category-hierarchy-box {
   margin-top: 10px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 8px;
   background: #f8fafc;
-  border: 1px dashed #cbd5e1;
+  border: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.8rem;
+  flex-wrap: wrap;
 
   .cat-hierarchy-label {
     font-weight: 700;
     color: #64748b;
-    font-size: 0.72rem;
-    text-transform: uppercase;
+    font-size: 0.74rem;
   }
 
   .cat-hierarchy-path {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-weight: 750;
-    color: #0f172a;
+    font-weight: 700;
 
     .cat-parent {
       color: #ea580c;
       background: #fff7ed;
-      padding: 2px 7px;
-      border-radius: 4px;
+      border: 1px solid #fed7aa;
+      padding: 2px 8px;
+      border-radius: 5px;
       font-size: 0.74rem;
     }
 
@@ -102,37 +245,100 @@
 
     .cat-sub {
       color: #1e293b;
+      font-size: 0.76rem;
     }
   }
 }
 
-// Store & Merchant Linkage Box
-.merchant-linkage-note {
-  margin-top: 10px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 0.76rem;
-  color: #166534;
-  line-height: 1.4;
+// -----------------------------------------------------------------------------
+// Settings Grid & Modern Switch Toggles
+// -----------------------------------------------------------------------------
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
 
-  i {
-    font-size: 0.95rem;
-    color: #16a34a;
-    margin-top: 2px;
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+
+  &:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+  }
+
+  input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 44px;
+    height: 24px;
+    background: #cbd5e1;
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
+    position: relative;
+    outline: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+
+    &::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      background: #ffffff;
+      transition: left 0.2s ease;
+    }
+
+    &:checked {
+      background: #ea580c;
+      border-color: #ea580c;
+
+      &::before {
+        left: 22px;
+      }
+    }
+  }
+
+  span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    strong {
+      font-size: 0.82rem;
+      font-weight: 750;
+      color: #0f172a;
+    }
+
+    small {
+      font-size: 0.72rem;
+      color: #64748b;
+      line-height: 1.35;
+    }
   }
 }
 
-// Photo Management Grid
+// -----------------------------------------------------------------------------
+// Photo Gallery Grid
+// -----------------------------------------------------------------------------
 .photo-items-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .photo-item-card {
@@ -142,7 +348,6 @@
   overflow: hidden;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 
   &.is-primary {
     border: 2px solid #ea580c;
@@ -156,27 +361,26 @@
 
   .photo-primary-badge {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
-    background: rgba(234, 88, 12, 0.92);
+    bottom: 6px;
+    right: 6px;
+    background: #ea580c;
     color: #ffffff;
-    font-size: 0.6rem;
+    font-size: 0.62rem;
     font-weight: 750;
-    padding: 1px 5px;
+    padding: 2px 6px;
     border-radius: 4px;
-    backdrop-filter: blur(4px);
 
     html[dir="ltr"] &,
     body[dir="ltr"] & {
       right: auto;
-      left: 4px;
+      left: 6px;
     }
   }
 
   .photo-delete-btn {
     position: absolute;
-    top: 4px;
-    left: 4px;
+    top: 6px;
+    left: 6px;
     width: 22px;
     height: 22px;
     border-radius: 50%;
@@ -186,53 +390,103 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.62rem;
+    font-size: 0.65rem;
     cursor: pointer;
-    transition: transform 0.15s ease;
+    transition: background-color 0.15s ease;
 
     html[dir="ltr"] &,
     body[dir="ltr"] & {
       left: auto;
-      right: 4px;
+      right: 6px;
     }
 
     &:hover {
-      transform: scale(1.15);
+      background: #b91c1c;
     }
   }
 
   .photo-set-primary-btn {
     position: absolute;
-    bottom: 4px;
-    left: 4px;
+    bottom: 6px;
+    left: 6px;
     font-size: 0.62rem;
-    background: rgba(15, 23, 42, 0.75);
+    font-weight: 600;
+    background: rgba(15, 23, 42, 0.8);
     color: #ffffff;
     border: none;
-    padding: 1px 6px;
+    padding: 2px 6px;
     border-radius: 4px;
     cursor: pointer;
 
     html[dir="ltr"] &,
     body[dir="ltr"] & {
       left: auto;
-      right: 4px;
+      right: 6px;
     }
 
     &:hover {
-      background: rgba(15, 23, 42, 0.95);
+      background: #0f172a;
     }
   }
 }
 
-// -------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Danger Zone
+// -----------------------------------------------------------------------------
+.product-danger-zone {
+  margin-top: 20px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.product-danger-zone-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.product-danger-zone-title {
+  font-size: 0.9rem;
+  font-weight: 750;
+  color: #dc2626;
+  margin: 0 0 3px;
+}
+
+.product-danger-zone-desc {
+  font-size: 0.74rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.product-btn-delete-current {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid #f87171;
+  background: #ffffff;
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #b91c1c;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Live Customer App Preview Phone Mockup
-// -------------------------------------------------------------
+// -----------------------------------------------------------------------------
 .preview-phone-card {
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -250,11 +504,9 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.68rem;
-    font-weight: 700;
+    font-size: 0.7rem;
+    font-weight: 650;
     color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
 
     .preview-dot-pulse {
       width: 6px;
@@ -265,24 +517,25 @@
   }
 
   .preview-app-title {
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 800;
     color: #f97316;
+    letter-spacing: 0.05em;
   }
 }
 
 .preview-card-viewport {
   padding: 14px;
   background: #f8fafc;
+  max-height: calc(85vh - 130px);
+  overflow-y: auto;
 }
 
 .customer-app-card {
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  transition: transform 0.2s ease;
 }
 
 .customer-card-media {
@@ -301,26 +554,43 @@
   }
 
   .customer-media-fallback {
-    color: #cbd5e1;
-    font-size: 2.2rem;
+    color: #94a3b8;
+    font-size: 2rem;
   }
 
   .customer-featured-ribbon {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    background: #f59e0b;
     color: #ffffff;
     font-size: 0.65rem;
-    font-weight: 800;
-    padding: 3px 8px;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    font-weight: 750;
+    padding: 2px 7px;
+    border-radius: 5px;
 
     html[dir="ltr"] &,
     body[dir="ltr"] & {
       right: auto;
       left: 8px;
+    }
+  }
+
+  .customer-discount-ribbon {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 750;
+    padding: 2px 7px;
+    border-radius: 5px;
+
+    html[dir="ltr"] &,
+    body[dir="ltr"] & {
+      left: auto;
+      right: 8px;
     }
   }
 
@@ -332,9 +602,8 @@
     color: #ffffff;
     font-size: 0.62rem;
     font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 6px;
-    backdrop-filter: blur(4px);
+    padding: 2px 6px;
+    border-radius: 5px;
 
     html[dir="ltr"] &,
     body[dir="ltr"] & {
@@ -357,16 +626,16 @@
 
 .customer-cat-tag {
   font-size: 0.68rem;
-  font-weight: 750;
+  font-weight: 700;
   color: #ea580c;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .customer-product-title {
-  font-size: 0.9rem;
-  font-weight: 800;
+  font-size: 0.88rem;
+  font-weight: 750;
   color: #0f172a;
   line-height: 1.3;
   margin: 0;
@@ -384,6 +653,41 @@
   overflow: hidden;
 }
 
+.customer-card-pricing {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+
+  .customer-card-old-price {
+    color: #94a3b8;
+    font-size: 0.68rem;
+    text-decoration: line-through;
+  }
+
+  .customer-card-current-price {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    strong {
+      color: #ea580c;
+      font-size: 0.92rem;
+      font-weight: 800;
+    }
+
+    .customer-card-discount {
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: #dc2626;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      font-size: 0.62rem;
+      font-weight: 700;
+    }
+  }
+}
+
 .customer-card-bottom {
   display: flex;
   align-items: center;
@@ -395,11 +699,11 @@
 
 .customer-unit-pill {
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 650;
   color: #475569;
   background: #f1f5f9;
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 2px 7px;
+  border-radius: 5px;
 }
 
 .customer-btn-cart {
@@ -407,13 +711,17 @@
   align-items: center;
   gap: 5px;
   padding: 5px 12px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #FF5722 0%, #ea580c 100%);
-  border: none;
-  color: #ffffff;
+  border-radius: 7px;
+  background: #ea580c;
+  color: #ffffff !important;
   font-size: 0.72rem;
-  font-weight: 750;
+  font-weight: 700;
   cursor: default;
+
+  &, i, .fas, .fa, span {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+  }
 }
 
 .preview-card-meta {
@@ -424,4 +732,14 @@
   color: #64748b;
   line-height: 1.4;
   text-align: center;
+}
+
+@media (max-width: 575.98px) {
+  .product-editor-layout {
+    padding: 0 10px 10px;
+  }
+
+  .edit-section {
+    padding: 16px 0;
+  }
 }

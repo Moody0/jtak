@@ -1,0 +1,319 @@
+// =============================================================================
+// JTAK Operations - Driver Cash Advance Modal
+// Modern Minimalist Enterprise UI (Zero Shadows, Alexandria Font, High Density)
+// Strict Color System: Slate Neutral + JTAK Warm Orange (#ea580c)
+// =============================================================================
+
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+.driver-advance-modal {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+
+  .modal-header,
+  .modal-footer {
+    padding: 14px 20px;
+    border-color: #e2e8f0;
+    background: #ffffff;
+  }
+
+  .modal-body {
+    padding: 18px 20px;
+  }
+
+  .advance-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #ea580c;
+    font-size: 0.74rem;
+    font-weight: 750;
+    margin-bottom: 4px;
+  }
+
+  .modal-title {
+    font-weight: 800;
+    color: #0f172a;
+    font-size: 1.15rem;
+    margin-bottom: 3px;
+    letter-spacing: -0.01em;
+  }
+
+  .advance-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .advance-stat {
+    padding: 12px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+
+    span {
+      display: block;
+      color: #64748b;
+      font-size: 0.74rem;
+      font-weight: 650;
+      margin-bottom: 4px;
+    }
+
+    strong {
+      color: #0f172a;
+      font-size: 1.15rem;
+      font-weight: 850;
+      font-feature-settings: 'tnum';
+
+      small {
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: #94a3b8;
+        margin-inline-start: 2px;
+      }
+    }
+  }
+
+  .form-label {
+    font-size: 0.78rem;
+    font-weight: 750;
+    color: #334155;
+    margin-bottom: 6px;
+  }
+
+  .form-control {
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-size: 0.82rem;
+    color: #0f172a;
+    padding: 8px 12px;
+    background: #ffffff;
+    transition: border-color 0.15s ease;
+
+    &:focus {
+      border-color: #ea580c !important;
+      outline: none;
+    }
+
+    &::placeholder {
+      color: #94a3b8;
+    }
+  }
+
+  ng-select {
+    font-size: 0.82rem;
+
+    ::ng-deep .ng-select-container {
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 8px !important;
+      min-height: 40px !important;
+      background: #ffffff !important;
+      box-shadow: none !important;
+    }
+
+    &.ng-select-opened ::ng-deep .ng-select-container {
+      border-color: #ea580c !important;
+    }
+  }
+
+  .field-hint {
+    color: #64748b;
+    font-size: 0.73rem;
+    margin-top: 5px;
+  }
+
+  .field-error {
+    color: #dc2626;
+    font-size: 0.73rem;
+    font-weight: 600;
+    margin-top: 5px;
+  }
+
+  .balance-preview {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+
+    span {
+      display: block;
+      color: #9a3412;
+      font-size: 0.74rem;
+      font-weight: 650;
+      margin-bottom: 2px;
+    }
+
+    strong {
+      color: #0f172a;
+      font-size: 0.92rem;
+      font-weight: 800;
+      font-feature-settings: 'tnum';
+    }
+
+    > i {
+      color: #ea580c;
+      font-size: 0.88rem;
+    }
+
+    .preview-limit {
+      margin-inline-start: auto;
+      text-align: end;
+    }
+  }
+
+  .advance-history {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+  }
+
+  .history-list {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+
+  .history-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s ease;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    &:hover {
+      background: #fafbfc;
+    }
+  }
+
+  .history-icon {
+    flex: 0 0 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: #ea580c;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    font-size: 0.85rem;
+  }
+
+  .history-main {
+    min-width: 0;
+    flex: 1;
+
+    strong {
+      display: block;
+      font-size: 0.8rem;
+      color: #0f172a;
+      font-weight: 750;
+    }
+
+    small {
+      display: block;
+      font-size: 0.72rem;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .history-amount {
+    white-space: nowrap;
+    color: #059669;
+    font-weight: 800;
+    font-size: 0.84rem;
+    font-feature-settings: 'tnum';
+  }
+
+  .advance-state {
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #64748b;
+    font-size: 0.82rem;
+  }
+
+  // Buttons inside modal
+  .btn-primary {
+    background-color: #ea580c !important;
+    border-color: #ea580c !important;
+    color: #ffffff !important;
+    font-weight: 750;
+    font-size: 0.82rem;
+    border-radius: 8px;
+    padding: 7px 16px;
+
+    i, .fas, svg, span {
+      color: #ffffff !important;
+      fill: #ffffff !important;
+    }
+
+    &:hover:not(:disabled) {
+      background-color: #c2410c !important;
+      border-color: #c2410c !important;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  .btn-light {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-weight: 700;
+    font-size: 0.82rem;
+    border-radius: 8px;
+    padding: 7px 16px;
+
+    &:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+  }
+}
+
+@media (max-width: 575.98px) {
+  .driver-advance-modal {
+    .modal-header, .modal-body, .modal-footer {
+      padding: 12px 14px;
+    }
+    .advance-summary {
+      grid-template-columns: 1fr;
+    }
+    .balance-preview {
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .preview-limit {
+      margin-inline-start: 0;
+      text-align: start;
+    }
+  }
+}

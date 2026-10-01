@@ -97,6 +97,19 @@ namespace App.Areas.Admin.Controllers
         {
             if (ModelState.IsValid)
             {
+                var phoneNumber = vm.PhoneNumber;
+                if (SyrianPhoneIdentity.TryNormalize(phoneNumber, out var canonicalPhone))
+                {
+                    var phoneMatch = await SyrianPhoneIdentity.FindAsync(UserManager, canonicalPhone);
+                    if (phoneMatch.Ambiguous || phoneMatch.User != null)
+                    {
+                        ModelState.AddModelError(nameof(vm.PhoneNumber), "رقم الهاتف مرتبط بحساب موجود بالفعل.");
+                        ViewBag.Title = _Common.Create;
+                        await InitViewBags(vm);
+                        return View(vm);
+                    }
+                    phoneNumber = canonicalPhone;
+                }
                 var user = new AppUser()
                 {
                     FirstName = vm.FirstName,
@@ -106,7 +119,7 @@ namespace App.Areas.Admin.Controllers
                     IsActive = true,
                     ProfilePhoto = vm.ProfilePhoto,
                     Birthday = vm.Birthday,
-                    PhoneNumber = vm.PhoneNumber,
+                    PhoneNumber = phoneNumber,
                     Email = vm.Email,
                     UserName = vm.Email,
                     EmailConfirmed = true
@@ -167,16 +180,29 @@ namespace App.Areas.Admin.Controllers
                 try
                 {
                     var resendEmail = !target.EmailConfirmed && target.Email != vm.Email;
+                    var phoneNumber = vm.PhoneNumber;
+                    if (SyrianPhoneIdentity.TryNormalize(phoneNumber, out var canonicalPhone))
+                    {
+                        var phoneMatch = await SyrianPhoneIdentity.FindAsync(UserManager, canonicalPhone);
+                        if (phoneMatch.Ambiguous || (phoneMatch.User != null && phoneMatch.User.Id != target.Id))
+                        {
+                            ModelState.AddModelError(nameof(vm.PhoneNumber), "رقم الهاتف مرتبط بحساب آخر.");
+                            ViewBag.Title = _Common.Edit;
+                            await InitViewBags(vm);
+                            return View(vm);
+                        }
+                        phoneNumber = canonicalPhone;
+                    }
 
                     target.FirstName = vm.FirstName;
                     target.LastName = vm.LastName;
                     target.FullName = $"{vm.FirstName} {vm.LastName}";
                     target.Email = vm.Email;
                     target.UserName = vm.Email;
-                    target.PhoneNumber = vm.PhoneNumber;
+                    target.PhoneNumber = phoneNumber;
                     target.ProfilePhoto = vm.ProfilePhoto;
                     
-                    target.PhoneNumber = vm.PhoneNumber;
+                    target.PhoneNumber = phoneNumber;
 
                     var result = await UserManager.UpdateAsync(target);
 
@@ -326,7 +352,7 @@ namespace App.Areas.Admin.Controllers
 
         public async Task<IActionResult> Details(Guid id)
         {
-            if (id == null) return NotFound();
+            if (id == Guid.Empty) return NotFound();
             var target = await UserManager.Users.FirstOrDefaultAsync(x => x.Id == id);
             if (target == null) return NotFound();
 

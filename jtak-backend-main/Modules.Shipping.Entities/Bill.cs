@@ -17,6 +17,13 @@ namespace Modules.Accounting.Entities
         //// TODO: remove redundunt property (DueDate < DateTime.UtcNow) is enough
         public bool IsAddedToDues { get; set; } = false;
         public int OrderId { get; set; }
+
+        /// <summary>Canonical alias for gross merchant item sales before commission.</summary>
+        public decimal MerchantGross => TotalAmount;
+        /// <summary>Canonical alias for platform commission.</summary>
+        public decimal MerchantCommission => JTakAmount;
+        /// <summary>Canonical alias for net amount payable to merchant.</summary>
+        public decimal MerchantPayable => MerchantAmount;
     }
     public class BillDto
     {
@@ -32,5 +39,12 @@ namespace Modules.Accounting.Entities
         public DateTime DueDate { get; set; }
         public bool IsAddedToDues { get; set; }
         public DateTime CreatedDate { get; set; }
+
+        /// <summary>Canonical alias for gross merchant item sales before commission.</summary>
+        public decimal MerchantGross => TotalAmount;
+        /// <summary>Canonical alias for platform commission.</summary>
+        public decimal MerchantCommission => JTakAmount;
+        /// <summary>Canonical alias for net amount payable to merchant.</summary>
+        public decimal MerchantPayable => MerchantAmount;
     }
 }

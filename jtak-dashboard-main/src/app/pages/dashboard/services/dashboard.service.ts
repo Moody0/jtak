@@ -46,6 +46,22 @@ extends TableService<Balance> implements OnDestroy {
     return this.http.put<any>(environment.apiUrl + '/Admin/Settings', settings);
   }
 
+  getDriverPricing(): Observable<any> {
+    return this.http.get<any>(environment.apiUrl + '/Admin/Settings/DriverPricing');
+  }
+
+  saveDriverPricing(pricing: any): Observable<any> {
+    return this.http.put<any>(environment.apiUrl + '/Admin/Settings/DriverPricing', pricing);
+  }
+
+  getErrandDriverEarning(): Observable<any> {
+    return this.http.get<any>(environment.apiUrl + '/Admin/Settings/ErrandDriverEarning');
+  }
+
+  saveErrandDriverEarning(setting: any): Observable<any> {
+    return this.http.put<any>(environment.apiUrl + '/Admin/Settings/ErrandDriverEarning', setting);
+  }
+
   /*
   getDashboard(): Observable<Dashboard> {    
     return this.http.get<Dashboard>(environment.apiUrl + '/Admin/Dashboard/');

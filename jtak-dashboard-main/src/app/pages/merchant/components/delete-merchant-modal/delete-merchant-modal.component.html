@@ -1,8 +1,8 @@
 <app-delete-modal
-moduleName="Merchant"
-title="Delete"
-[isLoading]="service.isLoading$ | async"
-(cancelClicked)="modal.dismiss()"
-(deleteClicked)="this.delete()"
+  moduleName="Merchant"
+  confirmationText="هل أنت متأكد من رغبتك في حذف هذا المتجر نهائياً؟ (تنبيه: المتاجر المرتبطة بطلبات أو فواتير سابقة لا يمكن حذفها من قاعدة البيانات، ويُفضل استخدام خيار التعطيل بدلاً من ذلك لإخفاء المتجر عن العملاء)."
+  [isLoading]="service.isLoading$ | async"
+  (cancelClicked)="modal.dismiss()"
+  (deleteClicked)="delete()"
 >
 </app-delete-modal>

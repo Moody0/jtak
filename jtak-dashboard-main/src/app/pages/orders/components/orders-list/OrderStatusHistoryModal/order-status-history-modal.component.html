@@ -1,60 +1,82 @@
-<div class="modal-header bg-light py-3">
-  <h4 class="modal-title fw-bolder text-dark d-flex align-items-center gap-2 m-0">
-    <i class="fas fa-history text-primary"></i>
-    <span>سجل تدقيق وتغييرات حالات الطلب #{{ order?.id }}</span>
-  </h4>
-  <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+<div class="modal-header history-header">
+  <div>
+    <div class="history-eyebrow">{{ 'ORDERS_PAGE.HISTORY_TITLE' | translate }}</div>
+    <h4 class="modal-title">#{{ order?.id }}</h4>
+  </div>
+  <button type="button" class="btn-close" [attr.aria-label]="'COMMON.CLOSE' | translate" (click)="modal.dismiss()"></button>
 </div>
 
-<div class="modal-body py-4">
-  <div *ngIf="errorMessage" class="alert alert-danger mb-4">
+<div class="modal-body history-body">
+  <div *ngIf="errorMessage" class="alert alert-danger mb-0">
     {{ errorMessage }}
   </div>
 
-  <div *ngIf="isLoading" class="text-center py-5">
+  <div *ngIf="isLoading" class="history-state">
     <div class="spinner-border text-primary" role="status"></div>
-    <div class="text-muted mt-2 fs-7">جاري تحميل سجل الحالات...</div>
+    <div>{{ 'ORDERS_PAGE.HISTORY_LOADING' | translate }}</div>
   </div>
 
-  <div *ngIf="!isLoading && history.length === 0" class="text-center py-5 text-muted">
-    <i class="fas fa-clipboard-list fs-1 mb-3 text-gray-300"></i>
-    <p>لا يوجد سجل حالات مسجل لهذا الطلب حتى الآن.</p>
+  <div *ngIf="!isLoading && history.length === 0" class="history-state">
+    <i class="fas fa-clipboard-list"></i>
+    <strong>{{ 'ORDERS_PAGE.HISTORY_EMPTY' | translate }}</strong>
   </div>
 
-  <div *ngIf="!isLoading && history.length > 0" class="timeline-widget">
-    <div class="timeline timeline-5 mt-3">
-      <div class="timeline-item mb-4" *ngFor="let h of history">
-        <div class="timeline-badge">
-          <i class="fas" [ngClass]="getStatusIcon(h.status)"></i>
-        </div>
-        <div class="timeline-content p-3 rounded bg-light border">
-          <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
-            <div class="d-flex align-items-center gap-2">
-              <span class="badge" [ngClass]="getStatusBadgeClass(h.status)">
-                {{ h.statusArabic || h.statusName }}
-              </span>
-              <span class="text-muted fs-8">بواسطة: <strong>{{ h.createdBy || 'النظام' }}</strong></span>
-            </div>
-            <div class="text-muted fs-8" dir="ltr">
-              {{ h.createdDate | date:'yyyy-MM-dd HH:mm:ss' }}
-            </div>
-          </div>
-
-          <div *ngIf="h.driverName" class="text-primary fs-8 mt-1">
-            <i class="fas fa-motorcycle me-1"></i>المندوب المرتبط: <strong>{{ h.driverName }}</strong>
-          </div>
-
-          <div *ngIf="h.details" class="text-dark fs-8 mt-2 p-2 bg-white rounded border">
-            <i class="fas fa-sticky-note text-warning me-1"></i>{{ h.details }}
-          </div>
-        </div>
+  <div *ngIf="!isLoading && history.length > 0" class="history-timeline">
+    <article class="history-entry" *ngFor="let h of history; let last = last">
+      <div class="history-marker" [ngClass]="getStatusBadgeClass(h.status)">
+        <i class="fas" [ngClass]="getStatusIcon(h.status)"></i>
       </div>
-    </div>
+
+      <div class="history-card" [class.history-card--last]="last">
+        <div class="history-card-top">
+          <div class="history-status-group">
+            <span class="history-status" [ngClass]="getStatusBadgeClass(h.status)">
+              {{ getHistoryStatusLabel(h) }}
+            </span>
+            <span class="history-time" dir="ltr">
+              <i class="far fa-clock"></i>{{ h.createdDate | date:'dd MMM yyyy, HH:mm' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="history-meta">
+          <span>
+            <i class="fas fa-user-edit"></i>{{ 'ORDERS_PAGE.HISTORY_BY' | translate }}
+            <strong>{{ h.createdBy || ('ORDERS_PAGE.HISTORY_SYSTEM' | translate) }}</strong>
+          </span>
+          <span *ngIf="h.driverName">
+            <i class="fas fa-motorcycle"></i>{{ 'ORDERS_PAGE.HISTORY_DRIVER' | translate }}
+            <strong>{{ h.driverName }}</strong>
+          </span>
+        </div>
+
+        <ng-container *ngIf="getDetailsView(h) as detailView">
+          <div *ngIf="detailView.items.length > 0" class="history-items">
+            <div class="history-section-title">
+              <i class="fas fa-shopping-basket"></i>{{ 'ORDERS_PAGE.HISTORY_ITEMS' | translate }}
+            </div>
+            <div class="history-item" *ngFor="let item of detailView.items">
+              <span class="history-item-quantity">{{ item.quantity }}×</span>
+              <span class="history-item-name">{{ item.title }}</span>
+              <span *ngIf="item.totalPrice" class="history-item-price">{{ item.totalPrice | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            </div>
+            <div *ngIf="detailView.total" class="history-total">
+              <span>{{ 'ORDERS_PAGE.HISTORY_TOTAL' | translate }}</span>
+              <strong>{{ detailView.total | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+            </div>
+          </div>
+
+          <div *ngIf="detailView.note" class="history-note">
+            <i class="fas fa-info-circle"></i><span>{{ detailView.note }}</span>
+          </div>
+        </ng-container>
+      </div>
+    </article>
   </div>
 </div>
 
-<div class="modal-footer bg-light py-2">
-  <button type="button" class="btn btn-sm btn-secondary" (click)="modal.dismiss()">
-    إغلاق
+<div class="modal-footer history-footer">
+  <button type="button" class="btn btn-light" (click)="modal.dismiss()">
+    {{ 'COMMON.CLOSE' | translate }}
   </button>
 </div>

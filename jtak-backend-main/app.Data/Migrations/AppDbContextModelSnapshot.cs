@@ -3,7 +3,10 @@ using System;
 using App.Shared.Data.App;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
 
 namespace App.Shared.Data.Migrations
 {
@@ -14,8 +17,94 @@ namespace App.Shared.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Relational:MaxIdentifierLength", 64)
-                .HasAnnotation("ProductVersion", "5.0.13");
+                .HasAnnotation("ProductVersion", "8.0.31")
+                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+
+            modelBuilder.Entity("App.Shared.Entities.AdminAuditLog", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<string>("Action")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("AdminEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("AdminName")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("AdminUserId")
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<string>("AfterStateJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("BeforeStateJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Module")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("AdminUserId");
+
+                    b.HasIndex("CorrelationId");
+
+                    b.HasIndex("CreatedDate");
+
+                    b.HasIndex("Module");
+
+                    b.HasIndex("Result");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("AdminAuditLogs");
+                });
 
             modelBuilder.Entity("App.Shared.Entities.AppUser", b =>
                 {
@@ -102,6 +191,9 @@ namespace App.Shared.Data.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<decimal>("MaxCashFloat")
+                        .HasColumnType("decimal(65,30)");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
@@ -151,7 +243,7 @@ namespace App.Shared.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("AspNetUsers");
+                    b.ToTable("AspNetUsers", (string)null);
                 });
 
             modelBuilder.Entity("App.Shared.Entities.City", b =>
@@ -159,6 +251,8 @@ namespace App.Shared.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("Country")
                         .HasColumnType("int");
@@ -179,6 +273,8 @@ namespace App.Shared.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("AddressType")
                         .HasColumnType("int");
@@ -257,6 +353,8 @@ namespace App.Shared.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<bool>("Active")
                         .HasColumnType("tinyint(1)");
 
@@ -297,11 +395,51 @@ namespace App.Shared.Data.Migrations
                     b.ToTable("Banners");
                 });
 
+            modelBuilder.Entity("App.Shared.Entities.Domain.ErrandStatusEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ActorRole")
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("ActorUserId")
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("FromStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<int>("SupportMessageId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupportMessageId", "CreatedDate");
+
+                    b.ToTable("ErrandStatusEvents");
+                });
+
             modelBuilder.Entity("App.Shared.Entities.Domain.Faq", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AnswerAr")
                         .HasColumnType("longtext");
@@ -379,6 +517,8 @@ namespace App.Shared.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
@@ -429,6 +569,8 @@ namespace App.Shared.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("AdminNotes")
                         .HasColumnType("longtext");
 
@@ -438,6 +580,89 @@ namespace App.Shared.Data.Migrations
 
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("ErrandApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal?>("ErrandCashCollected")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ErrandDeliveredAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrandDeliveryCode")
+                        .HasMaxLength(6)
+                        .HasColumnType("varchar(6)");
+
+                    b.Property<int>("ErrandDeliveryCodeFailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("ErrandDeliveryFee")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("ErrandDriverEarning")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ErrandDriverUserId")
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<decimal?>("ErrandItemPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ErrandItemsJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal?>("ErrandPickupLatitude")
+                        .HasColumnType("decimal(10,7)");
+
+                    b.Property<decimal?>("ErrandPickupLongitude")
+                        .HasColumnType("decimal(10,7)");
+
+                    b.Property<string>("ErrandPickupPlace")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<decimal?>("ErrandPurchaseCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ErrandPurchasedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("ErrandQuoteExpiresAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrandQuoteKey")
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<string>("ErrandReceiptPhotoToken")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ErrandReceiptReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<decimal?>("ErrandRefundAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ErrandRequestKey")
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<string>("ErrandReturnReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("ErrandReturnedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ErrandStatus")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrandUnavailableReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
 
                     b.Property<string>("Message")
                         .HasColumnType("longtext");
@@ -476,8 +701,8 @@ namespace App.Shared.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Status", "CreatedDate")
-                        .HasDatabaseName("IX_SupportMessages_Status_CreatedDate");
+                    b.HasIndex("ErrandRequestKey")
+                        .IsUnique();
 
                     b.ToTable("SupportMessages");
                 });
@@ -487,6 +712,8 @@ namespace App.Shared.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
@@ -512,6 +739,8 @@ namespace App.Shared.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("CoreId")
                         .HasColumnType("int");
@@ -568,12 +797,22 @@ namespace App.Shared.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AudienceApp")
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
 
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("DispatchKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
 
                     b.Property<string>("EntityData")
                         .HasColumnType("longtext");
@@ -589,6 +828,21 @@ namespace App.Shared.Data.Migrations
 
                     b.Property<int>("NotificationType")
                         .HasColumnType("int");
+
+                    b.Property<int>("PushAttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PushLockId")
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<DateTime?>("PushLockedUntilUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("PushNextAttemptAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("PushSentAtUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("TextAr")
                         .HasColumnType("longtext");
@@ -623,6 +877,11 @@ namespace App.Shared.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DispatchKey")
+                        .IsUnique();
+
+                    b.HasIndex("PushSentAtUtc", "PushNextAttemptAtUtc", "PushLockedUntilUtc");
+
                     b.ToTable("Notifications");
                 });
 
@@ -631,6 +890,8 @@ namespace App.Shared.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
@@ -668,11 +929,37 @@ namespace App.Shared.Data.Migrations
                     b.ToTable("NotificationMessage");
                 });
 
+            modelBuilder.Entity("App.Shared.Entities.PendingPhoneSignup", b =>
+                {
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("varchar(6)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("int");
+
+                    b.HasKey("PhoneNumber");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("PendingPhoneSignups");
+                });
+
             modelBuilder.Entity("App.Shared.Entities.SmsLog", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Code")
                         .HasColumnType("longtext");
@@ -760,7 +1047,7 @@ namespace App.Shared.Data.Migrations
                     b.HasIndex("ClientId")
                         .IsUnique();
 
-                    b.ToTable("OpenIddictApplications");
+                    b.ToTable("OpenIddictApplications", (string)null);
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization<System.Guid>", b =>
@@ -802,7 +1089,7 @@ namespace App.Shared.Data.Migrations
 
                     b.HasIndex("ApplicationId", "Status", "Subject", "Type");
 
-                    b.ToTable("OpenIddictAuthorizations");
+                    b.ToTable("OpenIddictAuthorizations", (string)null);
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreScope<System.Guid>", b =>
@@ -843,7 +1130,7 @@ namespace App.Shared.Data.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("OpenIddictScopes");
+                    b.ToTable("OpenIddictScopes", (string)null);
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreToken<System.Guid>", b =>
@@ -903,7 +1190,7 @@ namespace App.Shared.Data.Migrations
 
                     b.HasIndex("ApplicationId", "Status", "Subject", "Type");
 
-                    b.ToTable("OpenIddictTokens");
+                    b.ToTable("OpenIddictTokens", (string)null);
                 });
 
             modelBuilder.Entity("Solf.Identity.AppUserLogin", b =>
@@ -927,7 +1214,7 @@ namespace App.Shared.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserLogins");
+                    b.ToTable("AspNetUserLogins", (string)null);
                 });
 
             modelBuilder.Entity("Solf.Identity.RolePermission", b =>
@@ -967,7 +1254,7 @@ namespace App.Shared.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
 
-                    b.ToTable("AspNetRoles");
+                    b.ToTable("AspNetRoles", (string)null);
                 });
 
             modelBuilder.Entity("Solf.Identity.SolRoleClaim", b =>
@@ -975,6 +1262,8 @@ namespace App.Shared.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");
@@ -990,7 +1279,7 @@ namespace App.Shared.Data.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetRoleClaims");
+                    b.ToTable("AspNetRoleClaims", (string)null);
                 });
 
             modelBuilder.Entity("Solf.Identity.SolUserClaim", b =>
@@ -998,6 +1287,8 @@ namespace App.Shared.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");
@@ -1013,7 +1304,7 @@ namespace App.Shared.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserClaims");
+                    b.ToTable("AspNetUserClaims", (string)null);
                 });
 
             modelBuilder.Entity("Solf.Identity.SolUserRole", b =>
@@ -1028,7 +1319,7 @@ namespace App.Shared.Data.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetUserRoles");
+                    b.ToTable("AspNetUserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Solf.Identity.SolUserToken", b =>
@@ -1049,7 +1340,16 @@ namespace App.Shared.Data.Migrations
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
-                    b.ToTable("AspNetUserTokens");
+                    b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("App.Shared.Entities.Domain.ErrandStatusEvent", b =>
+                {
+                    b.HasOne("App.Shared.Entities.Domain.SupportMessage", null)
+                        .WithMany()
+                        .HasForeignKey("SupportMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("App.Shared.Entities.Domain.TestimonialTranslation", b =>

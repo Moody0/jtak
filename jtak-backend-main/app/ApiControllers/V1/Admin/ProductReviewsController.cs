@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Shared.Services;
 using App.Shared.Services.Domain;
 using AutoMapper;
@@ -63,6 +63,10 @@ namespace App.ApiControllers.V1.Admin
         [Route("Datatable")]
         public async Task<ActionResult<TableResponseModel<ProductReviewDto>>> Datatable([FromBody] MetronicTable request)
         {
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
             var lang = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
             var list = await _service.ListMetronicTableQueryable(request, x => new ProductReviewDto
             {
@@ -71,6 +75,9 @@ namespace App.ApiControllers.V1.Admin
                 ProductImage = x.ProductImage,
                 Rate = x.Rate,
                 TextReview = x.TextReview,
+                ReviewerId = x.ReviewerId,
+                ProductId = x.ProductId,
+                IsApproved = x.IsApproved,
             });
             return list;
         }

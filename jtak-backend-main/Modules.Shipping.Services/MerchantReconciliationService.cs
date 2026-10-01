@@ -166,7 +166,27 @@ namespace Modules.Accounting.Services
                 })
                 .ToDictionaryAsync(x => x.MerchantId);
 
-            // 3. Fetch Order aggregates per merchant from delivered order details
+            // 3. Fetch the authoritative aggregates from bills that were activated after
+            // successful delivery. Bills are created when shipping starts, so using all
+            // OrderDetails (or all Bills) would include pickup-time and cancelled orders.
+            // JTakAmount is already the complete platform share for the bill; do not add
+            // JTakAdditionalAmount again because it is a breakdown of that amount.
+            var billAggregates = await _accountingDb.Bills.AsNoTracking()
+                .Where(b => merchantIds.Contains(b.MerchantId) && b.IsAddedToDues)
+                .GroupBy(b => b.MerchantId)
+                .Select(g => new
+                {
+                    MerchantId = g.Key,
+                    OrdersCount = g.Select(x => x.OrderId).Distinct().Count(),
+                    GrossSales = g.Sum(x => x.TotalAmount),
+                    MerchantNet = g.Sum(x => x.MerchantAmount),
+                    JTakShare = g.Sum(x => x.JTakAmount)
+                })
+                .ToDictionaryAsync(x => x.MerchantId);
+
+            // Legacy fallback: older delivered orders may not have an activated Bill.
+            // Keep those rows visible until the historical data is backfilled, but prefer
+            // the authoritative bill totals whenever they exist for the merchant.
             var orderAggregates = await _ordersDb.OrderDetails.AsNoTracking()
                 .Where(d => merchantIds.Contains(d.MerchantId))
                 .GroupBy(d => d.MerchantId)
@@ -204,10 +224,14 @@ namespace Modules.Accounting.Services
                 var approvedAwaiting = activeAllocations.TryGetValue(m.Id, out var alloc2) ? alloc2.ApprovedAwaitingReceipt : 0m;
                 var available = Math.Max(0m, balance - reserved);
 
-                var orderStats = orderAggregates.TryGetValue(m.Id, out var stats) ? stats : null;
-                var gross = orderStats?.GrossSales ?? 0m;
-                var net = orderStats?.MerchantNet ?? 0m;
-                var jtakShare = Math.Max(0m, gross - net);
+                var hasBillStats = billAggregates.TryGetValue(m.Id, out var billStats);
+                var hasLegacyStats = orderAggregates.TryGetValue(m.Id, out var legacyStats);
+                var ordersCount = hasBillStats ? billStats.OrdersCount : (hasLegacyStats ? legacyStats.OrdersCount : 0);
+                var gross = hasBillStats ? billStats.GrossSales : (hasLegacyStats ? legacyStats.GrossSales : 0m);
+                var net = hasBillStats ? billStats.MerchantNet : (hasLegacyStats ? legacyStats.MerchantNet : 0m);
+                var jtakShare = hasBillStats
+                    ? Math.Max(0m, billStats.JTakShare)
+                    : Math.Max(0m, gross - net);
 
                 var latestSettle = latestSettlementByMerchant.TryGetValue(m.Id, out var ls) ? ls : null;
 
@@ -217,7 +241,7 @@ namespace Modules.Accounting.Services
                     MerchantName = m.Title,
                     OwnerName = m.OwnerName,
                     Phone = !string.IsNullOrWhiteSpace(m.Phone1) ? m.Phone1 : m.Phone2,
-                    OrdersCount = orderStats?.OrdersCount ?? 0,
+                    OrdersCount = ordersCount,
                     GrossSales = gross,
                     JTakShare = jtakShare,
                     MerchantNet = net,
@@ -333,6 +357,19 @@ namespace Modules.Accounting.Services
                     .ToDictionaryAsync(o => o.Id);
             }
 
+            // A Bill is created before delivery and activated only after a successful
+            // delivery. Use its stored totals in the statement so the detail view and
+            // the reconciliation row show the same JTAK share.
+            var deliveredBillsMap = new Dictionary<int, Bill>();
+            if (orderIdsToFetch.Count > 0)
+            {
+                deliveredBillsMap = await _accountingDb.Bills.AsNoTracking()
+                    .Where(b => b.MerchantId == merchantId &&
+                                b.IsAddedToDues &&
+                                orderIdsToFetch.Contains(b.OrderId))
+                    .ToDictionaryAsync(b => b.OrderId);
+            }
+
             // 6. Batch Fetch Linked Settlement Requests
             var settlementsMap = new Dictionary<string, SettlementRequest>();
             if (settlementIdsToFetch.Count > 0)
@@ -370,9 +407,14 @@ namespace Modules.Accounting.Services
                     item.Type = "مبيعات طلب";
 
                     var merchantItems = order.OrderDetails?.Where(d => d.MerchantId == merchantId).ToList() ?? new List<OrderDetail>();
-                    var gross = merchantItems.Sum(d => (decimal)d.Quantity * (d.SingleFinalPrice > 0 ? d.SingleFinalPrice : d.SinglePrice));
-                    var net = item.Credit;
-                    var jtakShare = Math.Max(0m, gross - net);
+                    var hasDeliveredBill = deliveredBillsMap.TryGetValue(order.Id, out var deliveredBill);
+                    var gross = hasDeliveredBill
+                        ? deliveredBill.TotalAmount
+                        : merchantItems.Sum(d => (decimal)d.Quantity * (d.SingleFinalPrice > 0 ? d.SingleFinalPrice : d.SinglePrice));
+                    var net = hasDeliveredBill ? deliveredBill.MerchantAmount : item.Credit;
+                    var jtakShare = hasDeliveredBill
+                        ? Math.Max(0m, deliveredBill.JTakAmount)
+                        : Math.Max(0m, gross - net);
 
                     item.GrossAmount = gross > 0 ? gross : item.Credit;
                     item.MerchantNet = net;
@@ -459,12 +501,19 @@ namespace Modules.Accounting.Services
             if (!string.IsNullOrWhiteSpace(request.SearchTerm))
             {
                 var term = request.SearchTerm.Trim().ToLowerInvariant();
+                var cleanDigits = new string(term.Where(char.IsDigit).ToArray());
+
                 filteredTransactions = filteredTransactions.Where(t =>
                     (t.TransactionNumber != null && t.TransactionNumber.ToLowerInvariant().Contains(term)) ||
                     (t.OrderNumber.HasValue && t.OrderNumber.Value.ToString().Contains(term)) ||
+                    (t.OrderNumber.HasValue && !string.IsNullOrEmpty(cleanDigits) && t.OrderNumber.Value.ToString() == cleanDigits) ||
                     (t.SettlementRequestNumber != null && t.SettlementRequestNumber.ToLowerInvariant().Contains(term)) ||
                     (t.Description != null && t.Description.ToLowerInvariant().Contains(term)) ||
                     (t.CustomerName != null && t.CustomerName.ToLowerInvariant().Contains(term)) ||
+                    (t.CustomerPhone != null && t.CustomerPhone.Contains(term)) ||
+                    (t.Type != null && t.Type.ToLowerInvariant().Contains(term)) ||
+                    (t.PaymentMethod != null && t.PaymentMethod.ToLowerInvariant().Contains(term)) ||
+                    (t.FinancialStatus != null && t.FinancialStatus.ToLowerInvariant().Contains(term)) ||
                     (t.ReferenceId != null && t.ReferenceId.ToLowerInvariant().Contains(term)));
             }
 

@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { SubSink } from 'subsink';
@@ -34,7 +34,7 @@ export class AuditLogsListComponent
     topAdmin: 'Admin',
   };
 
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
   paginator: PaginatorState;
   sorting: SortState = new SortState();
   isLoading: boolean = false;
@@ -47,28 +47,28 @@ export class AuditLogsListComponent
 
   readonly modules = [
     { value: '', label: 'AUDIT_LOGS_PAGE.FILTER_ALL' },
-    { value: 'Orders', label: 'الطلبات (Orders)' },
-    { value: 'Settlements', label: 'التسويات والمالية (Settlements)' },
-    { value: 'Merchants', label: 'التجار والشركاء (Merchants)' },
-    { value: 'Users', label: 'المستخدمون والمناديب (Users)' },
-    { value: 'Catalog', label: 'الكتالوج والمنتجات (Catalog)' },
-    { value: 'Banners', label: 'الإعلانات والبنرات (Banners)' },
-    { value: 'Settings', label: 'إعدادات النظام (Settings)' },
-    { value: 'Auth', label: 'المصادقة والدخول (Auth)' },
+    { value: 'Orders', label: 'الطلبات' },
+    { value: 'Settlements', label: 'التسويات والمالية' },
+    { value: 'Merchants', label: 'التجار والشركاء' },
+    { value: 'Users', label: 'المستخدمون والمناديب' },
+    { value: 'Catalog', label: 'الكتالوج والمنتجات' },
+    { value: 'Banners', label: 'الإعلانات والبنرات' },
+    { value: 'Settings', label: 'إعدادات النظام' },
+    { value: 'Auth', label: 'المصادقة والدخول' },
   ];
 
   readonly actions = [
     { value: '', label: 'AUDIT_LOGS_PAGE.FILTER_ALL' },
-    { value: 'Create', label: 'إنشاء (Create)' },
-    { value: 'Update', label: 'تعديل (Update)' },
-    { value: 'Delete', label: 'حذف (Delete)' },
-    { value: 'Archive', label: 'أرشفة (Archive)' },
-    { value: 'Restore', label: 'استعادة (Restore)' },
-    { value: 'Approve', label: 'موافقة وقبول (Approve)' },
-    { value: 'Reject', label: 'رفض (Reject)' },
-    { value: 'Pay', label: 'صرف مالي (Pay)' },
-    { value: 'Deliver', label: 'تسليم (Deliver)' },
-    { value: 'AssignDriver', label: 'تعيين مندوب (Assign)' },
+    { value: 'Create', label: 'إنشاء' },
+    { value: 'Update', label: 'تعديل' },
+    { value: 'Delete', label: 'حذف' },
+    { value: 'Archive', label: 'أرشفة' },
+    { value: 'Restore', label: 'استعادة' },
+    { value: 'Approve', label: 'موافقة وقبول' },
+    { value: 'Reject', label: 'رفض' },
+    { value: 'Pay', label: 'صرف مالي' },
+    { value: 'Deliver', label: 'تسليم' },
+    { value: 'AssignDriver', label: 'تعيين مندوب' },
   ];
 
   readonly results = [
@@ -78,12 +78,15 @@ export class AuditLogsListComponent
   ];
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public auditLogsService: AuditLogsService,
     private modalService: NgbModal
   ) {}
 
   ngOnInit(): void {
+    // Keep the last successful totals visible while the page refreshes them.
+    this.summary = this.auditLogsService.getCachedSummary() || this.summary;
+
     this.subs.sink = this.auditLogsService.isLoading$.subscribe((val) => {
       this.isLoading = val;
     });
@@ -100,6 +103,7 @@ export class AuditLogsListComponent
     this.subs.sink = this.auditLogsService.getSummary().subscribe({
       next: (summary) => {
         this.summary = summary;
+        this.auditLogsService.cacheSummary(summary);
       },
       error: () => {},
     });
@@ -137,6 +141,143 @@ export class AuditLogsListComponent
       filter,
       paginator,
     });
+  }
+
+  filterAll(): void {
+    this.clearKpiFilters();
+  }
+
+  filterToday(): void {
+    const today = this.getDamascusToday();
+    this.applyKpiFilters({ fromDate: today, toDate: today });
+  }
+
+  filterThisWeek(): void {
+    const today = this.getDamascusToday();
+    this.applyKpiFilters({
+      fromDate: this.getWeekStart(today),
+      toDate: today,
+    });
+  }
+
+  filterByResult(result: string): void {
+    this.applyKpiFilters({ result });
+  }
+
+  filterByModule(module: string): void {
+    if (!module) return;
+    this.applyKpiFilters({ module });
+  }
+
+  isDateFilterActive(range: 'today' | 'week'): boolean {
+    const today = this.getDamascusToday();
+    if (range === 'today') return this.fromDate === today && this.toDate === today;
+
+    return this.fromDate === this.getWeekStart(today) && this.toDate === today;
+  }
+
+  private applyKpiFilters(options: {
+    module?: string;
+    result?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): void {
+    this.selectedModule = options.module || '';
+    this.selectedAction = '';
+    this.selectedResult = options.result || '';
+    this.fromDate = options.fromDate || '';
+    this.toDate = options.toDate || '';
+    this.searchGroup?.controls.searchTerm.setValue('', { emitEvent: false });
+
+    const filter: any = {};
+    if (this.selectedModule) filter.module = this.selectedModule;
+    if (this.selectedResult) filter.result = this.selectedResult;
+    if (this.fromDate) filter.fromDate = this.fromDate;
+    if (this.toDate) filter.toDate = this.toDate;
+
+    const paginator = this.auditLogsService.paginator;
+    paginator.page = 1;
+    this.auditLogsService.patchState({ filter, searchTerm: '', paginator });
+  }
+
+  private clearKpiFilters(): void {
+    this.selectedModule = '';
+    this.selectedAction = '';
+    this.selectedResult = '';
+    this.fromDate = '';
+    this.toDate = '';
+    this.searchGroup?.controls.searchTerm.setValue('', { emitEvent: false });
+    const paginator = this.auditLogsService.paginator;
+    paginator.page = 1;
+    this.auditLogsService.patchState({ filter: {}, searchTerm: '', paginator });
+  }
+
+  private getDamascusToday(): string {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Damascus',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const value = (type: string) => parts.find((part) => part.type === type)?.value;
+    return `${value('year')}-${value('month')}-${value('day')}`;
+  }
+
+  private getWeekStart(today: string): string {
+    const date = new Date(`${today}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+    return date.toISOString().slice(0, 10);
+  }
+
+  getModuleLabel(module?: string): string {
+    const labels: { [key: string]: string } = {
+      Orders: 'الطلبات',
+      Settlements: 'التسويات والمالية',
+      Merchants: 'التجار والشركاء',
+      Users: 'المستخدمون والمناديب',
+      Catalog: 'الكتالوج والمنتجات',
+      Banners: 'الإعلانات والبنرات',
+      Settings: 'إعدادات النظام',
+      Auth: 'المصادقة والدخول',
+      System: 'النظام',
+    };
+    return labels[module || ''] || module || '—';
+  }
+
+  getActionLabel(action?: string): string {
+    const labels: { [key: string]: string } = {
+      Create: 'إنشاء',
+      Update: 'تعديل',
+      Delete: 'حذف',
+      Archive: 'أرشفة',
+      Restore: 'استعادة',
+      Approve: 'موافقة وقبول',
+      Reject: 'رفض',
+      Pay: 'صرف مالي',
+      Deliver: 'تسليم',
+      AssignDriver: 'تعيين مندوب',
+      Login: 'تسجيل الدخول',
+      Logout: 'تسجيل الخروج',
+      Execute: 'تنفيذ',
+    };
+    return labels[action || ''] || action || '—';
+  }
+
+  getEntityLabel(entityType?: string): string {
+    const labels: { [key: string]: string } = {
+      Order: 'طلب',
+      Merchant: 'متجر',
+      Product: 'منتج',
+      User: 'مستخدم',
+      Delivery: 'مندوب توصيل',
+      Driver: 'مندوب توصيل',
+      SettlementRequest: 'طلب تسوية',
+      Payment: 'دفعة مالية',
+      Banner: 'إعلان',
+      Category: 'تصنيف',
+      Settings: 'إعدادات',
+    };
+    return labels[entityType || ''] || entityType || '—';
   }
 
   resetFilters(): void {

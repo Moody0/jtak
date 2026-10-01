@@ -1,7 +1,9 @@
+using App.Orders.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Modules.Accounting.Data;
 using Modules.Accounting.Entities;
+using Modules.Orders.Entities;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -13,36 +15,175 @@ namespace Modules.Accounting.Services
     public class SettlementRequestService : ISettlementRequestService
     {
         private readonly AccountingDbContext _context;
+        private readonly OrdersDbContext _ordersContext;
         private readonly ILedgerService _ledger;
         private readonly ILogger<SettlementRequestService> _logger;
+        private readonly DriverFinancialSafetyService _safety;
 
-        public SettlementRequestService(AccountingDbContext context, ILedgerService ledger, ILogger<SettlementRequestService> logger)
+        public SettlementRequestService(AccountingDbContext context, ILedgerService ledger, ILogger<SettlementRequestService> logger,
+            OrdersDbContext ordersContext = null, DriverFinancialSafetyService safety = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _ledger = ledger ?? throw new ArgumentNullException(nameof(ledger));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _ordersContext = ordersContext;
+            _safety = safety ?? new DriverFinancialSafetyService(context, ledger, orders: ordersContext);
         }
 
         public async Task<SettlementBalanceDto> GetCaptainBalanceAsync(Guid captainUserId, string currency = "SYP")
         {
             currency = NormalizeCurrency(currency);
             var gross = await _ledger.GetUserCashFloatBalanceAsync(captainUserId, currency);
-            var active = await _context.SettlementRequests
+            var activeAmounts = await _context.SettlementRequests
                 .Where(x => x.RequestedByUserId == captainUserId &&
                             x.PartyType == SettlementPartyType.Captain &&
                             x.Currency == currency &&
                             (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved))
+                .Select(x => x.Amount).ToListAsync();
+            var active = activeAmounts.Sum();
+
+            var position = await _safety.GetPositionAsync(captainUserId, currency: currency);
+            var hasPendingAccounting = position.HasUnfinishedAccounting;
+            var availableCustody = hasPendingAccounting ? 0m : Math.Max(0m, gross - active - position.ReservedForPurchases);
+
+            // Compute driver earnings to calculate smart netting breakdown
+            var earningsGross = await _ledger.GetUserEarningsBalanceAsync(captainUserId, currency);
+            var activeEarnings = await _context.SettlementRequests
+                .Where(x => x.RequestedByUserId == captainUserId &&
+                            x.PartyType == SettlementPartyType.CaptainEarnings &&
+                            x.Currency == currency &&
+                            (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved))
                 .SumAsync(x => (decimal?)x.Amount) ?? 0m;
+            var availableEarnings = hasPendingAccounting ? 0m : Math.Max(0m, earningsGross - activeEarnings);
+
+            var wagesOffset = Math.Min(availableCustody, Math.Max(0m, availableEarnings));
+            var netCashDue = Math.Max(0m, availableCustody - wagesOffset);
+            var isCovered = availableEarnings > 0m && availableCustody >= availableEarnings;
 
             return new SettlementBalanceDto
             {
                 GrossAmount = gross,
+                CustodyBalance = gross,
                 PendingAmount = active,
-                AvailableAmount = Math.Max(0m, gross - active),
+                ReservedPurchaseAmount = position.ReservedForPurchases,
+                AvailableAmount = availableCustody,
+                WagesOffset = wagesOffset,
+                NetCashDue = netCashDue,
+                IsCoveredByCustody = isCovered,
                 Currency = currency,
-                HasPendingRequest = active > 0m
+                HasPendingRequest = active > 0m,
+                HasPendingAccountingOrders = hasPendingAccounting
             };
         }
+
+        public async Task<CaptainEarningsWalletDto> GetCaptainEarningsAsync(Guid captainUserId, string currency = "SYP")
+        {
+            currency = NormalizeCurrency(currency);
+            var entries = await _context.LedgerEntries.AsNoTracking()
+                .Where(x => x.Account.OwnerUserId == captainUserId &&
+                            x.Account.Type == AccountType.Liability &&
+                            x.Account.AccountCode.StartsWith(SystemAccountCodes.CaptainEarningsPrefix) &&
+                            x.Currency == currency)
+                .Select(x => new { x.Credit, x.Debit, x.Transaction.ReferenceType }).ToListAsync();
+            var gross = entries.Sum(x => x.Credit - x.Debit);
+            // Reversal/correction debits are not cash payouts. Net lifetime
+            // earnings include those corrections; payouts include EOD offsets.
+            var paid = entries.Where(x => x.ReferenceType == "CaptainEarningsPayout" || x.ReferenceType == "FleetSettlement" || x.ReferenceType == "CaptainSettlementRequest")
+                .Sum(x => x.Debit - x.Credit);
+            var requests = await GetMineAsync(captainUserId, SettlementPartyType.CaptainEarnings);
+            var active = requests.Where(x => x.Currency == currency &&
+                (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved)).Sum(x => x.Amount);
+            var position = await _safety.GetPositionAsync(captainUserId, currency: currency);
+            var pendingAccounting = position.HasUnfinishedAccounting;
+            var available = pendingAccounting ? 0m : Math.Max(0m, gross - active);
+
+            var custodyGross = position.Cash;
+            var custodySpendable = position.SpendableCash;
+            var wagesOffset = Math.Min(custodySpendable, Math.Max(0m, available));
+            var netCashDue = Math.Max(0m, custodySpendable - wagesOffset);
+            var isCovered = available > 0m && custodySpendable >= available;
+
+            return new CaptainEarningsWalletDto
+            {
+                GrossAmount = gross,
+                CustodyBalance = custodyGross,
+                TotalPaid = paid,
+                TotalEarned = gross + paid,
+                PendingAmount = active,
+                AvailableAmount = available,
+                WagesOffset = wagesOffset,
+                NetCashDue = netCashDue,
+                IsCoveredByCustody = isCovered,
+                Currency = currency,
+                HasPendingRequest = active > 0m,
+                HasPendingAccountingOrders = pendingAccounting,
+                Requests = requests.Take(50).ToList()
+            };
+        }
+
+        public Task<SettlementRequestDto> CreateCaptainEarningsRequestAsync(Guid userId, string name, string phone, CreateSettlementRequestDto request) =>
+            _safety.WithDriverLockAsync(userId, () => InFinancialTransactionAsync(async () =>
+            {
+                var balance = await GetCaptainEarningsAsync(userId);
+                if (balance.HasPendingAccountingOrders)
+                    throw new InvalidOperationException("هناك طلبات مسلّمة قيد المعالجة المحاسبية. يرجى المحاولة بعد اكتمالها.");
+                if (balance.HasPendingRequest)
+                    throw new InvalidOperationException("يوجد طلب صرف مستحقات قيد المعالجة بالفعل.");
+                if (balance.IsCoveredByCustody)
+                    throw new InvalidOperationException("مستحقاتك مغطاة بالكامل من العهدة النقدية المسجلة بحوزتك. يتم اقتطاعها مباشرة عند تسليم صافي العهدة للإدارة.");
+                var maxPayable = balance.WagesOffset > 0m ? Math.Max(0m, balance.AvailableAmount - balance.WagesOffset) : balance.AvailableAmount;
+                if (maxPayable <= 0m)
+                    throw new InvalidOperationException("مستحقاتك مغطاة بالكامل من العهدة النقدية المسجلة بحوزتك. يتم اقتطاعها مباشرة عند تسليم صافي العهدة للإدارة.");
+                var amount = request?.Amount ?? maxPayable;
+                if (amount <= 0m || amount != Math.Round(amount, 2) || amount > maxPayable)
+                    throw new InvalidOperationException(balance.WagesOffset > 0m
+                        ? $"المبلغ المطلوب يتجاوز المستحقات غير المغطاة بالعهدة النقدية ({maxPayable:N0} ل.س)."
+                        : "مبلغ الصرف غير صالح أو يتجاوز الأرباح المتاحة.");
+                var entity = NewRequest(SettlementPartyType.CaptainEarnings, userId, name, phone, amount, "SYP", request);
+                // The driver cannot select an unrelated treasury/payment source.
+                entity.Method = "cash_driver_payout";
+                _context.SettlementRequests.Add(entity);
+                await _context.SaveChangesAsync();
+                return Map(entity);
+            }));
+
+        public Task<SettlementRequestDto> CompleteCaptainEarningsPayoutAsync(Guid requestId, Guid adminId, string notes = null) =>
+            WithRequestDriverLockAsync(requestId, () => InFinancialTransactionAsync(async () =>
+            {
+                var entity = await TrackingQuery().FirstOrDefaultAsync(x => x.Id == requestId)
+                    ?? throw new InvalidOperationException("طلب صرف المستحقات غير موجود.");
+                if (entity.PartyType != SettlementPartyType.CaptainEarnings)
+                    throw new InvalidOperationException("هذا الإجراء متاح لصرف مستحقات السائق فقط.");
+                if (entity.Status == SettlementRequestStatus.Completed) return Map(entity);
+                if (entity.Status != SettlementRequestStatus.Approved)
+                    throw new InvalidOperationException("يجب الموافقة على الطلب أولاً قبل تأكيد دفع المستحقات.");
+                var balance = await GetCaptainEarningsAsync(entity.RequestedByUserId, entity.Currency);
+                if (balance.HasPendingAccountingOrders || balance.GrossAmount < entity.Amount)
+                    throw new InvalidOperationException("الرصيد غير كافٍ أو توجد قيود محاسبية معلقة. لم يتم الصرف.");
+                var earnings = await _ledger.GetOrCreateUserAccountAsync(entity.RequestedByUserId, AccountType.Liability,
+                    SystemAccountCodes.CaptainEarningsPrefix, $"Earnings - {entity.RequestedByName}", entity.Currency);
+                var vault = await _ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.CompanyMainVault,
+                    "Company Cash Vault", AccountType.Asset, entity.Currency);
+                if (await _ledger.GetAccountBalanceAsync(vault.Id) < entity.Amount)
+                    throw new InvalidOperationException("رصيد خزينة جيتك غير كافٍ لصرف المستحقات. لم يتم الخصم.");
+                var txn = await _ledger.PostTransactionAsync(new PostTransactionRequest
+                {
+                    ReferenceType = "CaptainEarningsPayout", ReferenceId = entity.Id.ToString(),
+                    IdempotencyKey = $"CaptainEarningsPayout-{entity.Id}",
+                    Description = $"Driver earnings paid for {entity.RequestNumber}",
+                    Entries = new List<PostLedgerEntryRequest>
+                    {
+                        new() { AccountId = earnings.Id, Debit = entity.Amount, Currency = entity.Currency, Memo = $"Driver paid for {entity.RequestNumber}" },
+                        new() { AccountId = vault.Id, Credit = entity.Amount, Currency = entity.Currency, Memo = $"Cash paid for {entity.RequestNumber}" }
+                    }
+                });
+                entity.Status = SettlementRequestStatus.Completed;
+                entity.LedgerTransactionId = txn.Id;
+                entity.CompletedByAdminId = adminId; entity.CompletedAt = DateTime.UtcNow;
+                if (!string.IsNullOrWhiteSpace(notes)) entity.Notes = JoinNotes(entity.Notes, notes);
+                await _context.SaveChangesAsync();
+                return Map(entity);
+            }));
 
         public async Task<SettlementBalanceDto> GetMerchantBalanceAsync(IEnumerable<int> merchantIds, string currency = "SYP")
         {
@@ -61,38 +202,50 @@ namespace Modules.Accounting.Services
                              x.SettlementRequest.Status == SettlementRequestStatus.Approved))
                 .SumAsync(x => (decimal?)x.Amount) ?? 0m;
 
+            var hasPendingAccounting = _ordersContext != null && ids.Length > 0 && await _ordersContext.Orders
+                .AnyAsync(x => x.AccountingStatus == OrderAccountingStatus.PendingAccounting &&
+                               x.OrderDetails.Any(d => ids.Contains(d.MerchantId)));
+
             return new SettlementBalanceDto
             {
                 GrossAmount = gross,
                 PendingAmount = active,
-                AvailableAmount = Math.Max(0m, gross - active),
+                AvailableAmount = hasPendingAccounting ? 0m : Math.Max(0m, gross - active),
                 Currency = currency,
-                HasPendingRequest = active > 0m
+                HasPendingRequest = active > 0m,
+                HasPendingAccountingOrders = hasPendingAccounting
             };
         }
 
         public Task<SettlementRequestDto> CreateCaptainRequestAsync(Guid userId, string name, string phone, CreateSettlementRequestDto request) =>
-            InFinancialTransactionAsync(() => CreateCaptainRequestCoreAsync(userId, name, phone, request));
+            _safety.WithDriverLockAsync(userId, () => InFinancialTransactionAsync(() => CreateCaptainRequestCoreAsync(userId, name, phone, request)));
 
         private async Task<SettlementRequestDto> CreateCaptainRequestCoreAsync(Guid userId, string name, string phone, CreateSettlementRequestDto request)
         {
             var currency = "SYP";
             var balance = await GetCaptainBalanceAsync(userId, currency);
+            if (balance.HasPendingAccountingOrders)
+                throw new InvalidOperationException("لا يمكن طلب تسوية مالية للمندوب لوجود طلبات مسلّمة معلقة لم تكتمل قيودها المحاسبية بعد.");
             if (balance.HasPendingRequest)
                 throw new InvalidOperationException("يوجد طلب تسوية قيد المراجعة بالفعل.");
             if (balance.GrossAmount <= 0m)
                 throw new InvalidOperationException("لا توجد عهدة نقدية لتسويتها حالياً.");
 
-            var amount = request?.Amount.HasValue == true && request.Amount.Value > 0
+            var isNetHandover = balance.WagesOffset > 0m && (request?.Method == "cash_to_admin_net" || (request?.Amount.HasValue == true && request.Amount.Value == balance.NetCashDue));
+            var amount = isNetHandover && request?.Amount.HasValue == true
                 ? request.Amount.Value
-                : balance.AvailableAmount;
+                : (isNetHandover ? balance.NetCashDue : (request?.Amount.HasValue == true && request.Amount.Value > 0 ? request.Amount.Value : balance.AvailableAmount));
 
-            if (amount <= 0m)
+            if (amount < 0m || (amount == 0m && !isNetHandover))
                 throw new InvalidOperationException("يرجى إدخال مبلغ صحيح أكبر من الصفر.");
             if (amount > balance.AvailableAmount)
                 throw new InvalidOperationException($"المبلغ المطلوب يتجاوز العهدة المتاحة ({balance.AvailableAmount:N0} {currency}).");
 
             var entity = NewRequest(SettlementPartyType.Captain, userId, name, phone, amount, currency, request);
+            if (isNetHandover)
+            {
+                entity.Method = "cash_to_admin_net";
+            }
             _context.SettlementRequests.Add(entity);
             await _context.SaveChangesAsync();
             return Map(entity);
@@ -112,6 +265,8 @@ namespace Modules.Accounting.Services
 
             var currency = "SYP";
             var balance = await GetMerchantBalanceAsync(sources.Select(x => x.MerchantId), currency);
+            if (balance.HasPendingAccountingOrders)
+                throw new InvalidOperationException("لا يمكن طلب تسوية مالية للمتجر لوجود طلبات مسلّمة معلقة لم تكتمل قيودها المحاسبية بعد.");
             var amount = request?.Amount ?? balance.AvailableAmount;
             if (amount <= 0m)
                 throw new InvalidOperationException("يرجى إدخال مبلغ صحيح أكبر من الصفر.");
@@ -162,17 +317,35 @@ namespace Modules.Accounting.Services
         }
 
         public Task<SettlementRequestDto> AcceptAsync(Guid requestId, Guid adminId, string notes = null) =>
-            InFinancialTransactionAsync(() => AcceptCoreAsync(requestId, adminId, notes));
+            WithRequestDriverLockAsync(requestId, () => InFinancialTransactionAsync(() => AcceptCoreAsync(requestId, adminId, notes)));
 
         private async Task<SettlementRequestDto> AcceptCoreAsync(Guid requestId, Guid adminId, string notes)
         {
             var entity = await TrackingQuery().FirstOrDefaultAsync(x => x.Id == requestId)
                 ?? throw new InvalidOperationException("طلب التسوية غير موجود.");
+            if (entity.Status == SettlementRequestStatus.Completed ||
+                (entity.PartyType == SettlementPartyType.CaptainEarnings && entity.Status == SettlementRequestStatus.Approved))
+                return Map(entity);
             if (entity.Status != SettlementRequestStatus.Pending)
                 throw new InvalidOperationException("تمت معالجة طلب التسوية مسبقاً.");
 
+            if (entity.PartyType == SettlementPartyType.CaptainEarnings)
+            {
+                var earnings = await GetCaptainEarningsAsync(entity.RequestedByUserId, entity.Currency);
+                if (earnings.HasPendingAccountingOrders || earnings.GrossAmount < entity.Amount)
+                    throw new InvalidOperationException("الرصيد غير كافٍ أو توجد قيود محاسبية معلقة. لم تتم الموافقة.");
+            }
+
             if (entity.PartyType == SettlementPartyType.Captain)
             {
+                var position = await _safety.GetPositionAsync(entity.RequestedByUserId,
+                    excludeHandoverId: entity.Id, currency: entity.Currency);
+                if (position.HasUnfinishedAccounting)
+                    throw new InvalidOperationException("لا يمكن اعتماد تسوية المندوب لوجود طلبات مسلّمة معلقة للمندوب قيد المعالجة المحاسبية.");
+
+                if (position.SpendableCash < entity.Amount)
+                    throw new InvalidOperationException("المبلغ محجوز لطلبات شراء أو تسوية أخرى. أكملها قبل تسليم العهدة.");
+
                 var currentFloat = await _ledger.GetUserCashFloatBalanceAsync(entity.RequestedByUserId, entity.Currency);
                 if (currentFloat + 0.001m < entity.Amount)
                     throw new InvalidOperationException($"عهدة المندوب الحالية ({currentFloat:N0} {entity.Currency}) أقل من المبلغ المطلوب تسويته ({entity.Amount:N0} {entity.Currency}).");
@@ -181,17 +354,51 @@ namespace Modules.Accounting.Services
                     SystemAccountCodes.CaptainCashFloatPrefix, $"Cash Float - {entity.RequestedByName}", entity.Currency);
                 var vault = await _ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.CompanyMainVault,
                     "Company Cash Vault", AccountType.Asset, entity.Currency);
+
+                // Smart netting: If this is a net handover request, offset driver wages up to the difference
+                var wagesToOffset = 0m;
+                Account wagesAcc = null;
+                if (entity.Method == "cash_to_admin_net")
+                {
+                    wagesAcc = await _ledger.GetOrCreateUserAccountAsync(entity.RequestedByUserId, AccountType.Liability,
+                        SystemAccountCodes.CaptainEarningsPrefix, $"Earnings - {entity.RequestedByName}", entity.Currency);
+                    var wagesBal = await _ledger.GetAccountBalanceAsync(wagesAcc.Id);
+                    wagesToOffset = Math.Min(currentFloat - entity.Amount, Math.Max(0m, wagesBal));
+                }
+                var totalFloatToClear = entity.Amount + wagesToOffset;
+
+                var entries = new List<PostLedgerEntryRequest>();
+                if (entity.Amount > 0m)
+                {
+                    entries.Add(new() { AccountId = vault.Id, Debit = entity.Amount, Currency = entity.Currency, Memo = $"Cash received for {entity.RequestNumber}" });
+                }
+
+                if (wagesToOffset > 0m)
+                {
+                    entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = wagesAcc.Id,
+                        Debit = wagesToOffset,
+                        Currency = entity.Currency,
+                        Memo = $"Driver earnings offset against custody for {entity.RequestNumber}"
+                    });
+                }
+
+                entries.Add(new PostLedgerEntryRequest
+                {
+                    AccountId = captainFloat.Id,
+                    Credit = totalFloatToClear,
+                    Currency = entity.Currency,
+                    Memo = $"Captain custody cleared by {entity.RequestNumber}"
+                });
+
                 var txn = await _ledger.PostTransactionAsync(new PostTransactionRequest
                 {
                     ReferenceType = "CaptainSettlementRequest",
                     ReferenceId = entity.Id.ToString(),
                     IdempotencyKey = $"CaptainSettlementRequest-{entity.Id}",
-                    Description = $"Cash received from captain {entity.RequestedByName}",
-                    Entries = new List<PostLedgerEntryRequest>
-                    {
-                        new() { AccountId = vault.Id, Debit = entity.Amount, Currency = entity.Currency, Memo = $"Cash received for {entity.RequestNumber}" },
-                        new() { AccountId = captainFloat.Id, Credit = entity.Amount, Currency = entity.Currency, Memo = $"Captain custody cleared by {entity.RequestNumber}" }
-                    }
+                    Description = $"Cash received from captain {entity.RequestedByName}" + (wagesToOffset > 0m ? $" (wages offset: {wagesToOffset:N2} {entity.Currency})" : ""),
+                    Entries = entries
                 });
 
                 entity.Status = SettlementRequestStatus.Completed;
@@ -218,7 +425,8 @@ namespace Modules.Accounting.Services
         {
             var entity = await TrackingQuery().FirstOrDefaultAsync(x => x.Id == requestId)
                 ?? throw new InvalidOperationException("طلب التسوية غير موجود.");
-            if (entity.Status != SettlementRequestStatus.Pending)
+            if (entity.Status != SettlementRequestStatus.Pending &&
+                !(entity.PartyType == SettlementPartyType.CaptainEarnings && entity.Status == SettlementRequestStatus.Approved))
                 throw new InvalidOperationException("لا يمكن رفض الطلب بعد قبوله أو معالجته مسبقاً.");
             entity.Status = SettlementRequestStatus.Rejected;
             entity.RejectionReason = string.IsNullOrWhiteSpace(reason) ? "لم تتم الموافقة على طلب التسوية." : reason.Trim();
@@ -246,6 +454,15 @@ namespace Modules.Accounting.Services
 
             if (entity.Status != SettlementRequestStatus.Approved)
                 throw new InvalidOperationException("يجب قبول طلب التاجر أولاً قبل تأكيد الاستلام.");
+
+            if (_ordersContext != null && entity.MerchantAllocations.Any())
+            {
+                var allocMerchantIds = entity.MerchantAllocations.Select(a => a.MerchantId).Distinct().ToArray();
+                if (await _ordersContext.Orders.AnyAsync(x => x.AccountingStatus == OrderAccountingStatus.PendingAccounting && x.OrderDetails.Any(d => allocMerchantIds.Contains(d.MerchantId))))
+                {
+                    throw new InvalidOperationException("لا يمكن صرف تسوية المتجر لوجود طلبات مسلّمة معلقة للمتجر قيد المعالجة المحاسبية.");
+                }
+            }
 
             return await PostMerchantPayoutJournalAsync(entity, notes, isMerchantConfirmation: false, completedByAdminId: adminId);
         }
@@ -370,13 +587,20 @@ namespace Modules.Accounting.Services
         private async Task<T> InFinancialTransactionAsync<T>(Func<Task<T>> action)
         {
             // The in-memory provider used by unit tests does not support transactions.
-            if (!_context.Database.IsRelational())
+            if (!_context.Database.IsRelational() || _context.Database.CurrentTransaction != null)
                 return await action();
 
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             var result = await action();
             await transaction.CommitAsync();
             return result;
+        }
+
+        private async Task<T> WithRequestDriverLockAsync<T>(Guid requestId, Func<Task<T>> action)
+        {
+            var request = await _context.SettlementRequests.AsNoTracking().FirstOrDefaultAsync(x => x.Id == requestId);
+            if (request == null || request.PartyType == SettlementPartyType.Merchant) return await action();
+            return await _safety.WithDriverLockAsync(request.RequestedByUserId, action);
         }
 
         private static SettlementRequest NewRequest(SettlementPartyType partyType, Guid userId, string name, string phone,

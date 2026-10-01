@@ -106,7 +106,6 @@
           aria-label="Filter by Role"
         >
           <option value="all">{{ 'USERS_PAGE.ALL_ROLES' | translate }}</option>
-          <option [ngValue]="0">🛡️ {{ 'USERS_PAGE.ROLE_ADMIN' | translate }}</option>
           <option [ngValue]="1">👤 {{ 'USERS_PAGE.ROLE_CUSTOMER' | translate }}</option>
           <option [ngValue]="2">🏪 {{ 'USERS_PAGE.ROLE_MERCHANT' | translate }}</option>
           <option [ngValue]="3">🛵 {{ 'USERS_PAGE.ROLE_DELIVERY' | translate }}</option>
@@ -290,13 +289,24 @@
 
               <!-- Role & Scope Badge -->
               <td>
-                <span
-                  class="ops-role-badge"
-                  [ngClass]="getRoleBadgeInfo(user).badgeClass"
-                >
-                  <i [class]="getRoleBadgeInfo(user).icon"></i>
-                  <span>{{ getRoleBadgeInfo(user).label }}</span>
-                </span>
+                <div class="d-flex flex-column align-items-start gap-1">
+                  <span
+                    class="ops-role-badge"
+                    [ngClass]="getRoleBadgeInfo(user).badgeClass"
+                  >
+                    <i [class]="getRoleBadgeInfo(user).icon"></i>
+                    <span>{{ getRoleBadgeInfo(user).label }}</span>
+                  </span>
+                  <span
+                    *ngIf="getCaptainCompensationBadge(user) as badge"
+                    class="ops-captain-badge"
+                    [ngClass]="badge.badgeClass"
+                    title="طريقة استحقاق الكابتن"
+                  >
+                    <i class="fas fa-coins"></i>
+                    <span>{{ badge.label }}</span>
+                  </span>
+                </div>
               </td>
 
               <!-- Status -->

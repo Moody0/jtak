@@ -51,7 +51,13 @@ namespace App.ApiControllers.V1.Admin
             [FromBody] MetronicTable request,
             [FromQuery] SupportMessageStatus? status = null)
         {
-            var query = _service.Queryable();
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
+            // Purchase requests have their own operations queue. They must not
+            // be mixed into the support-ticket list or its status filters.
+            var query = _service.Queryable().Where(x => x.ErrandStatus == null);
 
             if (status.HasValue)
             {
@@ -82,7 +88,19 @@ namespace App.ApiControllers.V1.Admin
                     Status = x.Status,
                     AdminNotes = x.AdminNotes,
                     CreatedDate = x.CreatedDate,
-                    ResolvedDate = x.ResolvedDate
+                    ResolvedDate = x.ResolvedDate,
+                    ErrandStatus = x.ErrandStatus,
+                    ErrandItemPrice = x.ErrandItemPrice,
+                    ErrandDeliveryFee = x.ErrandDeliveryFee,
+                    ErrandDriverEarning = x.ErrandDriverEarning ?? x.ErrandDeliveryFee,
+                    ErrandQuoteExpiresAt = x.ErrandQuoteExpiresAt,
+                    ErrandDriverUserId = x.ErrandDriverUserId,
+                    ErrandPurchaseCost = x.ErrandPurchaseCost,
+                    ErrandReceiptReference = x.ErrandReceiptReference,
+                    ErrandReceiptPhotoToken = x.ErrandReceiptPhotoToken,
+                    ErrandCashCollected = x.ErrandCashCollected,
+                    ErrandRefundAmount = x.ErrandRefundAmount,
+                    ErrandReturnReason = x.ErrandReturnReason
                 });
         }
 
@@ -104,7 +122,7 @@ namespace App.ApiControllers.V1.Admin
             var msg = await _service.Queryable().FirstOrDefaultAsync(x => x.Id == id);
             if (msg == null) return NotFound();
 
-            if (msg.Status == SupportMessageStatus.New)
+            if (msg.ErrandStatus == null && msg.Status == SupportMessageStatus.New)
             {
                 msg.Status = SupportMessageStatus.Read;
                 await _uow.SaveChangesAsync();
@@ -122,7 +140,27 @@ namespace App.ApiControllers.V1.Admin
                 Status = msg.Status,
                 AdminNotes = msg.AdminNotes,
                 CreatedDate = msg.CreatedDate,
-                ResolvedDate = msg.ResolvedDate
+                ResolvedDate = msg.ResolvedDate,
+                ErrandStatus = msg.ErrandStatus,
+                ErrandItemPrice = msg.ErrandItemPrice,
+                ErrandDeliveryFee = msg.ErrandDeliveryFee,
+                ErrandDriverEarning = msg.ErrandDriverEarning ?? msg.ErrandDeliveryFee,
+                ErrandQuoteExpiresAt = msg.ErrandQuoteExpiresAt,
+                ErrandDriverUserId = msg.ErrandDriverUserId,
+                ErrandPurchaseCost = msg.ErrandPurchaseCost,
+                ErrandReceiptReference = msg.ErrandReceiptReference,
+                ErrandReceiptPhotoToken = msg.ErrandReceiptPhotoToken,
+                ErrandCashCollected = msg.ErrandCashCollected,
+                ErrandRefundAmount = msg.ErrandRefundAmount,
+                ErrandReturnReason = msg.ErrandReturnReason,
+                ErrandUnavailableReason = msg.ErrandUnavailableReason,
+                ErrandDeliveryCodeFailedAttempts = msg.ErrandDeliveryCodeFailedAttempts,
+                ErrandLatestException = await _uow.Context.ErrandStatusEvents.AsNoTracking()
+                    .Where(x => x.SupportMessageId == msg.Id &&
+                        x.Note != null && x.Note.StartsWith("EXCEPTION:"))
+                    .OrderByDescending(x => x.CreatedDate)
+                    .Select(x => x.Note)
+                    .FirstOrDefaultAsync()
             };
         }
 
@@ -132,6 +170,8 @@ namespace App.ApiControllers.V1.Admin
         [HttpPut("{id}/status")]
         public async Task<ActionResult<bool>> UpdateStatus(int id, [FromBody] UpdateSupportMessageStatusDto model)
         {
+            if (await _service.Queryable().AnyAsync(x => x.Id == id && x.ErrandStatus != null))
+                return BadRequest(ApiErr.Create("طلبات الشراء تُدار من خلال مراحل عرض السعر والتنفيذ المخصصة لها."));
             var success = await _service.UpdateStatusAsync(id, model.Status, model.AdminNotes);
             if (!success) return NotFound();
             return true;
@@ -145,6 +185,8 @@ namespace App.ApiControllers.V1.Admin
         {
             var msg = await _service.Queryable().FirstOrDefaultAsync(x => x.Id == id);
             if (msg == null) return NotFound();
+            if (msg.ErrandStatus != null)
+                return BadRequest(ApiErr.Create("لا يمكن حذف طلب شراء له سجل مالي أو عرض سعر."));
 
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();

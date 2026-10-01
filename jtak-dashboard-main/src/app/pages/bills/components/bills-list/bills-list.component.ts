@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import {
   SortState,
@@ -26,7 +26,7 @@ export class BillsListComponent
   selection = new TableSelection<Bill>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   // Real Financial KPIs
   kpiTotalBilled = 0;
@@ -41,7 +41,7 @@ export class BillsListComponent
   sorting: SortState;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public billsService: BillsService,
     private cdr: ChangeDetectorRef
   ) {}
@@ -73,15 +73,28 @@ export class BillsListComponent
   }
 
   calculateKpis(items: Bill[]): void {
-    if (!items || !items.length) return;
+    if (!items || !items.length) {
+      this.kpiBillsCount = 0;
+      this.kpiTotalBilled = 0;
+      this.kpiMerchantShare = 0;
+      this.kpiPlatformRevenue = 0;
+      this.cdr.detectChanges();
+      return;
+    }
     const earnedBills = items.filter(b => b.isAddedToDues);
     this.kpiBillsCount = earnedBills.length;
     this.kpiTotalBilled = earnedBills.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
     this.kpiMerchantShare = earnedBills.reduce((sum, b) => sum + (Number(b.merchantAmount) || 0), 0);
-    this.kpiPlatformRevenue = earnedBills.reduce(
-      (sum, b) => sum + (Number(b.jTakAmount) || 0) + (Number(b.jTakAdditionalAmount) || 0),
-      0
-    );
+    // JTakAmount is the commission already included in the invoice total.
+    // JTakAdditionalAmount is a separate informational field and must not be
+    // added again, otherwise merchant dues plus platform revenue exceed the
+    // invoice total. Use the invoice residual as the authoritative value so
+    // the KPI always reconciles with the amounts shown in each row.
+    this.kpiPlatformRevenue = earnedBills.reduce((sum, b) => {
+      const totalAmount = Number(b.totalAmount) || 0;
+      const merchantAmount = Number(b.merchantAmount) || 0;
+      return sum + Math.max(totalAmount - merchantAmount, 0);
+    }, 0);
     this.cdr.detectChanges();
   }
 
@@ -96,7 +109,9 @@ export class BillsListComponent
 
   search(searchTerm: string): void {
     this.selection.clear();
-    this.billsService.patchState({ searchTerm });
+    const paginator = this.billsService.paginator;
+    paginator.page = 1;
+    this.billsService.patchState({ searchTerm, paginator });
   }
 
   filterByDues(filter: 'all' | 'added' | 'pending'): void {

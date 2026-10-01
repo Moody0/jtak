@@ -3,6 +3,638 @@
 @import "./assets/sass/style";
 @import "./assets/sass/custom-rtl.css";
 
+// =========================================================================
+// GLOBAL HIGH-FIDELITY PRINT SYSTEM (A4 OFFICIAL FINANCIAL DOCUMENTS)
+// =========================================================================
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 6mm 6mm;
+  }
+
+  // 1. General Dashboard Chrome Elimination
+  #kt_header,
+  #kt_aside,
+  #kt_toolbar,
+  #kt_footer,
+  .header,
+  .aside,
+  .toolbar,
+  .footer,
+  .app-sidebar,
+  .app-header,
+  .app-toolbar,
+  .app-footer,
+  .drawer,
+  .scrolltop,
+  .btn,
+  .btn-close,
+  .no-print {
+    display: none !important;
+  }
+
+  // 2. When ANY modal is open or when printing modal vouchers/statements:
+  // Completely eliminate the Angular app shell (<app-root>) and modal backdrop from the print tree.
+  body.modal-open > *:not(ngb-modal-window):not(.modal),
+  body.print-merchant-statement > *:not(ngb-modal-window):not(.modal),
+  body.print-individual-receipt > *:not(ngb-modal-window):not(.modal),
+  body.print-driver-statement > *:not(ngb-modal-window):not(.modal),
+  body.print-shelf-label > *:not(ngb-modal-window):not(.modal),
+  ngb-modal-backdrop,
+  .modal-backdrop {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-family: Tahoma, Arial, 'Segoe UI', sans-serif !important;
+    font-size: 7.5pt !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  // 3. Flatten Modal Window into a continuous, natural A4 page layout
+  ngb-modal-window.modal,
+  .modal {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .modal-dialog {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  .modal-content {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .modal-body {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  // 4. Hide interactive screen-only controls inside modals
+  .modal-header .btn-close,
+  .modal-footer,
+  .merchant-statement-screen-header,
+  .nav-tabs,
+  .ops-search-box,
+  .ops-search-box + button,
+  .screen-driver-card {
+    display: none !important;
+  }
+
+  // =========================================================================
+  // DOCUMENT 1: Merchant Financial Statement (.merchant-statement-print-area)
+  // =========================================================================
+  .merchant-statement-print-area {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+
+    .merchant-statement-print-header {
+      display: block !important;
+      margin-bottom: 6px !important;
+
+      h2 {
+        font-size: 13pt !important;
+        margin-bottom: 2px !important;
+      }
+    }
+
+    .print-merchant-meta-grid {
+      padding: 4px 8px !important;
+      margin-bottom: 6px !important;
+    }
+
+    .merchant-statement-kpi-row {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      gap: 4px !important;
+      margin-bottom: 6px !important;
+
+      > div {
+        flex: 1 1 25% !important;
+        max-width: 25% !important;
+        width: 25% !important;
+      }
+
+      .rounded {
+        border: 1px solid #cbd5e1 !important;
+        background: #f8fafc !important;
+        padding: 4px 6px !important;
+        border-radius: 4px !important;
+      }
+
+      span {
+        font-size: 6.5pt !important;
+        color: #64748b !important;
+        margin-bottom: 1px !important;
+      }
+
+      strong {
+        font-size: 9.5pt !important;
+        font-weight: 800 !important;
+      }
+    }
+
+    .table-responsive {
+      overflow: visible !important;
+      display: block !important;
+      width: 100% !important;
+      border: none !important;
+      margin-bottom: 6px !important;
+    }
+
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 6.2pt !important;
+      line-height: 1.15 !important;
+      table-layout: auto !important;
+      background: #ffffff !important;
+
+      th, td {
+        min-width: 0 !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 2px 2px !important;
+        vertical-align: middle !important;
+        word-break: normal !important;
+        color: #0f172a !important;
+      }
+
+      thead {
+        display: table-header-group !important;
+
+        tr {
+          page-break-inside: avoid !important;
+        }
+
+        th {
+          background-color: #f1f5f9 !important;
+          color: #0f172a !important;
+          font-weight: 700 !important;
+          font-size: 6.5pt !important;
+          text-align: center !important;
+          border: 1px solid #94a3b8 !important;
+          padding: 3px 2px !important;
+        }
+      }
+
+      tbody tr {
+        page-break-inside: avoid !important;
+
+        &:nth-child(even) {
+          background-color: #f8fafc !important;
+        }
+      }
+
+      .badge {
+        border: 1px solid #94a3b8 !important;
+        background: transparent !important;
+        color: #0f172a !important;
+        padding: 1px 2px !important;
+        font-size: 5.5pt !important;
+        font-weight: 600 !important;
+        box-shadow: none !important;
+        white-space: nowrap !important;
+      }
+
+      code {
+        font-family: Consolas, 'Courier New', monospace !important;
+        font-size: 5.5pt !important;
+        color: #0f172a !important;
+        letter-spacing: -0.3px !important;
+        white-space: nowrap !important;
+      }
+
+      .text-success { color: #15803d !important; }
+      .text-danger { color: #b91c1c !important; }
+      .text-primary { color: #1d4ed8 !important; }
+      .text-info { color: #0284c7 !important; }
+      .font-weight-bold, .font-weight-bolder { font-weight: 700 !important; }
+    }
+
+    .merchant-statement-print-footer {
+      display: block !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin-top: 6px !important;
+      padding-top: 4px !important;
+
+      .border-top.border-dark {
+        margin-top: 14px !important;
+        padding-top: 2px !important;
+      }
+
+      .text-center.border-top {
+        margin-top: 4px !important;
+        padding-top: 2px !important;
+        font-size: 6pt !important;
+      }
+    }
+  }
+
+  // =========================================================================
+  // DOCUMENT 2: Individual Settlement Receipt Voucher (#individualReceiptPrintArea)
+  // Strictly fits on 1 Single A4 Paper
+  // =========================================================================
+  #individualReceiptPrintArea {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+
+    .ops-receipt-card {
+      border: 2px solid #0f172a !important;
+      border-radius: 8px !important;
+      padding: 16px 22px !important;
+      margin: 15mm auto !important;
+      max-width: 680px !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      background: #ffffff !important;
+
+      .ops-receipt-header {
+        border-bottom: 2px solid #0f172a !important;
+        padding-bottom: 6px !important;
+        margin-bottom: 8px !important;
+      }
+
+      .ops-receipt-amount-box {
+        border: 2px solid #1d4ed8 !important;
+        background: #eff6ff !important;
+        padding: 8px !important;
+        margin-bottom: 10px !important;
+        border-radius: 6px !important;
+
+        .fs-2x {
+          font-size: 1.6rem !important;
+        }
+      }
+
+      .row.g-3 {
+        --bs-gutter-y: 4px !important;
+        --bs-gutter-x: 6px !important;
+        margin-bottom: 8px !important;
+
+        .p-2 {
+          padding: 4px 6px !important;
+          border: 1px solid #cbd5e1 !important;
+          border-radius: 4px !important;
+          background: #f8fafc !important;
+        }
+      }
+
+      .ops-receipt-signatures {
+        border-top: 2px solid #0f172a !important;
+        margin-top: 10px !important;
+        padding-top: 6px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+
+        .ops-signature-line {
+          margin-top: 16px !important;
+          padding-top: 2px !important;
+          border-top: 1px dashed #64748b !important;
+        }
+      }
+    }
+  }
+
+  // =========================================================================
+  // DOCUMENT 3: Driver / Captain Shift Statement (.driver-statement-print-area)
+  // Clean JTAK Header, Float & Earnings Tables, Signatures
+  // Strictly fits on 1 Single A4 Paper
+  // =========================================================================
+  .driver-statement-print-area {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+
+    .driver-statement-print-header {
+      display: block !important;
+      margin-bottom: 6px !important;
+      padding-bottom: 4px !important;
+
+      h2 {
+        font-size: 13pt !important;
+        margin-bottom: 2px !important;
+      }
+    }
+
+    .print-driver-meta-grid {
+      padding: 4px 8px !important;
+      margin-bottom: 6px !important;
+    }
+
+    h6 {
+      font-size: 7.2pt !important;
+      font-weight: 700 !important;
+      color: #1e3a8a !important;
+      background: #eff6ff !important;
+      border-right: 3px solid #2563eb !important;
+      padding: 2px 6px !important;
+      margin: 6px 0 3px 0 !important;
+    }
+
+    h6.text-info {
+      color: #0e7490 !important;
+      background: #ecfeff !important;
+      border-right-color: #0891b2 !important;
+    }
+
+    .table-responsive {
+      overflow: visible !important;
+      display: block !important;
+      width: 100% !important;
+      border: none !important;
+      margin-bottom: 6px !important;
+    }
+
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 6.2pt !important;
+      line-height: 1.15 !important;
+      table-layout: fixed !important;
+      background: #ffffff !important;
+
+      th, td {
+        min-width: 0 !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 2px 3px !important;
+        vertical-align: middle !important;
+        word-break: break-word !important;
+        color: #0f172a !important;
+      }
+
+      thead {
+        display: table-header-group !important;
+
+        tr {
+          page-break-inside: avoid !important;
+        }
+
+        th {
+          background-color: #f1f5f9 !important;
+          color: #0f172a !important;
+          font-weight: 700 !important;
+          font-size: 6.5pt !important;
+          text-align: center !important;
+          border: 1px solid #94a3b8 !important;
+          padding: 3px 2px !important;
+        }
+      }
+
+      tbody tr {
+        page-break-inside: avoid !important;
+
+        &:nth-child(even) {
+          background-color: #f8fafc !important;
+        }
+      }
+
+      .badge {
+        border: 1px solid #94a3b8 !important;
+        background: transparent !important;
+        color: #0f172a !important;
+        padding: 1px 2px !important;
+        font-size: 5.5pt !important;
+        font-weight: 600 !important;
+        box-shadow: none !important;
+        white-space: nowrap !important;
+      }
+
+      code {
+        font-family: Consolas, 'Courier New', monospace !important;
+        font-size: 5.5pt !important;
+        color: #0f172a !important;
+        letter-spacing: -0.3px !important;
+        white-space: nowrap !important;
+      }
+
+      .text-success { color: #15803d !important; }
+      .text-danger { color: #b91c1c !important; }
+      .text-primary { color: #1d4ed8 !important; }
+      .text-info { color: #0284c7 !important; }
+      .font-weight-bold, .font-weight-bolder { font-weight: 700 !important; }
+    }
+
+    .driver-statement-print-footer {
+      display: block !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      margin-top: 6px !important;
+      padding-top: 4px !important;
+
+      .row.text-center {
+        margin-top: 0 !important;
+      }
+
+      .border-top.border-dark {
+        margin-top: 14px !important;
+        padding-top: 2px !important;
+      }
+
+      .text-center.border-top {
+        margin-top: 4px !important;
+        padding-top: 2px !important;
+        font-size: 6pt !important;
+      }
+    }
+  }
+
+  // =========================================================================
+  // DOCUMENT 4: Warehouse Shelf Label Sticker (.shelf-label-sticker)
+  // Perfectly Centered Physical Label Sticker on 1 Single A4 Paper
+  // =========================================================================
+  .shelf-label-sticker {
+    display: block !important;
+    width: 140mm !important;
+    max-width: 530px !important;
+    margin: 25mm auto !important;
+    padding: 20px 24px !important;
+    border: 2px dashed #0f172a !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    text-align: center !important;
+
+    .label-header {
+      border-bottom: 2px solid #0f172a !important;
+      padding-bottom: 10px !important;
+      margin-bottom: 12px !important;
+    }
+
+    .barcode-display {
+      font-family: 'Courier New', Courier, monospace !important;
+      letter-spacing: 4px !important;
+      font-size: 1.5rem !important;
+      font-weight: 800 !important;
+      border: 1px solid #cbd5e1 !important;
+      background: #f8fafc !important;
+      padding: 8px !important;
+      border-radius: 6px !important;
+      color: #0f172a !important;
+    }
+
+    .row.g-2 {
+      border-top: 2px solid #e2e8f0 !important;
+      padding-top: 10px !important;
+      margin-top: 10px !important;
+    }
+
+    .shelf-label-cut-guide {
+      margin-top: 16px !important;
+      padding-top: 8px !important;
+      border-top: 1px dashed #94a3b8 !important;
+      font-size: 7pt !important;
+      color: #64748b !important;
+    }
+  }
+
+  // =========================================================================
+  // DOCUMENT 5: Settlement History Log Report (body.print-history-report)
+  // Clean Report with Repeating Headers and Official Signatures
+  // =========================================================================
+  body.print-history-report {
+    .wrapper,
+    #kt_wrapper,
+    #kt_content,
+    #kt_post,
+    #kt_content_container,
+    app-content,
+    app-reconciliation-list {
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      background: transparent !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: 0 !important;
+      box-shadow: none !important;
+    }
+
+    // Hide everything inside app-reconciliation-list except the history report
+    app-reconciliation-list > *:not(#historyPrintReport) {
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    #historyPrintReport {
+      display: block !important;
+      visibility: visible !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+
+      .ops-print-header {
+        border-bottom: 2px solid #0f172a !important;
+        padding-bottom: 10px !important;
+        margin-bottom: 12px !important;
+      }
+
+      .ops-print-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 7.2pt !important;
+        line-height: 1.25 !important;
+
+        th, td {
+          border: 1px solid #cbd5e1 !important;
+          padding: 4px 3px !important;
+        }
+
+        thead {
+          display: table-header-group !important;
+
+          tr {
+            page-break-inside: avoid !important;
+          }
+
+          th {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            font-weight: 700 !important;
+            border: 1px solid #94a3b8 !important;
+          }
+        }
+
+        tbody tr {
+          page-break-inside: avoid !important;
+
+          &:nth-child(even) {
+            background-color: #f8fafc !important;
+          }
+        }
+      }
+
+      .row.text-center {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+    }
+  }
+}
+
 // Replace above style with this SCSS file to enable dark mode styles
 //@import "./assets/sass/style.dark";
 
@@ -313,8 +945,12 @@
   border: none !important;
 }
 
-body, button, input, select, textarea, .mat-typography {
-  font-family: 'IBM Plex Sans Arabic', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+body, button, input, select, textarea, .mat-typography,
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6,
+.card, .table, .btn, .badge, .form-control, .form-select,
+.menu-title, .menu-link, .modal-title, .modal-body, .nav-link,
+[dir="rtl"] {
+  font-family: 'Alexandria', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
 /* Global BiDi isolation for parentheses, brackets and mixed Arabic text */
@@ -355,6 +991,26 @@ body, button, input, select, textarea, .mat-typography {
   display: inline-block;
 }
 
+// Global Badge & Icon-Text System
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  vertical-align: middle;
+}
+
+.badge.badge-circle,
+.badge.badge-square {
+  justify-content: center;
+  gap: 0;
+}
+
+.ops-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .currency-text {
   font-weight: 700;
   color: #1e293b;
@@ -379,12 +1035,14 @@ body, button, input, select, textarea, .mat-typography {
 
 /* JTAK admin experience --------------------------------------------------- */
 :root {
-  --jtak-bg: #f6f6f3;
+  --jtak-bg: #f3f6fa;
   --jtak-surface: #ffffff;
-  --jtak-surface-subtle: #f8f8f6;
-  --jtak-ink: #172033;
-  --jtak-muted: #667085;
-  --jtak-border: #e7e7e2;
+  --jtak-surface-subtle: #f8fafc;
+  --jtak-ink: #1e293b;
+  --jtak-muted: #52606d;
+  --jtak-muted-strong: #475569;
+  --jtak-border: #d9e2ec;
+  --jtak-border-strong: #cbd5e1;
   --jtak-accent: #e4572e;
   --jtak-accent-dark: #bd3f1c;
   --jtak-accent-soft: #fff0e9;
@@ -460,8 +1118,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .aside .aside-toggle .svg-icon svg [fill]:not(.permanent):not(g) { fill: currentColor; }
 
 .aside .jtak-nav .menu-item .menu-link.active {
-  background: linear-gradient(135deg, #FF5722 0%, #f97316 100%) !important; color: #fff !important;
-  box-shadow: 0 4px 14px rgba(255,87,34,.38) !important; border-color: transparent !important;
+  background: #FF5722 !important; color: #fff !important;
+  box-shadow: none !important; border-color: transparent !important;
 }
 .aside .jtak-nav .menu-item .menu-link.active .menu-icon { color: #fff !important; }
 .jtak-system-state {
@@ -579,6 +1237,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   border-radius: 12px;
   transition: all 0.2s ease;
 }
+.jtak-user-trigger.dropdown-toggle::after {
+  display: none !important;
+  content: none !important;
+}
 .jtak-user-trigger:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
@@ -664,9 +1326,37 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .card-subtitle { margin-top: 5px; color: var(--jtak-muted); font-size: .74rem; font-weight: 400; }
 .card.card-custom.gutter-b > .card-body { padding: 22px 24px 18px; }
 .btn { min-height: 40px; border-radius: 8px; font-weight: 600; padding: .65rem 1.05rem; }
-.btn-sm, .btn.btn-sm { min-height: 34px; padding: .45rem .75rem; }
-.btn-primary { color: #fff; background: var(--jtak-accent); border-color: var(--jtak-accent); box-shadow: none; }
-.btn-primary:hover, .btn-primary:focus { color: #fff; background: var(--jtak-accent-dark); border-color: var(--jtak-accent-dark); }
+// STRICT ENFORCEMENT: Never use gray color on top of an orange button.
+// All icons (i, .fas, svg, etc.) and text on top of an orange button must be pure white (#ffffff).
+.btn-primary,
+.ops-btn-primary,
+.products-btn-add,
+.categories-btn-add,
+.rc-btn-add,
+.merchants-btn-add,
+.customer-btn-cart,
+[class*="-btn-add"],
+[class*="-btn-primary"] {
+  color: #ffffff !important;
+  background: var(--jtak-accent);
+  border-color: var(--jtak-accent);
+  box-shadow: none;
+
+  &, &:hover, &:focus, &:active {
+    color: #ffffff !important;
+
+    i, .fas, .fa, .far, .fal, .fad, svg, svg path, span:not(.badge) {
+      color: #ffffff !important;
+      fill: #ffffff !important;
+    }
+  }
+}
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active,
+.products-btn-add:hover, .products-btn-add:focus, .products-btn-add:active {
+  color: #ffffff !important;
+  background: var(--jtak-accent-dark);
+  border-color: var(--jtak-accent-dark);
+}
 .btn-dark { background: var(--jtak-navy); border-color: var(--jtak-navy); }
 .btn-light, .btn.btn-light { color: #3d4758; background: #fff; border: 1px solid var(--jtak-border); }
 .btn-light:hover { color: var(--jtak-ink); background: var(--jtak-surface-subtle); border-color: #d8d8d1; }
@@ -715,18 +1405,30 @@ app-table-actions .btn:hover { color: var(--jtak-accent); background: var(--jtak
 app-table-actions .btn-hover-danger:hover { color: var(--jtak-danger); background: #fdecec; }
 app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padding-top: 14px; color: var(--jtak-muted); font-size: .82rem; }
 .pagination .page-link { color: #596273; border: 0; border-radius: 7px !important; margin: 0 2px; }
-.pagination .page-item.active .page-link { color: #fff; background: var(--jtak-accent); }
+.pagination .page-item.active .page-link {
+  color: #ffffff !important;
+  background: var(--jtak-accent) !important;
+  border-color: var(--jtak-accent) !important;
+  *, i, .fas, .fa, span {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+  }
+}
 
-.modal-content { border: 0; border-radius: 14px; box-shadow: 0 24px 70px rgba(16,24,40,.2); overflow: hidden; }
+.modal-content { border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: none !important; overflow: hidden; }
 .modal-lg { max-width: min(940px, calc(100vw - 32px)); }
 .modal-header { min-height: 70px; padding: 18px 24px; border-bottom: 1px solid var(--jtak-border); }
 .modal-title { color: var(--jtak-ink); font-weight: 700; letter-spacing: -.02em; }
 .modal-body { padding: 24px; }
 .modal-footer { padding: 16px 24px; border-top: 1px solid var(--jtak-border); background: #fafaf8; }
-.jtak-edit-modal .modal-header { position: sticky; top: 0; z-index: 4; background: #fff; }
+.jtak-edit-modal .modal-header { position: sticky; top: 0; z-index: 4; background: #fff; border-bottom: 1px solid #e2e8f0; }
 .jtak-edit-modal .modal-body { max-height: calc(100vh - 190px); padding: 0; overflow-y: auto; }
 .jtak-edit-modal .modal-body > form:not(.jtak-edit-form) { padding: 24px; }
-.jtak-edit-modal .modal-footer { position: sticky; bottom: 0; z-index: 4; justify-content: space-between; }
+.jtak-edit-modal .modal-footer { position: sticky; bottom: 0; z-index: 4; justify-content: space-between; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.product-edit-modal .jtak-edit-modal .modal-body,
+.category-edit-modal .jtak-edit-modal .modal-body { overscroll-behavior: contain; scrollbar-gutter: stable; }
+.product-edit-modal .jtak-modal-icon,
+.category-edit-modal .jtak-modal-icon { width: 40px; height: 40px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa; color: #ea580c; }
 .jtak-modal-heading { display: flex; align-items: center; gap: 13px; }
 .jtak-modal-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 9px; color: var(--jtak-accent); background: var(--jtak-accent-soft); }
 .jtak-modal-kicker { display: block; margin-bottom: 3px; color: #9299a4; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -766,7 +1468,7 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
 .merchant-workspace-error > i { color: var(--jtak-danger); font-size: 1.8rem; }
 .merchant-workspace-error h2 { margin: 4px 0 0; color: var(--jtak-ink); font-size: 1.15rem; }
 .merchant-workspace-error p { margin: 0 0 8px; }
-.merchant-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px 24px; padding: 20px 24px; border: 1px solid var(--jtak-border); border-radius: 14px; background: #fff; box-shadow: var(--jtak-shadow); }
+.merchant-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px 24px; padding: 20px 24px; border: 1px solid var(--jtak-border); border-radius: 14px; background: #fff; box-shadow: none !important; }
 .merchant-back { width: 100%; margin-bottom: 2px; color: #717a89; font-size: .78rem; font-weight: 600; text-decoration: none; }
 .merchant-back i { margin-inline-end: 7px; font-size: .7rem; }
 .merchant-back:hover { color: var(--jtak-accent); }
@@ -782,7 +1484,7 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
 .merchant-header-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 .merchant-header-actions .btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; border-radius: 10px; }
 .unsaved-indicator { display: flex; align-items: center; gap: 7px; margin-inline-end: 4px; color: #9a6420; font-size: .75rem; font-weight: 700; }
-.unsaved-indicator i { width: 8px; height: 8px; border-radius: 50%; background: #dc941f; box-shadow: 0 0 0 4px rgba(220,148,31,.15); }
+.unsaved-indicator i { width: 8px; height: 8px; border-radius: 50%; background: #dc941f; }
 .merchant-tabs { display: flex; gap: 4px; padding: 5px; border: 1px solid var(--jtak-border); border-radius: 11px; background: #fff; }
 .merchant-tabs a { position: relative; display: flex; min-height: 42px; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 7px; color: #667085; font-size: .78rem; font-weight: 600; }
 .merchant-tabs a:hover { color: var(--jtak-ink); background: #f7f7f4; }
@@ -790,7 +1492,7 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
 .merchant-tabs a i { font-size: .75rem; }
 .merchant-tabs a small { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 5px; color: #747d8c; background: #f0f0ed; font-size: .6rem; }
 .merchant-tabs a.active small { color: #dce1e9; background: rgba(255,255,255,.1); }
-.merchant-tab-panel { border: 1px solid var(--jtak-border); border-radius: 13px; background: #fff; box-shadow: var(--jtak-shadow); overflow: hidden; }
+.merchant-tab-panel { border: 1px solid var(--jtak-border); border-radius: 13px; background: #fff; box-shadow: none !important; overflow: hidden; }
 .merchant-overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--jtak-border); }
 .merchant-detail-card { min-height: 190px; padding: 22px; background: #fff; }
 .merchant-detail-card--wide { grid-column: 1 / -1; min-height: 0; }
@@ -846,7 +1548,6 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
 .ops-search-box .ops-search-input:focus {
   background: #ffffff;
   border-color: #f97316;
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
   outline: none;
 }
 .ops-search-box .ops-search-clear {
@@ -905,7 +1606,7 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
 .category-switch { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
 .category-switch input { position: absolute; opacity: 0; pointer-events: none; }
 .category-switch > span { position: relative; width: 34px; height: 19px; border-radius: 10px; background: #d5d8dd; transition: background .18s ease; }
-.category-switch > span::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 13px; height: 13px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .18s ease; }
+.category-switch > span::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 13px; height: 13px; border-radius: 50%; background: #fff; box-shadow: none !important; transition: transform .18s ease; }
 .category-switch input:checked + span, .category-switch input:indeterminate + span { background: var(--jtak-accent); }
 .category-switch input:checked + span::after { transform: translateX(15px); }
 [dir="rtl"] .category-switch input:checked + span::after { transform: translateX(-15px); }
@@ -956,7 +1657,6 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
 .category-filter-pills button.active {
   background: #fff;
   color: var(--jtak-accent);
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
 }
 
 .category-filter-pills button .count-badge {
@@ -1033,7 +1733,6 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
 .view-mode-toggle button.active {
   background: #fff;
   color: var(--jtak-accent);
-  box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
 
 /* Category Badges */
@@ -1068,7 +1767,7 @@ app-paginator { margin-top: 18px; border-top: 1px solid var(--jtak-border); padd
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,.02);
+  box-shadow: none !important;
   transition: border-color .2s;
 }
 
@@ -1538,6 +2237,10 @@ app-auth > div > .flex-center.flex-column-auto { position: relative; background:
   .bulk-action-buttons { width: 100%; }
   .settings-grid, .edit-image-grid { grid-template-columns: 1fr; }
   .jtak-edit-form { padding: 0 18px; }
+  .product-edit-modal .jtak-edit-modal .modal-body { max-height: calc(100dvh - 150px); }
+  .product-edit-modal .jtak-edit-modal .modal-header { min-height: 58px; padding: 12px 14px; }
+  .product-edit-modal .jtak-edit-modal .modal-footer { padding: 10px 12px; }
+  .product-edit-modal .jtak-modal-heading p { display: none; }
   .jtak-modal-hint { display: none; }
   .jtak-user-copy, .jtak-user-chevron { display: none; }
   .merchant-header { padding: 17px; }
@@ -1637,4 +2340,78 @@ app-auth > div > .flex-center.flex-column-auto { position: relative; background:
     margin: 6px 0;
     border-top: 1px solid #f1f5f9;
   }
+}
+
+/* Neutral contrast system -------------------------------------------------
+   Keep secondary content visible on white cards and tinted surfaces. */
+.text-muted,
+.text-secondary,
+.form-text,
+.jtak-brand-copy small,
+.jtak-system-state small,
+.jtak-user-role-badge,
+.jtak-account-summary small,
+.jtak-account-summary span,
+.jtak-modal-kicker,
+.jtak-modal-hint,
+.optional-label,
+.setting-toggle small,
+.bulk-action-buttons .btn-link,
+.merchant-back,
+.merchant-meta,
+.merchant-card-heading span,
+.merchant-details dt,
+.workspace-selection-row,
+.workspace-product small,
+.category-path,
+.currency-label,
+.category-switch small,
+.ops-empty-state span,
+.jtak-login-help {
+  color: var(--jtak-muted) !important;
+}
+
+.table,
+.table > thead > tr > th,
+.ops-hero-subtitle,
+.ops-rate-desc,
+.ops-stat-label,
+.ops-section-kicker,
+.ops-finance-col-label,
+.ops-finance-col-desc,
+.ops-currency-text,
+.ops-merchant-meta,
+.ops-ranking-meta {
+  color: var(--jtak-muted-strong) !important;
+}
+
+.table > thead > tr,
+.table > thead > tr > th,
+.jtak-workspace-card,
+.jtak-topbar-action-btn,
+.jtak-lang-pill,
+.jtak-user-trigger,
+.workspace-selection-row,
+.ops-empty-icon {
+  border-color: var(--jtak-border-strong) !important;
+}
+
+.jtak-workspace-card,
+.jtak-topbar-action-btn,
+.jtak-lang-pill,
+.jtak-user-trigger,
+.workspace-selection-row,
+.ops-empty-icon {
+  background-color: var(--jtak-surface-subtle);
+}
+
+.ng-select .ng-select-container .ng-value-container .ng-placeholder,
+.ng-select .ng-clear-wrapper,
+.ng-dropdown-panel .ng-option.ng-option-disabled {
+  color: var(--jtak-muted-strong) !important;
+}
+
+.ops-empty-icon,
+.ops-empty-state span {
+  color: var(--jtak-muted-strong) !important;
 }

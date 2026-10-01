@@ -10,100 +10,284 @@
 
   <ng-container *ngIf="merchant && !isLoading">
     <header class="merchant-header">
-      <a routerLink="/merchants" class="merchant-back"><i class="fas fa-arrow-left rtl-flip me-1"></i> {{ 'MERCHANT_WORKSPACE.ALL_MERCHANTS' | translate }}</a>
-      <div class="merchant-identity">
-        <div class="merchant-logo">
-          <img *ngIf="merchant.photo" [src]="filesService.getFile(merchant.photo, 96, 96)" [alt]="merchant.title" (error)="onImageError($event)" />
-          <span *ngIf="!merchant.photo">{{ merchant.title.charAt(0) }}</span>
-        </div>
-        <div>
-          <div class="merchant-title-line">
-            <h2>
-              {{ merchantTitleAr }}
-              <span class="text-muted fs-5 ms-2 font-weight-normal" *ngIf="merchantTitleEn">({{ merchantTitleEn }})</span>
-            </h2>
-            <span class="badge" [ngClass]="merchant.active ? 'badge-light-success' : 'badge-light-danger'">{{ merchant.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}</span>
+      <div class="merchant-header-main">
+        <a routerLink="/merchants" class="merchant-back">
+          <i class="fas fa-arrow-left rtl-flip"></i>
+          <span>{{ 'MERCHANT_WORKSPACE.ALL_MERCHANTS' | translate }}</span>
+        </a>
+        <div class="merchant-identity">
+          <div class="merchant-logo">
+            <img *ngIf="merchant.photo" [src]="filesService.getFile(merchant.photo, 96, 96)" [alt]="merchant.title" (error)="onImageError($event)" />
+            <span *ngIf="!merchant.photo">{{ merchant.title.charAt(0) }}</span>
           </div>
-          <p>{{ merchant.shortDescription || merchant.address || ('MERCHANT_WORKSPACE.MERCHANT_INFO' | translate) }}</p>
-          <div class="merchant-meta"><span><i class="fas fa-box me-1"></i>{{ enabledProductsCount }} {{ 'MERCHANT_WORKSPACE.ACTIVE_PRODUCTS' | translate }}</span><span><i class="fas fa-folder me-1"></i>{{ merchantMainCount }} {{ 'MERCHANT_WORKSPACE.MAIN_CATEGORIES' | translate }}</span><span><i class="fas fa-tags me-1"></i>{{ merchantSubCount }} {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }}</span></div>
+          <div class="merchant-title-box">
+            <div class="merchant-title-line">
+              <h2>
+                {{ merchantTitleAr }}
+                <span class="text-muted fs-6 ms-2 font-weight-normal" *ngIf="merchantTitleEn">({{ merchantTitleEn }})</span>
+              </h2>
+              <span class="badge" [ngClass]="merchant.active ? 'badge-light-success' : 'badge-light-danger'">
+                {{ merchant.active ? ('COMMON.ACTIVE' | translate) : ('COMMON.DISABLED' | translate) }}
+              </span>
+              <span class="badge badge-light-primary" *ngIf="merchant.merchantKind === 0">مطعم</span>
+              <span class="badge badge-light-info" *ngIf="merchant.merchantKind === 1">ماركت</span>
+            </div>
+            <p class="merchant-subtitle">{{ merchant.shortDescription || merchant.address || ('MERCHANT_WORKSPACE.MERCHANT_INFO' | translate) }}</p>
+            <div class="merchant-meta">
+              <span><i class="fas fa-box text-primary"></i> <strong>{{ enabledProductsCount }}</strong> {{ 'MERCHANT_WORKSPACE.ACTIVE_PRODUCTS' | translate }}</span>
+              <span class="meta-sep">·</span>
+              <span><i class="fas fa-folder text-warning"></i> <strong>{{ merchantMainCount }}</strong> {{ 'MERCHANT_WORKSPACE.MAIN_CATEGORIES' | translate }}</span>
+              <span class="meta-sep">·</span>
+              <span><i class="fas fa-tags text-success"></i> <strong>{{ merchantSubCount }}</strong> {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }}</span>
+            </div>
+          </div>
         </div>
       </div>
+
       <div class="merchant-header-actions">
+        <button type="button" class="btn btn-sm btn-light" (click)="editMerchant()">
+          <i class="fas fa-pen me-1"></i> تعديل بيانات المتجر
+        </button>
         <span class="unsaved-indicator" *ngIf="hasChanges"><i></i> {{ 'MERCHANT_WORKSPACE.UNSAVED_CHANGES' | translate }}</span>
-        <button type="button" class="btn btn-light" *ngIf="hasChanges" (click)="resetChanges()">{{ 'MERCHANT_WORKSPACE.DISCARD' | translate }}</button>
-        <button type="button" class="btn btn-primary" [disabled]="!hasChanges || isSaving" (click)="saveCatalog()">
-          <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-1"></span><i *ngIf="!isSaving" class="fas fa-check me-1"></i>{{ isSaving ? ('COMMON.SAVING' | translate) : ('MERCHANT_WORKSPACE.SAVE_CATALOG' | translate) }}
+        <button type="button" class="btn btn-sm btn-light" *ngIf="hasChanges" (click)="resetChanges()">{{ 'MERCHANT_WORKSPACE.DISCARD' | translate }}</button>
+        <button type="button" class="btn btn-sm btn-primary" [disabled]="!hasChanges || isSaving" (click)="saveCatalog()">
+          <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-1"></span>
+          <i *ngIf="!isSaving" class="fas fa-check me-1"></i>
+          {{ isSaving ? ('COMMON.SAVING' | translate) : ('MERCHANT_WORKSPACE.SAVE_CATALOG' | translate) }}
         </button>
       </div>
     </header>
 
     <nav class="merchant-tabs" aria-label="Merchant workspace sections">
-      <a [routerLink]="['/merchants', merchant.id, 'overview']" routerLinkActive="active"><i class="fas fa-store me-1"></i><span>{{ 'MERCHANT_WORKSPACE.TAB_OVERVIEW' | translate }}</span></a>
-      <a [routerLink]="['/merchants', merchant.id, 'products']" routerLinkActive="active"><i class="fas fa-box-open me-1"></i><span>{{ 'MERCHANT_WORKSPACE.TAB_PRODUCTS' | translate }}</span><small class="ms-1">{{ enabledProductsCount }}</small></a>
-      <a [routerLink]="['/merchants', merchant.id, 'categories']" routerLinkActive="active"><i class="fas fa-tags me-1"></i><span>{{ 'MERCHANT_WORKSPACE.TAB_CATEGORIES' | translate }}</span><small class="ms-1">{{ merchantMainCount }} {{ 'MERCHANT_WORKSPACE.MAIN_CATEGORIES' | translate }} · {{ merchantSubCount }} {{ 'MERCHANT_WORKSPACE.SUBCATEGORIES' | translate }}</small></a>
+      <div class="tabs-group">
+        <a [routerLink]="['/merchants', merchant.id, 'overview']" routerLinkActive="active">
+          <i class="fas fa-store"></i>
+          <span>{{ 'MERCHANT_WORKSPACE.TAB_OVERVIEW' | translate }}</span>
+        </a>
+        <a [routerLink]="['/merchants', merchant.id, 'products']" routerLinkActive="active">
+          <i class="fas fa-box-open"></i>
+          <span>{{ 'MERCHANT_WORKSPACE.TAB_PRODUCTS' | translate }}</span>
+          <small>{{ enabledProductsCount }}</small>
+        </a>
+        <a [routerLink]="['/merchants', merchant.id, 'categories']" routerLinkActive="active">
+          <i class="fas fa-tags"></i>
+          <span>{{ 'MERCHANT_WORKSPACE.TAB_CATEGORIES' | translate }}</span>
+          <small>{{ merchantMainCount }} رئيسي · {{ merchantSubCount }} فرعي</small>
+        </a>
+      </div>
+      <div class="tabs-quick-info d-none d-md-block">
+        <span>معرف المتجر: #{{ merchant.id }}</span>
+      </div>
     </nav>
 
-    <section class="merchant-tab-panel" *ngIf="activeTab === 'overview'">
-      <div class="merchant-overview-grid">
-        <article class="merchant-detail-card merchant-detail-card--wide">
-          <div class="merchant-card-heading"><div><span>{{ 'MERCHANT_WORKSPACE.BUSINESS_PROFILE' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.MERCHANT_INFO' | translate }}</h3></div><button type="button" class="btn btn-sm btn-light" (click)="editMerchant()"><i class="fas fa-pen me-1"></i>{{ 'MERCHANT_WORKSPACE.EDIT_DETAILS' | translate }}</button></div>
-          <dl class="merchant-details">
-            <div><dt>{{ 'MERCHANT_WORKSPACE.OWNER' | translate }}</dt><dd>{{ merchant.owner || ('MERCHANT_WORKSPACE.NOT_ASSIGNED' | translate) }}</dd></div>
-            <div><dt>{{ 'MERCHANT_WORKSPACE.PRIMARY_PHONE' | translate }}</dt><dd>{{ merchant.phone1 || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</dd></div>
-            <div><dt>{{ 'MERCHANT_WORKSPACE.SECONDARY_PHONE' | translate }}</dt><dd>{{ merchant.phone2 || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</dd></div>
-            <div><dt>{{ 'MERCHANT_WORKSPACE.ADDRESS' | translate }}</dt><dd>{{ merchant.address || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</dd></div>
-          </dl>
-        </article>
-        <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>سياسات التوصيل</span><h3>مدة التوصيل المتوقعة</h3></div></div>
-          <strong class="merchant-large-value text-primary">{{ merchant.deliveryTime || '20-30 دقيقة' }}</strong><p>تظهر للعملاء في تطبيق الهواتف الذكية</p>
-        </article>
-        <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>سياسات التوصيل</span><h3>رسوم التوصيل</h3></div></div>
-          <strong class="merchant-large-value text-success">{{ (merchant.deliveryFee !== undefined && merchant.deliveryFee !== null ? (merchant.deliveryFee | number) : '5,000') }} ل.س</strong><p>تكلفة التوصيل المحسوبة لطلبات هذا المتجر</p>
-        </article>
-        <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>سياسات التوصيل</span><h3>الحد الأدنى للطلب</h3></div></div>
-          <strong class="merchant-large-value text-warning">{{ (merchant.minOrderAmount !== undefined && merchant.minOrderAmount !== null ? (merchant.minOrderAmount | number) : '15,000') }} ل.س</strong><p>أقل قيمة سلة مسموح بها لإتمام الطلب</p>
-        </article>
-        <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>حالة المتجر</span><h3>ساعات العمل</h3></div></div>
-          <strong class="merchant-large-value text-dark">{{ merchant.workingHours || 'حتى 3 ص' }}</strong><p>مواعيد الفتح والإغلاق على غلاف المتجر</p>
-        </article>
-        <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>{{ 'MERCHANTS_PAGE.COL_COMMISSION' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.COMMISSION' | translate }}</h3></div></div>
-          <strong class="merchant-large-value">{{ merchant.profitOutOfMerchantPricePercent || 0 }}%</strong><p>{{ 'MERCHANT_WORKSPACE.COMMISSION_DESC' | translate }}</p>
-        </article>
-        <article class="merchant-detail-card">
-          <div class="merchant-card-heading"><div><span>{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.COVERAGE_RADIUS' | translate }}</h3></div></div>
-          <strong class="merchant-large-value">{{ merchant.shippingCoverageInMeters | number }}</strong><p>{{ 'MERCHANT_WORKSPACE.COVERAGE_METERS' | translate }}</p>
-        </article>
-        <article class="merchant-detail-card merchant-detail-card--wide">
-          <div class="merchant-card-heading"><div><span>{{ 'MERCHANT_WORKSPACE.ABOUT' | translate }}</span><h3>{{ 'MERCHANT_WORKSPACE.DESCRIPTION' | translate }}</h3></div></div>
-          <p class="merchant-description">{{ merchant.description || ('MERCHANT_WORKSPACE.NO_DESCRIPTION' | translate) }}</p>
-        </article>
+    <section class="merchant-tab-panel merchant-overview-panel" *ngIf="activeTab === 'overview'">
+      <!-- 6-Metric KPIs Strip (Full Width, Balanced, Dense) -->
+      <div class="overview-metrics-strip">
+        <div class="metric-card">
+          <div class="metric-icon metric-icon--blue">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">مدة التوصيل المتوقعة</span>
+            <strong class="metric-val text-primary">{{ merchant.deliveryTime || '20-30 دقيقة' }}</strong>
+            <small class="metric-sub">تظهر في تطبيق الهواتف</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon metric-icon--green">
+            <i class="fas fa-motorcycle"></i>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">رسوم التوصيل</span>
+            <strong class="metric-val text-success">{{ (merchant.deliveryFee !== undefined && merchant.deliveryFee !== null ? (merchant.deliveryFee | number) : '50') }} ل.س</strong>
+            <small class="metric-sub">تكلفة التوصيل للطلب</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon metric-icon--amber">
+            <i class="fas fa-shopping-basket"></i>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">الحد الأدنى للطلب</span>
+            <strong class="metric-val text-warning">{{ (merchant.minOrderAmount !== undefined && merchant.minOrderAmount !== null ? (merchant.minOrderAmount | number) : '150') }} ل.س</strong>
+            <small class="metric-sub">أقل قيمة لإتمام الطلب</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon metric-icon--slate">
+            <i class="fas fa-store"></i>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">ساعات العمل</span>
+            <strong class="metric-val text-dark">{{ merchant.workingHours || '24 ساعة' }}</strong>
+            <small class="metric-sub">أوقات استقبال الطلبات</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon metric-icon--orange">
+            <i class="fas fa-percentage"></i>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">نسبة العمولة</span>
+            <strong class="metric-val text-orange">{{ merchant.profitOutOfMerchantPricePercent || 0 }}%</strong>
+            <small class="metric-sub">اقتطاع المنصة لكل طلب</small>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon metric-icon--purple">
+            <i class="fas fa-map-marked-alt"></i>
+          </div>
+          <div class="metric-body">
+            <span class="metric-label">نطاق التغطية</span>
+            <strong class="metric-val text-purple">{{ merchant.shippingCoverageInMeters ? ((merchant.shippingCoverageInMeters / 1000 | number:'1.0-1') + ' كم') : 'غير محدد' }}</strong>
+            <small class="metric-sub">قطر التوصيل الجغرافي</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Two-Column Operations Layout below KPIs -->
+      <div class="overview-content-split">
+        <!-- Main Info Side (65%) -->
+        <div class="overview-main-column">
+          <!-- Store Profile & Contact Card -->
+          <article class="overview-section-card">
+            <div class="card-top-bar">
+              <div class="card-title-group">
+                <i class="fas fa-id-card card-title-icon"></i>
+                <div>
+                  <h4>بيانات المتجر والاتصال</h4>
+                  <p>المعلومات الأساسية والمسؤول المعتمد والموقع الجغرافي</p>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-light" (click)="editMerchant()">
+                <i class="fas fa-pen me-1"></i> {{ 'MERCHANT_WORKSPACE.EDIT_DETAILS' | translate }}
+              </button>
+            </div>
+
+            <div class="info-tiles-grid">
+              <div class="info-tile">
+                <div class="tile-icon"><i class="fas fa-user-tie"></i></div>
+                <div class="tile-content">
+                  <span class="tile-label">{{ 'MERCHANT_WORKSPACE.OWNER' | translate }}</span>
+                  <strong class="tile-val">{{ merchant.owner || ('MERCHANT_WORKSPACE.NOT_ASSIGNED' | translate) }}</strong>
+                </div>
+              </div>
+
+              <div class="info-tile">
+                <div class="tile-icon"><i class="fas fa-phone-alt"></i></div>
+                <div class="tile-content">
+                  <span class="tile-label">{{ 'MERCHANT_WORKSPACE.PRIMARY_PHONE' | translate }}</span>
+                  <strong class="tile-val" dir="ltr">{{ merchant.phone1 || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</strong>
+                </div>
+              </div>
+
+              <div class="info-tile">
+                <div class="tile-icon"><i class="fas fa-phone"></i></div>
+                <div class="tile-content">
+                  <span class="tile-label">{{ 'MERCHANT_WORKSPACE.SECONDARY_PHONE' | translate }}</span>
+                  <strong class="tile-val" dir="ltr">{{ merchant.phone2 || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</strong>
+                </div>
+              </div>
+
+              <div class="info-tile">
+                <div class="tile-icon"><i class="fas fa-map-marker-alt"></i></div>
+                <div class="tile-content">
+                  <span class="tile-label">{{ 'MERCHANT_WORKSPACE.ADDRESS' | translate }}</span>
+                  <strong class="tile-val">{{ merchant.address || ('MERCHANT_WORKSPACE.NOT_PROVIDED' | translate) }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Store Description Card -->
+          <article class="overview-section-card">
+            <div class="card-top-bar">
+              <div class="card-title-group">
+                <i class="fas fa-info-circle card-title-icon"></i>
+                <div>
+                  <h4>{{ 'MERCHANT_WORKSPACE.ABOUT' | translate }}</h4>
+                  <p>النبذة التعريفية المعروضة للزبائن داخل التطبيق</p>
+                </div>
+              </div>
+            </div>
+            <div class="overview-desc-box">
+              <p *ngIf="merchant.description">{{ merchant.description }}</p>
+              <div class="desc-empty" *ngIf="!merchant.description">
+                <i class="fas fa-align-right text-muted"></i>
+                <span>{{ 'MERCHANT_WORKSPACE.NO_DESCRIPTION' | translate }}</span>
+                <button type="button" class="btn btn-sm btn-link text-primary p-0" (click)="editMerchant()">+ أضف وصفاً الآن</button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Side Operations Column (35%) -->
+        <div class="overview-side-column">
+          <!-- Catalog Health Card -->
+          <article class="overview-section-card">
+            <div class="card-top-bar">
+              <div class="card-title-group">
+                <i class="fas fa-chart-pie card-title-icon"></i>
+                <div>
+                  <h4>جاهزية الكتالوج</h4>
+                  <p>حالة التوفر والمنتجات النشطة</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="catalog-health-body">
+              <div class="progress-headline">
+                <span>نسبة المنتجات المتاحة</span>
+                <strong class="text-primary">{{ products.length ? (enabledProductsCount / products.length * 100 | number:'1.0-0') : 0 }}%</strong>
+              </div>
+              <div class="catalog-progress-bar">
+                <div class="progress-fill" [style.width.%]="products.length ? (enabledProductsCount / products.length * 100) : 0"></div>
+              </div>
+
+              <div class="catalog-counts-list">
+                <div class="count-row">
+                  <span class="count-name"><i class="fas fa-box text-primary me-2"></i>المنتجات المتاحة بالمتجر</span>
+                  <span class="count-badge count-badge--green">{{ enabledProductsCount }} / {{ products.length }}</span>
+                </div>
+                <div class="count-row">
+                  <span class="count-name"><i class="fas fa-folder text-warning me-2"></i>الأقسام الرئيسية</span>
+                  <span class="count-badge">{{ merchantMainCount }}</span>
+                </div>
+                <div class="count-row">
+                  <span class="count-name"><i class="fas fa-tags text-success me-2"></i>الأقسام الفرعية</span>
+                  <span class="count-badge">{{ merchantSubCount }}</span>
+                </div>
+              </div>
+
+              <div class="catalog-quick-links mt-3">
+                <a [routerLink]="['/merchants', merchant.id, 'products']" class="btn btn-sm btn-light w-100 mb-2">
+                  <i class="fas fa-box-open me-2 text-primary"></i> إدارة وتفعيل المنتجات
+                </a>
+                <a [routerLink]="['/merchants', merchant.id, 'categories']" class="btn btn-sm btn-light w-100">
+                  <i class="fas fa-tags me-2 text-warning"></i> تنظيم وهيكلة التصنيفات
+                </a>
+              </div>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
     <section class="merchant-tab-panel" *ngIf="activeTab === 'products'">
       <div class="workspace-toolbar">
-        <div>
-          <h3>{{ 'MERCHANT_WORKSPACE.PRODUCTS_TITLE' | translate }}</h3>
+        <div class="toolbar-title-box">
+          <h3>
+            {{ 'MERCHANT_WORKSPACE.PRODUCTS_TITLE' | translate }}
+            <span class="count-pill">{{ visibleProducts.length }}</span>
+          </h3>
           <p>{{ 'MERCHANT_WORKSPACE.PRODUCTS_DESC' | translate }}</p>
         </div>
         <div class="workspace-filters">
-          <button type="button" class="btn btn-primary" (click)="createProduct()">
-            <i class="fas fa-plus me-1"></i>{{ 'MERCHANT_WORKSPACE.ADD_PRODUCT' | translate }}
-          </button>
-          <select
-            class="form-select"
-            [(ngModel)]="categoryFilter"
-            (ngModelChange)="onProductFilterChange()"
-            aria-label="Filter by category"
-          >
-            <option value="">{{ 'MERCHANT_WORKSPACE.ALL_CATEGORIES' | translate }}</option>
-            <option *ngFor="let category of categoryNames" [value]="category">{{ category }}</option>
-          </select>
           <div class="workspace-search">
             <i class="fas fa-search"></i>
             <input
@@ -114,6 +298,18 @@
               [placeholder]="'MERCHANT_WORKSPACE.SEARCH_PRODUCTS' | translate"
             />
           </div>
+          <select
+            class="form-select"
+            [(ngModel)]="categoryFilter"
+            (ngModelChange)="onProductFilterChange()"
+            aria-label="Filter by category"
+          >
+            <option value="">{{ 'MERCHANT_WORKSPACE.ALL_CATEGORIES' | translate }}</option>
+            <option *ngFor="let category of categoryNames" [value]="category">{{ category }}</option>
+          </select>
+          <button type="button" class="btn btn-primary" (click)="createProduct()">
+            <i class="fas fa-plus me-1"></i>{{ 'MERCHANT_WORKSPACE.ADD_PRODUCT' | translate }}
+          </button>
         </div>
       </div>
 
@@ -140,19 +336,6 @@
           <button type="button" class="btn btn-sm btn-light-warning" (click)="bulkRemoveFromMerchant()">
             <i class="fas fa-ban me-1"></i> تعطيل في المتجر
           </button>
-
-          <div class="btn-group" ngbDropdown>
-            <button type="button" class="btn btn-sm btn-light dropdown-toggle" ngbDropdownToggle>
-              <i class="fas fa-percentage me-1"></i> نسبة الربح
-            </button>
-            <div ngbDropdownMenu class="dropdown-menu-end shadow">
-              <button ngbDropdownItem (click)="bulkSetExtraProfit(0)">0% (سعر المتجر الأصلي)</button>
-              <button ngbDropdownItem (click)="bulkSetExtraProfit(5)">5% ربح إضافي</button>
-              <button ngbDropdownItem (click)="bulkSetExtraProfit(10)">10% ربح إضافي</button>
-              <button ngbDropdownItem (click)="bulkSetExtraProfit(15)">15% ربح إضافي</button>
-              <button ngbDropdownItem (click)="bulkSetExtraProfit(20)">20% ربح إضافي</button>
-            </div>
-          </div>
 
           <button type="button" class="btn btn-sm btn-danger" (click)="deleteSelectedProducts()">
             <i class="fas fa-trash me-1"></i> حذف المحدد
@@ -204,12 +387,12 @@
                   title="تحديد الكل"
                 />
               </th>
-              <th>{{ 'MERCHANT_WORKSPACE.COL_PRODUCT' | translate }}</th>
-              <th>{{ 'MERCHANT_WORKSPACE.COL_CATEGORY' | translate }}</th>
-              <th class="text-end">{{ 'MERCHANT_WORKSPACE.COL_CUSTOMER_PRICE' | translate }}</th>
-              <th class="text-center">{{ 'MERCHANT_WORKSPACE.COL_ADDITIONAL_PROFIT' | translate }}</th>
-              <th class="text-center">{{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}</th>
-              <th class="text-end">{{ 'MERCHANT_WORKSPACE.COL_ACTIONS' | translate }}</th>
+              <th class="col-product">{{ 'MERCHANT_WORKSPACE.COL_PRODUCT' | translate }}</th>
+              <th class="col-category">{{ 'MERCHANT_WORKSPACE.COL_CATEGORY' | translate }}</th>
+              <th class="text-end col-price">{{ 'MERCHANT_WORKSPACE.COL_CUSTOMER_PRICE' | translate }}</th>
+              <th *ngIf="merchant?.merchantKind === 0" class="text-center col-max-order" title="الحد الأقصى لكمية الطلب">الحد الأقصى</th>
+              <th class="text-center col-availability">{{ 'MERCHANT_WORKSPACE.COL_AVAILABLE' | translate }}</th>
+              <th class="text-end col-actions">{{ 'MERCHANT_WORKSPACE.COL_ACTIONS' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -226,78 +409,90 @@
                   (change)="toggleProductRowSelection(item, $any($event.target).checked)"
                 />
               </td>
-              <td>
+              <td class="col-product">
                 <div class="workspace-product">
                   <img
-                    [src]="filesService.getFile(item.productPhotos, 56, 56)"
+                    [src]="filesService.getFile(item.productPhotos, 48, 48)"
                     [alt]="item.product"
                     loading="lazy"
                     (error)="onImageError($event)"
                   />
-                  <div>
-                    <strong>{{ item.product }}</strong>
-                    <small>
-                      #{{ item.productId }} ·
-                      <span [class.text-danger]="item.productActive === false">
+                  <div class="workspace-product-details">
+                    <strong class="product-name">{{ item.product }}</strong>
+                    <div class="product-sub-meta">
+                      <span class="product-id">#{{ item.productId }}</span>
+                      <span class="meta-dot">·</span>
+                      <span class="status-pill" [class.status-pill--disabled]="item.productActive === false">
                         {{ item.productActive === false ? ('MERCHANT_WORKSPACE.GLOBALLY_DISABLED' | translate) : ('COMMON.ACTIVE' | translate) }}
                       </span>
-                    </small>
+                    </div>
                   </div>
                 </div>
               </td>
-              <td>
-                <span class="category-path">
-                  <span *ngIf="item.productCat2">{{ item.productCat2 }}</span>
-                  <i *ngIf="item.productCat1 && item.productCat2" class="fas fa-chevron-right rtl-flip"></i>
-                  <strong>{{ item.productCat1 || ('CATEGORIES_PAGE.SUBCATEGORY' | translate) }}</strong>
-                </span>
-              </td>
-              <td class="text-end">
-                <span *ngIf="item.price !== item.finalPrice" class="old-price">{{ item.price | number }}</span>
-                <strong>{{ item.finalPrice | number }}</strong>
-                <small class="currency-label ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</small>
-              </td>
-              <td class="text-center">
-                <div class="compact-percent">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    [(ngModel)]="item.additionalProfitPercent"
-                    [disabled]="!item.isSelected"
-                    [attr.aria-label]="'Additional profit for ' + item.product"
-                  />
-                  <span>%</span>
+              <td class="col-category">
+                <div class="category-breadcrumb-tag">
+                  <span class="parent-cat" *ngIf="item.productCat2">{{ item.productCat2 }} <i class="fas fa-chevron-left rtl-flip mx-1"></i></span>
+                  <span class="sub-cat">{{ item.productCat1 || ('CATEGORIES_PAGE.SUBCATEGORY' | translate) }}</span>
                 </div>
               </td>
-              <td class="text-center">
+              <td class="text-end col-price">
+                <div class="price-wrapper">
+                  <span *ngIf="item.price !== item.finalPrice" class="old-price">{{ item.price | number }}</span>
+                  <span class="final-price">{{ item.finalPrice | number }} <small>{{ 'COMMON.CURRENCY_SYP' | translate }}</small></span>
+                  <span *ngIf="getDiscountPercent(item) as discountPercent" class="badge badge-light-danger mt-1">
+                    خصم {{ discountPercent }}%
+                  </span>
+                </div>
+              </td>
+              <td *ngIf="merchant?.merchantKind === 0" class="text-center col-max-order">
+                <input
+                  type="number"
+                  class="form-control form-control-sm text-center compact-num-input"
+                  min="1"
+                  max="999"
+                  [ngModel]="item.maxOrderQuantity ?? 20"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="setProductOrderLimit(item, $event)"
+                  title="الحد الأقصى لكمية الطلب (الافتراضي: 20)"
+                  [attr.aria-label]="'الحد الأقصى لطلب ' + item.product"
+                />
+              </td>
+              <td class="text-center col-availability">
                 <div class="in-store-switch justify-content-center">
                   <div class="form-check form-switch form-check-custom form-check-solid m-0">
                     <input
                       class="form-check-input"
                       type="checkbox"
                       [checked]="item.isSelected"
+                      [disabled]="!canAddProductToCurrentMerchant(item)"
                       (change)="toggleProduct(item, $any($event.target).checked)"
-                      [title]="item.isSelected ? 'متاح بالمتجر' : 'مخفي من المتجر'"
+                      [title]="!canAddProductToCurrentMerchant(item) ? 'هذا المنتج مرتبط بمطعم' : (item.isSelected ? 'متاح بالمتجر' : 'مخفي من المتجر')"
                     />
                   </div>
                   <span class="store-status-badge" [ngClass]="item.isSelected ? 'status-active' : 'status-inactive'">
                     {{ item.isSelected ? 'متاح' : 'مخفي' }}
                   </span>
                 </div>
+                <small *ngIf="merchant?.merchantKind === 1 && item.hasRestaurantAssignment" class="text-warning d-block mt-1">
+                  مرتبط بمطعم — أزِل ربطه بالماركت
+                </small>
+                <small *ngIf="merchant?.merchantKind === 0 && item.hasJtakMarketAssignment" class="text-warning d-block mt-1">
+                  مرتبط بجيتك ماركت
+                </small>
               </td>
-              <td class="text-end">
-                <div class="workspace-row-actions">
+              <td class="text-end col-actions">
+                <div class="workspace-row-actions justify-content-end">
                   <button
                     type="button"
-                    class="btn btn-sm btn-light workspace-edit-button"
+                    class="btn btn-sm btn-icon btn-light"
                     (click)="editProduct(item)"
+                    title="تعديل المنتج"
                   >
-                    <i class="fas fa-pen me-1"></i>{{ 'COMMON.EDIT' | translate }}
+                    <i class="fas fa-pen text-muted"></i>
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-light-danger"
+                    class="btn btn-sm btn-icon btn-light-danger"
                     [attr.aria-label]="'Delete ' + item.product"
                     (click)="deleteProduct(item)"
                     title="حذف من النظام"
@@ -331,11 +526,14 @@
 
     <section class="merchant-tab-panel" *ngIf="activeTab === 'categories'">
       <div class="workspace-toolbar">
-        <div>
-          <h3>{{ 'MERCHANT_WORKSPACE.CATEGORIES_TITLE' | translate }}</h3>
+        <div class="toolbar-title-box">
+          <h3>
+            {{ 'MERCHANT_WORKSPACE.CATEGORIES_TITLE' | translate }}
+            <span class="count-pill">{{ mainCategories.length }} رئيسي · {{ subCategories.length }} فرعي</span>
+          </h3>
           <p>{{ 'MERCHANT_WORKSPACE.CATEGORIES_DESC' | translate }}</p>
         </div>
-        <div class="d-flex align-items-center gap-3">
+        <div class="toolbar-actions-box">
           <button type="button" class="btn btn-primary" (click)="createCategory()">
             <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
           </button>
@@ -360,6 +558,18 @@
         </div>
 
         <div class="category-view-options">
+          <!-- Live Search Box -->
+          <div class="category-search-box">
+            <i class="fas fa-search"></i>
+            <input
+              type="search"
+              class="form-control"
+              [(ngModel)]="categorySearchTerm"
+              [placeholder]="'CATEGORIES_PAGE.SEARCH_PLACEHOLDER' | translate"
+              aria-label="Search categories"
+            />
+          </div>
+
           <!-- Parent Category Filter Dropdown -->
           <select
             class="form-select category-parent-select"
@@ -397,18 +607,6 @@
             <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="expandAll()">توسيع الكل</button>
             <span class="text-muted">·</span>
             <button type="button" class="btn btn-sm btn-link text-muted p-0" (click)="collapseAll()">طي الكل</button>
-          </div>
-
-          <!-- Live Search Box -->
-          <div class="category-search-box">
-            <i class="fas fa-search"></i>
-            <input
-              type="search"
-              class="form-control"
-              [(ngModel)]="categorySearchTerm"
-              [placeholder]="'CATEGORIES_PAGE.SEARCH_PLACEHOLDER' | translate"
-              aria-label="Search categories"
-            />
           </div>
         </div>
       </div>

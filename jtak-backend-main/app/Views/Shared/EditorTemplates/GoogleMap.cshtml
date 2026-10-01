@@ -1,6 +1,8 @@
 ﻿@using App.Extensions
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @model string
 @{
+    var googleMapsApiKey = Configuration["GoogleMaps:ApiKey"] ?? string.Empty;
     var latitudeVal = "40.986189";
     var longitudeVal = "28.9898774";
 
@@ -39,7 +41,8 @@
 </div>
 
 
-@Html.Script(@<script src="https://maps.google.com/maps/api/js?key=AIzaSyBk2cKUejJ6r1R4juhCF4DKpelMc-twebU&sensor=false&libraries=places"></script>)
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@Html.Script(@<script src="https://maps.google.com/maps/api/js?key=@googleMapsApiKey&sensor=false&libraries=places"></script>)
 @Html.Script(@<script src="~/vendor/jquery-locationpicker/dist/locationpicker.jquery.js"></script>)
 
 @Html.Script(

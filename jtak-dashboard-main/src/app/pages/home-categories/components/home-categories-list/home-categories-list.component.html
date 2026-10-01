@@ -1,188 +1,792 @@
-<div class="card">
-  <div class="card-header border-0 pt-6">
-    <div class="card-title flex-column align-items-start">
-      <h3 class="fw-bold m-0">فئات الصفحة الرئيسية</h3>
-      <span class="text-muted fs-7 mt-1">
-        الشبكة التي تظهر للعميل أعلى الصفحة الرئيسية. كل فئة تفتح وجهة تحددها أنت.
-      </span>
+<div class="home-categories-workspace">
+
+  <!-- 1. Branded Header -->
+  <header class="home-categories-header">
+    <div class="header-main-info">
+      <div class="header-icon-box">
+        <i class="fas fa-th-large"></i>
+      </div>
+      <div class="header-text-group">
+        <div class="header-title-line">
+          <h2>فئات الصفحة الرئيسية</h2>
+          <span class="badge badge-subtle-orange">الشبكة العلوية بالتطبيق</span>
+        </div>
+        <p class="header-desc">
+          الشبكة التي تظهر للعملاء في أعلى الصفحة الرئيسية للتطبيق. تتيح لك تخصيص أسماء وأيقونات الفئات والوجهة التي تفتحها كل فئة.
+        </p>
+      </div>
     </div>
-    <div class="card-toolbar">
-      <button type="button" class="btn btn-light-primary me-2" (click)="addTile()" [disabled]="loading">
-        <i class="fas fa-plus me-1"></i> إضافة فئة
+
+    <div class="header-actions">
+      <!-- Collapse / Expand All -->
+      <button
+        *ngIf="config.tiles.length"
+        type="button"
+        class="btn btn-header-secondary"
+        (click)="toggleAllTiles()"
+        [disabled]="loading"
+        [attr.aria-label]="allTilesExpanded ? 'طي تفاصيل كل الفئات' : 'فتح تفاصيل كل الفئات'"
+      >
+        <i class="fas" [class.fa-chevron-down]="!allTilesExpanded" [class.fa-chevron-up]="allTilesExpanded"></i>
+        <span>{{ allTilesExpanded ? 'طي الكل' : 'فتح الكل' }}</span>
       </button>
-      <button type="button" class="btn btn-primary" (click)="save()" [disabled]="loading || saving">
+
+      <!-- Reload -->
+      <button
+        type="button"
+        class="btn btn-header-icon"
+        (click)="load()"
+        [disabled]="loading"
+        title="تحديث البيانات"
+      >
+        <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i>
+      </button>
+
+      <!-- Add Tile -->
+      <button
+        type="button"
+        class="btn btn-header-add"
+        (click)="addTile()"
+        [disabled]="loading"
+      >
+        <i class="fas fa-plus"></i>
+        <span>إضافة فئة</span>
+      </button>
+
+      <!-- Save Changes -->
+      <button
+        type="button"
+        class="btn btn-header-save"
+        (click)="save()"
+        [disabled]="loading || saving"
+      >
+        <i *ngIf="!saving" class="fas fa-save"></i>
         <span *ngIf="!saving">حفظ التغييرات</span>
-        <span *ngIf="saving">جارِ الحفظ...</span>
+        <span *ngIf="saving" class="d-inline-flex align-items-center gap-2">
+          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+          <span>جارِ الحفظ...</span>
+        </span>
       </button>
+    </div>
+  </header>
+
+  <!-- 2. System Alerts -->
+  <!-- Success Alert -->
+  <div *ngIf="saveSuccess" class="alert-status-banner alert-success-banner">
+    <div class="alert-icon">
+      <i class="fas fa-check-circle"></i>
+    </div>
+    <div class="alert-content">
+      <strong>تم الحفظ بنجاح!</strong>
+      <span>تم حفظ فئات الصفحة الرئيسية بنجاح، وتظهر الآن للعملاء فور تحديثهم للتطبيق.</span>
     </div>
   </div>
 
-  <div class="card-body pt-0">
-    <div *ngIf="saveSuccess" class="alert alert-success d-flex align-items-center">
-      <i class="fas fa-check-circle me-2"></i>
-      تم حفظ الفئات. ستظهر للعملاء عند تحديث التطبيق للصفحة الرئيسية.
+  <!-- Error Alert with Retry -->
+  <div *ngIf="saveError" class="alert-status-banner alert-danger-banner">
+    <div class="alert-icon">
+      <i class="fas fa-exclamation-triangle"></i>
     </div>
-    <div *ngIf="saveError" class="alert alert-danger d-flex align-items-center">
-      <i class="fas fa-exclamation-triangle me-2"></i> {{ saveError }}
+    <div class="alert-content">
+      <strong>تنبيه في الحفظ</strong>
+      <span>{{ saveError }}</span>
     </div>
+    <button type="button" class="btn btn-sm btn-retry-error" (click)="load()" [disabled]="loading">
+      <i class="fas fa-redo"></i>
+      <span>إعادة المحاولة</span>
+    </button>
+  </div>
 
-    <div *ngIf="loading" class="text-center py-10 text-muted">جارِ التحميل...</div>
+  <!-- 3. Loading State -->
+  <div *ngIf="loading" class="home-categories-loading">
+    <div class="spinner-border text-primary" role="status"></div>
+    <span class="loading-text">جارِ تحميل إعدادات الفئات...</span>
+  </div>
 
-    <ng-container *ngIf="!loading">
-      <!-- Section-level settings -->
-      <div class="row g-4 mb-6">
-        <div class="col-md-3">
-          <label class="form-label fw-semibold">عنوان القسم (عربي)</label>
-          <input type="text" class="form-control" [(ngModel)]="config.sectionTitle" />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label fw-semibold">عنوان القسم (إنجليزي)</label>
-          <input type="text" class="form-control" [(ngModel)]="config.sectionTitleEn" />
-        </div>
-        <div class="col-md-3">
-          <label class="form-label fw-semibold">عدد الفئات المعروضة</label>
-          <input type="number" min="0" class="form-control" [(ngModel)]="config.maxItems" />
-          <span class="form-text">0 يعني عرض كل الفئات المفعّلة.</span>
-        </div>
-        <div class="col-md-3 d-flex align-items-end">
-          <div class="form-check form-switch form-check-custom form-check-solid">
-            <input class="form-check-input" type="checkbox" id="sectionEnabled" [(ngModel)]="config.enabled" />
-            <label class="form-check-label fw-semibold" for="sectionEnabled">إظهار القسم</label>
+  <ng-container *ngIf="!loading">
+
+    <!-- 4. Section Settings Card (Clean, Compact, Balanced) -->
+    <section class="section-settings-card">
+      <div class="settings-card-header">
+        <div class="settings-title-group">
+          <div class="settings-icon">
+            <i class="fas fa-sliders-h"></i>
+          </div>
+          <div>
+            <h4>إعدادات ظهور القسم بالتطبيق</h4>
+            <p>التحكم بعنوان القسم وعدد الفئات الظاهرة في الصفحة الرئيسية لتطبيق العميل</p>
           </div>
         </div>
+
+        <div class="settings-switch-wrapper">
+          <label class="custom-toggle" for="sectionEnabled">
+            <input
+              type="checkbox"
+              id="sectionEnabled"
+              [(ngModel)]="config.enabled"
+              [attr.aria-label]="config.enabled ? 'إخفاء قسم فئات الصفحة الرئيسية' : 'إظهار قسم فئات الصفحة الرئيسية'"
+            />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label" [class.text-active]="config.enabled">
+              {{ config.enabled ? 'القسم مفعّل ويظهر بالتطبيق' : 'القسم معطّل ومخفي' }}
+            </span>
+          </label>
+        </div>
       </div>
 
-      <div class="d-flex flex-wrap gap-4 mb-5 text-muted fs-7">
-        <span><strong class="text-dark">{{ config.tiles.length }}</strong> فئة</span>
-        <span><strong class="text-dark">{{ activeCount }}</strong> مفعّلة</span>
-        <span><strong class="text-dark">{{ visibleCount }}</strong> ستظهر في التطبيق</span>
-        <span *ngIf="invalidCount > 0" class="text-danger">
-          <strong>{{ invalidCount }}</strong> غير مكتملة
-        </span>
-        <span *ngIf="unavailableCount > 0" class="text-warning">
-          <strong>{{ unavailableCount }}</strong> لن تظهر لعدم توفر محتوى
-        </span>
+      <div class="settings-form-grid">
+        <div class="form-group-field">
+          <label class="field-label">
+            <i class="fas fa-font"></i>
+            <span>عنوان القسم (عربي)</span>
+          </label>
+          <input
+            type="text"
+            class="form-control field-input"
+            [(ngModel)]="config.sectionTitle"
+            placeholder="مثال: تسوق حسب الفئة أو الأقسام الرئيسية"
+          />
+        </div>
+
+        <div class="form-group-field">
+          <label class="field-label">
+            <i class="fas fa-language"></i>
+            <span>عنوان القسم (إنجليزي)</span>
+          </label>
+          <input
+            type="text"
+            class="form-control field-input"
+            [(ngModel)]="config.sectionTitleEn"
+            placeholder="Shop by category"
+            dir="ltr"
+          />
+        </div>
+
+        <div class="form-group-field">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <label class="field-label mb-0">
+              <i class="fas fa-list-ol"></i>
+              <span>عدد الفئات المعروضة بالتطبيق</span>
+            </label>
+            <span class="field-hint-badge">0 = عرض كل الفئات</span>
+          </div>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            class="form-control field-input"
+            [(ngModel)]="config.maxItems"
+            (ngModelChange)="normalizeMaxItems()"
+            placeholder="8"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. KPIs Ribbon & Stats Strip -->
+    <section class="home-categories-kpis">
+      <div class="kpi-metric-card">
+        <div class="kpi-icon-box kpi-icon-blue">
+          <i class="fas fa-layer-group"></i>
+        </div>
+        <div class="kpi-metric-body">
+          <span class="kpi-label">إجمالي الفئات</span>
+          <strong class="kpi-value text-blue">{{ config.tiles.length }}</strong>
+          <small class="kpi-sub">المضافة باللوحة</small>
+        </div>
       </div>
 
-      <div *ngIf="!config.tiles.length" class="text-center py-10 text-muted">
-        لا توجد فئات بعد. اضغط "إضافة فئة" للبدء.
+      <div class="kpi-metric-card">
+        <div class="kpi-icon-box kpi-icon-green">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="kpi-metric-body">
+          <span class="kpi-label">الفئات المفعّلة</span>
+          <strong class="kpi-value text-green">{{ activeCount }}</strong>
+          <small class="kpi-sub">حالتها نشطة</small>
+        </div>
       </div>
 
-      <!-- One editable row per tile -->
-      <div
+      <div class="kpi-metric-card">
+        <div class="kpi-icon-box kpi-icon-purple">
+          <i class="fas fa-mobile-alt"></i>
+        </div>
+        <div class="kpi-metric-body">
+          <span class="kpi-label">ستظهر بالتطبيق</span>
+          <strong class="kpi-value text-purple">{{ visibleCount }}</strong>
+          <small class="kpi-sub">
+            {{ config.maxItems > 0 ? ('حد أقصى ' + config.maxItems + ' فئات') : 'عرض غير محدود' }}
+          </small>
+        </div>
+      </div>
+
+      <div class="kpi-metric-card">
+        <div
+          class="kpi-icon-box"
+          [ngClass]="invalidCount > 0 ? 'kpi-icon-red' : (unavailableCount > 0 ? 'kpi-icon-amber' : 'kpi-icon-emerald')"
+        >
+          <i
+            class="fas"
+            [class.fa-exclamation-triangle]="invalidCount > 0"
+            [class.fa-eye-slash]="invalidCount === 0 && unavailableCount > 0"
+            [class.fa-shield-alt]="invalidCount === 0 && unavailableCount === 0"
+          ></i>
+        </div>
+        <div class="kpi-metric-body">
+          <span class="kpi-label">حالة الجاهزية</span>
+          <strong
+            class="kpi-value"
+            [ngClass]="invalidCount > 0 ? 'text-red' : (unavailableCount > 0 ? 'text-amber' : 'text-emerald')"
+          >
+            {{ invalidCount > 0 ? (invalidCount + ' تحتاج إكمال') : (unavailableCount > 0 ? (unavailableCount + ' بدون محتوى') : 'جاهزة بالكامل') }}
+          </strong>
+          <small class="kpi-sub">
+            {{ invalidCount > 0 ? 'يرجى مراجعة الحقول المطلوبة' : (unavailableCount > 0 ? 'لا تحتوي منتجات مسعرة حالياً' : 'جاهزة للظهور للعملاء') }}
+          </small>
+        </div>
+      </div>
+    </section>
+
+    <!-- Unsaved Changes Notice Banner -->
+    <div *ngIf="hasUnsavedChanges" class="unsaved-changes-banner">
+      <div class="d-flex align-items-center gap-2">
+        <span class="pulsing-dot"></span>
+        <strong>تنبيه: لديك تعديلات غير محفوظة</strong>
+      </div>
+      <span class="unsaved-hint">لن تظهر التغييرات التي أجريتها للعملاء حتى تضغط على زر «حفظ التغييرات» في أعلى الصفحة.</span>
+      <button type="button" class="btn btn-sm btn-quick-save" (click)="save()" [disabled]="saving">
+        <i class="fas fa-save me-1"></i> حفظ الآن
+      </button>
+    </div>
+
+    <!-- 6. Empty State -->
+    <div *ngIf="!config.tiles.length" class="home-categories-empty">
+      <div class="empty-icon-circle">
+        <i class="fas fa-th-large"></i>
+      </div>
+      <h4>لا توجد فئات مضافة بعد</h4>
+      <p>
+        قم بإضافة وتنسيق الفئات لتظهر كأيقونات سريعة في واجهة العميل الرئيسية، وتوجيههم مباشرة لأقسامك ومتاجرك المميزة.
+      </p>
+      <button type="button" class="btn btn-header-save" (click)="addTile()">
+        <i class="fas fa-plus me-1"></i> إضافة فئة جديدة للبدء
+      </button>
+    </div>
+
+    <!-- 7. Category Tile Cards Deck -->
+    <div class="tiles-deck" *ngIf="config.tiles.length">
+      <article
         *ngFor="let tile of config.tiles; let i = index; trackBy: trackByIndex"
-        class="border rounded p-4 mb-4"
-        [class.border-danger]="tileProblem(tile)"
-        [class.border-warning]="!tileProblem(tile) && tileAvailabilityProblem(tile)"
+        class="tile-card"
+        [class.tile-has-error]="tileProblem(tile)"
+        [class.tile-has-warning]="!tileProblem(tile) && tileAvailabilityProblem(tile)"
+        [class.tile-is-expanded]="isTileExpanded(tile)"
       >
-        <div class="d-flex align-items-center mb-3">
-          <span class="badge badge-light-primary me-3">{{ i + 1 }}</span>
+        <!-- Tile Header Bar (Compact & High-Density) -->
+        <div class="tile-header">
+          <!-- Leading Info -->
+          <div class="tile-header-leading">
+            <span class="tile-order-badge" title="ترتيب الفئة">{{ i + 1 }}</span>
 
-          <div class="btn-group btn-group-sm me-3">
-            <button type="button" class="btn btn-light" (click)="moveUp(i)" [disabled]="i === 0" title="تحريك لأعلى">
-              <i class="fas fa-arrow-up"></i>
-            </button>
+            <div class="tile-thumb-box" title="معاينة أيقونة الفئة">
+              <img
+                *ngIf="getEffectiveImageUrl(tile)"
+                [src]="resolvePreviewUrl(getEffectiveImageUrl(tile))"
+                [alt]="tile.title || 'أيقونة الفئة'"
+                (error)="handleImageError($event)"
+              />
+              <i *ngIf="!getEffectiveImageUrl(tile)" class="fas fa-th-large"></i>
+            </div>
+
             <button
               type="button"
-              class="btn btn-light"
-              (click)="moveDown(i)"
-              [disabled]="i === config.tiles.length - 1"
-              title="تحريك لأسفل"
+              class="tile-summary-toggle"
+              (click)="toggleTile(tile)"
+              [attr.aria-expanded]="isTileExpanded(tile)"
+              [attr.aria-controls]="isTileExpanded(tile) ? 'tile-editor-' + i : null"
             >
-              <i class="fas fa-arrow-down"></i>
+              <div class="d-flex align-items-center gap-2">
+                <strong class="tile-summary-title">{{ tile.title?.trim() || 'فئة جديدة بدون اسم' }}</strong>
+                <span class="badge badge-light-secondary fs-9" *ngIf="tile.titleEn">{{ tile.titleEn }}</span>
+              </div>
+              <span class="tile-summary-target">{{ tileTargetSummary(tile) }}</span>
             </button>
-          </div>
 
-          <div class="form-check form-switch form-check-custom form-check-solid me-auto">
-            <input class="form-check-input" type="checkbox" [id]="'active' + i" [(ngModel)]="tile.active" />
-            <label class="form-check-label fw-semibold" [for]="'active' + i">مفعّلة</label>
-          </div>
-
-          <span *ngIf="isHidden(i)" class="badge badge-light-warning me-3">
-            خارج عدد الفئات المعروضة
-          </span>
-
-          <button type="button" class="btn btn-sm btn-light-danger" (click)="removeTile(i)">
-            <i class="fas fa-trash"></i> حذف
-          </button>
-        </div>
-
-        <div class="row g-4">
-          <div class="col-md-3">
-            <label class="form-label fw-semibold">الاسم (عربي)</label>
-            <input type="text" class="form-control" [(ngModel)]="tile.title" placeholder="مثال: منظفات" />
-          </div>
-          <div class="col-md-3">
-            <label class="form-label fw-semibold">الاسم (إنجليزي)</label>
-            <input type="text" class="form-control" [(ngModel)]="tile.titleEn" placeholder="Cleaning" />
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">رابط الصورة</label>
-            <input type="text" class="form-control" [(ngModel)]="tile.imageUrl" placeholder="اتركه فارغاً لاستخدام صورة القسم" />
-          </div>
-
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">ماذا تفتح هذه الفئة؟</label>
-            <select class="form-select" [(ngModel)]="tile.linkType" (ngModelChange)="onLinkTypeChange(tile)">
-              <option *ngFor="let type of linkTypes" [ngValue]="type.value">{{ type.label }}</option>
-            </select>
-            <span class="form-text">
-              {{ linkTypes[tile.linkType]?.hint }}
+            <!-- Health Badges -->
+            <span *ngIf="tileProblem(tile)" class="tile-health-badge is-incomplete">
+              <i class="fas fa-exclamation-circle"></i> تحتاج إكمال
+            </span>
+            <span *ngIf="!tileProblem(tile) && tileAvailabilityProblem(tile)" class="tile-health-badge is-unavailable">
+              <i class="fas fa-eye-slash"></i> غير متاحة الآن
+            </span>
+            <span *ngIf="!tileProblem(tile) && !tileAvailabilityProblem(tile)" class="tile-health-badge is-ready">
+              <i class="fas fa-check-circle"></i> جاهزة
+            </span>
+            <span *ngIf="isHidden(i)" class="tile-health-badge is-hidden-limit" title="لن تظهر بسبب حد العرض الأقصى">
+              خارج حد العرض ({{ config.maxItems }})
             </span>
           </div>
 
-          <!-- Destination, one input per link type -->
-          <div class="col-md-8">
-            <ng-container [ngSwitch]="tile.linkType">
-              <div *ngSwitchCase="LinkType.ProductCategory">
-                <label class="form-label fw-semibold">القسم</label>
-                <select
-                  class="form-select"
-                  [(ngModel)]="tile.productCategoryId"
-                  (ngModelChange)="onTargetChange(tile)"
-                >
-                  <option [ngValue]="null">— اختر قسماً —</option>
-                  <option *ngFor="let category of categories" [ngValue]="category.id">
-                    {{ categoryLabel(category) }} (#{{ category.id }})
-                  </option>
-                </select>
-              </div>
+          <!-- Trailing Actions -->
+          <div class="tile-header-actions">
+            <!-- Reorder Buttons -->
+            <div class="tile-order-btn-group" role="group" aria-label="ترتيب الفئة">
+              <button
+                type="button"
+                class="btn btn-order"
+                (click)="moveUp(i)"
+                [disabled]="i === 0"
+                [attr.aria-label]="'تحريك ' + (tile.title || 'الفئة') + ' لأعلى'"
+                title="تحريك لأعلى"
+              >
+                <i class="fas fa-arrow-up"></i>
+              </button>
+              <button
+                type="button"
+                class="btn btn-order"
+                (click)="moveDown(i)"
+                [disabled]="i === config.tiles.length - 1"
+                [attr.aria-label]="'تحريك ' + (tile.title || 'الفئة') + ' لأسفل'"
+                title="تحريك لأسفل"
+              >
+                <i class="fas fa-arrow-down"></i>
+              </button>
+            </div>
 
-              <div *ngSwitchCase="LinkType.MerchantKind">
-                <label class="form-label fw-semibold">نوع المتاجر</label>
-                <select class="form-select" [(ngModel)]="tile.merchantKind" (ngModelChange)="onTargetChange(tile)">
-                  <option [ngValue]="null">— اختر نوعاً —</option>
-                  <option *ngFor="let kind of merchantKinds" [ngValue]="kind.value">
-                    {{ merchantKindOptionLabel(kind) }}
-                  </option>
-                </select>
-              </div>
+            <!-- Active Switch Control -->
+            <label class="tile-switch-control" [for]="'active' + i" title="تفعيل أو تعطيل ظهور هذه الفئة">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                [id]="'active' + i"
+                [(ngModel)]="tile.active"
+              />
+              <span class="tile-switch-label" [class.is-active]="tile.active">
+                {{ tile.active ? 'مفعّلة' : 'معطّلة' }}
+              </span>
+            </label>
 
-              <div *ngSwitchCase="LinkType.Merchant">
-                <label class="form-label fw-semibold">المتجر</label>
-                <select class="form-select" [(ngModel)]="tile.merchantId" (ngModelChange)="onTargetChange(tile)">
-                  <option [ngValue]="null">— اختر متجراً —</option>
-                  <option *ngFor="let merchant of merchants" [ngValue]="merchant.id">
-                    {{ merchantOptionLabel(merchant) }}
-                  </option>
-                </select>
-              </div>
+            <!-- Toggle Expand / Collapse Button -->
+            <button
+              type="button"
+              class="btn btn-sm btn-tile-action btn-edit-tile"
+              (click)="toggleTile(tile)"
+              [attr.aria-expanded]="isTileExpanded(tile)"
+              [attr.aria-label]="isTileExpanded(tile) ? 'طي تفاصيل ' + (tile.title || 'الفئة') : 'تعديل ' + (tile.title || 'الفئة')"
+            >
+              <i class="fas" [class.fa-pen]="!isTileExpanded(tile)" [class.fa-chevron-up]="isTileExpanded(tile)"></i>
+              <span>{{ isTileExpanded(tile) ? 'إغلاق' : 'تعديل' }}</span>
+            </button>
 
-              <div *ngSwitchCase="LinkType.Search">
-                <label class="form-label fw-semibold">كلمة البحث</label>
-                <input type="text" class="form-control" [(ngModel)]="tile.searchTerm" placeholder="مثال: شاورما" />
-              </div>
-            </ng-container>
+            <!-- Delete Button -->
+            <button
+              type="button"
+              class="btn btn-sm btn-tile-action btn-delete-tile"
+              (click)="removeTile(i)"
+              [attr.aria-label]="'حذف ' + (tile.title || 'الفئة')"
+              title="حذف الفئة"
+            >
+              <i class="fas fa-trash"></i>
+              <span>حذف</span>
+            </button>
           </div>
         </div>
 
-        <div *ngIf="tileProblem(tile)" class="text-danger fs-8 mt-3">
-          <i class="fas fa-exclamation-circle me-1"></i> {{ tileProblem(tile) }}
+        <!-- Tile Editor Body (Expanded View) -->
+        <div *ngIf="isTileExpanded(tile)" [id]="'tile-editor-' + i" class="tile-editor-body">
+          <div class="editor-sections-grid">
+
+            <!-- Panel 1: الهوية والتسمية -->
+            <div class="editor-section-panel">
+              <div class="panel-heading">
+                <i class="fas fa-signature text-primary"></i>
+                <h5>التسمية والعرض</h5>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold text-gray-700">
+                    الاسم (عربي) <span class="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    [(ngModel)]="tile.title"
+                    placeholder="مثال: بقالة وماركت"
+                  />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold text-gray-700">الاسم (إنجليزي)</label>
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    [(ngModel)]="tile.titleEn"
+                    placeholder="مثال: Grocery"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Panel 2: أيقونة الفئة والصورة -->
+            <div class="editor-section-panel">
+              <div class="panel-heading">
+                <i class="fas fa-image text-primary"></i>
+                <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                  <h5>أيقونة وصورة الفئة</h5>
+                  <span class="badge badge-light-primary fs-9" *ngIf="tile.imageUrl">رابط مخصص</span>
+                  <span class="badge badge-light-secondary fs-9" *ngIf="!tile.imageUrl">أيقونة تلقائية</span>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-start gap-3">
+                <!-- Thumbnail Preview -->
+                <div
+                  class="image-preview-wrapper"
+                  [title]="tile.imageUrl ? 'معاينة الصورة المخصصة' : 'معاينة الصورة التلقائية'"
+                >
+                  <img
+                    *ngIf="getEffectiveImageUrl(tile)"
+                    [src]="resolvePreviewUrl(getEffectiveImageUrl(tile))"
+                    [alt]="tile.title"
+                    (error)="handleImageError($event)"
+                    class="preview-img"
+                  />
+                  <div *ngIf="!getEffectiveImageUrl(tile)" class="preview-placeholder">
+                    <i *ngIf="tile.linkType === LinkType.ErrandRequests" class="fas fa-shopping-bag text-warning"></i>
+                    <i *ngIf="tile.linkType !== LinkType.ErrandRequests" class="fas fa-image text-muted"></i>
+                  </div>
+                </div>
+
+                <!-- Input Controls -->
+                <div class="flex-grow-1">
+                  <div class="input-group input-group-sm">
+                    <input
+                      type="text"
+                      class="form-control"
+                      [(ngModel)]="tile.imageUrl"
+                      (ngModelChange)="onImageUrlChange(tile)"
+                      placeholder="الصق رابط صورة أو ارفع صورة من جهازك"
+                      dir="ltr"
+                    />
+                    <button
+                      *ngIf="tile.imageUrl"
+                      type="button"
+                      class="btn btn-icon btn-light-danger"
+                      (click)="clearImageUrl(tile)"
+                      title="مسح الرابط واستعادة الأيقونة التلقائية"
+                    >
+                      <i class="fas fa-times"></i>
+                    </button>
+                    <button
+                      *ngIf="tile.imageUrl"
+                      type="button"
+                      class="btn btn-icon btn-light-primary"
+                      (click)="openImageInNewTab(tile.imageUrl)"
+                      title="فتح الصورة في علامة تبويب جديدة للتأكد منها"
+                    >
+                      <i class="fas fa-external-link-alt"></i>
+                    </button>
+                    <button
+                      *ngIf="!tile.imageUrl"
+                      type="button"
+                      class="btn btn-light-primary px-3"
+                      (click)="pasteFromClipboard(tile)"
+                      title="لصق الرابط من الحافظة"
+                    >
+                      <i class="fas fa-paste me-1"></i> لصق
+                    </button>
+                  </div>
+
+                  <div class="mt-2">
+                    <app-file-uploader
+                      [multiple]="false"
+                      [uploaderTitle]="'أو اختر صورة من جهازك'"
+                      (fileUploaded)="onImageUploaded($event, tile)"
+                    ></app-file-uploader>
+                  </div>
+
+                  <div class="form-text text-muted mt-1 d-flex flex-wrap justify-content-between gap-1">
+                    <span>ارفع صورة من جهازك أو الصق رابط صورة من الإنترنت.</span>
+                    <span *ngIf="!tile.imageUrl && getEffectiveImageUrl(tile)" class="text-primary fw-semibold">
+                      يتم حالياً استخدام الصورة التلقائية للقسم/المتجر.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Panel 3: الوجهة والربط -->
+            <div class="editor-section-panel editor-section-panel--full">
+              <div class="panel-heading">
+                <i class="fas fa-route text-primary"></i>
+                <h5>وجهة الفئة (ماذا تفتح عند النقر؟)</h5>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-lg-4 col-md-12">
+                  <label class="form-label fw-semibold text-gray-700">نوع الوجهة <span class="text-danger">*</span></label>
+                  <select class="form-select form-select-sm" [(ngModel)]="tile.linkType" (ngModelChange)="onLinkTypeChange(tile)">
+                    <option *ngFor="let type of linkTypes" [ngValue]="type.value">{{ type.label }}</option>
+                  </select>
+                  <span class="form-text text-muted mt-1 d-block">
+                    {{ linkTypeHint(tile.linkType) }}
+                  </span>
+                </div>
+
+                <!-- Destination Specific Selector -->
+                <div class="col-lg-8 col-md-12">
+                  <ng-container [ngSwitch]="tile.linkType">
+                    <!-- 1. ProductCategory -->
+                    <div *ngSwitchCase="LinkType.ProductCategory">
+                      <label class="form-label fw-semibold text-gray-700">القسم المستهدف <span class="text-danger">*</span></label>
+                      <ng-select
+                        [items]="categories"
+                        bindLabel="displayLabel"
+                        bindValue="id"
+                        [(ngModel)]="tile.productCategoryId"
+                        (ngModelChange)="onTargetChange(tile)"
+                        [searchFn]="categorySearchFn"
+                        [searchable]="true"
+                        placeholder="🔍 ابحث بالاسم أو الرقم عن قسم..."
+                        notFoundText="لم يتم العثور على أقسام مطابقة"
+                        [clearable]="false"
+                      >
+                        <ng-template ng-label-tmp let-item="item">
+                          <span class="fw-bold text-dark">{{ item.displayLabel }}</span>
+                          <span class="badge badge-light-primary ms-2 fs-8">#{{ item.id }}</span>
+                        </ng-template>
+                        <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                          <div class="d-flex align-items-center justify-content-between py-1 w-100">
+                            <div>
+                              <div class="fw-bold text-dark">{{ item.displayLabel }}</div>
+                              <small class="text-muted fs-8">{{ categoryAvailabilitySummary(item) }}</small>
+                            </div>
+                            <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
+                          </div>
+                        </ng-template>
+                      </ng-select>
+
+                      <div class="mt-3">
+                        <label class="form-label fw-semibold text-gray-700">
+                          القسم المستهدف الثاني (اختياري)
+                          <span class="text-muted fw-normal fs-8 ms-1">— لدمج تصنيفين معاً في نفس الفئة (مثل: دجاج ولحوم)</span>
+                        </label>
+                        <ng-select
+                          [items]="categories"
+                          bindLabel="displayLabel"
+                          bindValue="id"
+                          [(ngModel)]="tile.secondaryProductCategoryId"
+                          (ngModelChange)="onSecondaryTargetChange(tile)"
+                          [searchFn]="categorySearchFn"
+                          [searchable]="true"
+                          placeholder="🔍 اختر قسماً إضافياً (اختياري)..."
+                          notFoundText="لم يتم العثور على أقسام مطابقة"
+                          [clearable]="true"
+                        >
+                          <ng-template ng-label-tmp let-item="item">
+                            <span class="fw-bold text-dark">{{ item.displayLabel }}</span>
+                            <span class="badge badge-light-primary ms-2 fs-8">#{{ item.id }}</span>
+                          </ng-template>
+                          <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                            <div class="d-flex align-items-center justify-content-between py-1 w-100">
+                              <div>
+                                <div class="fw-bold text-dark">{{ item.displayLabel }}</div>
+                                <small class="text-muted fs-8">{{ categoryAvailabilitySummary(item) }}</small>
+                              </div>
+                              <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
+                            </div>
+                          </ng-template>
+                        </ng-select>
+                      </div>
+                    </div>
+
+                    <!-- 2. MerchantCategory -->
+                    <div *ngSwitchCase="LinkType.MerchantCategory">
+                      <div class="row g-3">
+                        <div class="col-md-6">
+                          <label class="form-label fw-semibold text-gray-700">المتجر أو الماركت المستهدف <span class="text-danger">*</span></label>
+                          <ng-select
+                            [items]="merchants"
+                            bindLabel="displayLabel"
+                            bindValue="id"
+                            [(ngModel)]="tile.merchantId"
+                            (ngModelChange)="onMerchantChange(tile)"
+                            [searchFn]="merchantSearchFn"
+                            [searchable]="true"
+                            placeholder="🔍 ابحث عن متجر أو ماركت أو مطعم..."
+                            notFoundText="لم يتم العثور على متاجر مطابقة"
+                            [clearable]="false"
+                          >
+                            <ng-template ng-label-tmp let-item="item">
+                              <span class="fw-bold text-dark">{{ item.title }}</span>
+                              <span class="badge badge-light-info ms-2 fs-8">{{ merchantKindLabel(item.merchantKind) }}</span>
+                              <span class="badge badge-light-primary ms-1 fs-8">#{{ item.id }}</span>
+                            </ng-template>
+                            <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                              <div class="d-flex align-items-center justify-content-between py-1 w-100">
+                                <div>
+                                  <div class="fw-bold text-dark">{{ item.title }}</div>
+                                  <small class="text-muted fs-8">{{ merchantKindLabel(item.merchantKind) }} • {{ item.productCount || 0 }} منتج</small>
+                                </div>
+                                <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
+                              </div>
+                            </ng-template>
+                          </ng-select>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label fw-semibold text-gray-700">القسم داخل هذا المتجر <span class="text-danger">*</span></label>
+                          <ng-select
+                            [items]="getCategoriesForMerchant(tile.merchantId, tile.productCategoryId)"
+                            bindLabel="displayLabel"
+                            bindValue="id"
+                            [(ngModel)]="tile.productCategoryId"
+                            (ngModelChange)="onTargetChange(tile)"
+                            [searchFn]="categorySearchFn"
+                            [searchable]="true"
+                            placeholder="🔍 ابحث عن القسم داخل المتجر..."
+                            [notFoundText]="tile.merchantId ? 'لا توجد أقسام بمنتجات مسعّرة في هذا المتجر' : 'اختر المتجر أولاً'"
+                            [clearable]="false"
+                          >
+                            <ng-template ng-label-tmp let-item="item">
+                              <span class="fw-bold text-dark">{{ item.displayLabel }}</span>
+                              <span *ngIf="isCategoryInMerchant(tile.merchantId, item.id)" class="badge badge-light-success ms-2 fs-8">متوفر بمنتجات مسعّرة</span>
+                              <span *ngIf="!isCategoryInMerchant(tile.merchantId, item.id)" class="badge badge-light-warning ms-2 fs-8" title="لا توجد منتجات مسعّرة (أكبر من 0) لهذا المتجر">بدون منتجات مسعّرة</span>
+                            </ng-template>
+                            <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                              <div class="d-flex align-items-center justify-content-between py-1 w-100">
+                                <div>
+                                  <div class="fw-bold text-dark">{{ item.displayLabel }}</div>
+                                  <small class="text-muted fs-8">
+                                    <span *ngIf="isCategoryInMerchant(tile.merchantId, item.id)" class="text-success fw-semibold">
+                                      <i class="fas fa-check-circle text-success fs-9 me-1"></i>يحتوي على منتجات مسعّرة ومتاحة للطلب
+                                    </span>
+                                    <span *ngIf="!isCategoryInMerchant(tile.merchantId, item.id)" class="text-warning">
+                                      <i class="fas fa-info-circle text-warning fs-9 me-1"></i>لا توجد منتجات مسعّرة (سعرها 0 أو لم تضف للمتجر)
+                                    </span>
+                                  </small>
+                                </div>
+                                <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
+                              </div>
+                            </ng-template>
+                          </ng-select>
+                          <small class="form-text text-muted">تظهر هنا فقط الأقسام التي تحتوي منتجات مسعّرة ومتاحة في المتجر المختار.</small>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 3. MerchantKind -->
+                    <div *ngSwitchCase="LinkType.MerchantKind">
+                      <label class="form-label fw-semibold text-gray-700">نوع المتاجر <span class="text-danger">*</span></label>
+                      <select class="form-select form-select-sm" [(ngModel)]="tile.merchantKind" (ngModelChange)="onMerchantKindChange(tile)">
+                        <option [ngValue]="null">— اختر نوعاً —</option>
+                        <option *ngFor="let kind of merchantKinds" [ngValue]="kind.value">
+                          {{ merchantKindOptionLabel(kind) }}
+                        </option>
+                      </select>
+                      <div *ngIf="tile.merchantKind === 0" class="mt-3">
+                        <label class="form-label fw-semibold text-gray-700">فلتر المطاعم عند الفتح <span class="text-muted fw-normal">(اختياري)</span></label>
+                        <ng-select
+                          [items]="restaurantCategories"
+                          bindLabel="title"
+                          bindValue="id"
+                          [(ngModel)]="tile.restaurantCategoryId"
+                          placeholder="كل المطاعم — بدون فلتر محدد"
+                          [clearable]="true"
+                          [searchable]="true"
+                          notFoundText="لا توجد فلاتر مطاعم"
+                        >
+                          <ng-template ng-label-tmp let-item="item">
+                            <span>{{ item.title }}</span>
+                            <span class="badge badge-light-primary ms-2">#{{ item.id }}</span>
+                          </ng-template>
+                          <ng-template ng-option-tmp let-item="item">
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                              <span>{{ item.title }}<small *ngIf="!item.active" class="text-danger ms-2">غير مفعّل</small></span>
+                              <span class="text-muted fs-8">{{ item.merchantCount || 0 }} مطعم · #{{ item.id }}</span>
+                            </div>
+                          </ng-template>
+                        </ng-select>
+                        <span *ngIf="!restaurantCategoriesLoadError" class="form-text text-muted">يستخدم فلاتر صفحة المطاعم المُدارة من صفحة «أصناف المطاعم».</span>
+                        <span *ngIf="restaurantCategoriesLoadError" class="form-text text-danger">تعذر تحميل فلاتر المطاعم؛ أعد تحميل الصفحة وحاول مرة أخرى.</span>
+                      </div>
+                    </div>
+
+                    <!-- 4. Merchant -->
+                    <div *ngSwitchCase="LinkType.Merchant">
+                      <label class="form-label fw-semibold text-gray-700">المتجر المستهدف <span class="text-danger">*</span></label>
+                      <ng-select
+                        [items]="merchants"
+                        bindLabel="displayLabel"
+                        bindValue="id"
+                        [(ngModel)]="tile.merchantId"
+                        (ngModelChange)="onTargetChange(tile)"
+                        [searchFn]="merchantSearchFn"
+                        [searchable]="true"
+                        placeholder="🔍 ابحث عن متجر أو ماركت أو مطعم..."
+                        notFoundText="لم يتم العثور على متاجر مطابقة"
+                        [clearable]="false"
+                      >
+                        <ng-template ng-label-tmp let-item="item">
+                          <span class="fw-bold text-dark">{{ item.title }}</span>
+                          <span class="badge badge-light-info ms-2 fs-8">{{ merchantKindLabel(item.merchantKind) }}</span>
+                          <span class="badge badge-light-primary ms-1 fs-8">#{{ item.id }}</span>
+                        </ng-template>
+                        <ng-template ng-option-tmp let-item="item" let-search="searchTerm">
+                          <div class="d-flex align-items-center justify-content-between py-1 w-100">
+                            <div>
+                              <div class="fw-bold text-dark">{{ item.title }}</div>
+                              <small class="text-muted fs-8">{{ merchantKindLabel(item.merchantKind) }} • {{ item.productCount || 0 }} منتج</small>
+                            </div>
+                            <span class="badge badge-light-secondary fs-8">#{{ item.id }}</span>
+                          </div>
+                        </ng-template>
+                      </ng-select>
+                    </div>
+
+                    <!-- 5. Search -->
+                    <div *ngSwitchCase="LinkType.Search">
+                      <label class="form-label fw-semibold text-gray-700">كلمة البحث <span class="text-danger">*</span></label>
+                      <input
+                        type="text"
+                        class="form-control form-control-sm"
+                        [(ngModel)]="tile.searchTerm"
+                        placeholder="مثال: شاورما، حليب، مياه..."
+                      />
+                    </div>
+
+                    <!-- 6. ErrandRequests -->
+                    <div *ngSwitchCase="LinkType.ErrandRequests" class="alert-errand-box">
+                      <i class="fas fa-shopping-bag"></i>
+                      <span>تفتح هذه الفئة نموذج «طلبات». تحكّم بظهورها من مفتاح التفعيل، وبترتيبها من أزرار التحريك أعلى الفئة.</span>
+                    </div>
+                  </ng-container>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Alerts on Tile Level -->
+          <div *ngIf="tileProblem(tile)" class="tile-inline-alert tile-inline-alert--danger">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>{{ tileProblem(tile) }}</span>
+          </div>
+
+          <div *ngIf="tileAvailabilityProblem(tile)" class="tile-inline-alert tile-inline-alert--warning">
+            <i class="fas fa-eye-slash"></i>
+            <span>{{ tileAvailabilityProblem(tile) }}</span>
+            <a
+              *ngIf="tile.linkType === LinkType.ProductCategory && jtakMarketMerchantId"
+              class="btn btn-sm btn-light-warning ms-auto text-nowrap"
+              [routerLink]="['/merchants', jtakMarketMerchantId, 'products']"
+            >
+              <i class="fas fa-store me-1"></i>فتح كتالوج جيتك ماركت
+            </a>
+          </div>
+
         </div>
-        <div *ngIf="tileAvailabilityProblem(tile)" class="text-warning fw-semibold fs-8 mt-3">
-          <i class="fas fa-eye-slash me-1"></i> {{ tileAvailabilityProblem(tile) }}
-        </div>
-      </div>
-    </ng-container>
-  </div>
+      </article>
+    </div>
+
+  </ng-container>
 </div>

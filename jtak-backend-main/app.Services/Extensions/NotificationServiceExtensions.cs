@@ -4,11 +4,22 @@ using Modules.Orders.Entities;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace App.Shared.Services.Extentions
 {
     public static class NotificationServiceExtensions
     {
+        private static Task SendActionAsync(INotificationService service, Notification n, Guid[] ids,
+            [CallerMemberName] string action = null)
+        {
+            n.EventKey ??= $"{action}:{n.Url}:{n.EntityData}:{n.TextEn}";
+            n.AudienceApp ??= action.StartsWith("SendCustomer") || action == nameof(SendShippingStarted) ? "customer"
+                : action.StartsWith("SendMerchant") || action == nameof(SendOrderCanceled) ? "warehouse"
+                : action.StartsWith("SendDelivery") ? "delivery"
+                : action.StartsWith("SendAdmin") ? "admin" : null;
+            return service.SendPushNotification(n, ids);
+        }
         public static async Task SendMerchantNewOrderRecived(this INotificationService service,
                                                                   Guid[] ids,
                                                                   int orderId,
@@ -27,12 +38,12 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/NewMerchantOrder/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendDeliveryNewOrderRecived(this INotificationService service,
                                                                   Guid[] ids,
                                                                   int orderId,
-                                                                  OrderDetail[] items)
+                                                                  OrderDetail[] items, int matchingRound = 0)
         {
             var desc = string.Join(Environment.NewLine, items.Select(i => $"{i.ProductTitle} ({i.ProductUnit}) ×{i.Quantity}"));
             var n = new Notification
@@ -45,9 +56,10 @@ namespace App.Shared.Services.Extentions
                 TextTr = desc,
                 //Topic = $"Order_{orderId}",
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/NewDeliveryOrder/{orderId}",
+                EventKey = $"courier-offer:{orderId}:round:{matchingRound}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendDeliveryOrderReadyForPickup(this INotificationService service,
                                                                  Guid[] ids,
@@ -71,7 +83,44 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/ReadyForPickup/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
+        }
+
+        public static async Task SendMerchantCourierAssigned(this INotificationService service,
+                                                              Guid[] ids,
+                                                              int orderId,
+                                                              string courierName)
+        {
+            var n = new Notification
+            {
+                TitleAr = $"تم تعيين سائق للطلب #{orderId}",
+                TitleEn = $"A courier was assigned to order #{orderId}",
+                TitleTr = $"#{orderId} numaralı siparişe kurye atandı",
+                TextAr = $"استلم {courierName} الطلب. يمكنك الآن البدء بتجهيزه.",
+                TextEn = $"{courierName} accepted the order. You can now start preparing it.",
+                TextTr = $"{courierName} siparişi kabul etti. Artık hazırlamaya başlayabilirsiniz.",
+                Url = $"{AppDomainHelper.DashboardUrl}/Orders/Prepare/{orderId}",
+                NotificationType = NotificationType.Order
+            };
+            await SendActionAsync(service, n, ids);
+        }
+
+        public static async Task SendOrderCanceledForNoCourier(this INotificationService service, Guid[] ids, int orderId, string audienceApp = "customer")
+        {
+            var n = new Notification
+            {
+                TitleAr = $"تم إلغاء الطلب #{orderId}",
+                TitleEn = $"Order #{orderId} was cancelled",
+                TitleTr = $"#{orderId} numaralı sipariş iptal edildi",
+                AudienceApp = audienceApp,
+                EventKey = $"order:{orderId}:cancelled-no-courier",
+                TextAr = "تعذر العثور على سائق متاح خلال 3 دقائق، لذلك تم إلغاء الطلب وإعادة المنتجات إلى المخزون.",
+                TextEn = "No courier accepted within 3 minutes. The order was cancelled and reserved items were returned to stock.",
+                TextTr = "3 dakika içinde kurye bulunamadığı için sipariş iptal edildi ve ürünler stoğa iade edildi.",
+                Url = $"{AppDomainHelper.DashboardUrl}/Orders/Cancel/{orderId}",
+                NotificationType = NotificationType.Order
+            };
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendCustomerOrderReadyForPickup(this INotificationService service,
                                                                  Guid[] ids,
@@ -95,7 +144,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/CustomerReady/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendOrderCanceled(this INotificationService service,
                                                         Guid[] ids,
@@ -115,7 +164,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/Cancel/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendCustomerOrderItemsNotFound(this INotificationService service,
                                                                      Guid[] ids,
@@ -135,7 +184,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/ItemsNotFound/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendCustomerOrderRejected(this INotificationService service,
                                                                 Guid[] ids,
@@ -171,7 +220,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/Rejected/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendAdminMerchantDecision(this INotificationService service,
                                                            Guid[] adminIds,
@@ -195,7 +244,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/orders",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, adminIds);
+            await SendActionAsync(service, n, adminIds);
         }
 
         public static async Task SendAdminOrderReadyForAssignment(this INotificationService service,
@@ -216,7 +265,49 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/orders",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, adminIds);
+            await SendActionAsync(service, n, adminIds);
+        }
+
+        public static async Task SendAdminDriverDeclined(this INotificationService service,
+                                                         Guid[] adminIds,
+                                                         int orderId,
+                                                         string driverName)
+        {
+            var driver = string.IsNullOrWhiteSpace(driverName) ? "مندوب التوصيل" : driverName;
+            var text = $"رفض {driver} متابعة توصيل الطلب #{orderId}. الطلب لم يُلغَ؛ يرجى تعيين مندوب آخر.";
+            var n = new Notification
+            {
+                TitleAr = "رفض المندوب مهمة التوصيل",
+                TitleEn = "Courier declined the delivery",
+                TitleTr = "Kurye teslimatı reddetti",
+                TextAr = text,
+                TextEn = text,
+                TextTr = text,
+                Url = $"{AppDomainHelper.DashboardUrl}/orders",
+                NotificationType = NotificationType.Order
+            };
+            await SendActionAsync(service, n, adminIds);
+        }
+
+        public static async Task SendCustomerDeliveryReassignment(this INotificationService service,
+                                                                  Guid[] customerIds,
+                                                                  int orderId,
+                                                                  string driverName)
+        {
+            var driver = string.IsNullOrWhiteSpace(driverName) ? "مندوب التوصيل" : driverName;
+            var textAr = $"اعتذر {driver} عن متابعة التوصيل. طلبك لم يُلغَ، ويجري الآن تعيين مندوب آخر لاستلامه.";
+            var n = new Notification
+            {
+                TitleAr = "جارٍ تعيين مندوب بديل",
+                TitleEn = "A replacement courier is being assigned",
+                TitleTr = "Yeni kurye atanıyor",
+                TextAr = textAr,
+                TextEn = textAr,
+                TextTr = textAr,
+                Url = $"{AppDomainHelper.DashboardUrl}/Orders/{orderId}",
+                NotificationType = NotificationType.Order
+            };
+            await SendActionAsync(service, n, customerIds);
         }
 
         public static async Task SendAdminNewOrder(this INotificationService service,
@@ -238,7 +329,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/orders",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, adminIds);
+            await SendActionAsync(service, n, adminIds);
         }
         public static async Task SendCustomerOrderItemsChanged(this INotificationService service,
                                                                     Guid[] ids,
@@ -258,7 +349,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/ItemsChanged/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendShippingStarted(this INotificationService service,
                                                           Guid[] ids,
@@ -278,7 +369,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/ShippingStarted/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendCustomerOrderDelivered(this INotificationService service,
                                                           Guid[] ids,
@@ -295,7 +386,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/Delivered/{orderId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendPaymentRecived(this INotificationService service,
                                                           Guid[] ids,
@@ -315,29 +406,32 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Payment/Recived/{paymentId}",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, ids);
+            await SendActionAsync(service, n, ids);
         }
         public static async Task SendNewSettlementRequest(this INotificationService service,
                                                           Guid[] adminIds,
                                                           string requestNumber,
                                                           string requesterName,
                                                           decimal amount,
-                                                          bool isMerchant)
+                                                          bool isMerchant, bool isDriverEarnings = false)
         {
             var typeAr = isMerchant ? "تاجر" : "مندوب توصيل";
             var typeEn = isMerchant ? "merchant" : "delivery captain";
             var n = new Notification
             {
-                TitleAr = $"طلب تسوية جديد من {typeAr}",
+                TitleAr = isDriverEarnings ? "طلب صرف مستحقات سائق" : $"طلب تسوية جديد من {typeAr}",
                 TitleEn = $"New {typeEn} settlement request",
                 TitleTr = "Yeni mutabakat talebi",
-                TextAr = $"{requesterName} أرسل طلب التسوية {requestNumber} بمبلغ {amount:N0} ل.س.",
+                TextAr = isDriverEarnings
+                    ? $"{requesterName} طلب صرف مستحقاته: {requestNumber} بقيمة {amount:N2} ل.س."
+                    : $"{requesterName} أرسل طلب التسوية {requestNumber} بمبلغ {amount:N0} ل.س.",
                 TextEn = $"{requesterName} submitted settlement {requestNumber} for {amount:N0} SYP.",
                 TextTr = $"{requesterName}, {amount:N0} SYP tutarında mutabakat talebi gönderdi.",
                 Url = $"{AppDomainHelper.DashboardUrl}/reconciliation",
+                AudienceApp = "admin",
                 NotificationType = NotificationType.Order
             };
-            await service.SendPushNotification(n, adminIds);
+            await SendActionAsync(service, n, adminIds);
         }
 
         public static async Task SendSettlementApproved(this INotificationService service,
@@ -373,7 +467,29 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
                 NotificationType = NotificationType.Payment
             };
-            await service.SendPushNotification(n, userIds);
+            await SendActionAsync(service, n, userIds);
+        }
+
+        public static Task SendDeliveryEarningsStatus(this INotificationService service,
+            Guid userId, string requestNumber, decimal amount, string status, string reason = null)
+        {
+            var approved = status == "approved";
+            var completed = status == "completed";
+            var n = new Notification
+            {
+                TitleAr = completed ? "تم صرف مستحقاتك" : approved ? "تم قبول طلب صرف المستحقات" : "تم رفض طلب صرف المستحقات",
+                TitleEn = completed ? "Earnings paid" : approved ? "Earnings payout approved" : "Earnings payout rejected",
+                TitleTr = completed ? "Kazançlar ödendi" : approved ? "Kazanç ödeme talebi onaylandı" : "Kazanç ödeme talebi reddedildi",
+                TextAr = completed ? $"تم تسجيل دفع {amount:N2} ل.س لطلبك {requestNumber}."
+                    : approved ? $"تم قبول طلبك {requestNumber} بمبلغ {amount:N2} ل.س. لم يتم الدفع بعد."
+                    : $"تم رفض طلبك {requestNumber}. {reason}",
+                TextEn = $"Earnings request {requestNumber}: {status}, {amount:N2} SYP. {reason}",
+                TextTr = $"Kazanç talebi {requestNumber}: {status}, {amount:N2} SYP. {reason}",
+                Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
+                NotificationType = NotificationType.Payment, AudienceApp = "delivery",
+                EventKey = $"driver-earnings:{requestNumber}:{status}"
+            };
+            return SendActionAsync(service, n, new[] { userId });
         }
 
         public static async Task SendSettlementRejected(this INotificationService service,
@@ -409,7 +525,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
                 NotificationType = NotificationType.Payment
             };
-            await service.SendPushNotification(n, userIds);
+            await SendActionAsync(service, n, userIds);
         }
 
         public static async Task SendSettlementCompleted(this INotificationService service,
@@ -436,7 +552,7 @@ namespace App.Shared.Services.Extentions
                 Url = $"{AppDomainHelper.DashboardUrl}/Settlement/{requestNumber}",
                 NotificationType = NotificationType.Payment
             };
-            await service.SendPushNotification(n, userIds);
+            await SendActionAsync(service, n, userIds);
         }
 
         public static async Task SendSettlementRequestStatus(this INotificationService service,

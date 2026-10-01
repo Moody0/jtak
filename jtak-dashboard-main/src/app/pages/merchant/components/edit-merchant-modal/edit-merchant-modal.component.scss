@@ -1,4 +1,24 @@
 // Edit Merchant Modal Two-Column Studio Architecture & Mobile Live Preview
+// Modern Minimalist Enterprise UI (No Shadows, Alexandria Font)
+
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  *,
+  *::before,
+  *::after,
+  .edit-section,
+  .activity-kind-card,
+  .merchant-map,
+  .preview-phone-card,
+  .customer-store-card,
+  .ng-select,
+  .ng-dropdown-panel {
+    box-shadow: none !important;
+  }
+}
 
 .merchant-editor-layout {
   display: flex;
@@ -39,7 +59,6 @@
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 
   .edit-section-heading {
     display: flex;
@@ -172,7 +191,6 @@
     border-color: #f97316;
     background: #fff7ed;
     color: #c2410c;
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
   }
 
   .activity-icon {
@@ -236,7 +254,6 @@
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 // Phone Mockup & Customer App Live Preview
@@ -244,7 +261,6 @@
   background: #ffffff;
   border-radius: 24px;
   border: 2px solid #e2e8f0;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -271,7 +287,6 @@
       height: 7px;
       border-radius: 50%;
       background: #22c55e;
-      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
     }
   }
 
@@ -297,7 +312,6 @@
   border-radius: 18px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
 
@@ -449,13 +463,11 @@
 
   &.ng-select-focused:not(.ng-select-opened) > .ng-select-container {
     border-color: #f97316 !important;
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12) !important;
     background: #ffffff !important;
   }
 
   &.ng-select-opened > .ng-select-container {
     border-color: #f97316 !important;
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12) !important;
     background: #ffffff !important;
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
@@ -558,7 +570,6 @@
     border-radius: 0 0 12px 12px !important;
     border: 1px solid #e2e8f0 !important;
     border-top: none !important;
-    box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
     background: #ffffff !important;
     margin-top: 0 !important;
     z-index: 1060 !important;

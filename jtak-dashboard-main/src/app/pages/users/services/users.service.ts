@@ -32,14 +32,25 @@ export class UsersService extends TableService<User> implements OnDestroy {
     return this.http
       .post<TableResponseModel<User>>(
         `${this.BASE_URL}/${this.GET_ALL_URL}`,
-        { pageNumber: 0, pageSize: 500, filter: {} },
+        // The API uses one-based page numbers (the UI paginator is zero-based).
+        { pageNumber: 1, pageSize: 500, filter: {} },
         this.httpOptions
       )
       .pipe(map((res) => res.items || []));
   }
 
   getMerchantUsers(): Observable<User[]> {
-    return this.getAllUsers();
+    return this.http
+      .get<User[]>(`${this.BASE_URL}/Admin/Users/Merchants`)
+      .pipe(map((users) => users || []));
+  }
+
+  resetMerchantPassword(userId: string, newPassword: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.BASE_URL}/Admin/Users/${userId}/ResetPassword`,
+      { newPassword },
+      this.httpOptions
+    );
   }
 
   changeUserStatus(isActive: boolean, userId: string) {

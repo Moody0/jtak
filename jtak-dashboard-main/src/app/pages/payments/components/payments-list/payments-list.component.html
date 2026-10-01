@@ -18,6 +18,10 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>{{ 'PAYMENTS_PAGE.REFRESH' | translate }}</span>
       </button>
+      <button type="button" class="ops-btn-cash-advance" (click)="createDriverCashAdvance()">
+        <i class="fas fa-hand-holding-usd"></i>
+        <span>إضافة عهدة مندوب</span>
+      </button>
       <button type="button" class="ops-btn-primary" (click)="create()">
         <i class="fas fa-plus"></i>
         <span>{{ 'PAYMENTS_PAGE.ADD_PAYMENT' | translate }}</span>
@@ -155,13 +159,13 @@
               <th scope="col" style="width: 180px;">
                 {{ 'PAYMENTS_PAGE.COL_BY_USER' | translate }}
               </th>
-              <th scope="col" style="width: 160px; text-align: left;">
+              <th scope="col" style="width: 160px;" class="text-end">
                 <span role="button" (click)="sort('amount')">
                   {{ 'PAYMENTS_PAGE.COL_AMOUNT' | translate }}
                   <app-sort-icon column="amount" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
                 </span>
               </th>
-              <th scope="col" style="width: 160px; text-align: left;">
+              <th scope="col" style="width: 160px;" class="text-end">
                 <span role="button" (click)="sort('newBalance')">
                   {{ 'PAYMENTS_PAGE.COL_NEW_BALANCE' | translate }}
                   <app-sort-icon column="newBalance" [activeColumn]="sorting.column" [activeDirection]="sorting.direction"></app-sort-icon>
@@ -191,7 +195,7 @@
               <!-- Reference & Date -->
               <td>
                 <div class="ops-payment-ref">
-                  <span class="ref-num">#{{ payment.id }}</span>
+                  <span class="ref-num">{{ payment.referenceNumber || ('#' + payment.id) }}</span>
                   <span class="ref-date text-muted" *ngIf="payment.createdDate">
                     {{ payment.createdDate | date:'yyyy/MM/dd, h:mm a' }}
                   </span>
@@ -204,7 +208,10 @@
                   <div class="ops-payee-icon">
                     <i class="fas fa-store"></i>
                   </div>
-                  <span class="ops-payee-name">{{ payment.toUser || ('COMMON.NOT_AVAILABLE' | translate) }}</span>
+                  <div>
+                    <span class="ops-payee-name">{{ payment.toUser || ('COMMON.NOT_AVAILABLE' | translate) }}</span>
+                    <small class="d-block text-muted" *ngIf="payment.paymentType">{{ payment.paymentType }}</small>
+                  </div>
                 </div>
               </td>
 
@@ -217,7 +224,7 @@
               </td>
 
               <!-- Disbursed Amount -->
-              <td style="text-align: left;">
+              <td class="text-end">
                 <div class="ops-amount-cell">
                   <span class="amount-val fw-bold text-success">+{{ payment.amount | number }}</span>
                   <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
@@ -225,10 +232,11 @@
               </td>
 
               <!-- Remaining Balance -->
-              <td style="text-align: left;">
+              <td class="text-end">
                 <div class="ops-amount-cell">
-                  <span class="amount-val fw-bold text-dark">{{ payment.newBalance | number }}</span>
-                  <span class="currency-tag">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                  <span *ngIf="!payment.isSettlement" class="amount-val fw-bold text-dark">{{ payment.newBalance | number }}</span>
+                  <span *ngIf="!payment.isSettlement" class="currency-tag">{{ payment.currency || ('COMMON.CURRENCY_SYP' | translate) }}</span>
+                  <span *ngIf="payment.isSettlement" class="text-muted">—</span>
                 </div>
               </td>
 

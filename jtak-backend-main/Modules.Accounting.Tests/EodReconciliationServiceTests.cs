@@ -129,7 +129,8 @@ namespace Modules.Accounting.Tests
                 PhysicalCashReceived = 95000m,
                 Currency = "SYP",
                 Notes = "Lost 5000 change",
-                DiscrepancyReason = "Lost cash change during run"
+                DiscrepancyReason = "Lost cash change during run",
+                ShortageTreatment = "write_off"
             };
 
             var result = await eodService.SettleCaptainShiftAsync(request, Guid.NewGuid());

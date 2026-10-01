@@ -4,6 +4,23 @@
 // are not accessible in this file but you can override any global variable as shown below:
 //
 
+// Global Typography
+$font-family-sans-serif: 'Alexandria', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !default;
+$headings-font-family: 'Alexandria', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !default;
+$input-btn-font-family: 'Alexandria', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !default;
+
+// Accessible neutral palette used by the admin shell and shared components.
+// The previous gray scale was too pale for secondary text on white surfaces.
+$gray-100: if(isDarkMode(), #1e293b, #f8fafc) !default;
+$gray-200: if(isDarkMode(), #273449, #eef2f6) !default;
+$gray-300: if(isDarkMode(), #334155, #d9e2ec) !default;
+$gray-400: if(isDarkMode(), #64748b, #94a3b8) !default;
+$gray-500: if(isDarkMode(), #94a3b8, #64748b) !default;
+$gray-600: if(isDarkMode(), #cbd5e1, #52606d) !default;
+$gray-700: if(isDarkMode(), #e2e8f0, #334155) !default;
+$gray-800: if(isDarkMode(), #f1f5f9, #1e293b) !default;
+$gray-900: if(isDarkMode(), #f8fafc, #0f172a) !default;
+
 // Theme colors
 // Primary
 $primary:       									if(isDarkMode(), #FF7043, #FF5722);

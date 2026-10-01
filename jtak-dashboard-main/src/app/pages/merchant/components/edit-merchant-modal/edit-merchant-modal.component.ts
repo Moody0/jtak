@@ -1,5 +1,5 @@
-import { Component, OnInit, Input, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+﻿import { Component, OnInit, Input, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable, of } from 'rxjs';
@@ -32,10 +32,10 @@ const EMPTY_Merchant: Merchant = {
   active: false,
   merchantKind: 0,
   deliveryTime: '20-30 دقيقة',
-  deliveryFee: 5000,
-  minOrderAmount: 15000,
+  deliveryFee: 50,
+  minOrderAmount: 150,
   workingHours: 'حتى 3 ص',
-  ownerId: '-',
+  ownerId: '',
   owner: '',
   photo: ''
 };
@@ -48,10 +48,28 @@ const EMPTY_Merchant: Merchant = {
 export class EditMerchantModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
   @Input() item: Merchant;
+  @Input() initialMerchantKind: number | null = null;
+
+  get isWarehouseRecord(): boolean {
+    return Number(this.initialMerchantKind ?? this.formGroup?.get('merchantKind')?.value ?? this.item?.merchantKind) === 4;
+  }
+
+  get isWarehouseCreation(): boolean {
+    return this.initialMerchantKind === 4 && !this.item?.id;
+  }
   merchantUsers: User[] = [];
   loadingUsers = false;
+  creatingMerchantAccount = false;
+  showAccountCreation = false;
+  accountFirstName = '';
+  accountLastName = '';
+  accountPhone = '';
+  accountPassword = '';
+  passwordResetting = false;
+  newMerchantPassword = '';
+  confirmMerchantPassword = '';
   isLoading$: Observable<boolean>;
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
   userRoles = Object.entries(AppUserRoleMap);
   zoom = 10;
   center: google.maps.LatLngLiteral;
@@ -68,8 +86,8 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   commissionPresets: number[] = [5, 10, 15, 20, 25];
   coveragePresets: number[] = [1000, 2000, 3000, 5000, 10000];
   deliveryTimePresets: string[] = ['15-25 دقيقة', '20-30 دقيقة', '25-40 دقيقة', '30-45 دقيقة', '40-60 دقيقة'];
-  deliveryFeePresets: number[] = [0, 3000, 5000, 7000, 10000];
-  minOrderPresets: number[] = [10000, 15000, 20000, 25000, 30000, 50000];
+  deliveryFeePresets: number[] = [0, 30, 50, 70, 100];
+  minOrderPresets: number[] = [100, 150, 200, 250, 300, 500];
   workingHoursPresets: string[] = ['حتى 12 ص', 'حتى 1 ص', 'حتى 2 ص', 'حتى 3 ص', '24 ساعة'];
 
   setDeliveryTime(val: string): void {
@@ -120,7 +138,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   constructor(
     private service: MerchantsService,
     private userService: UsersService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     public filesService: FilesService,
     private toasterService: ToastrService,
@@ -143,12 +161,109 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
     return this.formGroup?.get('photo')?.value || null;
   }
 
+  getSelectedMerchantOwner(): User | undefined {
+    const ownerId = this.formGroup?.get('ownerId')?.value || this.item?.ownerId;
+    return ownerId ? this.merchantUsers.find((user) => user.id === ownerId) : undefined;
+  }
+
+  createMerchantAccount(): void {
+    const firstName = this.accountFirstName.trim();
+    const lastName = this.accountLastName.trim();
+    const phone = this.normalizePhone(this.accountPhone);
+    const canonicalPhone = /^09\d{8}$/.test(phone) ? `+963${phone.substring(1)}` : '';
+    const password = this.accountPassword;
+    if (!firstName || !lastName || !canonicalPhone || password.length < 6) {
+      this.toasterService.error('أدخل الاسم الأول والأخير ورقم موبايل سوري صحيح وكلمة مرور من 6 أحرف على الأقل.');
+      return;
+    }
+
+    this.creatingMerchantAccount = true;
+    // The API DTO's Id is a non-nullable Guid. Omitting it lets the server
+    // apply its default; sending an empty string fails JSON Guid conversion.
+    const account = {
+      firstName, lastName, fullName: `${firstName} ${lastName}`,
+      phoneNumber: canonicalPhone, countryPhoneCode: '+963', email: '',
+      password, role: 2, isActive: true, lang: 'ar'
+    } as User;
+    this.subs.sink = this.userService.create(account).pipe(
+      tap((id) => {
+        this.merchantUsers.push({ ...account, id, password: undefined, phoneNumber: canonicalPhone });
+        this.formGroup.patchValue({ ownerId: id, ownerName: account.fullName, owner: account.fullName });
+        this.accountPassword = '';
+        this.showAccountCreation = false;
+        this.toasterService.success('تم إنشاء حساب التاجر وربطه. احفظ بيانات المتجر لإكمال الربط.');
+        this.cdk.detectChanges();
+      }),
+      catchError((error) => {
+        const message = error?.error?.errorDescription || error?.error?.error ||
+          error?.error?.errors?.[0]?.description || 'تعذر إنشاء حساب التاجر.';
+        this.toasterService.error(message);
+        return of(null);
+      }),
+      finalize(() => { this.creatingMerchantAccount = false; this.cdk.detectChanges(); })
+    ).subscribe();
+  }
+
+  resetMerchantPassword(): void {
+    const owner = this.getSelectedMerchantOwner();
+    const password = this.newMerchantPassword.trim();
+    const confirmation = this.confirmMerchantPassword.trim();
+
+    if (!owner) {
+      this.toasterService.error('لا يوجد حساب تاجر مرتبط بهذا المتجر.');
+      return;
+    }
+    if (password.length < 6) {
+      this.toasterService.error('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.');
+      return;
+    }
+    if (password !== confirmation) {
+      this.toasterService.error('كلمتا المرور غير متطابقتين.');
+      return;
+    }
+
+    this.passwordResetting = true;
+    this.subs.sink = this.userService
+      .resetMerchantPassword(owner.id, password)
+      .pipe(
+        tap(() => {
+          this.newMerchantPassword = '';
+          this.confirmMerchantPassword = '';
+          this.toasterService.success(`تم تغيير كلمة مرور حساب ${owner.fullName || 'التاجر'}.`);
+          this.cdk.detectChanges();
+        }),
+        catchError((error) => {
+          const errors = error?.error?.errors;
+          const identityErrors = Array.isArray(errors)
+            ? errors.map((item) => item?.description).filter(Boolean).join(' ')
+            : errors
+              ? Object.values(errors)
+                  .map((value) => Array.isArray(value) ? value.join(' ') : String(value))
+                  .join(' ')
+              : '';
+          const description = identityErrors || error?.error?.errorDescription || error?.error?.error || error?.error?.message;
+          this.toasterService.error(
+            description || 'تعذر تغيير كلمة المرور، يرجى التحقق من البيانات والمحاولة مجدداً.'
+          );
+          return of(null);
+        }),
+        finalize(() => {
+          this.passwordResetting = false;
+          this.cdk.detectChanges();
+        })
+      )
+      .subscribe();
+  }
+
   getKindInfo(): { label: string; icon: string; emoji: string } {
     const kind = Number(this.formGroup?.get('merchantKind')?.value ?? 0);
     switch (kind) {
       case 1:
-      case 3:
         return { label: 'سوبرماركت / بقالية', icon: 'fas fa-shopping-basket', emoji: '🛒' };
+      case 3:
+        return { label: 'أخرى', icon: 'fas fa-store', emoji: '🏪' };
+      case 4:
+        return { label: 'مستودع مركزي', icon: 'fas fa-warehouse', emoji: '🏬' };
       default:
         return { label: 'مطعم', icon: 'fas fa-utensils', emoji: '🍽️' };
     }
@@ -166,7 +281,14 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
 
   loadItem() {
     if (!this.item) {
-      this.item = EMPTY_Merchant;
+      this.item = { ...EMPTY_Merchant };
+    }
+    if (this.initialMerchantKind !== null && !this.item.id) {
+      this.item.merchantKind = this.initialMerchantKind;
+      if (this.initialMerchantKind === 4) {
+        this.item.title = 'مستودع مركزي';
+        this.item.shortDescription = 'مستودع مركزي لتخزين وتجهيز المنتجات';
+      }
     }
     this.loadingUsers = true;
     this.userService
@@ -180,25 +302,6 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       )
       .subscribe((users) => {
         this.merchantUsers = users || [];
-        if (
-          this.item.ownerId &&
-          this.item.ownerId !== '-' &&
-          !this.merchantUsers.some((u) => u.id === this.item.ownerId)
-        ) {
-          this.merchantUsers.unshift({
-            id: this.item.ownerId,
-            fullName: this.item.owner || 'مالك المتجر الحالي',
-            phoneNumber: this.item.phone1 || '',
-            email: '',
-            firstName: '',
-            lastName: '',
-            profilePhoto: '',
-            isActive: true,
-            role: 'Merchant' as any,
-            lang: 'ar',
-            countryPhoneCode: '+963',
-          });
-        }
         this.cdk.detectChanges();
       });
   }
@@ -251,14 +354,25 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       lng: [this.item.lng ?? 37.378656, [Validators.required]],
       profitOutOfMerchantPricePercent: [this.item.profitOutOfMerchantPricePercent ?? 0, [Validators.required]],    
       deliveryTime: [this.item.deliveryTime || '20-30 دقيقة'],
-      deliveryFee: [this.item.deliveryFee !== undefined && this.item.deliveryFee !== null ? this.item.deliveryFee : 5000, [Validators.required, Validators.min(0)]],
-      minOrderAmount: [this.item.minOrderAmount !== undefined && this.item.minOrderAmount !== null ? this.item.minOrderAmount : 15000, [Validators.required, Validators.min(0)]],
+      deliveryFee: [this.item.deliveryFee !== undefined && this.item.deliveryFee !== null ? this.item.deliveryFee : 50, [Validators.required, Validators.min(0)]],
+      minOrderAmount: [this.item.minOrderAmount !== undefined && this.item.minOrderAmount !== null ? this.item.minOrderAmount : 150, [Validators.required, Validators.min(0)]],
       workingHours: [this.item.workingHours || 'حتى 3 ص'],
       active: [this.item.active ?? true],
       ownerName: [this.item.ownerName || this.item.owner || ''],
       owner: [this.item.ownerName || this.item.owner || ''],
-      ownerId: [this.item.ownerId],
+      ownerId: [this.item.ownerId && this.item.ownerId !== '-' ? this.item.ownerId : null, [Validators.required]],
       photo: [this.item.photo || '']
+    });
+
+    ['phone1', 'phone2'].forEach((phoneControlName) => {
+      const phoneControl = this.formGroup.get(phoneControlName);
+      if (!phoneControl) return;
+      this.subs.sink = phoneControl.valueChanges.subscribe(() => {
+        if (!phoneControl.errors?.duplicatePhone) return;
+        const errors = { ...phoneControl.errors };
+        delete errors.duplicatePhone;
+        phoneControl.setErrors(Object.keys(errors).length ? errors : null);
+      });
     });
 
     this.subs.sink = this.formGroup.get('merchantKind')?.valueChanges.subscribe((type) => {
@@ -283,6 +397,10 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         this.formGroup.patchValue({
           shortDescription: cleaned || 'مطعم ومأكولات متنوعة',
         });
+      } else if (type === 3 && !currentDesc) {
+        this.formGroup.patchValue({ shortDescription: 'متجر متنوع' });
+      } else if (type === 4 && !currentDesc) {
+        this.formGroup.patchValue({ shortDescription: 'مستودع مركزي لتخزين وتجهيز المنتجات' });
       }
       this.cdk.detectChanges();
     });
@@ -345,27 +463,108 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       if (!desc) {
         desc = 'مطعم ومأكولات متنوعة';
       }
+    } else if (merchantKind === 3 && !desc) {
+      desc = 'متجر متنوع';
+    } else if (merchantKind === 4 && !desc) {
+      desc = 'مستودع مركزي لتخزين وتجهيز المنتجات';
     }
     formValues.shortDescription = desc;
 
-    // Set owner human-readable name from text input (Canonical #1)
-    const ownerName = (this.formGroup.get('ownerName')?.value || this.formGroup.get('owner')?.value || '').toString().trim();
+    const selectedOwner = this.merchantUsers.find((u) => u.id === formValues.ownerId);
+    const ownerName = (selectedOwner?.fullName || this.formGroup.get('ownerName')?.value || '').toString().trim();
     formValues.ownerName = ownerName;
     formValues.owner = ownerName;
-    if (!ownerName && formValues.ownerId && formValues.ownerId !== '-') {
-      const selectedUser = this.merchantUsers.find((u) => u.id === formValues.ownerId);
-      if (selectedUser) {
-        formValues.ownerName = selectedUser.fullName;
-        formValues.owner = selectedUser.fullName;
-      }
+
+    const isGuid = (val: any) =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    if (!isGuid(formValues.ownerId) || !this.merchantUsers.some(u => u.id === formValues.ownerId && u.isActive)) {
+      this.formGroup.get('ownerId')?.setErrors({ invalidAccount: true });
+      this.toasterService.error('اختر حساب تاجر نشطاً مرتبطاً بالمتجر.');
+      return;
     }
 
-    if (this.item.id) {
-      this.edit(formValues);
-    } else {
-      delete formValues.id;
-      this.create(formValues);
-    }
+    this.checkPhoneUniqueness(formValues);
+  }
+
+  private normalizePhone(value: unknown): string {
+    const digits = String(value ?? '')
+      .trim()
+      .replace(/[٠-٩]/g, (digit: string) => String(digit.charCodeAt(0) - '٠'.charCodeAt(0)))
+      .replace(/[۰-۹]/g, (digit: string) => String(digit.charCodeAt(0) - '۰'.charCodeAt(0)))
+      .replace(/\D/g, '');
+
+    if (digits.startsWith('00963')) return `0${digits.substring(5)}`;
+    if (digits.startsWith('963')) return `0${digits.substring(3)}`;
+    if (digits.length === 9 && digits.startsWith('9')) return `0${digits}`;
+    return digits;
+  }
+
+  private checkPhoneUniqueness(formValues: Merchant): void {
+    const phone1 = this.normalizePhone(formValues.phone1);
+    const phone2 = this.normalizePhone(formValues.phone2);
+    const phoneControls = [this.formGroup.get('phone1'), this.formGroup.get('phone2')];
+
+    phoneControls.forEach((control) => {
+      if (!control?.errors?.duplicatePhone) return;
+      const errors = { ...control.errors };
+      delete errors.duplicatePhone;
+      control.setErrors(Object.keys(errors).length ? errors : null);
+    });
+
+    this.subs.sink = this.service
+      .getAllMerchants()
+      .pipe(catchError(() => of(null)))
+      .subscribe((merchants) => {
+        const merchantId = Number(formValues.id || this.item?.id || 0);
+        const duplicate = (merchants || []).find((merchant) => {
+          if (merchant.id === merchantId) return false;
+          const existingPhones = [
+            this.normalizePhone(merchant.phone1),
+            this.normalizePhone(merchant.phone2),
+          ];
+          return [phone1, phone2].filter(Boolean).some((phone) => existingPhones.includes(phone));
+        });
+
+        if (duplicate) {
+          const existingPhones = [
+            this.normalizePhone(duplicate.phone1),
+            this.normalizePhone(duplicate.phone2),
+          ];
+          this.markDuplicatePhone([
+            phone1 && existingPhones.includes(phone1) ? phoneControls[0] : null,
+            phone2 && existingPhones.includes(phone2) ? phoneControls[1] : null,
+          ]);
+          this.toasterService.error(`رقم الهاتف مستخدم مسبقاً للمتجر «${duplicate.title}».`);
+          return;
+        }
+
+        if (this.item.id) {
+          this.edit(formValues);
+        } else {
+          delete (formValues as any).id;
+          this.create(formValues);
+        }
+      });
+  }
+
+  private markDuplicatePhone(controls: any[]): void {
+    controls.forEach((control) => {
+      if (!control) return;
+      control.setErrors({ ...(control.errors || {}), duplicatePhone: true });
+      control.markAsTouched();
+    });
+  }
+
+  private handleSaveError(error: any): void {
+    const message = typeof error?.error === 'string'
+      ? error.error
+      : error?.error?.message;
+    this.toasterService.error(
+      error?.status === 409
+        ? (message || 'رقم الهاتف مستخدم مسبقاً لمتجر آخر.')
+        : (error?.error?.errorDescription || message || 'تعذر حفظ بيانات المتجر، يرجى المحاولة مرة أخرى.')
+    );
   }
 
   create(formValues: Merchant) {
@@ -375,6 +574,10 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         tap((id) => {
           this.toasterService.success('Merchant Added');
           this.modal.close({ ...formValues, id });
+        }),
+        catchError((error) => {
+          this.handleSaveError(error);
+          return of(null);
         })
       )
       .subscribe();
@@ -387,6 +590,10 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         tap(() => {
           this.toasterService.success('Merchant Updated');
           this.modal.close(formValues);
+        }),
+        catchError((error) => {
+          this.handleSaveError(error);
+          return of(null);
         })
       )
       .subscribe();

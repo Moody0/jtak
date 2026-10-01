@@ -1,5 +1,6 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { Observable } from 'rxjs';
 import { CategoriesService } from '../../services/categories.service';
 
 @Component({
@@ -10,18 +11,23 @@ import { CategoriesService } from '../../services/categories.service';
 })
 export class DeleteCategoryModalComponent implements OnInit {
   @Input() id: number;
+  isLoading$: Observable<boolean>;
 
   constructor(
     private service: CategoriesService,
-    public modal: NgbActiveModal) { }
+    public modal: NgbActiveModal
+  ) {}
 
   ngOnInit(): void {
+    this.isLoading$ = this.service.isLoading$;
   }
 
-  delete() {
+  delete(): void {
     if (this.id) {
-      this.service
-          .delete(this.id).subscribe(x => this.modal.dismiss());
+      this.service.delete(this.id).subscribe({
+        next: () => this.modal.close(true),
+        error: () => this.modal.dismiss(),
+      });
     }
   }
 }

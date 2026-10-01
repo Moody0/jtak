@@ -15,6 +15,7 @@ namespace App.Setup
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
             var serverVersion = new MySqlServerVersion(new Version(8, 0, 21));
             optionsBuilder.UseMySql("Server=localhost;Database=jtak_db;Uid=root;Pwd=;", serverVersion);
+            optionsBuilder.UseOpenIddict<Guid>();
             return new AppDbContext(optionsBuilder.Options, null);
         }
     }

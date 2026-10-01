@@ -80,6 +80,7 @@ export interface BatchProductLookup {
 export interface BatchMerchantLookup {
   id: number;
   title: string;
+  merchantKind?: number;
 }
 
 export interface QuarantineBatchDto {

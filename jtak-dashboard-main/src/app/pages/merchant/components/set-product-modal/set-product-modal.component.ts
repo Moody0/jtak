@@ -9,7 +9,7 @@ import { FilesService } from 'src/app/modules/shared/services/files.service';
 @Component({
   selector: 'app-set-product-modal',
   templateUrl: './set-product-modal.component.html',
-  styles: [],
+  styleUrls: ['./set-product-modal.component.scss'],
 })
 export class SetProductModalComponent implements OnInit {
   @Input() mid: number;
@@ -17,7 +17,6 @@ export class SetProductModalComponent implements OnInit {
   productMerchants: ProductMerchant[] = [];
   private subs = new SubSink();
   isLoading$: Observable<boolean>;
-  public percent: number;
   search = '';
   toggleAll = true;
 
@@ -69,18 +68,6 @@ export class SetProductModalComponent implements OnInit {
     for (let product of this.productMerchants) {
       product.isSelected = this.toggleAll;
     }
-  }
-
-  onPercentChange(productId: number, event: any) {
-    const updatedProductMerchants = [...this.productMerchants];
-    const productIndex = this.productMerchants.findIndex(
-      (item) => item.productId === productId
-    );
-
-    updatedProductMerchants[productIndex] = {
-      ...updatedProductMerchants[productIndex],
-      additionalProfitPercent: event.target.value,
-    };
   }
 
   changeIsSelected(productId: number) {

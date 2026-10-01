@@ -19,8 +19,8 @@ namespace App.Setup
         public async Task Seed()
         {
             await CreateRole(nameof(AppRoleName.Admin), Enum.GetValues<AppPermissionKey>());
-            await CreateRole(nameof(AppRoleName.Merchant), AppPermissionKey.MerchantPermission);
-            await CreateRole(nameof(AppRoleName.Delivery), AppPermissionKey.DeliveryPermission);
+            await CreateRole(nameof(AppRoleName.Merchant), AppPermissionKey.MerchantPermission, AppPermissionKey.CustomerPermission);
+            await CreateRole(nameof(AppRoleName.Delivery), AppPermissionKey.DeliveryPermission, AppPermissionKey.CustomerPermission);
             await CreateRole(nameof(AppRoleName.Customer), AppPermissionKey.CustomerPermission);
         }
 
@@ -37,6 +37,23 @@ namespace App.Setup
             {
                 dbrole.RolePermissions = keys.Select(x => new RolePermission(dbrole.Id, (byte)x)).ToList();
                 var result = await _roleManager.UpdateAsync(dbrole);
+            }
+            else
+            {
+                var existingKeys = dbrole.RolePermissions.Select(rp => (AppPermissionKey)rp.SolPermissionKey).ToHashSet();
+                bool added = false;
+                foreach (var key in keys)
+                {
+                    if (!existingKeys.Contains(key))
+                    {
+                        dbrole.RolePermissions.Add(new RolePermission(dbrole.Id, (byte)key));
+                        added = true;
+                    }
+                }
+                if (added)
+                {
+                    await _roleManager.UpdateAsync(dbrole);
+                }
             }
         }
     }

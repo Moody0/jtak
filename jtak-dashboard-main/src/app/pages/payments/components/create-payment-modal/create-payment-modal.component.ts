@@ -1,5 +1,5 @@
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable } from 'rxjs';
@@ -28,6 +28,7 @@ const EMPTY_PAYMENT: Payment = {
 @Component({
   selector: 'app-create-payment-modal',
   templateUrl: './create-payment-modal.component.html',
+  styleUrls: ['./create-payment-modal.component.scss'],
 })
 export class CreatePaymentModalComponent implements OnInit {
   private subs = new SubSink();
@@ -36,13 +37,13 @@ export class CreatePaymentModalComponent implements OnInit {
   deliveries: Deliver[] = [];
   @Input() item: Payment;
   isLoading$: Observable<boolean>;
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
   merchantBalance:number = 0;
   deliveryBalance:number = 0;
   constructor(
     private usersService: UsersService,
     private paymentsService: paymentsService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     private toasterService: ToastrService,
     public merchantsService: MerchantsService,

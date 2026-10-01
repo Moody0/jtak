@@ -1,4 +1,5 @@
 using Modules.Catalog.Entities;
+using Modules.Orders.Entities;
 
 namespace App.ApiModels
 {
@@ -13,5 +14,11 @@ namespace App.ApiModels
         public ProductCategoryDto[] HomeFeaturedCategories { get; set; }
 
         public decimal UsdToSypExchangeRate { get; set; } = 15000;
+
+        /// <summary>
+        /// Delivery driver compensation pricing configuration (fixed or distance-based).
+        /// </summary>
+        public DriverPricingSetting DriverPricing { get; set; }
     }
 }
+

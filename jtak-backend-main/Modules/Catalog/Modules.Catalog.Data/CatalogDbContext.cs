@@ -61,8 +61,26 @@ namespace App.Catalog.Data
             builder.Entity<BatchReservation>().HasIndex(b => b.OrderId);
             builder.Entity<BatchReservation>().HasIndex(b => b.OrderDetailId);
             builder.Entity<BatchReservation>().HasIndex(b => b.ProductBatchId);
+            builder.Entity<BatchReservation>()
+                .HasIndex(b => new { b.OrderDetailId, b.ProductBatchId })
+                .IsUnique();
+
+            builder.Entity<InventoryMovement>(b =>
+            {
+                // Every stock mutation carries a deterministic business key. The
+                // unique index makes reservation/release/restock retries safe.
+                b.HasIndex(x => x.BusinessKey).IsUnique();
+                b.HasIndex(x => x.ProductBatchId);
+                b.HasIndex(x => new { x.OrderId, x.OrderDetailId });
+                b.HasOne(x => x.ProductBatch).WithMany().HasForeignKey(x => x.ProductBatchId).IsRequired(false);
+            });
 
             builder.Entity<DynamicFieldValue>().HasKey(c => new { c.DynamicFieldId, c.ProductId });
+            builder.Entity<DynamicFieldValue>()
+                .HasOne(c => c.Product)
+                .WithMany()
+                .HasForeignKey(c => c.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             #region Use updated datetime2 , decimal
             //https://stackoverflow.com/questions/43277154/entity-framework-core-setting-the-decimal-precision-and-scale-to-all-decimal-p
@@ -159,5 +177,6 @@ namespace App.Catalog.Data
         public DbSet<Tag> Tags { get; set; }
         public DbSet<ProductBatch> ProductBatches { get; set; }
         public DbSet<BatchReservation> BatchReservations { get; set; }
+        public DbSet<InventoryMovement> InventoryMovements { get; set; }
     }
 }

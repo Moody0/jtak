@@ -19,6 +19,8 @@ using OpenIddict.Validation.AspNetCore;
 using Solf.Helpers;
 using App.Shared.Data.App;
 using SixLabors.ImageSharp.Formats.Webp;
+using Microsoft.EntityFrameworkCore;
+using App.Shared.Entities.Enums;
 
 namespace App.ApiControllers.V1
 {
@@ -29,13 +31,16 @@ namespace App.ApiControllers.V1
     public class ServicesController : SolBaseController
     {
         private readonly IWebHostEnvironment _env;
+        private readonly AppDbContext _app;
         public ServicesController(IAppUnitOfWork UOW,
                                     ILogger<ServicesController> logger,
                                     UserManager<AppUser> userManager,
                                     IMapper mapper,
-                                    IWebHostEnvironment env) : base(UOW, mapper, logger, userManager)
+                                    IWebHostEnvironment env,
+                                    AppDbContext app) : base(UOW, mapper, logger, userManager)
         {
             _env = env;
+            _app = app;
         }
 
         [HttpPost]
@@ -52,8 +57,9 @@ namespace App.ApiControllers.V1
         [HttpGet]
         [Route("Download/{id}")]
         [AllowAnonymous]
-        public IActionResult Download(string id, string token = "")
+        public async Task<IActionResult> Download(string id, string token = "")
         {
+            if (!IsSafeFileToken(id) || await IsPrivateReceipt(id)) return NotFound();
             try
             {
                 var fullPath = FileHelper.GetPhysicalPath(_env, id);
@@ -64,8 +70,41 @@ namespace App.ApiControllers.V1
             }
             catch (Exception e)
             {
-                return NotFound(e.ToString());
+                return NotFound();
             }
+        }
+
+        // Receipts are internal accounting evidence. Never serve them through
+        // anonymous media routes, even if a customer retained an old token.
+        [HttpGet("ErrandReceipt/{id:int}")]
+        [Authorize(Policy = nameof(AppPermissionKey.AdminPermission))]
+        public async Task<IActionResult> ErrandReceipt(int id)
+        {
+            var receiptToken = await _app.SupportMessages.AsNoTracking()
+                .Where(x => x.Id == id && x.ErrandStatus != null)
+                .Select(x => x.ErrandReceiptPhotoToken).FirstOrDefaultAsync();
+            if (!IsSafeFileToken(receiptToken)) return NotFound();
+            var path = _env.GetPhysicalPath(receiptToken);
+            if (!System.IO.File.Exists(path)) return NotFound();
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return new PhysicalFileResult(path, MimeTypeMap.GetMimeType(Path.GetExtension(receiptToken)));
+        }
+
+        private static bool IsSafeFileToken(string id) => !string.IsNullOrWhiteSpace(id) &&
+            id.All(c => char.IsAsciiLetterOrDigit(c) || c == '_' || c == '-' || c == '.') &&
+            !id.Contains("..");
+
+        private Task<bool> IsPrivateReceipt(string id)
+        {
+            var parts = id.Split('_');
+            // Include old generated thumbnails and tokens with extra suffixes:
+            // FileHelper resolves them to the same stored file or its preview.
+            var prefix = parts.Length >= 4 && parts[3].Length >= 32 &&
+                Guid.TryParseExact(parts[3].Substring(0, 32), "N", out _)
+                ? string.Join("_", parts.Take(3)) + "_" + parts[3].Substring(0, 32)
+                : id;
+            return _app.SupportMessages.AsNoTracking().AnyAsync(x =>
+                x.ErrandReceiptPhotoToken != null && x.ErrandReceiptPhotoToken.StartsWith(prefix));
         }
 
 
@@ -112,16 +151,18 @@ namespace App.ApiControllers.V1
         [AllowAnonymous]
         [Route("PreviewImage/{id?}")]
         [HttpGet]
-        public IActionResult PreviewImageApi(string id = "", int w = 150, int h = 150, bool crop = true)
+        public async Task<IActionResult> PreviewImageApi(string id = "", int w = 150, int h = 150, bool crop = true)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(id)) return NotFound();
 
                 var cleanId = id.Split(',')[0].Trim();
+                if (!IsSafeFileToken(cleanId) || await IsPrivateReceipt(cleanId)) return NotFound();
                 var physicalPath = FileHelper.GetPhysicalPath(_env, cleanId);
                 var ext = Path.GetExtension(cleanId)?.ToLower() ?? "";
 
+                bool isDefaultImage = false;
                 if (!System.IO.File.Exists(physicalPath))
                 {
                     physicalPath = Path.Combine(_env.WebRootPath, "images", "default-image.jpg");
@@ -130,6 +171,14 @@ namespace App.ApiControllers.V1
                     {
                         return NotFound();
                     }
+                    isDefaultImage = true;
+
+                    // The product fallback image can be replaced by a newer
+                    // branded asset. Prevent clients and proxies from keeping
+                    // the previous generic fallback under the same image URL.
+                    Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+                    Response.Headers["Pragma"] = "no-cache";
+                    Response.Headers["Expires"] = "0";
                 }
 
                 if (ext == ".svg" || ext == ".webp" || ext == ".gif" || ext == ".avif")
@@ -137,8 +186,17 @@ namespace App.ApiControllers.V1
                     return new PhysicalFileResult(physicalPath, MimeTypeMap.GetMimeType(ext));
                 }
 
-                var cleanNameWithoutExt = Path.GetFileNameWithoutExtension(cleanId);
-                var thumbPhysicalPath = FileHelper.GetPhysicalPath(_env, cleanNameWithoutExt) + $"{w}x{h}{(crop ? "c" : "")}" + ext;
+                string thumbPhysicalPath;
+                if (isDefaultImage)
+                {
+                    var imageVersion = System.IO.File.GetLastWriteTimeUtc(physicalPath).Ticks;
+                    thumbPhysicalPath = Path.Combine(_env.WebRootPath, "images", $"default-image_{imageVersion}_{w}x{h}{(crop ? "c" : "")}.webp");
+                }
+                else
+                {
+                    var cleanNameWithoutExt = Path.GetFileNameWithoutExtension(cleanId);
+                    thumbPhysicalPath = FileHelper.GetPhysicalPath(_env, cleanNameWithoutExt) + $"{w}x{h}{(crop ? "c" : "")}" + ext;
+                }
                 var resizeOptions = new ResizeOptions { Size = new Size(w, h), Mode = crop ? ResizeMode.Crop : ResizeMode.Min };
 
                 if (!System.IO.File.Exists(thumbPhysicalPath) && (ext == ".png" || ext == ".jpg" || ext == ".jpeg"))

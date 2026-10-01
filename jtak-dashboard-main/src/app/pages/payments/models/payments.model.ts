@@ -2,6 +2,11 @@ import { BaseModel } from 'src/app/_metronic/shared/crud-table';
 
 export interface Payment extends BaseModel {
   id: any;
+  referenceNumber?: string;
+  paymentType?: string;
+  currency?: string;
+  status?: string;
+  isSettlement?: boolean;
   toUserId: any;
   toUser: any;
   byUserId: any;

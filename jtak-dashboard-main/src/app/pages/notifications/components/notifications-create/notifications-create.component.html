@@ -1,36 +1,101 @@
-<app-edit-modal [item]="item" [itemName]="item.title" moduleName="Notification" [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid" (cancelClicked)="modal.dismiss()" (saveClicked)="save()">
-  <ng-container *ngIf="item">
-    <form class="form form-label-right" [formGroup]="formGroup">
-      <div class="row">
-        <div class="col-md-12">
-          <div class="mb-8">
-            <label for="titleAr" class="form-label fw-bold mb-2">{{ 'NOTIFICATIONS_PAGE.COL_TITLE' | translate }}</label>
-            <app-input-container [control]="formGroup.controls.titleAr">
-              <input type="text" class="form-control form-control-solid" formControlName="titleAr" id="titleAr"
-                [placeholder]="'NOTIFICATIONS_PAGE.COL_TITLE' | translate" #input />
-            </app-input-container>
-          </div>
-        </div>
-        <div class="col-md-12">
-          <div class="mb-8">
-            <label for="textAr" class="form-label fw-bold mb-2">{{ 'NOTIFICATIONS_PAGE.COL_TEXT' | translate }}</label>
-            <app-input-container [control]="formGroup.controls.textAr">
-              <textarea class="form-control form-control-solid" formControlName="textAr" id="textAr" rows="3"
-                [placeholder]="'NOTIFICATIONS_PAGE.COL_TEXT' | translate" #input></textarea>
-            </app-input-container>
-          </div>
-        </div>
+<div class="modal-header campaign-header" dir="rtl">
+  <div>
+    <h2 class="modal-title fw-bolder mb-1">إرسال إشعار جديد</h2>
+    <p class="text-muted mb-0">اختر التطبيق، اكتب الرسالة، وراجع المعاينة قبل الإرسال.</p>
+  </div>
+  <button type="button" class="btn btn-icon btn-sm btn-light" aria-label="إغلاق" (click)="modal.dismiss()" [disabled]="isSending">
+    <i class="fas fa-times"></i>
+  </button>
+</div>
 
-        <div class="col-md-12">
-          <app-file-uploader uploaderTitle="صورة الإشعار (اختياري)"
-            (fileUploaded)="onFileUploaded($event, 'image')"></app-file-uploader>
+<div class="modal-body campaign-body" dir="rtl" [formGroup]="formGroup">
+  <div *ngIf="sendError" class="alert alert-danger d-flex justify-content-between align-items-center">
+    <span>{{ sendError }}</span>
+    <button *ngIf="!audiences && !statsLoading" type="button" class="btn btn-sm btn-light-danger" (click)="loadAudiences()">إعادة المحاولة</button>
+  </div>
+  <div *ngIf="audiences && !audiences.pushConfigured" class="alert alert-warning">
+    خدمة Firebase غير مهيأة على الخادم. يجب إعداد بيانات الخدمة قبل إرسال إشعار إلى التطبيقات.
+  </div>
 
-          <app-uploaded-image [imageId]="formGroup.get('image')?.value"
-            [dimensions]="{ width: 600, height: 300 }" (imageDeleted)="onFileDelete('image')">
-          </app-uploaded-image>
+  <section class="mb-7" aria-labelledby="campaign-target-heading">
+    <h3 id="campaign-target-heading" class="fs-5 fw-bolder mb-3">التطبيق المستهدف</h3>
+    <div class="campaign-targets">
+      <button *ngFor="let target of targets" type="button" class="campaign-target" [class.is-selected]="selectedTarget === target.value"
+        [attr.aria-pressed]="selectedTarget === target.value" (click)="selectTarget($any(target.value))" [disabled]="isSending">
+        <span class="campaign-target-icon" [ngClass]="target.color"><i class="fas" [ngClass]="target.icon"></i></span>
+        <strong>{{ target.label }}</strong>
+        <small *ngIf="statsLoading">جارٍ حساب المستلمين...</small>
+        <small *ngIf="audiences">{{ getAudienceCount(target.value) | number }} حساب نشط</small>
+      </button>
+    </div>
+    <p class="text-muted fs-8 mt-2 mb-0">عدد الحسابات المعروض لا يشمل أجهزة العملاء الذين لم يسجلوا الدخول. قبول Firebase للرسالة لا يثبت تسليمها لكل جهاز.</p>
+  </section>
+
+  <div class="row g-5">
+    <div class="col-lg-7">
+      <h3 class="fs-5 fw-bolder mb-3">محتوى الإشعار</h3>
+      <div class="mb-5">
+        <label for="campaign-title" class="form-label fw-bold">العنوان</label>
+        <input id="campaign-title" type="text" class="form-control" formControlName="titleAr" maxlength="100"
+          placeholder="مثال: عروض جديدة في جيتك ماركت" autocomplete="off" />
+        <div class="d-flex justify-content-between mt-1 fs-8">
+          <span class="text-danger" *ngIf="formGroup.get('titleAr')?.touched && formGroup.get('titleAr')?.invalid">اكتب عنوانًا من 3 إلى 100 حرف.</span>
+          <span class="ms-auto text-muted">{{ formGroup.get('titleAr')?.value?.length || 0 }}/100</span>
         </div>
       </div>
-    </form>
-  </ng-container>
-</app-edit-modal>
+      <div class="mb-5">
+        <label for="campaign-body" class="form-label fw-bold">نص الإشعار</label>
+        <textarea id="campaign-body" class="form-control" formControlName="textAr" maxlength="500" rows="5"
+          placeholder="اكتب الرسالة التي ستظهر في إشعار الهاتف..."></textarea>
+        <div class="d-flex justify-content-between mt-1 fs-8">
+          <span class="text-danger" *ngIf="formGroup.get('textAr')?.touched && formGroup.get('textAr')?.invalid">اكتب نصًا من 5 إلى 500 حرف.</span>
+          <span class="ms-auto text-muted">{{ formGroup.get('textAr')?.value?.length || 0 }}/500</span>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 mb-6">
+        <button type="button" class="btn btn-sm btn-light-primary" (click)="applyPreset('offer')" [disabled]="isSending || selectedTarget !== 'customers'">قالب عرض</button>
+        <button type="button" class="btn btn-sm btn-light-primary" (click)="applyPreset('orders')" [disabled]="isSending || selectedTarget === 'customers'">قالب طلبات</button>
+        <button type="button" class="btn btn-sm btn-light-primary" (click)="applyPreset('update')" [disabled]="isSending">قالب تنبيه</button>
+      </div>
+      <div class="mb-5" *ngIf="selectedTarget !== 'customers'">
+        <label for="campaign-destination" class="form-label fw-bold">عند الضغط على الإشعار</label>
+        <select id="campaign-destination" class="form-select" formControlName="destination">
+          <option value="orders">فتح الطلبات</option>
+          <option value="home">فتح التطبيق</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <app-file-uploader uploaderTitle="صورة الإشعار (اختياري)" (fileUploaded)="onFileUploaded($event)"></app-file-uploader>
+        <app-uploaded-image *ngIf="formGroup.get('image')?.value" [imageId]="formGroup.get('image')?.value"
+          [dimensions]="{ width: 600, height: 300 }" (imageDeleted)="onFileDelete()"></app-uploaded-image>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <h3 class="fs-5 fw-bolder mb-3">معاينة على الهاتف</h3>
+      <div class="campaign-preview">
+        <div class="campaign-preview-top"><i class="fas fa-bell me-2"></i> {{ targetLabel }} <span>الآن</span></div>
+        <strong>{{ titlePreview }}</strong>
+        <p>{{ bodyPreview }}</p>
+      </div>
+      <div class="campaign-preview-note mt-3">
+        <i class="fas fa-info-circle me-1"></i>
+        ستظهر الرسالة باللغة المكتوبة هنا، وسيُحفظ سجلها داخل حسابات الجمهور المختار.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer campaign-footer" dir="rtl">
+  <div *ngIf="confirming" class="campaign-confirm w-100 mb-3">
+    سيُرسل الإشعار إلى <strong>{{ targetLabel }}</strong> الآن. يوجد <strong>{{ targetCount | number }}</strong> حساب نشط؛ وقد تصل الرسالة أيضًا إلى أجهزة العملاء غير المسجلين عند اختيار تطبيق العملاء.
+  </div>
+  <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isSending">إلغاء</button>
+  <button *ngIf="!confirming" type="button" class="btn btn-primary" (click)="reviewSend()" [disabled]="isSending || statsLoading || !audiences?.pushConfigured">
+    <i class="fas fa-paper-plane me-1"></i> مراجعة الإرسال
+  </button>
+  <button *ngIf="confirming" type="button" class="btn btn-primary" (click)="send()" [disabled]="isSending">
+    <i class="fas" [ngClass]="isSending ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+    {{ isSending ? 'جارٍ الإرسال...' : 'تأكيد الإرسال الآن' }}
+  </button>
+</div>

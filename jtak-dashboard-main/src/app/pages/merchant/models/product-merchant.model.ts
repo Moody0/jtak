@@ -1,5 +1,6 @@
-export interface ProductMerchant {
+﻿export interface ProductMerchant {
   merchantId: number;
+  merchantKind?: number;
   productId: number;
   product: string;
   productPhotos: string;
@@ -10,6 +11,8 @@ export interface ProductMerchant {
   productCategoryId: number | null;
   productActive: boolean;
   productIsFeatured: boolean;
+  hasRestaurantAssignment?: boolean;
+  hasJtakMarketAssignment?: boolean;
   categoryParentId: number | null;
   categoryActive: boolean;
   categoryIcon: string;
@@ -17,9 +20,11 @@ export interface ProductMerchant {
   profitOutOfMerchantPrice: number
   merchantProfit: number;
   merchantPrice: number;
-  additionalProfitPercent: number;
-  additionalProfit: number;
+  priceUsd?: number | null;
+  originalPrice?: number | null;
   discount: number;
+  discountPercent?: number | null;
+  maxOrderQuantity?: number | null;
   price: number;
   finalPrice: number;
   isSelected: boolean;

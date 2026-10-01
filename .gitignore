@@ -68,6 +68,7 @@ backend-release.zip
 **/appsettings.Development.json
 **/appsettings.Production.json
 !**/appsettings*.example.json
+**/keys/
 
 # IDEs
 **/.idea/
@@ -97,3 +98,16 @@ artifacts/backend_package_*/
 
 # Kotlin incremental build cache.
 **/android/.kotlin/
+
+# Releases, server deployment packages, and temporary build outputs
+release-*/
+jtak-server-deployment-*/
+server-deployment-*/
+jtak-backend-publish-*/
+jtak-backend-main/app/release-*/
+scratch/
+tools/DbSnapshot/
+tools/FreshDeploymentSql/
+tools/__pycache__/
+*.sql
+*.cjs

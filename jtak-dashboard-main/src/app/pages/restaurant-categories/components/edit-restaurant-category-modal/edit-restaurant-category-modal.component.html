@@ -1,9 +1,16 @@
 <div class="modal-header border-0 pb-0">
-  <h5 class="modal-title fw-bolder fs-5 text-dark">
-    <i class="fas text-primary me-2" [ngClass]="isEdit ? 'fa-edit' : 'fa-plus-circle'"></i>
-    {{ isEdit ? 'تعديل تصنيف المطاعم' : 'إضافة تصنيف مطاعم جديد' }}
-  </h5>
-  <button type="button" class="btn btn-sm btn-icon btn-active-light-primary" (click)="modal.dismiss()">
+  <div class="d-flex align-items-center gap-2">
+    <div class="edit-modal-icon">
+      <i class="fas" [ngClass]="isEdit ? 'fa-edit' : 'fa-plus'"></i>
+    </div>
+    <div>
+      <h5 class="modal-title fw-bolder fs-5 text-dark mb-0">
+        {{ isEdit ? 'تعديل تصنيف المطاعم' : 'إضافة تصنيف مطاعم جديد' }}
+      </h5>
+      <span class="text-muted fs-8">إدارة بطاقة التصنيف المعروضة في شريط الأقسام السريع</span>
+    </div>
+  </div>
+  <button type="button" class="btn btn-sm btn-icon btn-light" (click)="modal.dismiss()">
     <i class="fas fa-times"></i>
   </button>
 </div>
@@ -12,46 +19,51 @@
   <form [formGroup]="formGroup" (ngSubmit)="save()">
     <div class="row g-4">
       
-      <!-- Left Column: Live Mobile Preview -->
-      <div class="col-lg-4 d-flex flex-column align-items-center justify-content-center p-3 rounded bg-light border border-dashed border-primary">
-        <span class="badge badge-light-primary mb-3 fs-8 fw-bold">معاينة كما يظهر في التطبيق</span>
-        
-        <!-- Circular Chip Preview matching Mobile App design -->
-        <div class="mobile-chip-preview text-center">
-          <div class="chip-avatar-circle" [class.active-border]="formGroup.get('active')?.value">
-            <img
-              [src]="getImageUrl()"
-              alt="Category Preview"
-              (error)="$any($event.target).src = './assets/media/svg/files/blank-image.svg'"
-            />
+      <!-- Right/Sidebar: Live Mobile Preview Card -->
+      <div class="col-lg-4">
+        <div class="rc-preview-card text-center">
+          <div class="rc-preview-badge">
+            <span class="rc-pulse-dot"></span>
+            <span>معاينة مباشرة في التطبيق</span>
           </div>
-          <div class="chip-title mt-2 fw-bold" [class.text-primary]="formGroup.get('active')?.value">
-            {{ formGroup.get('title')?.value || 'اسم التصنيف' }}
+          
+          <!-- Circular Chip Preview matching Mobile App design -->
+          <div class="mobile-chip-preview mt-3">
+            <div class="chip-avatar-circle mx-auto" [class.active-border]="formGroup.get('active')?.value">
+              <img
+                [src]="getImageUrl()"
+                alt="Category Preview"
+                (error)="$any($event.target).src = './assets/media/svg/files/blank-image.svg'"
+              />
+            </div>
+            <div class="chip-title mt-2 fw-bold" [class.text-primary]="formGroup.get('active')?.value">
+              {{ formGroup.get('title')?.value || 'اسم التصنيف' }}
+            </div>
+            <div class="text-muted fs-8" *ngIf="formGroup.get('titleEn')?.value">
+              {{ formGroup.get('titleEn')?.value }}
+            </div>
           </div>
-          <div class="text-muted fs-9" *ngIf="formGroup.get('titleEn')?.value">
-            {{ formGroup.get('titleEn')?.value }}
-          </div>
-        </div>
 
-        <div class="mt-4 text-center">
-          <span class="badge" [ngClass]="formGroup.get('active')?.value ? 'badge-light-success' : 'badge-light-danger'">
-            <i class="fas me-1" [ngClass]="formGroup.get('active')?.value ? 'fa-check' : 'fa-ban'"></i>
-            {{ formGroup.get('active')?.value ? 'نشط في التطبيق' : 'معطل' }}
-          </span>
-          <div class="text-muted fs-8 mt-1">الترتيب: #{{ formGroup.get('order')?.value }}</div>
+          <div class="mt-3 pt-3 border-top border-slate d-flex flex-column align-items-center gap-2">
+            <span class="rc-status-pill" [class.status-active]="formGroup.get('active')?.value" [class.status-disabled]="!formGroup.get('active')?.value">
+              <span class="status-dot"></span>
+              {{ formGroup.get('active')?.value ? 'نشط في التطبيق' : 'معطل ومخفي' }}
+            </span>
+            <span class="rc-order-badge">الترتيب: #{{ formGroup.get('order')?.value || 1 }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Right Column: Form Controls -->
+      <!-- Left: Form Controls -->
       <div class="col-lg-8">
         <div class="row g-3">
           
           <!-- Title (Arabic) -->
           <div class="col-md-6">
-            <label class="form-label fw-bold required">اسم التصنيف (بالعربية)</label>
+            <label class="form-label fw-bold mb-1">اسم التصنيف (بالعربية) <span class="text-danger">*</span></label>
             <input
               type="text"
-              class="form-control form-control-solid"
+              class="form-control"
               formControlName="title"
               placeholder="مثال: شاورما، مشاوي، برجر..."
             />
@@ -65,10 +77,10 @@
 
           <!-- Title (English) -->
           <div class="col-md-6">
-            <label class="form-label fw-bold">الاسم بالإنجليزية (اختياري)</label>
+            <label class="form-label fw-bold mb-1">الاسم بالإنجليزي (اختياري)</label>
             <input
               type="text"
-              class="form-control form-control-solid"
+              class="form-control"
               formControlName="titleEn"
               placeholder="e.g. Shawarma, Grills..."
             />
@@ -76,77 +88,90 @@
 
           <!-- Filter Tag / Matching Keyword -->
           <div class="col-md-8">
-            <label class="form-label fw-bold">
-              كلمة التصفية والربط بالمطاعم (Filter Tag)
+            <label class="form-label fw-bold mb-1">
+              كلمة الفلترة المطابقة للمطاعم (Filter Tag)
             </label>
-            <input
-              type="text"
-              class="form-control form-control-solid"
-              formControlName="filterTag"
-              placeholder="مثال: شاورما أو burger"
-            />
-            <div class="form-text text-muted fs-8">
-              الكلمة التي يُفلتر بها تطبيق الهاتف المطاعم عند النقر على هذه الدائرة (تطابق تصنيف المطعم، المطبخ، أو الاسم).
+            <div class="position-relative">
+              <input
+                type="text"
+                class="form-control"
+                formControlName="filterTag"
+                placeholder="مثال: شاورما أو burger"
+              />
+            </div>
+            <div class="form-text text-muted fs-8 mt-1">
+              يظهر المطعم للعميل إذا احتوى اسمه أو مطبخه على هذه الكلمة.
             </div>
           </div>
 
           <!-- Order -->
           <div class="col-md-4">
-            <label class="form-label fw-bold required">الترتيب (الأولوية)</label>
+            <label class="form-label fw-bold mb-1">الترتيب (الأولوية) <span class="text-danger">*</span></label>
             <input
               type="number"
-              class="form-control form-control-solid"
+              class="form-control"
               formControlName="order"
               min="1"
             />
           </div>
 
-          <!-- Active Switch -->
+          <!-- Active Switch Card -->
           <div class="col-12">
-            <div class="form-check form-switch form-check-custom form-check-solid">
-              <input
-                class="form-check-input h-20px w-35px"
-                type="checkbox"
-                formControlName="active"
-                id="catActiveSwitch"
-              />
-              <label class="form-check-label fw-bold ms-2" for="catActiveSwitch">
-                تفعيل وإظهار هذا التصنيف في صفحة المطاعم
-              </label>
+            <div class="rc-switch-card" (click)="formGroup.patchValue({ active: !formGroup.get('active')?.value })">
+              <div class="switch-info">
+                <span class="switch-title">تفعيل هذا التصنيف في صفحة المطاعم</span>
+                <span class="switch-desc">
+                  {{ formGroup.get('active')?.value ? 'يظهر هذا القسم حالياً لزبائن التطبيق ضمن شريط الدوائر السريع' : 'معطل ومخفي مؤقتاً عن زبائن التطبيق' }}
+                </span>
+              </div>
+              <div class="form-check form-switch m-0">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  formControlName="active"
+                  id="catActiveSwitch"
+                  (click)="$event.stopPropagation()"
+                />
+              </div>
             </div>
           </div>
 
           <!-- Image Selection & Upload -->
-          <div class="col-12 mt-4">
-            <label class="form-label fw-bold mb-2">صورة التصنيف / الأيقونة</label>
+          <div class="col-12 mt-3">
+            <label class="form-label fw-bold mb-2">أيقونة أو صورة التصنيف</label>
             
             <!-- Preset Quick Image Buttons -->
             <div class="mb-3">
-              <div class="fs-8 text-muted mb-2">اختيار سريع من الصور الجاهزة:</div>
+              <div class="fs-8 text-muted mb-2">اختيار سريع من الأيقونات الجاهزة:</div>
               <div class="d-flex flex-wrap gap-2">
                 <button
                   type="button"
-                  class="btn btn-sm btn-light border py-1 px-2 fs-8 d-flex align-items-center"
+                  class="btn btn-sm preset-btn"
                   *ngFor="let preset of presetImages"
-                  [class.btn-primary]="formGroup.get('image')?.value === preset.path"
-                  [class.text-white]="formGroup.get('image')?.value === preset.path"
+                  [class.active]="formGroup.get('image')?.value === preset.path"
                   (click)="selectPresetImage(preset.path)"
                 >
-                  <img [src]="preset.path" class="rounded-circle me-1" style="width: 20px; height: 20px; object-fit: cover;" alt="" />
-                  {{ preset.label }}
+                  <img
+                    [src]="preset.path"
+                    class="rounded-circle me-1"
+                    style="width: 22px; height: 22px; object-fit: cover;"
+                    alt=""
+                    (error)="$any($event.target).src = './assets/media/svg/files/blank-image.svg'"
+                  />
+                  <span>{{ preset.label }}</span>
                 </button>
               </div>
             </div>
 
             <!-- Custom Upload -->
-            <div class="card p-3 bg-light-secondary border border-dashed">
-              <div class="fs-8 fw-bold mb-2">أو ارفع صورة مخصصة عالية الدقة من جهازك:</div>
+            <div class="rc-upload-card p-3 rounded-3">
+              <div class="fs-8 fw-bold text-dark mb-2">أو ارفع صورة مخصصة من جهازك:</div>
               <app-file-uploader
                 uploaderTitle="رفع صورة التصنيف"
                 (fileUploaded)="onFileUploaded($event, 'image')"
               ></app-file-uploader>
 
-              <div class="mt-2" *ngIf="formGroup.get('image')?.value && !formGroup.get('image')?.value.startsWith('assets')">
+              <div class="mt-3" *ngIf="formGroup.get('image')?.value && !formGroup.get('image')?.value.startsWith('assets')">
                 <app-uploaded-image
                   [imageId]="formGroup.get('image')?.value"
                   [dimensions]="{ width: 120, height: 120 }"
@@ -167,9 +192,9 @@
   <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isSaving">
     إلغاء
   </button>
-  <button type="button" class="btn btn-primary" (click)="save()" [disabled]="isSaving || formGroup.invalid">
-    <i class="fas fa-spinner fa-spin me-1" *ngIf="isSaving"></i>
-    <i class="fas fa-check me-1" *ngIf="!isSaving"></i>
-    {{ isEdit ? 'حفظ التعديلات' : 'إضافة التصنيف' }}
+  <button type="button" class="btn btn-primary rc-btn-submit" (click)="save()" [disabled]="isSaving || formGroup.invalid">
+    <i class="fas fa-spinner fa-spin text-white me-1" *ngIf="isSaving"></i>
+    <i class="fas fa-check text-white me-1" *ngIf="!isSaving"></i>
+    <span class="text-white">{{ isEdit ? 'حفظ التعديلات' : 'إضافة التصنيف' }}</span>
   </button>
 </div>

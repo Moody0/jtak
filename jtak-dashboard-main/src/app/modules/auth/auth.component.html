@@ -23,10 +23,15 @@
 
   <!-- begin::Footer -->
   <div class="d-flex flex-center flex-column-auto p-10">
-    <div class="d-flex align-items-center fw-bold fs-6">
-      <a class="text-muted text-hover-primary px-2 cursor-pointer">عن المنصة</a>
-      <a class="text-muted text-hover-primary px-2 cursor-pointer">سياسة الخصوصية</a>
-      <a class="text-muted text-hover-primary px-2 cursor-pointer">الدعم الفني</a>
+    <div class="d-flex flex-column align-items-center gap-4">
+      <div class="d-flex align-items-center gap-2" role="group" [attr.aria-label]="'TRANSLATOR.SELECT' | translate">
+        <button type="button" class="btn btn-sm px-3"
+          [ngClass]="currentLanguage === 'ar' ? 'btn-primary' : 'btn-light'"
+          (click)="setLanguage('ar')">العربية</button>
+        <button type="button" class="btn btn-sm px-3"
+          [ngClass]="currentLanguage === 'en' ? 'btn-primary' : 'btn-light'"
+          (click)="setLanguage('en')">English</button>
+      </div>
     </div>
   </div>
   <!-- end::Footer -->

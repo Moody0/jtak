@@ -186,7 +186,7 @@ namespace App.Setup
 
                 var cost = R.Next(10, 100);
                 var discount = (int)R.NextDouble() * cost;
-                var newmps = products.Select(p => new MerchantProductAssignDto { ProductId = p.Id, MerchantPrice = cost, Discount = discount, AdditionalProfitPercent = R.Next(0, 5) }).ToArray();
+                var newmps = products.Select(p => new MerchantProductAssignDto { ProductId = p.Id, MerchantPrice = cost, Discount = discount }).ToArray();
                 try
                 {
                     await _merchantService.AssignMerchantProducts(new[] { merchant.Id }, newmps);

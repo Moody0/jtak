@@ -15,13 +15,15 @@ namespace Modules.Shipping.Services
 {
     public interface IDeliveryService : ISolService<ShippingOrder, ShippingOrderDto>
     {
-        Task UpdateDeliveryLocation(Guid uid, (decimal Lat, decimal Lng) loc, double? heading = null, double? speed = null);
+        Task UpdateDeliveryLocation(Guid uid, (decimal Lat, decimal Lng) loc, double? heading = null, double? speed = null, DateTime? capturedAtUtc = null);
         Task<DeliveryStatus> GetDeliveryStatus(Guid uid);
+        Task<Guid[]> GetOnlineDeliveryIds();
         Task SetDutyStatus(Guid uid, bool isOnline);
         Task<(Guid Id, int Distance)> PickBestDelivery((decimal Lat, decimal Lng, int MerchantId)[] allMerchantStops);
         Task AddOrder(Guid uid, int oid, ShippingOrderDto[] merchantLocations, ShippingOrderDto customerLoction);
         Task RemoveOrder(Guid uid, int oid, int? mid = null);
         Task<List<ShippingOrderDto>> GetOrderStops(int orderId);
+        Task CompensateOrderStops(Guid uid, int oid);
     }
     public class DeliveryService : SolService<ShippingOrder, ShippingOrderDto>, IDeliveryService
     {
@@ -67,9 +69,11 @@ namespace Modules.Shipping.Services
                     _ => 12000
                 };
 
-                // Location freshness
-                var hasFreshGps = s.LastLocationUpdatedAt.HasValue &&
-                                  s.LastLocationUpdatedAt.Value >= DateTime.UtcNow.AddMinutes(-10);
+                // Location freshness & stale GPS check
+                if (!s.LastLocationUpdatedAt.HasValue || s.LastLocationUpdatedAt.Value < DateTime.UtcNow.AddMinutes(-30))
+                    continue;
+
+                var hasFreshGps = s.LastLocationUpdatedAt.Value >= DateTime.UtcNow.AddMinutes(-10);
                 var freshnessPenalty = hasFreshGps ? 0 : 3000;
 
                 // Calculate realistic sequential pickup route distance
@@ -101,31 +105,104 @@ namespace Modules.Shipping.Services
         }
 
 
-        public async Task UpdateDeliveryLocation(Guid uid, (decimal Lat, decimal Lng) loc, double? heading = null, double? speed = null)
+        public async Task UpdateDeliveryLocation(Guid uid, (decimal Lat, decimal Lng) loc, double? heading = null, double? speed = null, DateTime? capturedAtUtc = null)
         {
             var s = await GetDeliveryStatus(uid);
+            var captured = capturedAtUtc ?? DateTime.UtcNow;
+            captured = captured.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(captured, DateTimeKind.Utc) : captured.ToUniversalTime();
+            // Out-of-order heartbeat requests must not move the courier backwards.
+            if (s.LastLocationUpdatedAt.HasValue && captured < s.LastLocationUpdatedAt.Value) return;
             s.Loc = loc;
             if (heading.HasValue) s.Heading = heading.Value;
             if (speed.HasValue) s.Speed = speed.Value;
-            s.LastLocationUpdatedAt = DateTime.UtcNow;
+            s.LastLocationUpdatedAt = captured;
             SetDeliveryStatus(uid, s);
+
+            try
+            {
+                var duty = await _uow.Context.DriverDuties.FirstOrDefaultAsync(x => x.DriverId == uid);
+                if (duty == null)
+                {
+                    duty = new DeliveryDriverDuty
+                    {
+                        DriverId = uid,
+                        IsOnline = s.IsOnline,
+                        ShiftStartedAt = s.ShiftStartedAt,
+                        Lat = loc.Lat,
+                        Lng = loc.Lng,
+                        Heading = heading,
+                        Speed = speed,
+                        LastLocationUpdatedAt = captured
+                    };
+                    _uow.Context.DriverDuties.Add(duty);
+                }
+                else
+                {
+                    duty.Lat = loc.Lat;
+                    duty.Lng = loc.Lng;
+                    duty.Heading = heading;
+                    duty.Speed = speed;
+                    duty.LastLocationUpdatedAt = captured;
+                }
+                await _uow.SaveChangesAsync();
+            }
+            catch
+            {
+                // Non-fatal if DB write fails during high-frequency live tracking
+            }
         }
 
         public async Task AddOrder(Guid uid, int oid, ShippingOrderDto[] merchantLocations, ShippingOrderDto customerLoction)
         {
             var s = await GetDeliveryStatus(uid);
 
+            // Idempotency: Check if stops already exist in DB for this order
+            var existingStops = await _uow.Context.ShippingOrders
+                .Where(x => x.OrderId == oid)
+                .OrderBy(x => x.Index)
+                .ToListAsync();
+
+            if (existingStops.Any())
+            {
+                if (existingStops.Any(x => x.DriverId != uid))
+                {
+                    throw new InvalidOperationException($"Order #{oid} already has a route assigned to another driver.");
+                }
+                s.PendingOrders.RemoveAll(x => x.OrderId == oid);
+                foreach (var st in existingStops.Where(x => !x.CompletedDate.HasValue))
+                {
+                    s.PendingOrders.Add(new ShippingOrderDto
+                    {
+                        Id = st.Id,
+                        Index = st.Index,
+                        OrderId = st.OrderId,
+                        DriverId = st.DriverId,
+                        MerchantId = st.MerchantId,
+                        CustomerId = st.CustomerId,
+                        Lat = st.Lat,
+                        Lng = st.Lng,
+                        StopType = st.StopType,
+                        StopTitle = st.StopTitle,
+                        IsDarkStore = st.IsDarkStore,
+                        VerificationCode = st.VerificationCode,
+                        Notes = st.Notes
+                    });
+                }
+                SetDeliveryStatus(uid, s);
+                return;
+            }
+
             var bestTripPath = FindBestTrip(s.FreeOnStop, merchantLocations, customerLoction);
 
-            s.PendingOrders.AddRange(bestTripPath);
-
-            SetDeliveryStatus(uid, s);
+            s.PendingOrders.RemoveAll(x => x.OrderId == oid);
 
             // Store to DB
             int i = 0;
             foreach (var item in bestTripPath)
             {
                 i += 1;
+                item.Index = i;
                 Insert(new ShippingOrder
                 {
                     OrderId = oid,
@@ -141,6 +218,40 @@ namespace Modules.Shipping.Services
                     VerificationCode = item.VerificationCode,
                     Notes = item.Notes
                 });
+            }
+
+            s.PendingOrders.AddRange(bestTripPath);
+            SetDeliveryStatus(uid, s);
+            try
+            {
+                await _uow.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Only a route written by this same driver is an idempotent
+                // retry. Never hide a conflicting route or unrelated DB error.
+                var persisted = await _uow.Context.ShippingOrders
+                    .Where(x => x.OrderId == oid)
+                    .ToListAsync();
+                if (!persisted.Any() || persisted.Any(x => x.DriverId != uid))
+                {
+                    throw;
+                }
+            }
+        }
+
+        public async Task CompensateOrderStops(Guid uid, int oid)
+        {
+            var s = await GetDeliveryStatus(uid);
+            s.PendingOrders.RemoveAll(x => x.OrderId == oid);
+            SetDeliveryStatus(uid, s);
+
+            var uncompletedStops = await Queryable()
+                .Where(x => x.OrderId == oid && x.DriverId == uid && !x.CompletedDate.HasValue)
+                .ToListAsync();
+            foreach (var stop in uncompletedStops)
+            {
+                Delete(stop);
             }
             await _uow.SaveChangesAsync();
         }
@@ -237,6 +348,21 @@ namespace Modules.Shipping.Services
         private void SetDeliveryStatus(Guid uid, DeliveryStatus status) =>
             _cache.Set($"DeliveryStatus_{uid}", status);
 
+        public async Task<Guid[]> GetOnlineDeliveryIds()
+        {
+            var drivers = await _userService.ListFromRoles(AppRoleName.Delivery.ToString());
+            if (drivers == null) return Array.Empty<Guid>();
+
+            var onlineIds = new List<Guid>();
+            foreach (var driver in drivers.Where(x => x.IsActive))
+            {
+                if ((await GetDeliveryStatus(driver.Id)).IsOnline)
+                    onlineIds.Add(driver.Id);
+            }
+
+            return onlineIds.ToArray();
+        }
+
         public async Task SetDutyStatus(Guid uid, bool isOnline)
         {
             var s = await GetDeliveryStatus(uid);
@@ -250,6 +376,33 @@ namespace Modules.Shipping.Services
                 s.ShiftStartedAt = null;
             }
             SetDeliveryStatus(uid, s);
+
+            try
+            {
+                var duty = await _uow.Context.DriverDuties.FirstOrDefaultAsync(x => x.DriverId == uid);
+                if (duty == null)
+                {
+                    duty = new DeliveryDriverDuty
+                    {
+                        DriverId = uid,
+                        IsOnline = isOnline,
+                        ShiftStartedAt = s.ShiftStartedAt,
+                        Lat = s.Loc.Lat,
+                        Lng = s.Loc.Lng
+                    };
+                    _uow.Context.DriverDuties.Add(duty);
+                }
+                else
+                {
+                    duty.IsOnline = isOnline;
+                    duty.ShiftStartedAt = s.ShiftStartedAt;
+                }
+                await _uow.SaveChangesAsync();
+            }
+            catch
+            {
+                // Non-fatal if DB write encounters race condition
+            }
         }
 
         public async Task<DeliveryStatus> GetDeliveryStatus(Guid uid)
@@ -257,13 +410,23 @@ namespace Modules.Shipping.Services
             if (_cache.TryGetValue($"DeliveryStatus_{uid}", out DeliveryStatus result))
                 return result;
 
+            // Reload from DB - safely defaults to offline if no duty record exists!
+            DeliveryDriverDuty duty = null;
+            try
+            {
+                duty = await _uow.Context.DriverDuties.AsNoTracking().FirstOrDefaultAsync(x => x.DriverId == uid);
+            }
+            catch
+            {
+                // Fallback for tests or unmigrated contexts
+            }
 
-            // Reload from DB
             var shippingOrders = await Queryable().Where(x => x.DriverId == uid && !x.CompletedDate.HasValue)
                                                   .OrderBy(x => x.Index)
                                                   .Select(x => new ShippingOrderDto
                                                   {
                                                       Id = x.Id,
+                                                      Index = x.Index,
                                                       OrderId = x.OrderId,
                                                       DriverId = x.DriverId,
                                                       MerchantId = x.MerchantId,
@@ -281,7 +444,13 @@ namespace Modules.Shipping.Services
 
             var s = new DeliveryStatus
             {
-                Loc = shippingOrders.FirstOrDefault()?.Loc ?? (37.05637741088867m, 37.33407211303711m),
+                IsOnline = duty?.IsOnline ?? false,
+                ShiftStartedAt = duty?.ShiftStartedAt,
+                Heading = duty?.Heading,
+                Speed = duty?.Speed,
+                LastLocationUpdatedAt = duty?.LastLocationUpdatedAt,
+                // A merchant/customer stop is never the driver's GPS position.
+                Loc = duty != null ? (duty.Lat, duty.Lng) : (0m, 0m),
                 PendingOrders = shippingOrders
             };
             SetDeliveryStatus(uid, s);

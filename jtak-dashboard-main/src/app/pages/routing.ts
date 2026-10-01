@@ -54,6 +54,13 @@ const Routing: Routes = [
       ),
   },
   {
+    path: 'market-best-selling',
+    loadChildren: () =>
+      import('./market-best-selling/market-best-selling.module').then(
+        (m) => m.MarketBestSellingModule
+      ),
+  },
+  {
     path: 'home-categories',
     loadChildren: () =>
       import('./home-categories/home-categories.module').then(
@@ -78,9 +85,9 @@ const Routing: Routes = [
       import('./reconciliation/reconciliation.module').then((m) => m.ReconciliationModule),
   },
   {
-    path: 'inventory-batches',
+    path: 'captain-settlements',
     loadChildren: () =>
-      import('./inventory-batches/inventory-batches.module').then((m) => m.InventoryBatchesModule),
+      import('./captain-settlements/captain-settlements.module').then((m) => m.CaptainSettlementsModule),
   },
   {
     path: 'audit-logs',

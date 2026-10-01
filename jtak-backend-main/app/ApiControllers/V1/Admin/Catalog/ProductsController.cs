@@ -6,6 +6,8 @@ using OpenIddict.Validation.AspNetCore;
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using App.Shared.Entities.Enums;
 using Modules.Catalog.Services;
@@ -33,6 +35,7 @@ namespace App.ApiControllers.V1.Admin
     {
         private readonly IProductService _service;
         private readonly IProductCategoryService _productCategoryService;
+        private readonly IMerchantService _merchantService;
         private readonly ITagService _tagService;
         private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepo;
         private readonly ICatalogUnitOfWork _uow;
@@ -44,6 +47,7 @@ namespace App.ApiControllers.V1.Admin
 
         public ProductsController(IProductService service,
             IProductCategoryService productCategoryService,
+            IMerchantService merchantService,
             ITagService tagService,
             ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepo,
             ICatalogUnitOfWork uow,
@@ -56,6 +60,7 @@ namespace App.ApiControllers.V1.Admin
             _env = env;
             _service = service;
             _productCategoryService = productCategoryService;
+            _merchantService = merchantService;
             _tagService = tagService;
             _merchantProductRepo = merchantProductRepo;
             _uow = uow;
@@ -71,9 +76,43 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
-        public async Task<ActionResult<TableResponseModel<ProductDto>>> DataTable([FromBody] MetronicTable request)
+        public async Task<ActionResult<TableResponseModel<ProductDto>>> DataTable(
+            [FromBody] MetronicTable request, [FromQuery] int? categoryId = null)
         {
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
             var lang = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
+            Expression<Func<Product, bool>> productFilter = x => x.DeletionDate == null;
+            if (categoryId.HasValue)
+            {
+                if (categoryId.Value <= 0)
+                    return BadRequest(ApiErr.Create("معرّف التصنيف غير صالح."));
+
+                var categories = await _productCategoryService.Queryable()
+                    .Where(x => x.DeletionDate == null)
+                    .Select(x => new { x.Id, x.ParentId })
+                    .ToListAsync();
+                var childrenByParent = categories.ToLookup(x => x.ParentId);
+                var selectedIds = new HashSet<int>();
+                if (categories.Any(x => x.Id == categoryId.Value))
+                {
+                    var pending = new Queue<int>();
+                    pending.Enqueue(categoryId.Value);
+                    while (pending.Count > 0)
+                    {
+                        var current = pending.Dequeue();
+                        if (!selectedIds.Add(current)) continue;
+                        foreach (var child in childrenByParent[current])
+                            pending.Enqueue(child.Id);
+                    }
+                }
+
+                var categoryIds = selectedIds.ToList();
+                productFilter = x => x.DeletionDate == null &&
+                    x.ProductCategoryId.HasValue && categoryIds.Contains(x.ProductCategoryId.Value);
+            }
             var list = await _service.ListMetronicTableQueryable(request, x => new ProductDto
             {
                 Id = x.Id,
@@ -91,13 +130,47 @@ namespace App.ApiControllers.V1.Admin
                 ProductCategoryId = x.ProductCategoryId,
                 ProductCategory = x.ProductCategory != null ? x.ProductCategory.Title : string.Empty,
                 Active = x.Active,
-                MerchantId = x.MerchantProducts.Select(mp => (int?)mp.MerchantId).FirstOrDefault(),
-                Merchant = x.MerchantProducts.Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty).FirstOrDefault(),
-                MerchantTitle = x.MerchantProducts.Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty).FirstOrDefault(),
-                Price = x.MerchantProducts.Select(mp => mp.MerchantPrice).FirstOrDefault(),
-                PriceUsd = x.MerchantProducts.Select(mp => mp.PriceUsd).FirstOrDefault(),
-                Discount = x.MerchantProducts.Select(mp => mp.Discount).FirstOrDefault()
-            }, x => x.DeletionDate == null, x => x.ProductCategory, x => x.MerchantProducts);
+                MerchantId = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => (int?)mp.MerchantId)
+                    .FirstOrDefault(),
+                Merchant = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty)
+                    .FirstOrDefault(),
+                MerchantTitle = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty)
+                    .FirstOrDefault(),
+                Price = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.MerchantPrice)
+                    .FirstOrDefault(),
+                PriceUsd = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.PriceUsd)
+                    .FirstOrDefault(),
+                OriginalPrice = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.OriginalPrice)
+                    .FirstOrDefault(),
+                Discount = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.Discount)
+                    .FirstOrDefault(),
+                ProfitOutOfMerchantPricePercent = x.MerchantProducts
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.ProfitOutOfMerchantPricePercent)
+                    .FirstOrDefault(),
+            }, productFilter, x => x.ProductCategory, x => x.MerchantProducts);
             return list;
         }
 
@@ -110,8 +183,15 @@ namespace App.ApiControllers.V1.Admin
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         public async Task<ActionResult<BulkImportDesc>> BulkImport(ProductsBulkImport item)
         {
+            var marketMerchantId = await _merchantService.GetJtakMarketMerchantId();
+            if (!marketMerchantId.HasValue)
+            {
+                return BadRequest(ApiErr.Create("تعذر تحديد متجر جيتك ماركت. لم يتم استيراد المنتجات."));
+            }
+
             var file = _env.ContentRootPath + FileHelper.GetVirtualPath(item.File).Replace("/", "\\").Replace("~", "");
             BulkImportDesc result = new();
+            var importedProducts = new System.Collections.Generic.List<Product>();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             using (var package = new ExcelPackage(new FileInfo(file)))
             {
@@ -159,6 +239,9 @@ namespace App.ApiControllers.V1.Admin
 
                 // Import Products
                 var allProds = await _service.Queryable().ToArrayAsync();
+                var productTitles = new System.Collections.Generic.HashSet<string>(
+                    allProds.Select(x => x.Title?.Trim()).Where(x => !string.IsNullOrWhiteSpace(x)),
+                    StringComparer.OrdinalIgnoreCase);
                 for (int row = productsSheet.Dimension.Start.Row; row <= productsSheet.Dimension.End.Row; row++)
                 {
                     var catTitle = productsSheet.Cells[row, 1].Text;
@@ -167,14 +250,41 @@ namespace App.ApiControllers.V1.Admin
                     if (!catId.HasValue)
                         continue;
 
-                    var prod = new Product { Title = productsSheet.Cells[row, 0].Text, Active = true, ProductCategoryId = catId.Value };
-                    if (!allProds.Any(x => x.Title == prod.Title))
+                    var title = productsSheet.Cells[row, 0].Text?.Trim();
+                    if (string.IsNullOrWhiteSpace(title))
+                        continue;
+
+                    var prod = new Product { Title = title, Active = true, ProductCategoryId = catId.Value };
+                    if (productTitles.Add(prod.Title))
                     {
                         result.ImportedProds++;
                         _service.Insert(prod);
+                        importedProducts.Add(prod);
                     }
                 }
                 await _uow.SaveChangesAsync();
+
+                var market = await _merchantService.FindAsync(marketMerchantId.Value);
+                foreach (var product in importedProducts)
+                {
+                    _merchantProductRepo.Insert(new MerchantProduct
+                    {
+                        MerchantId = marketMerchantId.Value,
+                        ProductId = product.Id,
+                        MerchantPrice = 0m,
+                        ProfitOutOfMerchantPricePercent = market?.ProfitOutOfMerchantPricePercent ?? 0m,
+                        AdditionalProfitPercent = 0m
+                    });
+                    _cache.Remove($"MerchantProduct_{marketMerchantId.Value}_{product.Id}");
+                }
+                if (importedProducts.Count > 0)
+                {
+                    await _uow.SaveChangesAsync();
+                    _cache.Remove($"ActiveMerchantPrices_{marketMerchantId.Value}");
+                    _cache.Remove($"AllMerchantPrices_{marketMerchantId.Value}");
+                    _cache.Remove("ProductCategoriesTree");
+                    _cache.Remove("ProductCategories");
+                }
             }
             // TODO: Import images from zip?
             return result;
@@ -208,9 +318,55 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create("قيمة الخصم غير صالحة."));
             }
 
-            if (item.Discount > item.Price)
+            if (item.DiscountPercent.HasValue && (item.DiscountPercent.Value < 0m || item.DiscountPercent.Value >= 100m))
             {
-                return BadRequest(ApiErr.Create("قيمة الخصم لا يمكن أن تتجاوز سعر المنتج."));
+                return BadRequest(ApiErr.Create("نسبة الخصم يجب أن تكون بين 0 و99.99٪."));
+            }
+
+            var marketMerchantId = await _merchantService.GetJtakMarketMerchantId();
+            var merchantId = item.MerchantId.GetValueOrDefault() > 0
+                ? item.MerchantId.Value
+                : marketMerchantId;
+            if (!merchantId.HasValue)
+            {
+                return BadRequest(ApiErr.Create("تعذر تحديد متجر جيتك ماركت تلقائياً. اختر جيتك ماركت أو المطعم الذي يبيع هذا المنتج."));
+            }
+
+            var merchantError = await ValidateProductMerchant(merchantId.Value, marketMerchantId);
+            if (merchantError != null)
+            {
+                return BadRequest(ApiErr.Create(merchantError));
+            }
+
+            var price = item.Price > 0 ? item.Price : 0m;
+            var priceUsd = item.PriceUsd;
+            var discount = item.Discount > 0 ? item.Discount : 0m;
+            var originalPrice = item.OriginalPrice;
+            if (item.DiscountPercent.HasValue)
+            {
+                if (item.DiscountPercent.Value > 0m)
+                {
+                    var merchantProfit = await _merchantService.Queryable()
+                        .Where(x => x.Id == merchantId.Value)
+                        .Select(x => x.ProfitOutOfMerchantPricePercent)
+                        .FirstOrDefaultAsync();
+
+                    var pricing = CalculateDiscountPricing(
+                        price,
+                        priceUsd,
+                        item.DiscountPercent.Value,
+                        await _merchantService.GetUsdRate(),
+                        profitOutOfMerchantPricePercent: merchantProfit);
+                    price = pricing.SalePrice;
+                    priceUsd = pricing.SalePriceUsd;
+                    discount = pricing.DiscountAmount;
+                    originalPrice = pricing.OriginalPriceUsd;
+                }
+                else
+                {
+                    discount = 0m;
+                    originalPrice = null;
+                }
             }
 
             var entity = new Product
@@ -231,24 +387,22 @@ namespace App.ApiControllers.V1.Admin
             _service.Insert(entity);
             await _uow.SaveChangesAsync();
 
-            if (item.MerchantId.HasValue && item.MerchantId.Value > 0)
+            if (merchantId.HasValue)
             {
-                var price = item.Price > 0 ? item.Price : 0m;
-                var discount = item.Discount > 0 ? item.Discount : 0m;
-
                 _merchantProductRepo.Insert(new MerchantProduct
                 {
-                    MerchantId = item.MerchantId.Value,
+                    MerchantId = merchantId.Value,
                     ProductId = entity.Id,
                     MerchantPrice = price,
-                    PriceUsd = item.PriceUsd,
+                    PriceUsd = priceUsd,
+                    OriginalPrice = originalPrice,
                     Discount = discount
                 });
                 await _uow.SaveChangesAsync();
 
-                _cache.Remove($"ActiveMerchantPrices_{item.MerchantId.Value}");
-                _cache.Remove($"AllMerchantPrices_{item.MerchantId.Value}");
-                _cache.Remove($"MerchantProduct_{item.MerchantId.Value}_{entity.Id}");
+                _cache.Remove($"ActiveMerchantPrices_{merchantId.Value}");
+                _cache.Remove($"AllMerchantPrices_{merchantId.Value}");
+                _cache.Remove($"MerchantProduct_{merchantId.Value}_{entity.Id}");
             }
 
             _cache.Remove($"ProductPrices_{entity.Id}");
@@ -273,10 +427,11 @@ namespace App.ApiControllers.V1.Admin
                         entity.Id,
                         entity.Title,
                         entity.ProductCategoryId,
-                        item.Price,
-                        item.PriceUsd,
-                        item.Discount,
-                        item.MerchantId,
+                        Price = price,
+                        PriceUsd = priceUsd,
+                        Discount = discount,
+                        DiscountPercent = item.DiscountPercent,
+                        MerchantId = merchantId,
                         entity.Active
                     }
                 });
@@ -318,12 +473,59 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create("قيمة الخصم غير صالحة."));
             }
 
-            if (item.Discount > item.Price)
+            if (item.DiscountPercent.HasValue && (item.DiscountPercent.Value < 0m || item.DiscountPercent.Value >= 100m))
             {
-                return BadRequest(ApiErr.Create("قيمة الخصم لا يمكن أن تتجاوز سعر المنتج."));
+                return BadRequest(ApiErr.Create("نسبة الخصم يجب أن تكون بين 0 و99.99٪."));
             }
 
             var existingMps = await _merchantProductRepo.Queryable().Where(mp => mp.ProductId == entity.Id).ToListAsync();
+            var marketMerchantId = await _merchantService.GetJtakMarketMerchantId();
+            var requestedMerchantId = item.MerchantId.GetValueOrDefault() > 0
+                ? item.MerchantId
+                : existingMps.Count == 0 ? marketMerchantId : null;
+            if (!requestedMerchantId.HasValue && existingMps.Count == 0)
+            {
+                return BadRequest(ApiErr.Create("تعذر تحديد متجر جيتك ماركت تلقائياً. اختر جيتك ماركت أو المطعم الذي يبيع هذا المنتج."));
+            }
+
+            if (requestedMerchantId.HasValue)
+            {
+                var merchantError = await ValidateProductMerchant(requestedMerchantId.Value, marketMerchantId);
+                if (merchantError != null)
+                {
+                    return BadRequest(ApiErr.Create(merchantError));
+                }
+            }
+
+            var targetMpForPrice = requestedMerchantId.HasValue
+                ? existingMps.FirstOrDefault(mp => mp.MerchantId == requestedMerchantId.Value)
+                : null;
+            var price = item.Price > 0 ? item.Price : 0m;
+            var priceUsd = item.PriceUsd;
+            var discount = item.Discount > 0 ? item.Discount : 0m;
+            var originalPrice = item.OriginalPrice;
+            if (item.DiscountPercent.HasValue)
+            {
+                if (item.DiscountPercent.Value > 0m)
+                {
+                    var pricing = CalculateDiscountPricing(
+                        price,
+                        priceUsd,
+                        item.DiscountPercent.Value,
+                        await _merchantService.GetUsdRate(),
+                        targetMpForPrice?.ProfitOutOfMerchantPricePercent ?? 0m);
+                    price = pricing.SalePrice;
+                    priceUsd = pricing.SalePriceUsd;
+                    discount = pricing.DiscountAmount;
+                    originalPrice = pricing.OriginalPriceUsd;
+                }
+                else
+                {
+                    discount = 0m;
+                    originalPrice = null;
+                }
+            }
+
             var primaryMp = existingMps.FirstOrDefault();
             var beforeState = new
             {
@@ -351,21 +553,19 @@ namespace App.ApiControllers.V1.Admin
             entity.Currency = item.Currency;
 
             // Update MerchantProduct linkage & pricing
-            if (item.MerchantId.HasValue && item.MerchantId.Value > 0)
+            if (requestedMerchantId.HasValue)
             {
-                var price = item.Price > 0 ? item.Price : 0m;
-                var discount = item.Discount > 0 ? item.Discount : 0m;
-
-                var targetMp = existingMps.FirstOrDefault(mp => mp.MerchantId == item.MerchantId.Value);
+                var targetMp = targetMpForPrice;
                 if (targetMp != null)
                 {
                     targetMp.MerchantPrice = price;
-                    targetMp.PriceUsd = item.PriceUsd;
+                    targetMp.PriceUsd = priceUsd;
+                    targetMp.OriginalPrice = originalPrice;
                     targetMp.Discount = discount;
                     _merchantProductRepo.Update(targetMp);
 
                     // Clean up any extraneous merchant links if product is uniquely assigned
-                    foreach (var otherMp in existingMps.Where(mp => mp.MerchantId != item.MerchantId.Value))
+                    foreach (var otherMp in existingMps.Where(mp => mp.MerchantId != requestedMerchantId.Value))
                     {
                         _merchantProductRepo.Delete(otherMp);
                         _cache.Remove($"ActiveMerchantPrices_{otherMp.MerchantId}");
@@ -385,28 +585,24 @@ namespace App.ApiControllers.V1.Admin
 
                     _merchantProductRepo.Insert(new MerchantProduct
                     {
-                        MerchantId = item.MerchantId.Value,
+                        MerchantId = requestedMerchantId.Value,
                         ProductId = entity.Id,
                         MerchantPrice = price,
-                        PriceUsd = item.PriceUsd,
+                        PriceUsd = priceUsd,
+                        OriginalPrice = originalPrice,
                         Discount = discount
                     });
                 }
 
-                _cache.Remove($"ActiveMerchantPrices_{item.MerchantId.Value}");
-                _cache.Remove($"AllMerchantPrices_{item.MerchantId.Value}");
-                _cache.Remove($"MerchantProduct_{item.MerchantId.Value}_{entity.Id}");
+                _cache.Remove($"ActiveMerchantPrices_{requestedMerchantId.Value}");
+                _cache.Remove($"AllMerchantPrices_{requestedMerchantId.Value}");
+                _cache.Remove($"MerchantProduct_{requestedMerchantId.Value}_{entity.Id}");
             }
             else
             {
-                // Merchant unassigned (pure central catalog draft)
-                foreach (var oldMp in existingMps)
-                {
-                    _merchantProductRepo.Delete(oldMp);
-                    _cache.Remove($"ActiveMerchantPrices_{oldMp.MerchantId}");
-                    _cache.Remove($"AllMerchantPrices_{oldMp.MerchantId}");
-                    _cache.Remove($"MerchantProduct_{oldMp.MerchantId}_{entity.Id}");
-                }
+                // A partial edit that omits MerchantId must not detach the
+                // product. Restaurant products stay with their restaurant;
+                // existing market assignment and price are preserved too.
             }
 
             _cache.Remove($"ProductPrices_{entity.Id}");
@@ -434,10 +630,11 @@ namespace App.ApiControllers.V1.Admin
                         entity.Id,
                         entity.Title,
                         entity.ProductCategoryId,
-                        MerchantId = item.MerchantId,
+                        MerchantId = requestedMerchantId ?? primaryMp?.MerchantId,
                         Price = item.Price,
-                        PriceUsd = item.PriceUsd,
-                        Discount = item.Discount,
+                        PriceUsd = priceUsd,
+                        Discount = discount,
+                        DiscountPercent = item.DiscountPercent,
                         entity.Active
                     }
                 });
@@ -537,6 +734,17 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<int>> Duplicate(int id)
         {
             var item = await _service.FindAsync(id);
+            if (item == null)
+                return NotFound();
+
+            var restaurantAssignment = item.MerchantProducts?
+                .FirstOrDefault(x => x.Merchant?.MerchantKind == MerchantKind.Restaurant);
+            var marketMerchantId = await _merchantService.GetJtakMarketMerchantId();
+            var targetMerchantId = restaurantAssignment?.MerchantId ?? marketMerchantId;
+            if (!targetMerchantId.HasValue)
+            {
+                return BadRequest(ApiErr.Create("تعذر تحديد متجر جيتك ماركت لربط النسخة الجديدة."));
+            }
 
             var entity = new Product
             {
@@ -548,10 +756,43 @@ namespace App.ApiControllers.V1.Admin
             _service.Insert(entity);
             await _uow.SaveChangesAsync();
 
+            var targetMerchant = await _merchantService.FindAsync(targetMerchantId.Value);
+            _merchantProductRepo.Insert(new MerchantProduct
+            {
+                MerchantId = targetMerchantId.Value,
+                ProductId = entity.Id,
+                MerchantPrice = restaurantAssignment?.MerchantPrice ?? 0m,
+                PriceUsd = restaurantAssignment?.PriceUsd,
+                Discount = restaurantAssignment?.Discount ?? 0m,
+                ProfitOutOfMerchantPricePercent = targetMerchant?.ProfitOutOfMerchantPricePercent ?? 0m,
+                AdditionalProfitPercent = 0m
+            });
+            await _uow.SaveChangesAsync();
+            _cache.Remove($"ActiveMerchantPrices_{targetMerchantId.Value}");
+            _cache.Remove($"AllMerchantPrices_{targetMerchantId.Value}");
+            _cache.Remove($"MerchantProduct_{targetMerchantId.Value}_{entity.Id}");
+            _cache.Remove($"ProductPrices_{entity.Id}");
+
             await _tagService.SetTags(entity.Id, item.Tags?.Select(x => x.TagId).ToArray() ?? Array.Empty<int>());
             _logger.LogInformation("Duplicate New {0}", entity.GetType().Name);
 
             return entity.Id;
+        }
+
+        private async Task<string> ValidateProductMerchant(int merchantId, int? marketMerchantId)
+        {
+            var merchant = await _merchantService.FindAsync(merchantId);
+            if (merchant == null || merchant.DeletionDate != null || !merchant.Active)
+            {
+                return "المتجر المحدد غير موجود أو غير مفعّل.";
+            }
+
+            if (merchant.MerchantKind == MerchantKind.Restaurant || merchant.Id == marketMerchantId)
+            {
+                return null;
+            }
+
+            return "المنتجات غير المطعمية يجب ربطها بمتجر جيتك ماركت، وليس بمتجر آخر.";
         }
 
 
@@ -682,6 +923,77 @@ namespace App.ApiControllers.V1.Admin
             }
 
             return item.IsFeatured;
+        }
+
+        public static (decimal SalePrice, decimal? SalePriceUsd, decimal DiscountAmount, decimal? OriginalPriceUsd)
+            CalculateDiscountPricing(
+                decimal originalPriceLocal,
+                decimal? originalPriceUsd,
+                decimal discountPercent,
+                decimal usdRate,
+                decimal profitOutOfMerchantPricePercent)
+        {
+            var hasUsdPrice = originalPriceUsd.HasValue && originalPriceUsd.Value > 0m;
+            if (hasUsdPrice && usdRate <= 0m)
+            {
+                throw new InvalidOperationException("سعر صرف الدولار غير صالح.");
+            }
+
+            decimal oldBasePrice;
+            decimal? savedOriginalPriceUsd = null;
+
+            if (hasUsdPrice)
+            {
+                var oldUsd = originalPriceUsd!.Value;
+                savedOriginalPriceUsd = oldUsd;
+                oldBasePrice = Math.Round(oldUsd * usdRate, 0, MidpointRounding.AwayFromZero);
+            }
+            else
+            {
+                oldBasePrice = Math.Round(originalPriceLocal, 0, MidpointRounding.AwayFromZero);
+            }
+
+            static decimal CustomerPrice(decimal basePrice, decimal merchantProfitPercent)
+            {
+                var merchantProfit = Math.Round(basePrice * merchantProfitPercent / 100m, 0, MidpointRounding.AwayFromZero);
+                return Math.Round(basePrice + merchantProfit, 0, MidpointRounding.AwayFromZero);
+            }
+
+            // 1. Calculate Syrian customer price before discount (including platform/merchant profit markup)
+            var oldCustomerPrice = CustomerPrice(oldBasePrice, profitOutOfMerchantPricePercent);
+
+            // 2. Apply discount directly to the Syrian customer price (rounded to nearest integer Syrian Pound)
+            var saleCustomerPrice = Math.Round(oldCustomerPrice * (1m - discountPercent / 100m), 0, MidpointRounding.AwayFromZero);
+            var discountAmount = Math.Max(0m, oldCustomerPrice - saleCustomerPrice);
+
+            // 3. Derive merchant base Syrian price so that CustomerPrice(saleBasePrice, profitOutOfMerchantPricePercent) == saleCustomerPrice
+            decimal saleBasePrice;
+            if (profitOutOfMerchantPricePercent > 0m)
+            {
+                saleBasePrice = Math.Round(saleCustomerPrice / (1m + profitOutOfMerchantPricePercent / 100m), 0, MidpointRounding.AwayFromZero);
+                var actualCustomerPrice = CustomerPrice(saleBasePrice, profitOutOfMerchantPricePercent);
+                if (actualCustomerPrice < saleCustomerPrice && CustomerPrice(saleBasePrice + 1m, profitOutOfMerchantPricePercent) == saleCustomerPrice)
+                {
+                    saleBasePrice += 1m;
+                }
+                else if (actualCustomerPrice > saleCustomerPrice && CustomerPrice(saleBasePrice - 1m, profitOutOfMerchantPricePercent) == saleCustomerPrice)
+                {
+                    saleBasePrice -= 1m;
+                }
+            }
+            else
+            {
+                saleBasePrice = saleCustomerPrice;
+            }
+
+            // 4. Derive sale USD price from the base Syrian price if product uses USD pricing
+            decimal? salePriceUsd = null;
+            if (hasUsdPrice)
+            {
+                salePriceUsd = Math.Round(saleBasePrice / usdRate, 2, MidpointRounding.AwayFromZero);
+            }
+
+            return (saleBasePrice, salePriceUsd, discountAmount, savedOriginalPriceUsd);
         }
     }
 }

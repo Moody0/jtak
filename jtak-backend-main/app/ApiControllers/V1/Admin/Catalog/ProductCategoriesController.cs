@@ -12,6 +12,7 @@ using Modules.Catalog.Entities;
 using Modules.Catalog.Services;
 using OpenIddict.Validation.AspNetCore;
 using Solf.Models;
+using System;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Dynamic.Core;
@@ -52,10 +53,42 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
-        public async Task<ActionResult<TableResponseModel<ProductCategoryDto>>> DataTable([FromBody] MetronicTable request)
+        public async Task<ActionResult<TableResponseModel<ProductCategoryDto>>> DataTable(
+            [FromBody] MetronicTable request,
+            [FromQuery] string level = null)
         {
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
             var lang = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
-            var list = await _service.ListMetronicTableQueryable(request, x => new ProductCategoryDto
+            if (string.Equals(level, "root", StringComparison.OrdinalIgnoreCase))
+            {
+                return await _service.ListMetronicTableQueryable(request, x => new ProductCategoryDto
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    ParentId = x.ParentId,
+                    Active = x.Active,
+                    Icon = x.Icon,
+                    Order = x.Order
+                }, x => x.ParentId == null);
+            }
+
+            if (string.Equals(level, "sub", StringComparison.OrdinalIgnoreCase))
+            {
+                return await _service.ListMetronicTableQueryable(request, x => new ProductCategoryDto
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    ParentId = x.ParentId,
+                    Active = x.Active,
+                    Icon = x.Icon,
+                    Order = x.Order
+                }, x => x.ParentId != null);
+            }
+
+            return await _service.ListMetronicTableQueryable(request, x => new ProductCategoryDto
             {
                 Id = x.Id,
                 Title = x.Title,
@@ -64,8 +97,6 @@ namespace App.ApiControllers.V1.Admin
                 Icon = x.Icon,
                 Order = x.Order
             });
-
-            return list;
         }
 
         /// <summary>

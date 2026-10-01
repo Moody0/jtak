@@ -1,5 +1,5 @@
-import { Component, OnInit, Input, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+﻿import { Component, OnInit, Input, OnDestroy } from '@angular/core';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { SubSink } from 'subsink';
@@ -28,7 +28,7 @@ export class EditRestaurantCategoryModalComponent implements OnInit, OnDestroy {
   @Input() item: RestaurantCategoryItem | null = null;
   @Input() nextOrder: number = 1;
 
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
   isSaving = false;
 
   presetImages: Array<{ label: string; path: string }> = [
@@ -40,11 +40,11 @@ export class EditRestaurantCategoryModalComponent implements OnInit, OnDestroy {
     { label: 'مشروبات', path: 'assets/images/products/Iced Spanish Latte.webp' },
     { label: 'مخبوزات', path: 'assets/images/products/Minibon 9-Pack Box.webp' },
     { label: 'بيتزا', path: 'assets/images/cuisines/pizza.webp' },
-    { label: 'سوشي ومأكولات بحرية', path: 'assets/images/categories/fish.png' },
+    { label: 'سوشي ومأكولات بحرية', path: 'assets/images/cuisines/seafood.svg' },
   ];
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     private categoriesService: RestaurantCategoriesService,
     public filesService: FilesService,

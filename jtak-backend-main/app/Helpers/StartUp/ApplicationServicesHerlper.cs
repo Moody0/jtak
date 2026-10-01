@@ -20,6 +20,7 @@ using Modules.Accounting.Services;
 using Modules.Catalog.Services;
 using Modules.Orders.Services;
 using Modules.Shipping.Services;
+using App.Shared.Services.Pricing;
 using URF.Core.Abstractions;
 using URF.Core.Abstractions.Trackable;
 using URF.Core.EF;
@@ -60,6 +61,7 @@ namespace App.Helpers.StartUp
             services.AddScoped<IHomeCategoriesService, HomeCategoriesService>();
             services.AddScoped<IInventoryBatchService, InventoryBatchService>();
             services.AddScoped<IOrderService, OrderService>();
+            services.AddScoped<IOrderTransitionService, OrderTransitionService>();
             services.AddScoped<IOrderDetailService, OrderDetailService>();
             services.AddScoped<IDynamicFieldService, DynamicFieldService>();
             services.AddScoped<ITagService, TagService>();
@@ -72,6 +74,7 @@ namespace App.Helpers.StartUp
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IBalanceService, BalanceService>();
             services.AddScoped<ILedgerService, LedgerService>();
+            services.AddScoped<DriverFinancialSafetyService>();
             services.AddScoped<IEodReconciliationService, EodReconciliationService>();
             services.AddScoped<IMerchantReconciliationService, MerchantReconciliationService>();
             services.AddScoped<ISettlementRequestService, SettlementRequestService>();
@@ -79,9 +82,21 @@ namespace App.Helpers.StartUp
             services.AddScoped<ISupportMessageService, SupportMessageService>();
             services.AddScoped<IAdminNotificationSummaryService, AdminNotificationSummaryService>();
             services.AddScoped<IAdminAuditService, AdminAuditService>();
+            services.AddScoped<IOrderMoneyCalculationService, OrderMoneyCalculationService>();
+            services.AddScoped<IDriverPricingService, DriverPricingService>();
+            services.AddScoped<IOrderAccountingRetryService, OrderAccountingRetryService>();
+            services.AddScoped<IProductionReconciliationService, ProductionReconciliationService>();
+            services.AddScoped<IOrderFeatureFlagService, OrderFeatureFlagService>();
+            services.AddScoped<App.Services.IErrandSettlementService, App.Services.ErrandSettlementService>();
+            services.AddScoped<IContinuousInvariantAuditService, ContinuousInvariantAuditService>();
 
             // Background Service Management
             services.AddHostedService<OrderCheckingService>();
+            services.AddHostedService<OrderAccountingRetryWorker>();
+            services.AddHostedService<ContinuousInvariantAuditWorker>();
+            services.AddHostedService<OrderNotificationOutboxWorker>();
+            services.AddHostedService<CourierDispatchWorker>();
+            services.AddHostedService<NotificationRetryWorker>();
             services.AddHostedService<QueuedHostedService>();
             services.AddSingleton<IBackgroundTaskQueue>(ctx =>
             {
@@ -90,7 +105,11 @@ namespace App.Helpers.StartUp
                 return new BackgroundTaskQueue(queueCapacity);
             });
 
-            services.AddSingleton(provider => new MapperConfiguration(cfg => cfg.AddProfile(new MappingProfile(provider.GetService<IWebHostEnvironment>(), provider.GetService<IOptions<SolAppOptions>>()))).CreateMapper());
+            services.AddSingleton(provider => new MapperConfiguration(
+                cfg => cfg.AddProfile(new MappingProfile(
+                    provider.GetRequiredService<IWebHostEnvironment>(),
+                    provider.GetRequiredService<IOptions<SolAppOptions>>())),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()).CreateMapper());
 
             //services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
 

@@ -49,7 +49,10 @@ namespace App.ApiControllers.V1.Admin
                     if (_notifications != null && result.RequestedByUserId != Guid.Empty)
                     {
                         var isMerchant = result.PartyType == SettlementPartyType.Merchant;
-                        await _notifications.SendSettlementApproved(
+                        if (result.PartyType == SettlementPartyType.CaptainEarnings)
+                            await _notifications.SendDeliveryEarningsStatus(result.RequestedByUserId, result.RequestNumber,
+                                result.Amount, result.Status == SettlementRequestStatus.Completed ? "completed" : "approved");
+                        else await _notifications.SendSettlementApproved(
                             new[] { result.RequestedByUserId },
                             result.RequestNumber,
                             result.Amount,
@@ -106,7 +109,10 @@ namespace App.ApiControllers.V1.Admin
                 {
                     if (_notifications != null && result.RequestedByUserId != Guid.Empty)
                     {
-                        await _notifications.SendSettlementRejected(
+                        if (result.PartyType == SettlementPartyType.CaptainEarnings)
+                            await _notifications.SendDeliveryEarningsStatus(result.RequestedByUserId, result.RequestNumber,
+                                result.Amount, "rejected", result.RejectionReason);
+                        else await _notifications.SendSettlementRejected(
                             new[] { result.RequestedByUserId },
                             result.RequestNumber,
                             result.Amount,
@@ -154,16 +160,27 @@ namespace App.ApiControllers.V1.Admin
         }
 
         [HttpPost("{id}/Complete")]
-        public async Task<ActionResult<SettlementRequestDto>> Complete(Guid id, [FromBody] ReviewSettlementRequestDto request = null)
+        public Task<ActionResult<SettlementRequestDto>> Complete(Guid id, [FromBody] ReviewSettlementRequestDto request = null) =>
+            CompletePayout(id, request, false);
+
+        [HttpPost("{id}/CompleteDriverEarnings")]
+        public Task<ActionResult<SettlementRequestDto>> CompleteDriverEarnings(Guid id, [FromBody] ReviewSettlementRequestDto request = null) =>
+            CompletePayout(id, request, true);
+
+        private async Task<ActionResult<SettlementRequestDto>> CompletePayout(Guid id, ReviewSettlementRequestDto request, bool driverEarnings)
         {
             try
             {
-                var result = await _service.CompleteMerchantPayoutAsync(id, User.GetUserId() ?? Guid.Empty, request?.Notes);
+                var result = driverEarnings
+                    ? await _service.CompleteCaptainEarningsPayoutAsync(id, User.GetUserId() ?? Guid.Empty, request?.Notes)
+                    : await _service.CompleteMerchantPayoutAsync(id, User.GetUserId() ?? Guid.Empty, request?.Notes);
                 try
                 {
                     if (_notifications != null && result.RequestedByUserId != Guid.Empty)
                     {
-                        await _notifications.SendSettlementCompleted(
+                        if (driverEarnings)
+                            await _notifications.SendDeliveryEarningsStatus(result.RequestedByUserId, result.RequestNumber, result.Amount, "completed");
+                        else await _notifications.SendSettlementCompleted(
                             new[] { result.RequestedByUserId },
                             result.RequestNumber,
                             result.Amount);
@@ -182,7 +199,7 @@ namespace App.ApiControllers.V1.Admin
                         Action = "Pay",
                         EntityType = "SettlementRequest",
                         EntityId = result.RequestNumber ?? id.ToString(),
-                        Description = $"إتمام صرف تسوية التاجر {result.RequestedByName} بمبلغ {result.Amount:N0} ل.س",
+                        Description = $"إتمام صرف مستحقات {(driverEarnings ? "السائق" : "التاجر")} {result.RequestedByName} بمبلغ {result.Amount:N2} ل.س",
                         Result = "Success",
                         AfterState = result
                     });

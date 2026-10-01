@@ -11,6 +11,21 @@
   }
 }
 
+.audit-kpi-button {
+  cursor: pointer;
+  user-select: none;
+
+  &:focus-visible {
+    outline: 2px solid #e4572e;
+    outline-offset: 2px;
+  }
+}
+
+.audit-kpi-card-active {
+  box-shadow: 0 0.35rem 1rem rgba(228, 87, 46, 0.18) !important;
+  transform: translateY(-2px);
+}
+
 .hover-elevate-up {
   transition: background-color 0.15s ease;
 

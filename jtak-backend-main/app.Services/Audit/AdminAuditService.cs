@@ -13,6 +13,7 @@ namespace App.Shared.Services
 {
     public class AdminAuditService : IAdminAuditService
     {
+        private static readonly TimeZoneInfo DamascusTimeZone = GetDamascusTimeZone();
         private readonly AppDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -140,14 +141,14 @@ namespace App.Shared.Services
 
                 if (filter.FromDate.HasValue)
                 {
-                    var fromUtc = filter.FromDate.Value.ToUniversalTime();
+                    var fromUtc = StartOfDamascusDateUtc(filter.FromDate.Value);
                     query = query.Where(x => x.CreatedDate >= fromUtc);
                 }
 
                 if (filter.ToDate.HasValue)
                 {
-                    var toUtc = filter.ToDate.Value.ToUniversalTime();
-                    query = query.Where(x => x.CreatedDate <= toUtc);
+                    var endUtc = StartOfDamascusDateUtc(filter.ToDate.Value.Date.AddDays(1));
+                    query = query.Where(x => x.CreatedDate < endUtc);
                 }
             }
 
@@ -215,13 +216,15 @@ namespace App.Shared.Services
 
         public async Task<AdminAuditLogSummaryDto> GetSummaryAsync()
         {
-            var now = DateTime.UtcNow;
-            var todayUtc = now.Date;
-            var weekAgoUtc = now.AddDays(-7);
+            var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, DamascusTimeZone).Date;
+            var todayUtc = StartOfDamascusDateUtc(today);
+            var tomorrowUtc = StartOfDamascusDateUtc(today.AddDays(1));
+            var weekStart = today.AddDays(-((int)today.DayOfWeek + 6) % 7);
+            var weekStartUtc = StartOfDamascusDateUtc(weekStart);
 
             var total = await _context.AdminAuditLogs.CountAsync();
-            var today = await _context.AdminAuditLogs.CountAsync(x => x.CreatedDate >= todayUtc);
-            var thisWeek = await _context.AdminAuditLogs.CountAsync(x => x.CreatedDate >= weekAgoUtc);
+            var todayCount = await _context.AdminAuditLogs.CountAsync(x => x.CreatedDate >= todayUtc && x.CreatedDate < tomorrowUtc);
+            var thisWeek = await _context.AdminAuditLogs.CountAsync(x => x.CreatedDate >= weekStartUtc && x.CreatedDate < tomorrowUtc);
             var successCount = await _context.AdminAuditLogs.CountAsync(x => x.Result == "Success");
             var failureCount = await _context.AdminAuditLogs.CountAsync(x => x.Result != "Success");
 
@@ -242,13 +245,31 @@ namespace App.Shared.Services
             return new AdminAuditLogSummaryDto
             {
                 TotalOperations = total,
-                TodayOperations = today,
+                TodayOperations = todayCount,
                 ThisWeekOperations = thisWeek,
                 SuccessCount = successCount,
                 FailureCount = failureCount,
                 TopModule = topModuleGroup ?? "Orders",
                 TopAdmin = topAdminGroup ?? "Admin"
             };
+        }
+
+        private static DateTime StartOfDamascusDateUtc(DateTime date)
+        {
+            var localMidnight = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
+            return TimeZoneInfo.ConvertTimeToUtc(localMidnight, DamascusTimeZone);
+        }
+
+        private static TimeZoneInfo GetDamascusTimeZone()
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("Asia/Damascus");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("Syria Standard Time");
+            }
         }
 
         public async Task<AdminAuditLogDto> GetByIdAsync(Guid id)

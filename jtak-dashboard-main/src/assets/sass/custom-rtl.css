@@ -3,6 +3,7 @@
 [dir="rtl"], html[dir="rtl"], body[dir="rtl"] {
   direction: rtl !important;
   text-align: right;
+  font-family: 'Alexandria', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
 [dir="rtl"] body,
@@ -433,9 +434,9 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
 }
 
 .aside .jtak-nav .menu-item .menu-link.active {
-  background: linear-gradient(135deg, #FF5722 0%, #f97316 100%) !important;
+  background: #FF5722 !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 14px rgba(255, 87, 34, 0.38) !important;
+  box-shadow: none !important;
   border-color: transparent !important;
 }
 
@@ -511,14 +512,14 @@ html[data-kt-aside-minimize="on"] .aside .jtak-nav-label {
 
 [dir="rtl"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
 [dir="rtl"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
-  left: 12px !important;
-  right: auto !important;
+  right: 16px !important;
+  left: auto !important;
 }
 
 [dir="ltr"] .aside .jtak-nav .menu-item .menu-link .menu-badge,
 [dir="ltr"] .aside .jtak-nav .menu-item .menu-link .menu-icon .menu-badge {
-  right: 12px !important;
-  left: auto !important;
+  left: 16px !important;
+  right: auto !important;
 }
 
 .aside .jtak-nav .menu-item .menu-link .menu-badge .badge-text--expanded,
@@ -791,3 +792,40 @@ html[data-kt-aside-minimize="on"] .aside .jtak-system-state {
   transform: scaleX(-1);
   display: inline-block;
 }
+
+/* ==========================================================================
+   RTL Global Icon Spacing & Margin Utility Inversion
+   Fixes icons colliding with Arabic text across the entire application
+   ========================================================================== */
+[dir="rtl"] .me-0 { margin-left: 0 !important; margin-right: 0 !important; }
+[dir="rtl"] .me-1 { margin-left: 0.35rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-2 { margin-left: 0.55rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-3 { margin-left: 1rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-4 { margin-left: 1.5rem !important; margin-right: 0 !important; }
+[dir="rtl"] .me-5 { margin-left: 3rem !important; margin-right: 0 !important; }
+
+[dir="rtl"] .ms-0 { margin-right: 0 !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-1 { margin-right: 0.35rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-2 { margin-right: 0.55rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-3 { margin-right: 1rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-4 { margin-right: 1.5rem !important; margin-left: 0 !important; }
+[dir="rtl"] .ms-5 { margin-right: 3rem !important; margin-left: 0 !important; }
+
+/* Ensure every icon preceding Arabic text has distinct breathing room */
+[dir="rtl"] .btn > i:first-child:not(:only-child),
+[dir="rtl"] .btn > .fas:first-child:not(:only-child),
+[dir="rtl"] .btn > .far:first-child:not(:only-child),
+[dir="rtl"] .btn > .fab:first-child:not(:only-child),
+[dir="rtl"] .badge > i:first-child:not(:only-child),
+[dir="rtl"] .badge > .fas:first-child:not(:only-child),
+[dir="rtl"] .badge > .far:first-child:not(:only-child),
+[dir="rtl"] .dropdown-item > i:first-child:not(:only-child),
+[dir="rtl"] .dropdown-item > .fas:first-child:not(:only-child),
+[dir="rtl"] .nav-link > i:first-child:not(:only-child),
+[dir="rtl"] .nav-link > .fas:first-child:not(:only-child) {
+  margin-left: 0.45rem !important;
+  margin-right: 0 !important;
+  display: inline-block;
+  vertical-align: middle;
+}
+

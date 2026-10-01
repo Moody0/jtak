@@ -43,7 +43,9 @@ export class ReconciliationService {
     let url = `${this.merchantBaseUrl}/${merchantId}/Statement`;
     const queryParams: string[] = [];
     if (search && search.trim()) {
-      queryParams.push(`search=${encodeURIComponent(search.trim())}`);
+      const trimmed = search.trim();
+      queryParams.push(`searchTerm=${encodeURIComponent(trimmed)}`);
+      queryParams.push(`search=${encodeURIComponent(trimmed)}`);
     }
     if (fromDate) {
       queryParams.push(`fromDate=${encodeURIComponent(fromDate)}`);
@@ -124,5 +126,9 @@ export class ReconciliationService {
 
   completeMerchantRequest(id: string, notes?: string): Observable<SettlementRequestItem> {
     return this.http.post<SettlementRequestItem>(`${environment.apiUrl}/Admin/SettlementRequests/${id}/Complete`, { notes: notes || '' });
+  }
+
+  completeDriverEarningsRequest(id: string): Observable<SettlementRequestItem> {
+    return this.http.post<SettlementRequestItem>(`${environment.apiUrl}/Admin/SettlementRequests/${id}/CompleteDriverEarnings`, {});
   }
 }

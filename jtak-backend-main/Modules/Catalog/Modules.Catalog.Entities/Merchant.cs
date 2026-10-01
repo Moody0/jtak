@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using App.Shared.Entities.Enums;
 using Solf.Base;
 using Solf.Extensions;
@@ -42,13 +44,16 @@ namespace Modules.Catalog.Entities
         public bool Active { get; set; } = true;
         public MerchantKind MerchantKind { get; set; } = MerchantKind.Restaurant;
         public string DeliveryTime { get; set; } = "20-30 دقيقة";
-        public decimal DeliveryFee { get; set; } = 5000m;
-        public decimal MinOrderAmount { get; set; } = 15000m;
+        // Delivery fees are configured per merchant from the admin dashboard.
+        // Zero is the safe default until an administrator sets a value.
+        public decimal DeliveryFee { get; set; } = 0m;
+        public decimal MinOrderAmount { get; set; } = 150m;
         public string WorkingHours { get; set; } = "حتى 3 ص";
         public Currency DefaultCurrency { set; get; } = Currency.TRY;
         public string DefaultCurrencyString => DefaultCurrency.ToLocalizedName();
 
         [ForeignKey("Owner")]
+        [JsonConverter(typeof(SafeGuidConverter))]
         public Guid OwnerId { get; set; }
 
         public string Photo { get; set; }
@@ -95,6 +100,7 @@ namespace Modules.Catalog.Entities
         //public string DefaultCurrencyString => DefaultCurrency.ToLocalizedName();
 
         [ForeignKey("Owner")]
+        [JsonConverter(typeof(SafeGuidConverter))]
         public Guid OwnerId { get; set; }
         [StringLength(128)]
         public string OwnerName { get; set; }
@@ -103,5 +109,42 @@ namespace Modules.Catalog.Entities
         public string Photo { get; set; }
         //public ProductCategoryDto[] ProductCategories { get; set; }
         //public ProductDto[] FeaturedProducts { get; set; }
+    }
+
+    
+    public class SafeGuidConverter : JsonConverter<Guid>
+    {
+        public override Guid Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                var str = reader.GetString();
+                if (!string.IsNullOrWhiteSpace(str) && Guid.TryParse(str, out var guid))
+                {
+                    return guid;
+                }
+                return Guid.Empty;
+            }
+
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return Guid.Empty;
+            }
+
+            return Guid.Empty;
+        }
+
+        public override void Write(Utf8JsonWriter writer, Guid value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(value.ToString());
+        }
+    }
+
+    public class MerchantSummaryDto
+    {
+        public int Total { get; set; }
+        public int Active { get; set; }
+        public int Grocery { get; set; }
+        public int Restaurants { get; set; }
     }
 }

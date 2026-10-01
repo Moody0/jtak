@@ -1,5 +1,19 @@
 <div class="popular-products-container">
 
+  <!-- Navigation Switcher Between Home & Market Sections -->
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div class="nav-section-tabs">
+      <a routerLink="/popular-products" class="tab-link active">
+        <i class="fas fa-fire-alt me-1 text-danger"></i>
+        <span>الأكثر طلباً (الصفحة الرئيسية)</span>
+      </a>
+      <a routerLink="/market-best-selling" class="tab-link">
+        <i class="fas fa-shopping-basket me-1 text-warning"></i>
+        <span>الأكثر مبيعًا (سوبر ماركت جيتك)</span>
+      </a>
+    </div>
+  </div>
+
   <!-- 1. Operations Utility Bar -->
   <div class="popular-utility-bar">
     <div class="popular-utility-left">
@@ -251,9 +265,12 @@
 
             <!-- Price -->
             <td>
-              <span class="price-val">
+              <span class="price-val" *ngIf="(item.finalPrice || item.price) > 0">
                 {{ item.finalPrice || item.price | number }}
                 <small class="currency">ل.س</small>
+              </span>
+              <span class="badge badge-light-danger fs-8 py-1 px-2" *ngIf="(item.finalPrice || item.price) <= 0" title="هذا الصنف غير مسعر لدى متجر فعال">
+                <i class="fas fa-exclamation-triangle me-1 text-danger"></i>0 ل.س (غير مسعر)
               </span>
             </td>
 

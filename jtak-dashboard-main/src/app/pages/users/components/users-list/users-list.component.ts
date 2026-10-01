@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged, catchError } from 'rxjs/operators';
 import { forkJoin, of } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -17,7 +17,6 @@ import { UsersService } from '../../services/users.service';
 import { EditUserModalComponent } from '../edit-user-modal/edit-user-modal.component';
 import { DeleteUserModalComponent } from '../delete-user-modal/delete-user-modal.component';
 import { User } from '../../models/user.model';
-import { TagVal } from '../../models/TagVal-dto.model';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
 import { BulkConfirmModalComponent } from 'src/app/modules/shared/components/bulk-confirm-modal/bulk-confirm-modal.component';
 import { AppRoleName } from '../../enums/role.enum';
@@ -41,7 +40,7 @@ export class UsersListComponent
   selection = new TableSelection<User>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   // Real System KPIs
   kpiTotal = 0;
@@ -52,13 +51,12 @@ export class UsersListComponent
   // Filter States
   selectedRoleId: number | 'all' = 'all';
   selectedStatus: 'all' | 'active' | 'disabled' = 'all';
-  userRoles: TagVal[] = [];
 
   paginator: PaginatorState;
   sorting: SortState;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public service: UsersService,
     public filesService: FilesService,
     private modalService: NgbModal,
@@ -72,11 +70,6 @@ export class UsersListComponent
     this.loadKpis();
     this.service.fetchPost();
 
-    this.service.getRoles().subscribe((roles) => {
-      this.userRoles = roles || [];
-      this.cdr.detectChanges();
-    });
-
     this.subs.sink = this.service.isLoading$.subscribe(
       (res) => (this.isLoading = res)
     );
@@ -85,13 +78,6 @@ export class UsersListComponent
       this.totalRecords = total || 0;
       if (!this.kpiTotal) {
         this.kpiTotal = this.totalRecords;
-      }
-    });
-
-    // Reactive KPI calculation from loaded items to guarantee no zero values
-    this.subs.sink = this.service.items$.subscribe((items) => {
-      if (items && items.length) {
-        this.calculateKpis(items);
       }
     });
 
@@ -104,21 +90,19 @@ export class UsersListComponent
       .getAllUsers()
       .pipe(catchError(() => of([])))
       .subscribe((users) => {
-        if (users && users.length) {
-          this.calculateKpis(users);
-        }
+        this.calculateKpis(users || []);
       });
   }
 
   calculateKpis(users: User[]): void {
-    if (!users || !users.length) return;
+    if (!users) return;
     this.kpiTotal = this.totalRecords > users.length ? this.totalRecords : users.length;
     this.kpiActive = users.filter((u) => u.isActive).length;
     this.kpiCustomers = users.filter(
       (u) => this.getUserRole(u) === AppRoleName.Customer
     ).length;
     this.kpiStaff = users.filter(
-      (u) => this.getUserRole(u) !== AppRoleName.Customer
+      (u) => this.getUserRole(u) === AppRoleName.Delivery || this.getUserRole(u) === AppRoleName.Merchant
     ).length;
     this.cdr.detectChanges();
   }
@@ -156,9 +140,15 @@ export class UsersListComponent
     if (!items) return [];
 
     return items.filter((user) => {
+      // Admin accounts are intentionally excluded; customers, merchants and
+      // delivery couriers belong in this operational account directory.
+      const userRole = this.getUserRole(user);
+      if (userRole !== AppRoleName.Customer && userRole !== AppRoleName.Merchant && userRole !== AppRoleName.Delivery) {
+        return false;
+      }
+
       // Role filter (client-side backup for mixed sets)
       if (this.selectedRoleId !== 'all') {
-        const userRole = this.getUserRole(user);
         if (userRole !== this.selectedRoleId) {
           return false;
         }
@@ -271,23 +261,27 @@ export class UsersListComponent
     );
   }
 
-  // Smart Role Resolver to handle drivers and unassigned roles
+  // Roles are authoritative in the API/database. Do not infer a role from a
+  // user's name or email because that can make the table contradict the
+  // actual AspNetUserRoles assignment.
   getUserRole(user: User): number {
-    const email = (user.email || '').toLowerCase();
-    const name = (user.firstName || user.fullName || '').toLowerCase();
-
-    if (
-      email.startsWith('driver_') ||
-      name.includes('driver') ||
-      name.includes('سائق') ||
-      name.includes('مندوب') ||
-      name.includes('كابتن')
-    ) {
-      return AppRoleName.Delivery; // 3
-    }
-
     if (user.role !== undefined && user.role !== null) {
-      return Number(user.role);
+      const numericRole = Number(user.role);
+      if (Number.isInteger(numericRole)) {
+        return numericRole;
+      }
+
+      // Be tolerant of APIs returning enum names instead of their numeric value.
+      const roleName = String(user.role).trim().toLowerCase();
+      const roleByName: { [key: string]: AppRoleName } = {
+        admin: AppRoleName.Admin,
+        customer: AppRoleName.Customer,
+        merchant: AppRoleName.Merchant,
+        delivery: AppRoleName.Delivery,
+      };
+      if (roleByName[roleName] !== undefined) {
+        return roleByName[roleName];
+      }
     }
 
     return AppRoleName.Customer; // 1
@@ -324,6 +318,24 @@ export class UsersListComponent
           icon: 'fas fa-user',
           badgeClass: 'role-customer',
         };
+    }
+  }
+
+  getCaptainCompensationBadge(user: User): { label: string; badgeClass: string } | null {
+    if (this.getUserRole(user) !== AppRoleName.Delivery) {
+      return null;
+    }
+    const type = Number(user.captainCompensationType ?? 0);
+    const rate = user.captainRate ?? 0;
+    switch (type) {
+      case 0:
+        return { label: 'موظف براتب', badgeClass: 'type-salaried' };
+      case 1:
+        return { label: rate + ' ل.س / كم', badgeClass: 'type-km' };
+      case 2:
+        return { label: 'نسبة ' + rate + '%', badgeClass: 'type-percent' };
+      default:
+        return { label: 'موظف براتب', badgeClass: 'type-salaried' };
     }
   }
 

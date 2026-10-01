@@ -1,7 +1,7 @@
-import { FormGroup } from '@angular/forms';
+import { UntypedFormGroup } from '@angular/forms';
 
 export interface ISearchView {
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
   ngOnInit(): void;
   searchForm(): void;
   search(searchTerm: string): void;

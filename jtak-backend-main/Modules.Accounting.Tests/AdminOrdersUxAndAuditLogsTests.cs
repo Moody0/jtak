@@ -221,6 +221,32 @@ namespace Modules.Accounting.Tests
         }
 
         [Fact]
+        public async Task AdminAuditService_DateOnlyRange_IncludesOperationsDuringTheSelectedDay()
+        {
+            var db = CreateInMemoryAppDbContext("AuditTestDb_DateOnlyRange");
+            var service = new AdminAuditService(db, new HttpContextAccessor());
+
+            await service.LogAsync(new AdminAuditLogEntry
+            {
+                Module = "Orders",
+                Action = "Update",
+                Result = "Success"
+            });
+
+            var log = Assert.Single(db.AdminAuditLogs);
+            var damascusDate = TimeZoneInfo.ConvertTimeFromUtc(
+                log.CreatedDate,
+                TimeZoneInfo.FindSystemTimeZoneById("Asia/Damascus")).Date;
+
+            var filtered = await service.GetDataTableAsync(
+                new MetronicTable { PageNumber = 1, PageSize = 10 },
+                new AdminAuditLogFilter { FromDate = damascusDate, ToDate = damascusDate });
+
+            Assert.Equal(1, filtered.TotalRecords);
+            Assert.Equal(log.Id, Assert.Single(filtered.Items).Id);
+        }
+
+        [Fact]
         public async Task AdminAuditService_DataTableFilters_ByModuleActionAdminDateRangeAndResult()
         {
             var db = CreateInMemoryAppDbContext("AuditTestDb_Filters");
@@ -372,9 +398,9 @@ namespace Modules.Accounting.Tests
                 Cookie = "session_id=abcdef123456; Path=/",
                 Cookies = "auth_cookie=xyz789",
                 Session = "sess_999000",
-                SecretKey = "sk_live_123456789",
-                private_key = "-----BEGIN RSA PRIVATE KEY-----MIIEpAIBAAKCAQEA0...",
-                PrivateKey = "secret_rsa_key_data",
+                SecretKey = "test-secret-key",
+                private_key = "test-private-key",
+                PrivateKey = "test-private-key-data",
                 Cvv = "999",
                 Cvc = "888"
             };

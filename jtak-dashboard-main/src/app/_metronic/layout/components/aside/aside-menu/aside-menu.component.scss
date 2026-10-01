@@ -2,6 +2,30 @@
   display: block;
 }
 
+.jtak-nav { padding: 8px 10px 18px; }
+.jtak-nav-group { margin-bottom: 4px; }
+.jtak-workspace-row { display: flex; align-items: center; border-radius: 10px; }
+.jtak-workspace-row.is-active { background: rgba(255, 85, 31, .13); }
+.jtak-workspace-row .jtak-workspace-link { flex: 1; width: auto; min-width: 0; text-decoration: none; }
+.jtak-workspace-row.is-active .menu-title,
+.jtak-workspace-row.is-active .menu-icon { color: #ff6b35; }
+.jtak-workspace-toggle { width: 34px; height: 34px; flex: none; border: 0; background: transparent; color: #94a3b8; border-radius: 8px; }
+.jtak-workspace-toggle:hover,
+.jtak-workspace-toggle:focus-visible { background: rgba(255,255,255,.1); color: #fff; }
+.jtak-workspace-toggle i { transition: transform .15s ease; font-size: .7rem; }
+.jtak-workspace-toggle i.is-open { transform: rotate(180deg); }
+.jtak-workspace-children { padding-block: 3px 8px; padding-inline-start: 42px; padding-inline-end: 8px; }
+.jtak-workspace-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; color: #a8b4c9; font-size: .84rem; text-decoration: none; line-height: 1.35; }
+.jtak-workspace-child:hover,
+.jtak-workspace-child:focus-visible { background: rgba(255,255,255,.08); color: #fff; }
+.jtak-workspace-child.is-active { color: #fff; background: rgba(255,85,31,.2); font-weight: 700; }
+.jtak-child-count { flex: none; border-radius: 8px; background: #ff5b2b; color: #fff; padding: 1px 6px; font-size: .7rem; }
+
+:host-context([data-kt-aside-minimize="on"]) {
+  .jtak-workspace-toggle,
+  .jtak-workspace-children { display: none; }
+}
+
 .menu-badge {
   display: inline-flex;
   align-items: center;

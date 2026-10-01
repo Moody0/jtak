@@ -28,10 +28,11 @@ namespace App.Shared.Services
 
         public async Task<SupportMessageStatsDto> GetStatsAsync()
         {
-            var total = await Repository.Queryable().CountAsync();
-            var newCount = await Repository.Queryable().CountAsync(x => x.Status == SupportMessageStatus.New);
-            var inProgress = await Repository.Queryable().CountAsync(x => x.Status == SupportMessageStatus.Read);
-            var resolved = await Repository.Queryable().CountAsync(x => x.Status == SupportMessageStatus.Resolved);
+            var tickets = Repository.Queryable().Where(x => x.ErrandStatus == null);
+            var total = await tickets.CountAsync();
+            var newCount = await tickets.CountAsync(x => x.Status == SupportMessageStatus.New);
+            var inProgress = await tickets.CountAsync(x => x.Status == SupportMessageStatus.Read);
+            var resolved = await tickets.CountAsync(x => x.Status == SupportMessageStatus.Resolved);
 
             return new SupportMessageStatsDto
             {

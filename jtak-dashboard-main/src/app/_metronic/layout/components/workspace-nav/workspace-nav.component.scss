@@ -1,0 +1,189 @@
+// =============================================================================
+// JTAK Workspace Navigation Header (Floating Medium-Rounded Card)
+// Bounded inside container-fluid, border-radius: 12px, zero shadows, Alexandria font
+// =============================================================================
+
+:host {
+  display: block;
+}
+
+.workspace-nav-wrapper {
+  padding-top: 18px;
+  padding-bottom: 0;
+  margin-bottom: 22px;
+  background: transparent !important;
+  border: none !important;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+
+  *,
+  &,
+  .workspace-nav-card,
+  .workspace-nav-icon,
+  .workspace-nav-tabs,
+  .workspace-nav-tab {
+    box-shadow: none !important;
+  }
+}
+
+.workspace-nav-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px; // Medium rounded
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+}
+
+// -----------------------------------------------------------------------------
+// Workspace Heading (Right side in RTL)
+// -----------------------------------------------------------------------------
+.workspace-nav-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.workspace-nav-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #ea580c;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+
+  i, .fas, .far, .fab {
+    color: #ea580c !important;
+    margin: 0 !important;
+    line-height: 1;
+  }
+}
+
+.workspace-nav-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  .workspace-nav-title {
+    margin: 0;
+    font-family: 'Alexandria', sans-serif !important;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .workspace-nav-desc {
+    margin: 2px 0 0;
+    font-family: 'Alexandria', sans-serif !important;
+    font-size: 0.72rem;
+    color: #64748b;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Workspace Navigation Tabs (Segmented Control Pill Bar - Left side in RTL)
+// -----------------------------------------------------------------------------
+.workspace-nav-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  .workspace-nav-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px !important;
+    padding: 6px 14px;
+    border-radius: 7px;
+    color: #475569;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: 'Alexandria', sans-serif !important;
+    background: transparent;
+    border: 1px solid transparent;
+    transition: all 0.14s ease-in-out;
+    white-space: nowrap;
+    line-height: 1.4;
+
+    i, .fas, .far, .fab {
+      margin: 0 !important;
+      font-size: 0.78rem;
+      color: #64748b;
+      transition: color 0.14s ease;
+    }
+
+    &:hover {
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.6);
+
+      i, .fas, .far, .fab {
+        color: #0f172a;
+      }
+    }
+
+    &.is-active {
+      color: #ea580c !important;
+      font-weight: 750;
+      background: #ffffff !important;
+      border-color: #fed7aa !important;
+
+      i, .fas, .far, .fab {
+        color: #ea580c !important;
+      }
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Responsive (Mobile & Tablet)
+// -----------------------------------------------------------------------------
+@media (max-width: 991px) {
+  .workspace-nav-wrapper {
+    padding-top: 12px;
+    margin-bottom: 14px;
+  }
+
+  .workspace-nav-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 14px;
+    gap: 10px;
+    min-height: auto;
+    border-radius: 10px;
+  }
+
+  .workspace-nav-tabs {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .workspace-nav-meta .workspace-nav-desc {
+    display: none;
+  }
+}

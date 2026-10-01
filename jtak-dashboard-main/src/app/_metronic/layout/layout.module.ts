@@ -22,8 +22,10 @@ import { AsideMenuComponent } from './components/aside/aside-menu/aside-menu.com
 import { TopbarComponent } from './components/topbar/topbar.component';
 import { PageTitleComponent } from './components/header/page-title/page-title.component';
 import { HeaderMenuComponent } from './components/header/header-menu/header-menu.component';
+import { OrderSoundNotifierComponent } from './components/order-sound-notifier/order-sound-notifier.component';
 import { DrawersModule, DropdownMenusModule, ModalsModule} from '../partials';
 import { LanguageSelectorComponent } from '../partials/layout/extras/dropdown-inner/language-selector-inner/language-selector-inner.component';
+import { WorkspaceNavComponent } from './components/workspace-nav/workspace-nav.component';
 
 const routes: Routes = [
   {
@@ -47,6 +49,8 @@ const routes: Routes = [
     LanguageSelectorComponent,
     PageTitleComponent,
     HeaderMenuComponent,
+    OrderSoundNotifierComponent,
+    WorkspaceNavComponent,
   ],
   imports: [
     CommonModule,

@@ -3,6 +3,19 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { OrdersService } from '../../../services/orders.service';
 import { Order, OrderStatusHistoryItem } from '../../../models/orders.model';
 import { finalize } from 'rxjs/operators';
+import { TranslateService } from '@ngx-translate/core';
+
+interface HistoryItemView {
+  title: string;
+  quantity: number;
+  totalPrice?: number;
+}
+
+interface HistoryDetailsView {
+  items: HistoryItemView[];
+  total?: number;
+  note?: string;
+}
 
 @Component({
   selector: 'app-order-status-history-modal',
@@ -15,10 +28,12 @@ export class OrderStatusHistoryModalComponent implements OnInit {
   history: OrderStatusHistoryItem[] = [];
   isLoading: boolean = true;
   errorMessage: string = '';
+  private detailsCache = new Map<number, HistoryDetailsView | null>();
 
   constructor(
     public modal: NgbActiveModal,
-    private ordersService: OrdersService
+    private ordersService: OrdersService,
+    private translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -33,7 +48,7 @@ export class OrderStatusHistoryModalComponent implements OnInit {
           this.history = items || [];
         },
         error: () => {
-          this.errorMessage = 'تعذر تحميل سجل تدقيق الحالات لهذا الطلب.';
+          this.errorMessage = this.translate.instant('ORDERS_PAGE.HISTORY_ERROR');
         }
       });
   }
@@ -66,5 +81,71 @@ export class OrderStatusHistoryModalComponent implements OnInit {
       case 8: return 'fa-box-open';
       default: return 'fa-info-circle';
     }
+  }
+
+  getStatusLabel(status: number): string {
+    const keyByStatus: Record<number, string> = {
+      0: 'STATUS_PENDING',
+      1: 'STATUS_ACCEPTED',
+      2: 'STATUS_IN_TRANSIT',
+      3: 'STATUS_DELIVERED',
+      4: 'STATUS_REJECTED',
+      5: 'STATUS_REVIEW',
+      6: 'STATUS_CANCELED',
+      7: 'STATUS_CANCELED_DRIVER',
+      8: 'STATUS_READY'
+    };
+    return this.translate.instant(`ORDERS_PAGE.${keyByStatus[status] || 'STATUS_PROCESSING'}`);
+  }
+
+  getHistoryStatusLabel(item: OrderStatusHistoryItem): string {
+    if (item?.status === 7 && item.driverId) {
+      return this.translate.instant('ORDERS_PAGE.STATUS_CANCELED_DRIVER');
+    }
+    return this.getStatusLabel(item?.status);
+  }
+
+  getDetailsView(historyItem: OrderStatusHistoryItem): HistoryDetailsView | null {
+    if (this.detailsCache.has(historyItem.id)) {
+      return this.detailsCache.get(historyItem.id) || null;
+    }
+
+    const raw = historyItem.details?.trim();
+    if (!raw) {
+      this.detailsCache.set(historyItem.id, null);
+      return null;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      const view = { items: [], note: raw };
+      this.detailsCache.set(historyItem.id, view);
+      return view;
+    }
+
+    const records = Array.isArray(parsed) ? parsed : [parsed];
+    const items = records
+      .map((record: any): HistoryItemView | null => {
+        if (!record || typeof record !== 'object') return null;
+        const title = record.ProductTitle || record.productTitle || record.Name || record.name;
+        if (!title) return null;
+        const quantity = Number(record.Quantity ?? record.quantity ?? 1) || 1;
+        const totalPrice = Number(record.TotalPrice ?? record.totalPrice ?? record.totalFinalPrice ?? 0) || undefined;
+        return { title, quantity, totalPrice };
+      })
+      .filter((item: HistoryItemView | null): item is HistoryItemView => !!item);
+
+    if (!items.length) {
+      const view = { items: [], note: this.translate.instant('ORDERS_PAGE.HISTORY_CHANGE_RECORDED') };
+      this.detailsCache.set(historyItem.id, view);
+      return view;
+    }
+
+    const total = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || undefined;
+    const view = { items, total };
+    this.detailsCache.set(historyItem.id, view);
+    return view;
   }
 }

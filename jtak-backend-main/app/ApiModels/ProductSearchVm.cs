@@ -5,6 +5,7 @@
         public int Take { get; set; } = 9;
         public int Page { get; set; } = 0;
         public int? ProductCategoryId { get; set; }
+        public bool OnlyOffers { get; set; }
         public string q { get; set; }
         //public OrderBy OrderBy { get; set; }
         public decimal? Lat { get; set; }

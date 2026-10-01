@@ -3,11 +3,13 @@
 @using App.Shared.Services.Helpers
 @using App.Shared.Entities.Resources
 @using App.Resources
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @model dynamic
 @{
     var lang = System.Threading.Thread.CurrentThread.CurrentCulture.TwoLetterISOLanguageName;
     var RTLext = lang == "ar" ? "-rtl" : "";
     var isRtl = System.Threading.Thread.CurrentThread.CurrentCulture.TextInfo.IsRightToLeft;
+    var googleMapsApiKey = Configuration["GoogleMaps:ApiKey"] ?? string.Empty;
 
     var m = Model is App.Shared.Entities.ISeoPage ? Model as App.Shared.Entities.ISeoPage : null;
     var seoTitle = m?.SeoTitle != null ? m?.SeoTitle + " - " + _Common.SiteName : @_Common.SiteName;
@@ -135,7 +137,7 @@
     <script src="/theme/vendor/js/extensions/revolution.extension.video.min.js"></script>
 
     <!-- Google Map Api -->
-    <script src="//maps.googleapis.com/maps/api/js?key=AIzaSyAgIfLQi8KTxTJahilcem6qHusV-V6XXjw"></script>
+    <script src="//maps.googleapis.com/maps/api/js?key=@googleMapsApiKey"></script>
     <script src="/theme/js/maps.min.js"></script>
 
     <!--contact form-->

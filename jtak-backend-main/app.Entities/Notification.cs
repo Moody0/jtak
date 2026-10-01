@@ -14,6 +14,17 @@ namespace App.Shared.Entities
         [Display(Name = "Id", ResourceType = typeof(_Entities))]
         public int Id { get; set; }
 
+        // The business event is transient; its per-recipient hash is persisted.
+        [NotMapped]
+        public string EventKey { get; set; }
+        public string DispatchKey { get; set; }
+        public string AudienceApp { get; set; }
+        public System.DateTime? PushSentAtUtc { get; set; }
+        public System.Guid? PushLockId { get; set; }
+        public System.DateTime? PushLockedUntilUtc { get; set; }
+        public System.DateTime? PushNextAttemptAtUtc { get; set; }
+        public int PushAttemptCount { get; set; }
+
         #region Title
         [Display(Name = "TitleAr", ResourceType = typeof(_Entities))]
         public string TitleAr { get; set; }
@@ -66,20 +77,26 @@ namespace App.Shared.Entities
 
         public Dictionary<string, string> GetPayload(string lang) => new Dictionary<string, string>()
         {
+            // Firebase data messages do not accept null values. Optional
+            // notification fields must be sent as empty strings instead.
             ["Id"] = Id.ToString("D"),
-            ["Title"] = lang == "ar" ? TitleAr : lang == "tr" ? TitleTr : TitleEn,
-            ["Text"] = lang == "ar" ? TextAr : lang == "tr" ? TextTr : TextEn,
-            ["Url"] = Url,
-            ["ImageUrl"] = Image,
-            ["Topic"] = Topic,
+            ["EventKey"] = DispatchKey ?? Id.ToString("D"),
+            ["AudienceApp"] = AudienceApp ?? string.Empty,
+            ["Title"] = (lang == "ar" ? TitleAr : lang == "tr" ? TitleTr : TitleEn) ?? string.Empty,
+            ["Text"] = (lang == "ar" ? TextAr : lang == "tr" ? TextTr : TextEn) ?? string.Empty,
+            ["Url"] = Url ?? string.Empty,
+            ["ImageUrl"] = Image ?? string.Empty,
+            ["Topic"] = Topic ?? string.Empty,
             ["Entity"] = NotificationType.ToString(),
-            ["EntityData"] = EntityData,
+            ["EntityData"] = EntityData ?? string.Empty,
             ["CreatedDate"] = CreatedDate.ToString("O")
         };
     }
     public class NotificationDto
     {
         public int Id { get; set; }
+        public System.DateTime CreatedDate { get; set; }
+        public string Topic { get; set; }
 
         #region Title
         public string TitleAr { get; set; }

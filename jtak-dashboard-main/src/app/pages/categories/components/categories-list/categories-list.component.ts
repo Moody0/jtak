@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged, catchError } from 'rxjs/operators';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
@@ -39,7 +39,7 @@ export class CategoriesListComponent
   selection = new TableSelection<Category>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   // Parents and Hierarchy metadata
   parentCategories: Category[] = [];
@@ -61,7 +61,7 @@ export class CategoriesListComponent
   sorting: SortState;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public service: CategoriesService,
     public filesService: FilesService,
     private modalService: NgbModal,
@@ -120,6 +120,11 @@ export class CategoriesListComponent
     return this.parentMap.get(parentId) || 'تصنيف رئيسي';
   }
 
+  isRootCategory(category: Category): boolean {
+    const parentId = category?.parentId;
+    return parentId === null || parentId === undefined || Number(parentId) === 0;
+  }
+
   getSubcategoriesCount(categoryId: number): number {
     return this.childrenCountMap.get(categoryId) || 0;
   }
@@ -141,6 +146,8 @@ export class CategoriesListComponent
   filterByLevel(level: 'all' | 'root' | 'sub'): void {
     this.selectedLevel = level;
     this.selection.clear();
+    this.service.setCategoryLevel(level);
+    this.service.fetchPost();
   }
 
   filterByParent(parentId: number | null): void {
@@ -153,13 +160,28 @@ export class CategoriesListComponent
     this.selection.clear();
   }
 
+  clearSearch(): void {
+    this.searchGroup.get('searchTerm')?.setValue('');
+  }
+
+  resetFilters(): void {
+    this.searchGroup.get('searchTerm')?.setValue('');
+    this.selectedLevel = 'all';
+    this.selectedParentId = null;
+    this.selectedStatus = 'all';
+    this.selection.clear();
+    this.service.setCategoryLevel('all');
+    this.service.fetchPost();
+  }
+
   getDisplayedItems(items: Category[]): Category[] {
     if (!items) return [];
 
     return items.filter((item) => {
       // Level filter
-      if (this.selectedLevel === 'root' && item.parentId) return false;
-      if (this.selectedLevel === 'sub' && !item.parentId) return false;
+      const isRoot = this.isRootCategory(item);
+      if (this.selectedLevel === 'root' && !isRoot) return false;
+      if (this.selectedLevel === 'sub' && isRoot) return false;
 
       // Specific Parent filter
       if (this.selectedParentId !== null && item.parentId !== this.selectedParentId) {

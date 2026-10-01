@@ -1,7 +1,7 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged, catchError } from 'rxjs/operators';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
@@ -20,6 +20,7 @@ import { EditMerchantModalComponent } from '../edit-merchant-modal/edit-merchant
 import { Merchant } from '../../models/merchant.model';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
 import { BulkConfirmModalComponent } from 'src/app/modules/shared/components/bulk-confirm-modal/bulk-confirm-modal.component';
+import { ActivatedRoute, Router } from '@angular/router';
 
 export interface MerchantTypeInfo {
   kind: number;
@@ -46,7 +47,7 @@ export class MerchantsListComponent
   selection = new TableSelection<Merchant>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   // Real System KPIs
   kpiTotal = 0;
@@ -62,11 +63,14 @@ export class MerchantsListComponent
   sorting: SortState;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public service: MerchantsService,
     public filesService: FilesService,
     private modalService: NgbModal,
-    private toaster: ToastrService
+    private toaster: ToastrService,
+    private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -85,28 +89,70 @@ export class MerchantsListComponent
       if (!this.kpiTotal) {
         this.kpiTotal = this.totalRecords;
       }
+      this.cdr.markForCheck();
+    });
+
+    this.subs.sink = this.service.items$.subscribe((items) => {
+      if (items && items.length) {
+        if (!this.kpiActive && !this.kpiGrocery && !this.kpiRestaurants) {
+          this.calculateKpis(items);
+        }
+      }
     });
 
     this.sorting = this.service.sorting;
     this.paginator = this.service.paginator;
+
+    // Allow the central warehouse page to open the warehouse form directly.
+    if (this.route.snapshot.queryParamMap.get('create') === 'warehouse') {
+      setTimeout(() => {
+        this.edit(null, 4);
+        // Prevent a refresh or later return to the merchant list from reopening the form.
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { create: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+    }
+  }
+
+  calculateKpis(merchants: Merchant[]): void {
+    if (!merchants || !merchants.length) return;
+    this.kpiTotal = Math.max(this.kpiTotal, merchants.length, this.totalRecords);
+    this.kpiActive = merchants.filter((m) => m.active).length;
+    this.kpiGrocery = merchants.filter(
+      (m) => m.merchantKind === 1 || this.isMarket(m)
+    ).length;
+    this.kpiRestaurants = merchants.filter(
+      (m) =>
+        (m.merchantKind === 0 || m.merchantKind === 3 || m.merchantKind == null) && !this.isMarket(m)
+    ).length;
+    this.cdr.markForCheck();
   }
 
   loadKpis(): void {
     this.service
-      .getAllMerchants()
-      .pipe(catchError(() => of([])))
-      .subscribe((merchants) => {
-        if (!merchants || !merchants.length) return;
-        this.kpiTotal = merchants.length;
-        this.kpiActive = merchants.filter((m) => m.active).length;
-        this.kpiGrocery = merchants.filter(
-          (m) => m.merchantKind === 1 || m.merchantKind === 3 || this.isMarket(m)
-        ).length;
-        this.kpiRestaurants = merchants.filter(
-          (m) =>
-            m.merchantKind === 0 ||
-            m.merchantKind == null
-        ).length;
+      .getSummary()
+      .pipe(catchError(() => of(null as any)))
+      .subscribe((summary) => {
+        if (summary) {
+          this.kpiTotal = summary.total;
+          this.kpiActive = summary.active;
+          this.kpiGrocery = summary.grocery;
+          this.kpiRestaurants = summary.restaurants;
+          this.cdr.markForCheck();
+          return;
+        }
+
+        this.service
+          .getAllMerchants()
+          .pipe(catchError(() => of([])))
+          .subscribe((merchants) => {
+            if (!merchants || !merchants.length) return;
+            this.calculateKpis(merchants);
+          });
       });
   }
 
@@ -122,6 +168,10 @@ export class MerchantsListComponent
   search(searchTerm: string): void {
     this.selection.clear();
     this.service.patchState({ searchTerm });
+  }
+
+  clearSearch(): void {
+    this.searchGroup.get('searchTerm')?.setValue('');
   }
 
   filterByKind(kind: number | 'all'): void {
@@ -141,8 +191,7 @@ export class MerchantsListComponent
       // Kind filter
       if (this.selectedKind !== 'all') {
         const rawKind = merchant.merchantKind ?? (this.isMarket(merchant) ? 1 : 0);
-        const effectiveKind = (rawKind === 3 || rawKind === 1) ? 1 : rawKind;
-        if (effectiveKind !== this.selectedKind) {
+        if (rawKind !== this.selectedKind) {
           return false;
         }
       }
@@ -177,13 +226,14 @@ export class MerchantsListComponent
     this.edit(null);
   }
 
-  edit(item: Merchant | null): void {
+  edit(item: Merchant | null, initialMerchantKind?: number): void {
     const modalRef = this.modalService.open(EditMerchantModalComponent, {
       size: 'xl',
       backdrop: 'static',
       keyboard: false,
     });
     modalRef.componentInstance.item = item;
+    modalRef.componentInstance.initialMerchantKind = initialMerchantKind ?? null;
     modalRef.result.then(
       () => {
         this.loadKpis();
@@ -307,12 +357,18 @@ export class MerchantsListComponent
     const kind = merchant?.merchantKind ?? (this.isMarket(merchant) ? 1 : 0);
     switch (kind) {
       case 1:
-      case 3:
         return {
           kind: 1,
           label: 'سوبرماركت / بقالية',
           icon: 'fas fa-shopping-basket',
           badgeClass: 'type-grocery',
+        };
+      case 3:
+        return {
+          kind: 3,
+          label: 'أخرى',
+          icon: 'fas fa-store',
+          badgeClass: 'type-store',
         };
       default:
         return {

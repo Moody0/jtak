@@ -37,6 +37,31 @@ export class AdminDeliverModalComponent implements OnInit {
     return !!this.order?.deliveryId;
   }
 
+  getGrandTotal(): number {
+    const grandTotal = Number(this.order?.grandTotal);
+    if (this.order?.grandTotal != null && Number.isFinite(grandTotal)) {
+      return grandTotal;
+    }
+    return Number(this.order?.price || 0) + Number(this.order?.deliveryFee || 0);
+  }
+
+  private getErrorMessage(error: any): string {
+    const body = error?.error;
+    if (typeof body === 'string' && body.trim()) return body;
+    if (body && typeof body === 'object') {
+      const messages = [body.title, body.detail, body.message, body.errorDescription]
+        .filter((value): value is string => typeof value === 'string' && !!value.trim());
+      if (messages.length) return messages[0];
+      if (Array.isArray(body.errors)) {
+        const errors = body.errors.filter((value: unknown): value is string => typeof value === 'string' && !!value.trim());
+        if (errors.length) return errors.join(' ');
+      }
+    }
+    return typeof error?.message === 'string' && error.message.trim()
+      ? error.message
+      : 'حدث خطأ أثناء إتمام عملية التسليم.';
+  }
+
   submit(): void {
     this.errorMessage = '';
     const cleanOtp = (this.otp || '').trim();
@@ -57,7 +82,7 @@ export class AdminDeliverModalComponent implements OnInit {
     ).subscribe({
       next: () => this.modal.close(true),
       error: (err) => {
-        this.errorMessage = err?.error?.title || err?.error?.detail || err?.error || err?.message || 'حدث خطأ أثناء إتمام عملية التسليم.';
+        this.errorMessage = this.getErrorMessage(err);
       }
     });
   }

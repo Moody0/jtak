@@ -19,6 +19,8 @@ using App.Shared.Entities.Resources;
 using App.Shared.Entities.Enums;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography;
 
 namespace App.ApiControllers.V1.Authorization
 {
@@ -33,6 +35,21 @@ namespace App.ApiControllers.V1.Authorization
         private readonly IEmailService _emailService;
         private readonly ISmsLogService _smsLogService;
         private readonly ILogger _logger;
+        private readonly IConfiguration _configuration;
+
+        private bool IsTemporaryOtpEnabled =>
+            bool.TryParse(_configuration?["Authentication:TemporaryOtpEnabled"], out var enabled) && enabled;
+
+        private string TemporaryOtpCode
+        {
+            get
+            {
+                var configuredCode = _configuration?["Authentication:TemporaryOtpCode"]?.Trim();
+                return !string.IsNullOrEmpty(configuredCode) && configuredCode.Length == 6 && configuredCode.All(char.IsDigit)
+                    ? configuredCode
+                    : "123456";
+            }
+        }
 
         public AccountController(IAppUnitOfWork unitOfWorkAsync,
             UserManager<AppUser> userManager,
@@ -40,7 +57,8 @@ namespace App.ApiControllers.V1.Authorization
             ILogger<AccountController> logger,
             ISmsLogService smsLogService,
             IEmailService emailService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IConfiguration configuration = null)
         {
             _unitOfWork = unitOfWorkAsync;
             _userManager = userManager;
@@ -49,6 +67,7 @@ namespace App.ApiControllers.V1.Authorization
             _smsLogService = smsLogService;
             _emailService = emailService;
             _notificationService = notificationService;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -211,11 +230,20 @@ namespace App.ApiControllers.V1.Authorization
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
+            var phoneNumber = model.PhoneNumber;
+            if (!string.IsNullOrWhiteSpace(phoneNumber) && SyrianPhoneIdentity.TryNormalize(phoneNumber, out var canonicalPhone))
+            {
+                var existing = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+                if (existing.Ambiguous || existing.User != null)
+                    return StatusCode(409, new { error = "PHONE_ALREADY_REGISTERED", errorDescription = "رقم الهاتف مرتبط بحساب موجود بالفعل." });
+                phoneNumber = canonicalPhone;
+            }
+
             var user = new AppUser
             {
                 UserName = model.Email,
                 Email = model.Email,
-                PhoneNumber = model.PhoneNumber,
+                PhoneNumber = phoneNumber,
                 CountryPhoneCode = model.CountryPhoneCode,
                 FullName = model.FullName,
                 Gender = model.Gender,
@@ -235,11 +263,11 @@ namespace App.ApiControllers.V1.Authorization
 
             if (user.PhoneNumber != null)
             {
-                var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, model.PhoneNumber);
+                var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, phoneNumber);
                 var msg = string.Format(_Account.SmsVerification, code);
                 try
                 {
-                    var response = await _notificationService.SendSmsNotification(model.PhoneNumber, msg);
+                    var response = await _notificationService.SendSmsNotification(phoneNumber, msg);
                     _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = msg, Response = response });
                     await _unitOfWork.SaveChangesAsync();
                 }
@@ -258,18 +286,45 @@ namespace App.ApiControllers.V1.Authorization
         public async Task<ActionResult<int>> ResendSmsCode(PhoneNumberModel model)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-
-            var user = await _userManager.FindByNameAsync(model.PhoneNumber);
+            if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+            var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+            if (match.Ambiguous) return StatusCode(409, new { error = "PHONE_ACCOUNT_AMBIGUOUS", errorDescription = "يوجد أكثر من حساب مرتبط بهذا الرقم. يرجى التواصل مع الدعم." });
+            var user = match.User;
+            if (user?.DeletionDate != null) return NotFound();
+            if (user != null && !user.IsActive)
+                return StatusCode(403, new
+                {
+                    error = "ACCOUNT_DISABLED",
+                    errorDescription = "تم تعطيل حسابك. يرجى التواصل مع الدعم الفني."
+                });
             //var waitTimeInSecs = await _smsLogService.GetSMSResendWaitTime(user?.Id);
             var waitTimeInSecs = 0;
-            var hasDisplayName = user?.FirstName != null && user?.LastName != null;
 
             if (waitTimeInSecs > 0)
                 return BadRequest($"You need to wait {waitTimeInSecs}s");
 
-            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, model.PhoneNumber);
+            var pending = await _unitOfWork.Context.PendingPhoneSignups.FindAsync(canonicalPhone);
+            if (pending != null && (user == null || !HasCompletedProfileName(user)))
+            {
+                pending.Code = CreatePhoneSignupCode();
+                pending.ExpiresAt = DateTime.UtcNow.AddMinutes(10);
+                pending.FailedAttempts = 0;
+                await _unitOfWork.SaveChangesAsync();
+                var pendingMessage = string.Format(_Account.SmsVerification, pending.Code);
+                await SendOtpSmsAsync(canonicalPhone, pendingMessage);
+                return waitTimeInSecs;
+            }
+
+            if (pending != null)
+            {
+                _unitOfWork.Context.PendingPhoneSignups.Remove(pending);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            if (user == null || user.DeletionDate != null) return NotFound();
+
+            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, canonicalPhone);
             var msg = string.Format(_Account.SmsVerification, code);
-            var response = await _notificationService.SendSmsNotification(model.PhoneNumber, msg);
+            var response = await SendOtpSmsAsync(canonicalPhone, msg);
             _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = msg/*, Response = response */});
 
             await _unitOfWork.SaveChangesAsync();
@@ -283,50 +338,181 @@ namespace App.ApiControllers.V1.Authorization
         /// <param name="model">The phoneNumber with this Regex format ^\+?[1-9]\d{1,14}$ </param>
         /// <returns>Has display name or not</returns>
         [AllowAnonymous, HttpPost, Route("RegisterOrSignInByPhoneNumber")]
-        public async Task<ActionResult<string>> RegisterOrSignInByPhoneNumber(PhoneNumberModel model)
+        public async Task<ActionResult<PhoneSignInStartResponse>> RegisterOrSignInByPhoneNumber(PhoneNumberModel model)
         {
-            var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == model.PhoneNumber) ?? await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == model.PhoneNumber);
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+
+            await _unitOfWork.Context.PendingPhoneSignups
+                .Where(x => x.ExpiresAt <= DateTime.UtcNow)
+                .ExecuteDeleteAsync();
+            var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+            if (match.Ambiguous) return StatusCode(409, new { error = "PHONE_ACCOUNT_AMBIGUOUS", errorDescription = "يوجد أكثر من حساب مرتبط بهذا الرقم. يرجى التواصل مع الدعم." });
+            var user = match.User;
+            if (user?.DeletionDate != null) return NotFound();
+            if (user != null && !user.IsActive)
+                return StatusCode(403, new
+                {
+                    error = "ACCOUNT_DISABLED",
+                    errorDescription = "تم تعطيل حسابك. يرجى التواصل مع الدعم الفني."
+                });
+
+            // New signups and legacy accounts without a real name stay outside
+            // AppUsers until profile completion. This keeps abandoned OTP
+            // attempts from becoming nameless customer accounts.
+            if (user == null || !HasCompletedProfileName(user))
+            {
+                var pending = await _unitOfWork.Context.PendingPhoneSignups.FindAsync(canonicalPhone);
+                if (pending == null)
+                {
+                    pending = new PendingPhoneSignup { PhoneNumber = canonicalPhone };
+                    _unitOfWork.Context.PendingPhoneSignups.Add(pending);
+                }
+                pending.Code = CreatePhoneSignupCode();
+                pending.ExpiresAt = DateTime.UtcNow.AddMinutes(10);
+                pending.FailedAttempts = 0;
+                await _unitOfWork.SaveChangesAsync();
+                var msg = string.Format(_Account.SmsVerification, pending.Code);
+                await SendOtpSmsAsync(canonicalPhone, msg);
+
+                return new PhoneSignInStartResponse
+                {
+                    RequiresProfileCompletion = true,
+                    VerificationCode = GetVerificationCodeForClient(pending.Code)
+                };
+            }
+
+            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, canonicalPhone);
+            var smsMessage = string.Format(_Account.SmsVerification, code);
+            var smsResponse = await SendOtpSmsAsync(canonicalPhone, smsMessage);
+            _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = smsMessage, Response = smsResponse });
+            await _unitOfWork.SaveChangesAsync();
+
+            return new PhoneSignInStartResponse
+            {
+                RequiresProfileCompletion = false,
+                VerificationCode = GetVerificationCodeForClient(code)
+            };
+        }
+
+        [AllowAnonymous, HttpPost, Route("VerifyPhoneSignupCode")]
+        public async Task<ActionResult<string>> VerifyPhoneSignupCode(PhoneNumberCodeModel model)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+
+            var pending = await _unitOfWork.Context.PendingPhoneSignups.FindAsync(canonicalPhone);
+            if (pending == null || pending.ExpiresAt <= DateTime.UtcNow)
+                return BadRequest("انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد.");
+            if (pending.FailedAttempts >= 5)
+                return BadRequest("تم تجاوز عدد المحاولات. يرجى طلب رمز جديد.");
+
+            if (!IsPhoneSignupCodeValid(pending, model.Code.Trim()))
+            {
+                pending.FailedAttempts++;
+                await _unitOfWork.SaveChangesAsync();
+                return BadRequest(_Errors.InvalidCode);
+            }
+
+            return "OK";
+        }
+
+        [AllowAnonymous, HttpPost, Route("CompletePhoneSignUp")]
+        public async Task<ActionResult<string>> CompletePhoneSignUp(CompletePhoneSignupModel model)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+
+            var pending = await _unitOfWork.Context.PendingPhoneSignups.FindAsync(canonicalPhone);
+            if (pending == null || pending.ExpiresAt <= DateTime.UtcNow)
+            {
+                if (pending != null)
+                {
+                    _unitOfWork.Context.PendingPhoneSignups.Remove(pending);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+                return BadRequest("انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد.");
+            }
+
+            if (pending.FailedAttempts >= 5)
+                return BadRequest("تم تجاوز عدد المحاولات. يرجى طلب رمز جديد.");
+
+            var enteredCode = model.Code.Trim();
+            if (!IsPhoneSignupCodeValid(pending, enteredCode))
+            {
+                pending.FailedAttempts++;
+                await _unitOfWork.SaveChangesAsync();
+                return BadRequest(_Errors.InvalidCode);
+            }
+
+            var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+            if (match.Ambiguous) return StatusCode(409, new { error = "PHONE_ACCOUNT_AMBIGUOUS", errorDescription = "يوجد أكثر من حساب مرتبط بهذا الرقم. يرجى التواصل مع الدعم." });
+            var user = match.User;
+            if (user?.DeletionDate != null) return NotFound();
+            if (user != null && !user.IsActive)
+                return StatusCode(403, new
+                {
+                    error = "ACCOUNT_DISABLED",
+                    errorDescription = "تم تعطيل حسابك. يرجى التواصل مع الدعم الفني."
+                });
+            if (user != null && HasCompletedProfileName(user))
+                return Conflict("هذا الرقم مسجل بالفعل. يرجى تسجيل الدخول.");
+
+            var fullName = model.FullName.Trim();
+            var splitIndex = fullName.IndexOf(' ');
+            var firstName = splitIndex >= 0 ? fullName.Substring(0, splitIndex).Trim() : fullName;
+            var lastName = splitIndex >= 0 ? fullName.Substring(splitIndex + 1).Trim() : string.Empty;
 
             if (user == null)
             {
-                user = new AppUser { UserName = model.PhoneNumber, PhoneNumber = model.PhoneNumber, IsActive = true };
-
-                var result = await _userManager.CreateAsync(user);
-                if (!result.Succeeded)
+                user = new AppUser
                 {
-                    _logger.LogError($"Couldn't create user account on order submit: {JsonSerializer.Serialize(user)}");
-                    return BadRequest(result);
-                }
-
-                result = await _userManager.AddToRoleAsync(user, AppRoleName.Customer.ToString());
-                if (!result.Succeeded)
+                    UserName = canonicalPhone,
+                    PhoneNumber = canonicalPhone,
+                    PhoneNumberConfirmed = true,
+                    IsActive = true,
+                    FirstName = firstName,
+                    LastName = lastName,
+                    FullName = fullName
+                };
+                var createResult = await _userManager.CreateAsync(user);
+                if (!createResult.Succeeded)
                 {
-                    _logger.LogError($"Couldn't add user to role on order submit: {JsonSerializer.Serialize(user)}");
-                    return BadRequest(result);
+                    var racedMatch = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+                    if (racedMatch.User == null || racedMatch.Ambiguous) return Conflict(createResult);
+                    user = racedMatch.User;
+                    if (HasCompletedProfileName(user)) return Conflict("هذا الرقم مسجل بالفعل. يرجى تسجيل الدخول.");
                 }
-                user = await _userManager.FindByPhoneNumberAsync(model.PhoneNumber);
+                else
+                {
+                    var roleResult = await _userManager.AddToRoleAsync(user, AppRoleName.Customer.ToString());
+                    if (!roleResult.Succeeded)
+                    {
+                        await _userManager.DeleteAsync(user);
+                        return BadRequest(roleResult);
+                    }
+                }
             }
-            //var waitTimeInSecs = await _smsLogService.GetSMSResendWaitTime(user?.Id);
-            var waitTimeInSecs = 0;
+            else
+            {
+                user.FirstName = firstName;
+                user.LastName = lastName;
+                user.FullName = fullName;
+                user.PhoneNumber = canonicalPhone;
+                user.PhoneNumberConfirmed = true;
+                var updateResult = await _userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded) return BadRequest(updateResult);
+            }
 
-            var hasDisplayName = user?.FirstName != null && user?.LastName != null;
-
-            if (waitTimeInSecs > 0)
-                return BadRequest($"You need to wait {waitTimeInSecs}s");
-
-            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, model.PhoneNumber);
-            var msg = string.Format(_Account.SmsVerification, code);
-
-            var response = await _notificationService.SendSmsNotification(model.PhoneNumber, msg);
-            _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = msg, Response = response });
-
+            _smsLogService.Insert(new SmsLog
+            {
+                UserId = user.Id,
+                Code = enteredCode,
+                Text = string.Format(_Account.SmsVerification, enteredCode)
+            });
+            _unitOfWork.Context.PendingPhoneSignups.Remove(pending);
             await _unitOfWork.SaveChangesAsync();
-
-#if DEBUG
-            return code;
-#else
-            return string.Empty;
-#endif
+            return "OK";
         }
 
         /// <summary>
@@ -338,11 +524,14 @@ namespace App.ApiControllers.V1.Authorization
         [AllowAnonymous, HttpPost, Route("MerchantSignInByPhoneNumber")]
         public async Task<ActionResult<string>> MerchantSignInByPhoneNumber(PhoneNumberModel model)
         {
-            var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == model.PhoneNumber)
-                    ?? await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == model.PhoneNumber);
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+            var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+            if (match.Ambiguous) return StatusCode(409, new { error = "PHONE_ACCOUNT_AMBIGUOUS", errorDescription = "يوجد أكثر من حساب مرتبط بهذا الرقم. يرجى التواصل مع الدعم." });
+            var user = match.User;
 
             // 1. Verify user exists and has the Merchant role
-            if (user == null || !await _userManager.IsInRoleAsync(user, AppRoleName.Merchant.ToString()))
+            if (user == null || user.DeletionDate != null || !await _userManager.IsInRoleAsync(user, AppRoleName.Merchant.ToString()))
             {
                 return StatusCode(403, new
                 {
@@ -365,19 +554,15 @@ namespace App.ApiControllers.V1.Authorization
             if (waitTimeInSecs > 0)
                 return BadRequest($"You need to wait {waitTimeInSecs}s");
 
-            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, model.PhoneNumber);
+            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, canonicalPhone);
             var msg = string.Format(_Account.SmsVerification, code);
 
-            var response = await _notificationService.SendSmsNotification(model.PhoneNumber, msg);
+            var response = await SendOtpSmsAsync(canonicalPhone, msg);
             _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = msg, Response = response });
 
             await _unitOfWork.SaveChangesAsync();
 
-#if DEBUG
-            return code;
-#else
-            return string.Empty;
-#endif
+            return GetVerificationCodeForClient(code);
         }
 
         /// <summary>
@@ -390,8 +575,12 @@ namespace App.ApiControllers.V1.Authorization
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var user = await _userManager.FindByNameAsync(model?.PhoneNumber);
-            var result = await _userManager.ChangePhoneNumberAsync(user, model?.PhoneNumber, model?.Code);
+            if (!SyrianPhoneIdentity.TryNormalize(model?.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+            var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+            if (match.Ambiguous) return StatusCode(409, new { error = "PHONE_ACCOUNT_AMBIGUOUS", errorDescription = "يوجد أكثر من حساب مرتبط بهذا الرقم. يرجى التواصل مع الدعم." });
+            var user = match.User;
+            if (user == null) return BadRequest(_Errors.InvalidCode);
+            var result = await _userManager.ChangePhoneNumberAsync(user, canonicalPhone, model?.Code);
 
             return result.Succeeded ? "OK" : BadRequest(_Errors.InvalidCode);
         }
@@ -418,12 +607,6 @@ namespace App.ApiControllers.V1.Authorization
             var user = await _userManager.GetUserAsync(User)
                 ?? (User.GetUserId() != null ? await _userManager.FindByIdAsync(User.GetUserId().ToString()) : null);
 
-            if (user == null && !string.IsNullOrWhiteSpace(vm.PhoneNumber))
-            {
-                user = await _userManager.FindByPhoneNumberAsync(vm.PhoneNumber)
-                    ?? await _userManager.FindByNameAsync(vm.PhoneNumber);
-            }
-
             if (user == null)
                 return Unauthorized();
 
@@ -448,7 +631,17 @@ namespace App.ApiControllers.V1.Authorization
                 user.ProfilePhoto = vm.ProfilePhoto;
 
             if (!string.IsNullOrWhiteSpace(vm.PhoneNumber))
-                user.PhoneNumber = vm.PhoneNumber.Trim();
+            {
+                var requestedPhone = vm.PhoneNumber.Trim();
+                if (SyrianPhoneIdentity.TryNormalize(requestedPhone, out var canonicalPhone))
+                {
+                    var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+                    if (match.Ambiguous || (match.User != null && match.User.Id != user.Id))
+                        return StatusCode(409, new { error = "PHONE_ALREADY_REGISTERED", errorDescription = "رقم الهاتف مرتبط بحساب آخر." });
+                    requestedPhone = canonicalPhone;
+                }
+                user.PhoneNumber = requestedPhone;
+            }
 
             if (!string.IsNullOrWhiteSpace(vm.CountryPhoneCode))
                 user.CountryPhoneCode = vm.CountryPhoneCode.Trim();
@@ -528,6 +721,47 @@ namespace App.ApiControllers.V1.Authorization
             await _userManager.SendPasswordResetEmail(_emailService, user);
 
             return "OK";
+        }
+
+        private static string CreatePhoneSignupCode() =>
+            RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+
+        private bool IsPhoneSignupCodeValid(PendingPhoneSignup pending, string code) =>
+            (IsTemporaryOtpEnabled && string.Equals(TemporaryOtpCode, code, StringComparison.Ordinal)) ||
+            string.Equals(pending.Code, code, StringComparison.Ordinal);
+
+        private async Task<string> SendOtpSmsAsync(string phoneNumber, string message)
+        {
+            if (IsTemporaryOtpEnabled) return string.Empty;
+
+            try
+            {
+                return await _notificationService.SendSmsNotification(phoneNumber, message);
+            }
+            catch (Exception exception) when (IsTemporaryOtpEnabled)
+            {
+                _logger.LogWarning(exception,
+                    "OTP SMS delivery failed while temporary OTP mode is enabled.");
+                return string.Empty;
+            }
+        }
+
+        private string GetVerificationCodeForClient(string generatedCode)
+        {
+            if (IsTemporaryOtpEnabled) return TemporaryOtpCode;
+#if DEBUG
+            return generatedCode;
+#else
+            return string.Empty;
+#endif
+        }
+
+        private static bool HasCompletedProfileName(AppUser user)
+        {
+            var name = user?.FullName?.Trim();
+            return !string.IsNullOrWhiteSpace(name) &&
+                name != "عميل جيتك" && name != "مستخدم جيتك" &&
+                name != "عميل جتاك" && name != "مستخدم جتاك";
         }
 
         //// POST api/Account/Logout

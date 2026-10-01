@@ -1,7 +1,7 @@
-import { FormGroup } from '@angular/forms';
+import { UntypedFormGroup } from '@angular/forms';
 
 export interface IFilterView {
-  filterGroup: FormGroup;
+  filterGroup: UntypedFormGroup;
   ngOnInit(): void;
   filterForm(): void;
   filter(): void;

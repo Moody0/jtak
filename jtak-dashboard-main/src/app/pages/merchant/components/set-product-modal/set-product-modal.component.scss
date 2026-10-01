@@ -1,0 +1,43 @@
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  *,
+  .btn,
+  .badge,
+  .form-control,
+  .form-check-input {
+    box-shadow: none !important;
+  }
+}
+
+.set-product-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #ea580c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.btn-primary {
+  background-color: #ea580c !important;
+  border-color: #ea580c !important;
+  color: #ffffff !important;
+
+  i, .fas, svg, span {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+  }
+
+  &:hover {
+    background-color: #c2410c !important;
+    border-color: #c2410c !important;
+  }
+}

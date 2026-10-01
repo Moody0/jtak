@@ -2,6 +2,7 @@ import { BaseModel } from 'src/app/_metronic/shared/crud-table';
 
 export interface Product extends BaseModel {
   title: string;
+  barcode?: string | null;
   description: string;
   photos: string;
   unit: string;
@@ -16,6 +17,9 @@ export interface Product extends BaseModel {
   merchantTitle?: string;
   price?: number | null;
   priceUsd?: number | null;
+  originalPrice?: number | null;
   discount?: number | null;
+  discountPercent?: number | null;
+  profitOutOfMerchantPricePercent?: number | null;
   currency?: number;
 }

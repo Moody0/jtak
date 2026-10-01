@@ -317,8 +317,18 @@ namespace Modules.Accounting.Services
                 AccountType.Revenue,
                 currency);
 
-            var totalProductCash = request.MerchantSplits.Sum(m => m.TotalAmount);
-            var grossCashCollected = totalProductCash + (request.TotalsIncludeDeliveryFee ? 0m : request.DeliveryFee);
+            // New callers send product totals and delivery separately. Older
+            // callers set TotalsIncludeDeliveryFee and embedded the delivery
+            // fee in one of the split totals. Normalize both shapes before
+            // creating journal entries so the fee is never credited twice.
+            var embeddedDeliveryFee = request.TotalsIncludeDeliveryFee ? request.DeliveryFee : 0m;
+            var totalProductCash = request.MerchantSplits.Sum(m => m.TotalAmount) - embeddedDeliveryFee;
+            if (totalProductCash < 0m)
+            {
+                throw new InvalidOperationException(
+                    $"Order #{request.OrderId} product total cannot be less than the embedded delivery fee.");
+            }
+            var grossCashCollected = request.ActualCashCollected ?? (totalProductCash + request.DeliveryFee);
 
             var txnRequest = new PostTransactionRequest
             {
@@ -345,8 +355,21 @@ namespace Modules.Accounting.Services
             });
 
             // 3. Credit each Vendor for product value minus commission
-            foreach (var split in request.MerchantSplits)
+            var remainingEmbeddedDelivery = embeddedDeliveryFee;
+            var totalPlatformCommission = 0m;
+            for (var splitIndex = 0; splitIndex < request.MerchantSplits.Count; splitIndex++)
             {
+                var split = request.MerchantSplits[splitIndex];
+                var embeddedInThisSplit = 0m;
+                if (remainingEmbeddedDelivery > 0m)
+                {
+                    var declaredLegacyAmount = Math.Max(0m, split.CaptainEarningAmount);
+                    embeddedInThisSplit = declaredLegacyAmount > 0m
+                        ? Math.Min(remainingEmbeddedDelivery, declaredLegacyAmount)
+                        : (splitIndex == request.MerchantSplits.Count - 1 ? remainingEmbeddedDelivery : 0m);
+                    remainingEmbeddedDelivery -= embeddedInThisSplit;
+                }
+
                 if (split.IsPlatformOwned)
                 {
                     var marketSales = await GetOrCreateSystemAccountAsync(
@@ -354,7 +377,9 @@ namespace Modules.Accounting.Services
                         "JTAK Market Sales Revenue",
                         AccountType.Revenue,
                         currency);
-                    var platformOwnedRevenue = split.TotalAmount - (request.TotalsIncludeDeliveryFee ? split.CaptainEarningAmount : 0m);
+                    // TotalAmount is always product gross. Delivery economics are
+                    // posted separately below and must never reduce product sales.
+                    var platformOwnedRevenue = split.TotalAmount - embeddedInThisSplit;
                     if (platformOwnedRevenue > 0)
                     {
                         txnRequest.Entries.Add(new PostLedgerEntryRequest
@@ -385,12 +410,25 @@ namespace Modules.Accounting.Services
                         Memo = $"Order #{request.OrderId} net payable to merchant #{split.MerchantId}"
                     });
                 }
+
+                var normalizedCommission = split.PlatformCommission - embeddedInThisSplit;
+                totalPlatformCommission += normalizedCommission;
             }
 
-            // 4. Credit Captain Earnings for delivery fee wage
-            var captainEarnings = request.TotalsIncludeDeliveryFee
-                ? request.MerchantSplits.Sum(x => x.CaptainEarningAmount)
-                : request.DeliveryFee;
+            // 4. Credit Captain Earnings independently of platform delivery fee revenue
+            var captainEarnings = request.CaptainEarning
+                ?? request.MerchantSplits.Sum(x => Math.Max(0m, x.CaptainEarningAmount));
+            if (!request.CaptainEarning.HasValue && captainEarnings == 0m && request.CaptainUserId != Guid.Empty)
+            {
+                // Compatibility for old integrations that treated the whole
+                // delivery fee as the courier wage and sent no explicit field.
+                captainEarnings = request.DeliveryFee;
+            }
+            if (captainEarnings < 0m)
+            {
+                throw new InvalidOperationException(
+                    $"Order #{request.OrderId} captain earning cannot be negative.");
+            }
             if (captainEarnings > 0)
             {
                 if (captainEarningsAcc != null)
@@ -422,9 +460,43 @@ namespace Modules.Accounting.Services
                 }
             }
 
+            var platformDeliveryFee = Math.Max(0m, request.DeliveryFee - captainEarnings);
+            if (platformDeliveryFee > 0)
+            {
+                var platformDeliveryFeeAcc = await GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.PlatformDeliveryFeeRevenue,
+                    "Platform Delivery Fee Revenue",
+                    AccountType.Revenue,
+                    currency);
+                txnRequest.Entries.Add(new PostLedgerEntryRequest
+                {
+                    AccountId = platformDeliveryFeeAcc.Id,
+                    Debit = 0m,
+                    Credit = platformDeliveryFee,
+                    Currency = currency,
+                    Memo = $"Order #{request.OrderId} delivery fee revenue"
+                });
+            }
+
+            var driverEarningSubsidy = Math.Max(0m, captainEarnings - request.DeliveryFee);
+            if (driverEarningSubsidy > 0m)
+            {
+                var subsidyExpenseAcc = await GetOrCreateSystemAccountAsync(
+                    SystemAccountCodes.DriverEarningSubsidyExpense,
+                    "Driver Earning Subsidy Expense",
+                    AccountType.Expense,
+                    currency);
+                txnRequest.Entries.Add(new PostLedgerEntryRequest
+                {
+                    AccountId = subsidyExpenseAcc.Id,
+                    Debit = driverEarningSubsidy,
+                    Credit = 0m,
+                    Currency = currency,
+                    Memo = $"Order #{request.OrderId} configured driver wage above customer delivery fee"
+                });
+            }
+
             // 5. Credit Platform Revenue for total commissions (or Debit Promotional Discount Expense if negative)
-            var totalPlatformCommission = request.MerchantSplits.Where(m => !m.IsPlatformOwned)
-                .Sum(m => m.PlatformCommission - (request.TotalsIncludeDeliveryFee ? m.CaptainEarningAmount : 0m));
             if (totalPlatformCommission > 0)
             {
                 txnRequest.Entries.Add(new PostLedgerEntryRequest
@@ -452,6 +524,47 @@ namespace Modules.Accounting.Services
                     Currency = currency,
                     Memo = $"Order #{request.OrderId} platform promotional subsidy expense"
                 });
+            }
+
+            // 6. Handle Cash Discrepancy (if ActualCashCollected differs from expected cash)
+            var expectedGross = totalProductCash + request.DeliveryFee;
+            if (request.ActualCashCollected.HasValue && request.ActualCashCollected.Value != expectedGross)
+            {
+                var discrepancy = request.ActualCashCollected.Value - expectedGross;
+                if (discrepancy < 0)
+                {
+                    // Shortage: Platform Expense
+                    var shortageAcc = await GetOrCreateSystemAccountAsync(
+                        SystemAccountCodes.CashShortageExpense,
+                        "Cash Shortage Expense",
+                        AccountType.Expense,
+                        currency);
+                    txnRequest.Entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = shortageAcc.Id,
+                        Debit = Math.Abs(discrepancy),
+                        Credit = 0m,
+                        Currency = currency,
+                        Memo = $"Order #{request.OrderId} cash collection shortage"
+                    });
+                }
+                else
+                {
+                    // Overage: Platform Revenue
+                    var overageAcc = await GetOrCreateSystemAccountAsync(
+                        SystemAccountCodes.CashOverageRevenue,
+                        "Cash Overage Revenue",
+                        AccountType.Revenue,
+                        currency);
+                    txnRequest.Entries.Add(new PostLedgerEntryRequest
+                    {
+                        AccountId = overageAcc.Id,
+                        Debit = 0m,
+                        Credit = discrepancy,
+                        Currency = currency,
+                        Memo = $"Order #{request.OrderId} cash collection overage"
+                    });
+                }
             }
 
             return await PostTransactionAsync(txnRequest);
@@ -750,6 +863,10 @@ namespace Modules.Accounting.Services
             await GetOrCreateSystemAccountAsync(SystemAccountCodes.OperationalExpense, "Platform Operational Expense", AccountType.Expense);
             await GetOrCreateSystemAccountAsync(SystemAccountCodes.PromotionalDiscountExpense, "Promotional Discounts & Subsidies", AccountType.Expense);
             await GetOrCreateSystemAccountAsync(SystemAccountCodes.JtakMarketSalesRevenue, "JTAK Market Sales Revenue", AccountType.Revenue);
+            await GetOrCreateSystemAccountAsync(SystemAccountCodes.ErrandDeliveryFeeRevenue, "Errand Delivery Fee Revenue", AccountType.Revenue);
+            await GetOrCreateSystemAccountAsync(SystemAccountCodes.CashShortageExpense, "Cash Shortage Expense", AccountType.Expense);
+            await GetOrCreateSystemAccountAsync(SystemAccountCodes.DriverEarningSubsidyExpense, "Driver Earning Subsidy Expense", AccountType.Expense);
+            await GetOrCreateSystemAccountAsync(SystemAccountCodes.CashOverageRevenue, "Cash Overage Revenue", AccountType.Revenue);
         }
 
         private static JournalTransactionDto MapToDto(JournalTransaction t)

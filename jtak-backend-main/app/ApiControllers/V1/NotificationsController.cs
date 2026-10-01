@@ -2,11 +2,7 @@
 using App.Shared.Services;
 using App.Shared.Services.Helpers;
 using App.Shared.Entities;
-using FirebaseAdmin;
-using FirebaseAdmin.Messaging;
-using Google.Apis.Auth.OAuth2;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -26,14 +22,12 @@ namespace App.ApiControllers.V1
     {
         private readonly UserManager<AppUser> _userManager;
         private readonly INotificationService _notificationService;
-        private readonly IWebHostEnvironment _env;
         private readonly ILogger _logger;
-        public NotificationsController(INotificationService notificationService, IWebHostEnvironment env, ILogger<NotificationsController> logger, UserManager<AppUser> userManager)
+        public NotificationsController(INotificationService notificationService, ILogger<NotificationsController> logger, UserManager<AppUser> userManager)
         {
             _notificationService = notificationService;
             _userManager = userManager;
             _logger = logger;
-            _env = env;
         }
 
         [HttpGet]
@@ -43,13 +37,16 @@ namespace App.ApiControllers.V1
         public async Task<ActionResult<NotificationMessageDto[]>> GetNotifications(int page = 0)
         {
             var user = await _userManager.GetUserAsync(User);
-            var notifications = (await _notificationService.GetNotifications(user.Id))
+            var notifications = (await _notificationService.GetNotifications(user?.Id))
                 .Select(x => new NotificationMessageDto
                 {
                     CreatedDate = x.CreatedDate,
                     Text = x.Text,
                     Title = x.Title,
-                    Id = x.Id
+                    Id = x.Id,
+                    Url = x.Url,
+                    EntityData = x.EntityData,
+                    EventKey = x.EventKey
                 })
                 .OrderByDescending(x => x.CreatedDate)
                 .Skip(20 * page)
@@ -94,9 +91,7 @@ namespace App.ApiControllers.V1
         [Route("Subscribe/{topic}/{token}")]
         public async Task<ActionResult<bool>> Subscribe(string topic, string token)
         {
-            string path = _env.ContentRootPath + "/rightbite-4e059-firebase-adminsdk-8hcrm-eb184d3cf3.json";
-            if (FirebaseApp.DefaultInstance == null)
-                FirebaseApp.Create(new AppOptions() { Credential = GoogleCredential.FromFile(path) });
+            var messaging = NotificationService.EnsureFirebaseMessaging();
 
             var registrationTokens = new List<string>() { token };
 
@@ -104,12 +99,13 @@ namespace App.ApiControllers.V1
             {
                 if (topic.EndsWith(lang))
                 {
-                    await FirebaseMessaging.DefaultInstance.SubscribeToTopicAsync(registrationTokens, topic);
+                    await messaging.SubscribeToTopicAsync(registrationTokens, topic);
                 }
                 else
                 {
-                    var oldTopic = topic.Split("_").FirstOrDefault() + "_" + lang;
-                    await FirebaseMessaging.DefaultInstance.UnsubscribeFromTopicAsync(registrationTokens, oldTopic);
+                    var baseTopic = topic.Substring(0, topic.LastIndexOf('_') + 1);
+                    var oldTopic = baseTopic + lang;
+                    await messaging.UnsubscribeFromTopicAsync(registrationTokens, oldTopic);
                 }
             }
             return true;
@@ -119,14 +115,12 @@ namespace App.ApiControllers.V1
         [Route("Unsubscribe/{topic}/{token}")]
         public async Task<ActionResult<bool>> Unsubscribe(string topic, string token)
         {
-            string path = _env.ContentRootPath + "/rightbite-4e059-firebase-adminsdk-8hcrm-eb184d3cf3.json";
-            if (FirebaseApp.DefaultInstance == null)
-                FirebaseApp.Create(new AppOptions() { Credential = GoogleCredential.FromFile(path) });
+            var messaging = NotificationService.EnsureFirebaseMessaging();
 
             var registrationTokens = new List<string>() { token };
 
             // Subscribe the devices corresponding to the registration tokens to the topic
-            var response = await FirebaseMessaging.DefaultInstance.UnsubscribeFromTopicAsync(registrationTokens, topic);
+            var response = await messaging.UnsubscribeFromTopicAsync(registrationTokens, topic);
             // See the TopicManagementResponse reference documentation for the contents of response.
             Console.WriteLine($"{response.SuccessCount} tokens were subscribed successfully");
             return true;

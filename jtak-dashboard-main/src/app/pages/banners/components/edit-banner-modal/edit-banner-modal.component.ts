@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, OnInit, Input, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable } from 'rxjs';
@@ -31,7 +31,7 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
   @Input() item: Banner;
   isLoading$: Observable<boolean>;
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
 
   merchants: Merchant[] = [];
   restaurants: Merchant[] = [];
@@ -64,7 +64,7 @@ export class EditBannerModalComponent implements OnInit, OnDestroy {
   constructor(
     private bannersService: BannersService,
     private merchantsService: MerchantsService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     private toasterService: ToastrService,
     private cdr: ChangeDetectorRef

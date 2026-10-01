@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, Input, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { Subject } from 'rxjs';
@@ -21,7 +21,7 @@ export class AddPopularProductModalComponent implements OnInit, OnDestroy {
   @Input() existingIds: number[] = [];
   @Input() nextOrder = 1;
 
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
   candidates: SearchProductCandidate[] = [];
   selectedProduct: SearchProductCandidate | null = null;
   isSearching = false;
@@ -29,7 +29,7 @@ export class AddPopularProductModalComponent implements OnInit, OnDestroy {
 
   constructor(
     public modal: NgbActiveModal,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private popularService: PopularProductsService,
     public filesService: FilesService,
     private toastr: ToastrService,

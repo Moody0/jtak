@@ -146,15 +146,20 @@ namespace App.ApiControllers.V1.Admin
                 var mid = mp?.MerchantId ?? fallbackMp?.MerchantId ?? 0;
                 merchants.TryGetValue(mid, out var merchant);
 
-                decimal fallbackAdditional = fallbackMp == null ? 0m : fallbackMp.MerchantPrice * fallbackMp.AdditionalProfitPercent / 100m;
-                decimal finalPrice = mp?.FinalPrice ?? (fallbackMp == null ? 0m : fallbackMp.MerchantPrice + fallbackAdditional);
-                decimal price = mp?.Price ?? (fallbackMp == null ? 0m : finalPrice + fallbackMp.Discount);
+                var fallbackQuote = fallbackMp == null ? null : new MerchantProductDto
+                {
+                    MerchantPrice = fallbackMp.MerchantPrice,
+                    ProfitOutOfMerchantPricePercent = fallbackMp.ProfitOutOfMerchantPricePercent,
+                    Discount = fallbackMp.Discount
+                };
+                decimal finalPrice = mp?.FinalPrice ?? fallbackQuote?.FinalPrice ?? 0m;
+                decimal price = mp?.Price ?? fallbackQuote?.Price ?? 0m;
                 if (finalPrice <= 0 && fallbackMp != null)
                 {
                     if (fallbackMp.MerchantPrice > 0)
                     {
-                        price = fallbackMp.MerchantPrice;
-                        finalPrice = fallbackMp.MerchantPrice;
+                        price = fallbackQuote?.Price ?? 0m;
+                        finalPrice = fallbackQuote?.FinalPrice ?? 0m;
                     }
                 }
 
@@ -452,12 +457,20 @@ namespace App.ApiControllers.V1.Admin
                     Items = new List<PopularProductItemConfig>()
                 };
 
-                // Seed with current featured products so the list starts populated
+                // Seed with current featured products from active merchants so the list starts populated
                 try
                 {
+                    var activeMerchantIds = await _merchantService.Queryable()
+                        .AsNoTracking()
+                        .Where(x => x.DeletionDate == null && x.Active)
+                        .Select(x => x.Id)
+                        .ToListAsync();
+
                     var featuredProds = await _productService.Queryable()
                         .AsNoTracking()
-                        .Where(x => x.DeletionDate == null && x.Active && x.IsFeatured)
+                        .Include(x => x.MerchantProducts)
+                        .Where(x => x.DeletionDate == null && x.Active && x.IsFeatured &&
+                                    x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0))
                         .OrderBy(x => x.Id)
                         .Take(15)
                         .Select(x => x.Id)

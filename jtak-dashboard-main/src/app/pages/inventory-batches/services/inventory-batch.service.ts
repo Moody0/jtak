@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, tap } from 'rxjs/operators';
 import { environment } from 'src/environments/environment';
 import {
   ProductBatch,
@@ -19,8 +19,14 @@ import {
 })
 export class InventoryBatchService {
   private readonly baseUrl = `${environment.apiUrl}/Admin/Batches`;
+  private cachedMerchants: BatchMerchantLookup[] | null = null;
+  private cachedBatches: ProductBatch[] | null = null;
 
   constructor(private http: HttpClient) {}
+
+  getCachedBatches(): ProductBatch[] | null {
+    return this.cachedBatches;
+  }
 
   getBatches(
     merchantId?: number,
@@ -33,7 +39,13 @@ export class InventoryBatchService {
     if (productId) url += `productId=${productId}&`;
     if (status !== undefined && status !== null) url += `status=${status}&`;
     if (searchTerm) url += `searchTerm=${encodeURIComponent(searchTerm)}&`;
-    return this.http.get<ProductBatch[]>(url);
+    return this.http.get<ProductBatch[]>(url).pipe(
+      tap((batches) => {
+        if (!merchantId && !productId && status === undefined && !searchTerm) {
+          this.cachedBatches = batches;
+        }
+      })
+    );
   }
 
   getKpis(merchantId?: number): Observable<InventoryBatchKpi | null> {
@@ -78,18 +90,17 @@ export class InventoryBatchService {
   }
 
   lookupMerchants(): Observable<BatchMerchantLookup[]> {
+    if (this.cachedMerchants && this.cachedMerchants.length > 0) {
+      return of(this.cachedMerchants);
+    }
     return this.http
-      .post<any>(
-        `${environment.apiUrl}/Admin/Merchants/DataTable`,
-        { pageNumber: 1, pageSize: 500, filter: {} }
-      )
+      .get<BatchMerchantLookup[]>(`${this.baseUrl}/Lookup/Merchants`)
       .pipe(
-        map((res) =>
-          (res?.items || []).map((m: any) => ({
-            id: m.id,
-            title: m.title || m.fullName || `Merchant #${m.id}`,
-          }))
-        ),
+        tap((data) => {
+          if (data && data.length > 0) {
+            this.cachedMerchants = data;
+          }
+        }),
         catchError(() => {
           return this.http
             .get<any[]>(`${environment.apiUrl}/Admin/Users/Merchants`)
@@ -100,6 +111,11 @@ export class InventoryBatchService {
                   title: u.fullName || u.title || `Merchant #${u.id}`,
                 }))
               ),
+              tap((data) => {
+                if (data && data.length > 0) {
+                  this.cachedMerchants = data;
+                }
+              }),
               catchError(() => of([]))
             );
         })

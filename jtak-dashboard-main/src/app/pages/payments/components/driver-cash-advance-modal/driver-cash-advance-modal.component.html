@@ -1,0 +1,94 @@
+<div class="modal-content driver-advance-modal" dir="rtl">
+  <div class="modal-header">
+    <div>
+      <span class="advance-kicker">المالية والتسويات</span>
+      <h2 class="modal-title">إضافة عهدة لمندوب</h2>
+      <p class="text-muted mb-0">تسجيل صرف نقدي من خزينة الشركة إلى عهدة المندوب مع قيد محاسبي قابل للتتبع.</p>
+    </div>
+    <button type="button" class="btn-close" aria-label="إغلاق" (click)="modal.dismiss()"></button>
+  </div>
+
+  <div class="modal-body">
+    <div *ngIf="isLoading" class="advance-state"><span class="spinner-border spinner-border-sm"></span> جارٍ تحميل الأرصدة…</div>
+    <div *ngIf="loadError && !isLoading" class="alert alert-danger d-flex justify-content-between align-items-center">
+      <span>{{ loadError }}</span><button class="btn btn-sm btn-light-danger" type="button" (click)="loadOverview()">إعادة المحاولة</button>
+    </div>
+
+    <ng-container *ngIf="overview && !isLoading">
+      <div class="advance-summary">
+        <div class="advance-stat">
+          <span>رصيد خزينة الشركة المتاح</span>
+          <strong>{{ overview.companyVaultBalance | number:'1.0-2' }} <small>ل.س</small></strong>
+        </div>
+        <div class="advance-stat">
+          <span>عدد المندوبين النشطين</span>
+          <strong>{{ overview.drivers.length | number }}</strong>
+        </div>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div class="row g-4">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">مندوب التوصيل <span class="text-danger">*</span></label>
+            <ng-select formControlName="driverUserId" placeholder="اختر المندوب" appendTo="body" [clearable]="true">
+              <ng-option *ngFor="let driver of overview.drivers" [value]="driver.id">
+                {{ driver.name }} — الرصيد {{ driver.balance | number:'1.0-2' }} / السقف {{ driver.maxCashFloat | number:'1.0-2' }} ل.س
+              </ng-option>
+            </ng-select>
+            <div *ngIf="form.controls.driverUserId.touched && form.controls.driverUserId.invalid" class="field-error">اختر مندوباً نشطاً.</div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-bold">مبلغ العهدة (ل.س) <span class="text-danger">*</span></label>
+            <input class="form-control" type="number" min="0.01" step="0.01" inputmode="decimal" formControlName="amount" placeholder="أدخل المبلغ" />
+            <div *ngIf="selectedDriver" class="field-hint">
+              المتاح ضمن السقف: {{ selectedDriver.remainingCapacity | number:'1.0-2' }} ل.س
+            </div>
+            <div *ngIf="selectedDriver && amount > selectedDriver.remainingCapacity" class="field-error">المبلغ يتجاوز المساحة المتبقية ضمن سقف العهدة.</div>
+            <div *ngIf="overview && amount > overview.companyVaultBalance" class="field-error">المبلغ يتجاوز رصيد خزينة الشركة المتاح.</div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-bold">سبب الصرف / مرجع الطلب <span class="text-danger">*</span></label>
+            <input class="form-control" maxlength="300" formControlName="reason" placeholder="مثال: عهدة لشراء طلبات #123" />
+            <div class="field-hint">سيظهر السبب في سجل القيد المالي وسجل تدقيق الإدارة.</div>
+          </div>
+        </div>
+
+        <div *ngIf="selectedDriver" class="balance-preview mt-4">
+          <div><span>الرصيد الحالي</span><strong>{{ selectedDriver.balance | number:'1.0-2' }} ل.س</strong></div>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <div><span>بعد الصرف</span><strong>{{ selectedDriver.balance + amount | number:'1.0-2' }} ل.س</strong></div>
+          <div class="preview-limit"><span>السقف</span><strong>{{ selectedDriver.maxCashFloat | number:'1.0-2' }} ل.س</strong></div>
+        </div>
+      </form>
+
+      <section class="advance-history mt-5" *ngIf="overview.recentAdvances.length">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h3 class="h6 fw-bold mb-0">آخر العهد المصروفة</h3>
+          <span class="badge badge-light-primary">{{ overview.recentAdvances.length }} عملية</span>
+        </div>
+        <div class="history-list">
+          <div class="history-row" *ngFor="let advance of overview.recentAdvances">
+            <div class="history-icon"><i class="fas fa-hand-holding-usd"></i></div>
+            <div class="history-main">
+              <strong>{{ advance.driverName }}</strong>
+              <small>{{ advance.description }} · {{ advance.postedAt | date:'yyyy/MM/dd, h:mm a' }}</small>
+              <small class="text-muted">{{ advance.transactionNumber }}</small>
+            </div>
+            <strong class="history-amount">{{ advance.amount | number:'1.0-2' }} ل.س</strong>
+          </div>
+        </div>
+      </section>
+    </ng-container>
+  </div>
+
+  <div class="modal-footer">
+    <div class="small text-muted me-auto">لا تُسجّل العهدة كمصروف؛ إنها تحويل بين خزينة الشركة وعهدة المندوب.</div>
+    <button type="button" class="btn btn-light" (click)="modal.dismiss()">إلغاء</button>
+    <button type="button" class="btn btn-primary" [disabled]="!canSubmit" (click)="submit()">
+      <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-2"></span>
+      <i *ngIf="!isSaving" class="fas fa-check me-2"></i>تأكيد وصرف العهدة
+    </button>
+  </div>
+</div>

@@ -44,18 +44,26 @@
             <th scope="col">{{ 'REVIEWS_PAGE.COL_PRODUCT' | translate }}</th>
             <th scope="col">{{ 'REVIEWS_PAGE.COL_DATE' | translate }}</th>
             <th scope="col">{{ 'REVIEWS_PAGE.COL_RATE' | translate }}</th>
+            <th scope="col">{{ 'REVIEWS_PAGE.COL_COMMENT' | translate }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
             <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select review ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
             <td><span class="badge badge-light-secondary font-monospace">#{{ i.id }}</span></td>
-            <td><span class="fw-bolder text-dark">{{ i.productTitle }}</span></td>
+            <td>
+              <span class="fw-bolder text-dark">{{ i.merchantTitle }}</span>
+              <small class="d-block text-muted">{{ 'REVIEWS_PAGE.ORDER_NUMBER' | translate }} #{{ i.orderId }}</small>
+              <small class="d-block text-muted" *ngIf="i.reviewerName">{{ i.reviewerName }}</small>
+            </td>
             <td>{{ i.createdDate | date:'d/M/yy, h:mm a' }}</td>
             <td>
               <span class="badge badge-light-warning fw-bolder fs-7">
                 <i class="fas fa-star text-warning me-1"></i>{{ i.rate }}
               </span>
+            </td>
+            <td class="text-muted text-wrap" style="max-width: 320px;">
+              {{ i.textReview || '-' }}
             </td>
           </tr>
         </tbody>

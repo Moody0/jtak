@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.Authorization;
 using OpenIddict.Validation.AspNetCore;
 using App.Shared.Entities;
 using Modules.Catalog.Services;
-using App.Orders.Data;
+using App.Shared.Data.App;
 using App.Shared.Entities.Domain;
 using App.Shared.Services.eCommerce;
 using App.Shared.Services.Extentions;
@@ -26,7 +26,7 @@ namespace App.ApiControllers.V1.Customer
     [ApiVersion("1")]
     public class ProductReviewsController : SolApiController
     {
-        private readonly IOrdersUnitOfWork _uow;
+        private readonly IAppUnitOfWork _uow;
         private readonly INotificationService _notificationService;
         private readonly UserManager<AppUser> _userManager;
         private readonly IMapper _mapper;
@@ -35,7 +35,7 @@ namespace App.ApiControllers.V1.Customer
         private readonly IProductReviewService _service;
         private readonly IOrderDetailService _orderDetailService;
 
-        public ProductReviewsController(IOrdersUnitOfWork unitOfWork,
+        public ProductReviewsController(IAppUnitOfWork unitOfWork,
             INotificationService notificationService,
             UserManager<AppUser> userManager,
             IProductService productService,

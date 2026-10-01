@@ -16,6 +16,9 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using App.Shared.Services;
+using App.ApiModels;
+using App.Shared.Entities;
+using Microsoft.AspNetCore.Identity;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -32,6 +35,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IWebHostEnvironment _env;
         private readonly IMemoryCache _cache;
         private readonly IAdminAuditService _auditService;
+        private readonly UserManager<AppUser> _userManager;
 
         public MerchantsController(IMerchantService service,
             IProductService productService, 
@@ -40,7 +44,8 @@ namespace App.ApiControllers.V1.Admin
             IWebHostEnvironment env,
             ILogger<MerchantsController> logger,
             IMemoryCache cache,
-            IAdminAuditService auditService = null)
+            IAdminAuditService auditService,
+            UserManager<AppUser> userManager)
         {
             _env = env;
             _service = service;
@@ -50,6 +55,7 @@ namespace App.ApiControllers.V1.Admin
             _mapper = mapper;
             _cache = cache;
             _auditService = auditService;
+            _userManager = userManager;
         }
 
         /// <summary>
@@ -60,6 +66,10 @@ namespace App.ApiControllers.V1.Admin
         [Route("DataTable")]
         public async Task<ActionResult<TableResponseModel<MerchantDto>>> DataTable([FromBody] MetronicTable request)
         {
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
             var lang = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
             var list = await _service.ListMetronicTableQueryable(request, x => new MerchantDto
             {
@@ -90,6 +100,117 @@ namespace App.ApiControllers.V1.Admin
             return list;
         }
 
+        /// <summary>
+        /// Get merchant KPIs summary (counts for total, active, grocery, restaurants)
+        /// </summary>
+        [HttpGet]
+        [Route("Summary")]
+        public async Task<ActionResult<MerchantSummaryDto>> Summary()
+        {
+            var merchants = await _service.Queryable()
+                .AsNoTracking()
+                .Where(x => x.DeletionDate == null)
+                .Select(x => new { x.Id, x.Active, x.MerchantKind, x.Title, x.ShortDescription })
+                .ToListAsync();
+
+            int total = merchants.Count;
+            int active = merchants.Count(m => m.Active);
+            int grocery = merchants.Count(m => m.MerchantKind == MerchantKind.Grocery ||
+                                               m.MerchantKind == MerchantKind.Store ||
+                                               m.MerchantKind == MerchantKind.DarkStore ||
+                                               m.MerchantKind == MerchantKind.Pharmacy ||
+                                               ((m.Title != null && (m.Title.Contains("ماركت") || m.Title.Contains("بقالة") || m.Title.Contains("سوبر") || m.Title.Contains("تموين"))) ||
+                                                (m.ShortDescription != null && (m.ShortDescription.Contains("ماركت") || m.ShortDescription.Contains("بقالة") || m.ShortDescription.Contains("سوبر")))));
+            int restaurants = Math.Max(0, total - grocery);
+
+            return Ok(new MerchantSummaryDto
+            {
+                Total = total,
+                Active = active,
+                Grocery = grocery,
+                Restaurants = restaurants
+            });
+        }
+
+        /// <summary>
+        /// Get all active merchants
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<MerchantDto[]>> GetAll()
+        {
+            var list = await _service.Queryable()
+                .AsNoTracking()
+                .Where(x => x.DeletionDate == null)
+                .OrderBy(x => x.Title)
+                .Select(x => new MerchantDto
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    ShortDescription = x.ShortDescription,
+                    Description = x.Description,
+                    IBAN1 = x.IBAN1,
+                    IBAN1Title = x.IBAN1Title,
+                    Phone1 = x.Phone1,
+                    Phone2 = x.Phone2,
+                    ShippingCoverageInMeters = x.ShippingCoverageInMeters,
+                    ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent,
+                    Lat = x.Lat,
+                    Lng = x.Lng,
+                    OwnerId = x.OwnerId,
+                    OwnerName = x.OwnerName ?? "",
+                    Owner = x.OwnerName ?? "",
+                    Active = x.Active,
+                    MerchantKind = x.MerchantKind,
+                    DeliveryTime = x.DeliveryTime,
+                    DeliveryFee = x.DeliveryFee,
+                    MinOrderAmount = x.MinOrderAmount,
+                    WorkingHours = x.WorkingHours,
+                    Address = x.Address,
+                    Photo = x.Photo
+                })
+                .ToArrayAsync();
+
+            return Ok(list);
+        }
+
+        /// <summary>
+        /// Get merchant by ID
+        /// </summary>
+        [HttpGet]
+        [Route("{id:int}")]
+        public async Task<ActionResult<MerchantDto>> GetById(int id)
+        {
+            var x = await _service.FindAsync(id);
+            if (x == null || x.DeletionDate != null) return NotFound();
+
+            return Ok(new MerchantDto
+            {
+                Id = x.Id,
+                Title = x.Title,
+                ShortDescription = x.ShortDescription,
+                Description = x.Description,
+                IBAN1 = x.IBAN1,
+                IBAN1Title = x.IBAN1Title,
+                Phone1 = x.Phone1,
+                Phone2 = x.Phone2,
+                ShippingCoverageInMeters = x.ShippingCoverageInMeters,
+                ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent,
+                Lat = x.Lat,
+                Lng = x.Lng,
+                OwnerId = x.OwnerId,
+                OwnerName = x.OwnerName ?? "",
+                Owner = x.OwnerName ?? "",
+                Active = x.Active,
+                MerchantKind = x.MerchantKind,
+                DeliveryTime = x.DeliveryTime,
+                DeliveryFee = x.DeliveryFee,
+                MinOrderAmount = x.MinOrderAmount,
+                WorkingHours = x.WorkingHours,
+                Address = x.Address,
+                Photo = x.Photo
+            });
+        }
+
 
         /// <summary>
         /// Create a new Merchant
@@ -99,6 +220,11 @@ namespace App.ApiControllers.V1.Admin
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         public async Task<ActionResult<int>> Create(MerchantDto item)
         {
+            if (item == null || !await IsActiveMerchantAccountAsync(item.OwnerId))
+                return BadRequest(ApiErr.Create("اربط المتجر بحساب تاجر نشط قبل حفظه."));
+            if (await _service.Queryable().AnyAsync(x => x.OwnerId == item.OwnerId && x.DeletionDate == null))
+                return BadRequest(ApiErr.Create("حساب التاجر مرتبط بمتجر آخر. خصص حساباً مستقلاً لكل متجر."));
+
             var entity = new Merchant
             {
                 Title = item.Title,
@@ -121,7 +247,7 @@ namespace App.ApiControllers.V1.Admin
                 DeliveryFee = item.DeliveryFee >= 0 ? item.DeliveryFee : 5000m,
                 MinOrderAmount = item.MinOrderAmount >= 0 ? item.MinOrderAmount : 15000m,
                 WorkingHours = !string.IsNullOrWhiteSpace(item.WorkingHours) ? item.WorkingHours : "حتى 3 ص",
-                OwnerId = item.OwnerId != Guid.Empty ? item.OwnerId : Guid.NewGuid()
+                OwnerId = item.OwnerId
             };
             _service.Insert(entity);
             await _uow.SaveChangesAsync();
@@ -152,11 +278,16 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPut]
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
-        [Route("{id}")]
+        [Route("{id:int}")]
         public async Task<ActionResult<int>> Edit(int id, MerchantDto item)
         {
             var entity = await _service.FindAsync(id);
             if (entity == null) return NotFound();
+            var ownerId = item.OwnerId != Guid.Empty ? item.OwnerId : entity.OwnerId;
+            if (!await IsActiveMerchantAccountAsync(ownerId))
+                return BadRequest(ApiErr.Create("اربط المتجر بحساب تاجر نشط قبل حفظه أو تفعيله."));
+            if (await _service.Queryable().AnyAsync(x => x.Id != id && x.OwnerId == ownerId && x.DeletionDate == null))
+                return BadRequest(ApiErr.Create("حساب التاجر مرتبط بمتجر آخر. خصص حساباً مستقلاً لكل متجر."));
 
             var merchantActiveChanged = item.Active != entity.Active;
 
@@ -243,6 +374,14 @@ namespace App.ApiControllers.V1.Admin
             return entity.Id;
         }
 
+        private async Task<bool> IsActiveMerchantAccountAsync(Guid ownerId)
+        {
+            if (ownerId == Guid.Empty) return false;
+            var owner = await _userManager.FindByIdAsync(ownerId.ToString());
+            return owner != null && owner.IsActive && owner.DeletionDate == null &&
+                   await _userManager.IsInRoleAsync(owner, AppRoleName.Merchant.ToString());
+        }
+
         /// <summary>
         /// SetProducts of a Merchant (just the ones linked to this merchant)
         /// </summary>
@@ -252,6 +391,44 @@ namespace App.ApiControllers.V1.Admin
         [Route("Products/{mid}")]
         public async Task<ActionResult<int>> SetProducts(int mid, [FromBody] MerchantProductAssignDto[] products)
         {
+            var marketMerchantId = await _service.GetJtakMarketMerchantId();
+            var targetMerchant = await _service.FindAsync(mid);
+            if (targetMerchant == null || targetMerchant.DeletionDate != null)
+                return NotFound();
+
+            if ((products ?? Array.Empty<MerchantProductAssignDto>()).Any(x => x.Discount < 0m))
+                return BadRequest(ApiErr.Create("قيمة الخصم لا يمكن أن تكون سالبة."));
+
+            if (targetMerchant.MerchantKind == MerchantKind.Restaurant &&
+                (products ?? Array.Empty<MerchantProductAssignDto>()).Any(x => x.MaxOrderQuantity.HasValue && (x.MaxOrderQuantity.Value < 1 || x.MaxOrderQuantity.Value > 999)))
+                return BadRequest(ApiErr.Create("يجب أن يكون الحد الأقصى للطلب بين 1 و999."));
+            if (targetMerchant.MerchantKind != MerchantKind.Restaurant &&
+                (products ?? Array.Empty<MerchantProductAssignDto>()).Any(x => x.MaxOrderQuantity.HasValue))
+                return BadRequest(ApiErr.Create("يمكن تحديد حد كمية الطلب للأصناف المطعمية فقط."));
+
+            var selectedProductIds = (products ?? Array.Empty<MerchantProductAssignDto>())
+                .Select(x => x.ProductId)
+                .Distinct()
+                .ToArray();
+            if (mid == marketMerchantId || targetMerchant.MerchantKind == MerchantKind.Restaurant)
+            {
+                var conflictingProductIds = await _productService.Queryable().AsNoTracking()
+                    .Where(x => selectedProductIds.Contains(x.Id) &&
+                                x.MerchantProducts.Any(mp => mp.MerchantId != mid &&
+                                    (mid == marketMerchantId
+                                        ? mp.Merchant.MerchantKind == MerchantKind.Restaurant
+                                        : mp.MerchantId == marketMerchantId)))
+                    .Select(x => x.Id)
+                    .ToArrayAsync();
+                if (conflictingProductIds.Length > 0)
+                {
+                    var message = mid == marketMerchantId
+                        ? "لا يمكن ربط منتج تابع لمطعم بجيتك ماركت. انسخ المنتج أولاً إذا كان المطلوب صنفاً مستقلاً للماركت."
+                        : "لا يمكن ربط منتج جيتك ماركت بقائمة مطعم. انسخ المنتج أولاً لإنشاء صنف مطعمي مستقل.";
+                    return BadRequest(ApiErr.Create(message));
+                }
+            }
+
             var res = await _service.AssignMerchantProducts(new[] { mid }, products);
 
             if (_auditService != null)
@@ -280,6 +457,7 @@ namespace App.ApiControllers.V1.Admin
         [Route("Products/{mid}")]
         public async Task<ActionResult<MerchantProductDto[]>> GetProducts(int mid)
         {
+            var marketMerchantId = await _service.GetJtakMarketMerchantId();
             var products = await _productService.Queryable()
                                    .Include(x => x.MerchantProducts)
                                    .Include(x => x.ProductCategory)
@@ -300,6 +478,8 @@ namespace App.ApiControllers.V1.Admin
                                           ProductCategoryId = x.ProductCategoryId,
                                           ProductActive = x.Active,
                                           ProductIsFeatured = x.IsFeatured,
+                                          HasRestaurantAssignment = x.MerchantProducts.Any(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant),
+                                          HasJtakMarketAssignment = x.MerchantProducts.Any(mp => mp.MerchantId == marketMerchantId),
                                           CategoryParentId = x.ProductCategory != null ? x.ProductCategory.ParentId : null,
                                           CategoryActive = x.ProductCategory != null && x.ProductCategory.Active,
                                           CategoryIcon = x.ProductCategory != null ? x.ProductCategory.Icon : null
@@ -316,8 +496,11 @@ namespace App.ApiControllers.V1.Admin
                     var mp = mps[product.ProductId];
                     product.ProfitOutOfMerchantPricePercent = mp.ProfitOutOfMerchantPricePercent;
                     product.MerchantPrice = mp.MerchantPrice;
-                    product.AdditionalProfitPercent = mp.AdditionalProfitPercent;
                     product.Discount = mp.Discount;
+                    product.PriceUsd = mp.PriceUsd;
+                    product.OriginalPrice = mp.OriginalPrice;
+                    product.MaxOrderQuantity = mp.MaxOrderQuantity;
+                    product.MerchantKind = mp.MerchantKind;
                     product.MerchantId = mid;
                 }
             }
@@ -329,7 +512,7 @@ namespace App.ApiControllers.V1.Admin
         /// </summary>
         /// <returns></returns>
         [HttpDelete]
-        [Route("{id}")]
+        [Route("{id:int}")]
         public async Task<ActionResult<bool>> Delete(int id)
         {
             var merchant = await _service.FindAsync(id);

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
 using Microsoft.AspNetCore;
@@ -45,6 +46,7 @@ namespace App.ApiControllers.V1.Authorization
         private readonly IWebHostEnvironment _env;
         private readonly ILogger _logger;
         private readonly IAdminAuditService _auditService;
+        private readonly IConfiguration _configuration;
 
         private const double ConfirmationHour = 48;
 
@@ -58,7 +60,8 @@ namespace App.ApiControllers.V1.Authorization
             IOptionsMonitor<InstagramAuthOptions> instaoptions,
             SignInManager<AppUser> signInManager,
             UserManager<AppUser> userManager,
-            IAdminAuditService auditService = null)
+            IAdminAuditService auditService = null,
+            IConfiguration configuration = null)
         {
             _env = env;
             _logger = logger;
@@ -70,6 +73,7 @@ namespace App.ApiControllers.V1.Authorization
             _emailService = emailService;
             _smsLogService = smsLogService;
             _auditService = auditService;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -127,12 +131,19 @@ namespace App.ApiControllers.V1.Authorization
                 if (request.IsPasswordGrantType())
                 {
                     var uName = request.Username?.Trim() ?? "";
-                    var altUName = uName.StartsWith("+") ? uName.Substring(1) : ("+" + uName);
-                    var user = await _userManager.FindByNameAsync(uName) 
-                        ?? await _userManager.FindByPhoneNumberAsync(uName) 
-                        ?? await _userManager.FindByNameAsync(altUName)
-                        ?? await _userManager.FindByPhoneNumberAsync(altUName)
-                        ?? await _userManager.FindByEmailAsync(uName);
+                    AppUser user;
+                    if (SyrianPhoneIdentity.TryNormalize(uName, out var canonicalPhone))
+                    {
+                        var phoneMatch = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+                        if (phoneMatch.Ambiguous) return ForbidInvalidUsernamePassword();
+                        user = phoneMatch.User;
+                    }
+                    else
+                    {
+                        user = await _userManager.FindByNameAsync(uName)
+                            ?? await _userManager.FindByPhoneNumberAsync(uName)
+                            ?? await _userManager.FindByEmailAsync(uName);
+                    }
 
                     if (user == null || user.DeletionDate != null)
                     {
@@ -240,21 +251,11 @@ namespace App.ApiControllers.V1.Authorization
                 else if (request.GrantType == SolGrantTypes.SMSCodeGrantType)
                 {
                     var cleanPhone = request.Username?.Trim() ?? "";
-                    var altPhone = cleanPhone.StartsWith("+") ? cleanPhone.Substring(1) : ("+" + cleanPhone);
-                    var user = await _userManager.FindByNameAsync(cleanPhone)
-                        ?? await _userManager.FindByPhoneNumberAsync(cleanPhone)
-                        ?? await _userManager.FindByNameAsync(altPhone)
-                        ?? await _userManager.FindByPhoneNumberAsync(altPhone);
-
-                    if (user == null)
-                    {
-                        user = new AppUser { UserName = cleanPhone, PhoneNumber = cleanPhone, IsActive = true, CreatedDate = DateTime.UtcNow };
-                        var createRes = await _userManager.CreateAsync(user);
-                        if (createRes.Succeeded)
-                        {
-                            await _userManager.AddToRoleAsync(user, "Customer");
-                        }
-                    }
+                    if (!SyrianPhoneIdentity.TryNormalize(cleanPhone, out var canonicalPhone))
+                        return ForbidInvalidUsernamePassword();
+                    var phoneMatch = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+                    if (phoneMatch.Ambiguous) return ForbidInvalidUsernamePassword();
+                    var user = phoneMatch.User;
 
                     if (user == null || user.DeletionDate != null)
                         return ForbidInvalidUsernamePassword();
@@ -264,16 +265,25 @@ namespace App.ApiControllers.V1.Authorization
 
                     var isCodeValid = false;
                     var normalizedCode = request.Code?.Replace(" ", "").Trim() ?? "";
-                    // Temporary QA/testing OTP bypass: allow "123456" or "1234"
-                    if (normalizedCode == "123456" || normalizedCode == "1234")
+                    var configuredTemporaryCode = _configuration?["Authentication:TemporaryOtpCode"]?.Trim();
+                    if (!string.IsNullOrEmpty(configuredTemporaryCode) &&
+                        configuredTemporaryCode.Length == 6 &&
+                        configuredTemporaryCode.All(char.IsDigit) &&
+                        bool.TryParse(_configuration?["Authentication:TemporaryOtpEnabled"], out var temporaryOtpEnabled) &&
+                        temporaryOtpEnabled &&
+                        string.Equals(normalizedCode, configuredTemporaryCode, StringComparison.Ordinal))
                     {
                         isCodeValid = true;
                     }
 
                     if (!isCodeValid)
                     {
-                        var localPhone = cleanPhone.StartsWith("+963") ? ("0" + cleanPhone.Substring(4)) : "";
-                        var candidatePhones = new[] { cleanPhone, altPhone, localPhone, user.PhoneNumber, user.UserName }
+                        var nationalPhone = canonicalPhone.Substring(4);
+                        var candidatePhones = new[]
+                            {
+                                canonicalPhone, canonicalPhone.Substring(1), "00" + canonicalPhone.Substring(1),
+                                "0" + nationalPhone, nationalPhone, cleanPhone, user.PhoneNumber, user.UserName
+                            }
                             .Where(p => !string.IsNullOrWhiteSpace(p))
                             .Distinct()
                             .ToList();
@@ -307,11 +317,11 @@ namespace App.ApiControllers.V1.Authorization
                         {
                             var cutoff = DateTime.UtcNow.AddMinutes(-30);
                             var matchingLog = await _smsLogService.Queryable()
-                                .Where(x => x.Code == request.Code && x.CreatedDate >= cutoff)
+                                .Where(x => x.UserId == user.Id && x.Code == request.Code && x.CreatedDate >= cutoff)
                                 .OrderByDescending(x => x.CreatedDate)
                                 .FirstOrDefaultAsync();
 
-                            if (matchingLog != null && (matchingLog.UserId == user.Id || (matchingLog.Text != null && candidatePhones.Any(p => matchingLog.Text.Contains(p)))))
+                            if (matchingLog != null)
                             {
                                 isCodeValid = true;
                             }
@@ -320,13 +330,13 @@ namespace App.ApiControllers.V1.Authorization
 
                     if (!isCodeValid)
                     {
-                        _logger.LogWarning($"SMS code verification failed for user {user.UserName} ({cleanPhone}) with code {request.Code}");
+                        _logger.LogWarning("SMS code verification failed for user {UserName} ({PhoneNumber})", user.UserName, canonicalPhone);
                         return ForbidInvalidUsernamePassword();
                     }
 
-                    if (string.IsNullOrWhiteSpace(user.PhoneNumber) || user.PhoneNumber != cleanPhone)
+                    if (user.PhoneNumber != canonicalPhone)
                     {
-                        user.PhoneNumber = cleanPhone;
+                        user.PhoneNumber = canonicalPhone;
                     }
                     user.PhoneNumberConfirmed = true;
                     user.FirstName ??= request.Display;
@@ -397,7 +407,8 @@ namespace App.ApiControllers.V1.Authorization
             Forbid("ForbidNotConfirmed", Errors.AccessDenied, _Authorization.UserAccountNotConfirmed);
 
         private ForbidResult ForbidInactive() =>
-            Forbid("ForbidInactive", Errors.AccessDenied, _Authorization.UserAccountInactive);
+            Forbid("ForbidInactive", Errors.AccessDenied,
+                "تم تعطيل حسابك. يرجى التواصل مع الدعم الفني على الرقم 0985 615 705 أو واتساب +963985615705.");
 
         private ForbidResult ForbidException(Exception e) =>
             Forbid("ForbidException: " + e, Errors.InvalidGrant, _Authorization.AuthorizeException);

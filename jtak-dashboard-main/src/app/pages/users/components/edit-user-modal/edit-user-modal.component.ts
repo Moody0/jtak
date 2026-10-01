@@ -1,11 +1,11 @@
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { tap } from 'rxjs/operators';
-import { User } from '../../models/user.model';
+import { User, CaptainCompensationType } from '../../models/user.model';
 import { UsersService } from '../../services/users.service';
 import { AppUserRoleMap } from 'src/app/_metronic/config/settings';
 import * as moment from 'moment';
@@ -24,6 +24,8 @@ const EMPTY_USER: User = {
   role: 3,
   lang: 'ar',
   countryPhoneCode: '+963',
+  captainCompensationType: 0,
+  captainRate: 0,
 };
 
 @Component({
@@ -35,16 +37,29 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
   @Input() item: User;
   isLoading$: Observable<boolean>;
-  formGroup: FormGroup;
-  userRoles = Object.entries(AppUserRoleMap);
+  formGroup: UntypedFormGroup;
+  // Admin accounts are managed through the dedicated admin access workflow.
+  userRoles = Object.entries(AppUserRoleMap).filter(
+    ([roleId]) => roleId !== '0'
+  );
 
   constructor(
     private service: UsersService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     public filesService: FilesService,
     private toasterService: ToastrService
   ) {}
+
+  Number = Number;
+
+  get captainCompensationType(): number {
+    return Number(this.formGroup?.get('captainCompensationType')?.value ?? 0);
+  }
+
+  get isDeliveryRole(): boolean {
+    return Number(this.formGroup?.get('role')?.value) === 3;
+  }
 
   getUserAvatar(): string | null {
     return this.formGroup?.get('profilePhoto')?.value || null;
@@ -87,12 +102,17 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   }
 
   loadForm() {
+    const compType = Number(this.item.captainCompensationType ?? 0);
+    const initialRate = this.item.captainRate !== undefined && this.item.captainRate !== null
+      ? Number(this.item.captainRate)
+      : (compType === 1 ? 25 : (compType === 2 ? 60 : 0));
+
     this.formGroup = this.fb.group({
       id: [this.item?.id],
       firstName: [this.item.firstName, [Validators.required]],
       lastName: [this.item.lastName, [Validators.required]],
       phoneNumber: [
-        this.item.countryPhoneCode?this.item.phoneNumber.replace(this.item.countryPhoneCode,''):this.item.phoneNumber,
+        this.item.countryPhoneCode ? this.item.phoneNumber.replace(this.item.countryPhoneCode, '') : this.item.phoneNumber,
         [Validators.required, Validators.minLength(8), Validators.maxLength(15)],
       ],
       countryPhoneCode: [this.item.countryPhoneCode || '+963'],
@@ -101,8 +121,25 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
       isActive: [this.item.isActive !== undefined ? this.item.isActive : true],
       profilePhoto: [this.item.profilePhoto],
       role: [this.item.role !== undefined ? this.item.role : 3],
+      maxCashFloat: [this.item.maxCashFloat ?? 5000000, [Validators.required, Validators.min(0)]],
+      captainCompensationType: [compType],
+      captainRate: [initialRate, [Validators.min(0)]],
       lang: [this.item.lang || 'ar']
     });
+  }
+
+  onCompensationTypeChange(type: number): void {
+    const numericType = Number(type);
+    this.formGroup.get('captainCompensationType')?.setValue(numericType);
+    const currentRate = Number(this.formGroup.get('captainRate')?.value || 0);
+
+    if (numericType === 0) {
+      this.formGroup.get('captainRate')?.setValue(0);
+    } else if (numericType === 1 && currentRate === 0) {
+      this.formGroup.get('captainRate')?.setValue(25);
+    } else if (numericType === 2 && (currentRate === 0 || currentRate > 100)) {
+      this.formGroup.get('captainRate')?.setValue(60);
+    }
   }
 
   onFileUploaded(filesIds: string[], key: string) {
@@ -118,7 +155,18 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   }
 
   save() {
-    const formValues = this.formGroup.value;
+    const formValues: any = { ...this.formGroup.value };
+
+    if (Number(formValues.role) === 3) {
+      formValues.captainCompensationType = Number(formValues.captainCompensationType ?? 0);
+      formValues.captainRate = Number(formValues.captainRate ?? 0);
+      if (formValues.captainCompensationType === 0) {
+        formValues.captainRate = 0;
+      }
+    } else {
+      formValues.captainCompensationType = 0;
+      formValues.captainRate = 0;
+    }
 
     if (this.item.id) {
       this.edit(formValues);

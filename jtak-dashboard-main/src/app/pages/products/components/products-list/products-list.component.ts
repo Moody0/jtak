@@ -1,8 +1,8 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
-import { debounceTime, distinctUntilChanged, catchError } from 'rxjs/operators';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
+import { debounceTime, distinctUntilChanged, catchError, map } from 'rxjs/operators';
 import { forkJoin, of } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
@@ -24,6 +24,8 @@ import { InventoryBatchService } from 'src/app/pages/inventory-batches/services/
 import { BatchMerchantLookup } from 'src/app/pages/inventory-batches/models/product-batch.model';
 import { PopularProductsService } from 'src/app/pages/popular-products/services/popular-products.service';
 import { MerchantsService } from 'src/app/pages/merchant/services/merchants.service';
+import { ActivatedRoute, Router } from '@angular/router';
+import { DashboardService } from 'src/app/pages/dashboard/services/dashboard.service';
 
 export interface CategoryHierarchyInfo {
   id: number;
@@ -44,6 +46,7 @@ export interface CategoryBadgeDisplay {
 export interface MerchantDisplayInfo {
   name: string;
   isAssigned: boolean;
+  id?: number;
 }
 
 export interface PublicationInfo {
@@ -72,7 +75,7 @@ export class ProductsListComponent
   selection = new TableSelection<Product>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   // Category & Merchant metadata
   categoryMap = new Map<number, CategoryHierarchyInfo>();
@@ -89,6 +92,7 @@ export class ProductsListComponent
   kpiMerchantsCount = 0;
   kpiCategoriesCount = 0;
   kpiCatalogHealth = '99.2%';
+  exchangeRate = 15000;
 
   paginator: PaginatorState;
   sorting: SortState;
@@ -104,7 +108,7 @@ export class ProductsListComponent
   }
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public service: ProductsService,
     public filesService: FilesService,
     private categoriesService: CategoriesService,
@@ -113,14 +117,20 @@ export class ProductsListComponent
     private popularService: PopularProductsService,
     private modalService: NgbModal,
     private toaster: ToastrService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute,
+    private router: Router,
+    private dashboardService: DashboardService
   ) {}
 
   ngOnInit(): void {
     this.service.setDefaults();
     this.searchForm();
     this.loadLookups();
-    this.service.fetchPost();
+    this.subs.sink = this.dashboardService.getSettings().pipe(catchError(() => of(null))).subscribe((settings) => {
+      const rate = Number(settings?.usdToSypExchangeRate);
+      if (Number.isFinite(rate) && rate > 0) this.exchangeRate = rate;
+    });
 
     this.subs.sink = this.service.isLoading$.subscribe(
       (res) => (this.isLoading = res)
@@ -147,10 +157,20 @@ export class ProductsListComponent
 
     this.sorting = this.service.sorting;
     this.paginator = this.service.paginator;
+
+    this.subs.sink = this.route.queryParamMap
+      .pipe(
+        map((params) => {
+          const value = Number(params.get('categoryId'));
+          return Number.isSafeInteger(value) && value > 0 ? value : null;
+        }),
+        distinctUntilChanged()
+      )
+      .subscribe((categoryId) => this.applyCategoryFilter(categoryId));
   }
 
   loadLookups(): void {
-    forkJoin({
+    this.subs.sink = forkJoin({
       roots: this.categoriesService.getAll(true).pipe(catchError(() => of([]))),
       subs: this.categoriesService.getAll(false).pipe(catchError(() => of([]))),
       merchants: this.merchantsService
@@ -160,50 +180,56 @@ export class ProductsListComponent
           catchError(() => of([]))
         ),
     }).subscribe(({ roots, subs, merchants }) => {
-      const rootMap = new Map<number, string>();
-      (roots || []).forEach((r) => {
-        if (r && r.id) rootMap.set(r.id, r.title);
+      // The root and full-category endpoints can contain different records
+      // with the same visible name. Build the hierarchy from all records,
+      // then deduplicate by the displayed path rather than by database ID.
+      // This removes duplicate options while keeping same-named categories
+      // under different parents distinguishable.
+      const categoriesById = new Map<number, any>();
+      [...(roots || []), ...(subs || [])].forEach((category: any) => {
+        if (!category || !category.id || categoriesById.has(category.id)) return;
+        categoriesById.set(category.id, category);
       });
 
-      const seenCatIds = new Set<number>();
+      const titleById = new Map<number, string>();
+      categoriesById.forEach((category) => {
+        titleById.set(category.id, (category.title || '').trim());
+      });
+
+      const seenDisplayPaths = new Set<string>();
       const allCats: CategoryHierarchyInfo[] = [];
+      categoriesById.forEach((category) => {
+        const title = (category.title || '').trim();
+        if (!title) return;
 
-      // Add roots (Deduplicated by ID)
-      (roots || []).forEach((r) => {
-        if (!r || !r.id || seenCatIds.has(r.id)) return;
-        seenCatIds.add(r.id);
+        const parentId = category.parentId || null;
+        const parentTitle = parentId ? titleById.get(parentId) : undefined;
+        const fullPath = parentTitle ? `${parentTitle} > ${title}` : title;
         const info: CategoryHierarchyInfo = {
-          id: r.id,
-          title: r.title,
-          parentId: null,
-          fullPath: r.title,
-          isRoot: true,
-        };
-        this.categoryMap.set(r.id, info);
-        allCats.push(info);
-      });
-
-      // Add subcategories (Deduplicated by ID, preserving legitimate distinct hierarchies)
-      (subs || []).forEach((s) => {
-        if (!s || !s.id || seenCatIds.has(s.id)) return;
-        seenCatIds.add(s.id);
-        const parentTitle = s.parentId ? rootMap.get(s.parentId) : undefined;
-        const fullPath = parentTitle ? `${parentTitle} > ${s.title}` : s.title;
-        const isRoot = !parentTitle && (!s.parentId || s.parentId === 0);
-        const info: CategoryHierarchyInfo = {
-          id: s.id,
-          title: s.title,
-          parentId: s.parentId || null,
+          id: category.id,
+          title,
+          parentId,
           parentTitle,
           fullPath,
-          isRoot,
+          isRoot: !parentId,
         };
-        this.categoryMap.set(s.id, info);
+
+        // Keep every ID available for product-to-category lookup, but only
+        // show one option for an identical displayed path.
+        this.categoryMap.set(category.id, info);
+        const displayKey = fullPath.toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+        if (seenDisplayPaths.has(displayKey)) return;
+        seenDisplayPaths.add(displayKey);
         allCats.push(info);
       });
 
       this.categoriesList = allCats.sort((a, b) => a.fullPath.localeCompare(b.fullPath));
-      this.kpiCategoriesCount = allCats.length;
+      // A deep link must remain selectable even when another category has the same path.
+      if (this.selectedCategoryId && !this.categoriesList.some((cat) => cat.id === this.selectedCategoryId)) {
+        const selected = this.categoryMap.get(this.selectedCategoryId);
+        if (selected) this.categoriesList.push(selected);
+      }
+      this.kpiCategoriesCount = this.categoriesList.length;
 
       // Merchants
       if (merchants && merchants.length > 0) {
@@ -283,28 +309,16 @@ export class ProductsListComponent
    * Resolve Merchant linkage or brand inference
    */
   getMerchantInfo(product: Product): MerchantDisplayInfo {
-    if (product.merchantId && this.merchantsMap.has(product.merchantId)) {
-      return { name: this.merchantsMap.get(product.merchantId)!, isAssigned: true };
-    }
-    if (product.merchantTitle) {
-      return { name: product.merchantTitle, isAssigned: true };
-    }
-
-    const text = ((product.title || '') + ' ' + (product.description || '')).toLowerCase();
-    if (text.includes('art of beans') || text.includes('كافيه معتق') || text.includes('سبانش لاتيه')) {
-      return { name: 'Art of Beans Cafe', isAssigned: true };
-    }
-    if (text.includes('classic burger') || text.includes('برغر كرسبي') || text.includes('لوديد فرايز')) {
-      return { name: 'Classic Burger', isAssigned: true };
-    }
-    if (text.includes('برازق') || text.includes('مدلوقة') || text.includes('بقلاوة') || text.includes('مبرومة')) {
-      return { name: 'حلويات دمشق الأصيلة', isAssigned: true };
-    }
-    if (text.includes('وافل') || text.includes('تشيزكيك')) {
-      return { name: 'وافل هاوس & حلويات', isAssigned: true };
+    const merchantId = Number(product.merchantId || 0);
+    if (merchantId > 0) {
+      return {
+        id: merchantId,
+        name: this.merchantsMap.get(merchantId) || product.merchantTitle || `متجر #${merchantId}`,
+        isAssigned: true,
+      };
     }
 
-    return { name: 'كتالوج عام (غير مسند)', isAssigned: false };
+    return { name: 'غير مرتبط بأي متجر', isAssigned: false };
   }
 
   /**
@@ -312,7 +326,8 @@ export class ProductsListComponent
    */
   getPublicationInfo(product: Product): PublicationInfo {
     const hasMerchant = !!product.merchantId && product.merchantId > 0;
-    const hasPrice = product.price !== undefined && product.price !== null && product.price > 0;
+    const priceUsd = this.getPriceUsd(product);
+    const hasPrice = priceUsd > 0;
     const isActive = !!product.active;
 
     if (!hasMerchant) {
@@ -331,7 +346,7 @@ export class ProductsListComponent
         label: `مسند (${reason})`,
         badgeClass: 'badge-light-warning text-warning',
         tooltip: `${reason} — لن يظهر في تطبيق العملاء حتى تفعيله وتحديد السعر`,
-        priceDisplay: hasPrice ? `${product.price?.toLocaleString()} ل.س` : 'غير مسعر',
+        priceDisplay: hasPrice ? `${priceUsd.toFixed(2)} $` : 'غير مسعر',
       };
     }
 
@@ -340,9 +355,18 @@ export class ProductsListComponent
       status: 'published',
       label: 'منشور للعملاء',
       badgeClass: 'badge-light-success text-success',
-      tooltip: `منشور في متجر ${merchantName} بسعر ${product.price?.toLocaleString()} ل.س`,
-      priceDisplay: `${product.price?.toLocaleString()} ل.س`,
+      tooltip: `منشور في متجر ${merchantName} بسعر ${priceUsd.toFixed(2)} $`,
+      priceDisplay: `${priceUsd.toFixed(2)} $`,
     };
+  }
+
+  private getPriceUsd(product: Product): number {
+    const explicitUsd = Number(product.priceUsd);
+    if (Number.isFinite(explicitUsd) && explicitUsd > 0) return explicitUsd;
+    const localPrice = Number(product.price);
+    return Number.isFinite(localPrice) && localPrice > 0 && this.exchangeRate > 0
+      ? localPrice / this.exchangeRate
+      : 0;
   }
 
   /**
@@ -384,17 +408,34 @@ export class ProductsListComponent
     this.service.patchState({ searchTerm });
   }
 
+  clearSearch(): void {
+    this.searchGroup.get('searchTerm')?.setValue('');
+  }
+
   filterByCategory(categoryId: number | null): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { categoryId: categoryId || null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  private applyCategoryFilter(categoryId: number | null): void {
     this.selectedCategoryId = categoryId;
-    this.selection.clear();
-    if (categoryId) {
-      const cat = this.categoryMap.get(categoryId);
-      this.service.patchState({
-        searchTerm: cat ? cat.title : '',
-      });
-    } else {
-      this.service.patchState({ searchTerm: '' });
+    if (categoryId && !this.categoriesList.some((cat) => cat.id === categoryId)) {
+      const selected = this.categoryMap.get(categoryId);
+      if (selected) this.categoriesList.push(selected);
     }
+    this.selection.clear();
+    const paginator = this.service.paginator;
+    paginator.page = 1;
+    this.service.patchState({ filter: categoryId ? { categoryId } : {}, paginator });
+  }
+
+  getSelectedCategoryLabel(): string {
+    return this.selectedCategoryId
+      ? this.categoryMap.get(this.selectedCategoryId)?.fullPath || `#${this.selectedCategoryId}`
+      : '';
   }
 
   filterByStatus(status: 'all' | 'active' | 'disabled'): void {

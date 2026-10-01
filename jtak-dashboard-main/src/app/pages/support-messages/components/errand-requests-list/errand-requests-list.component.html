@@ -1,0 +1,266 @@
+<div class="errand-page-container">
+  <div class="errand-card">
+    <!-- Header -->
+    <div class="errand-header">
+      <div class="errand-header-right">
+        <div class="errand-header-icon">
+          <i class="fas fa-clipboard-list"></i>
+        </div>
+        <div class="errand-header-meta">
+          <h2 class="errand-header-title">طلبات الشراء</h2>
+          <span class="errand-header-subtitle">من طلب العميل حتى عرض السعر والتسليم والتحصيل</span>
+        </div>
+      </div>
+      <div class="errand-header-actions">
+        <button
+          type="button"
+          class="btn errand-btn-refresh"
+          (click)="load()"
+          [disabled]="loading"
+        >
+          <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i>
+          <span>تحديث القائمة</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Body Content -->
+    <div class="errand-body">
+      <!-- 1. Operational KPI Strip (Clickable stages) -->
+      <div class="errand-kpi-bar mb-4">
+        <div class="errand-kpi-chip" [class.is-active]="bucket === 'new'" (click)="selectBucket('new')">
+          <div class="errand-kpi-chip-icon errand-kpi-chip-icon--amber">
+            <i class="fas fa-tag"></i>
+          </div>
+          <div class="errand-kpi-chip-info">
+            <strong class="errand-kpi-chip-count">{{ stats.new }}</strong>
+            <span class="errand-kpi-chip-label">تحتاج تسعيراً</span>
+          </div>
+        </div>
+
+        <div class="errand-kpi-chip" [class.is-active]="bucket === 'approved'" (click)="selectBucket('approved')">
+          <div class="errand-kpi-chip-icon errand-kpi-chip-icon--green">
+            <i class="fas fa-user-check"></i>
+          </div>
+          <div class="errand-kpi-chip-info">
+            <strong class="errand-kpi-chip-count text-success">{{ stats.approved }}</strong>
+            <span class="errand-kpi-chip-label">وافق العميل</span>
+          </div>
+        </div>
+
+        <div class="errand-kpi-chip" [class.is-active]="bucket === 'quoted'" (click)="selectBucket('quoted')">
+          <div class="errand-kpi-chip-icon errand-kpi-chip-icon--blue">
+            <i class="fas fa-hourglass-half"></i>
+          </div>
+          <div class="errand-kpi-chip-info">
+            <strong class="errand-kpi-chip-count text-primary">{{ stats.quoted }}</strong>
+            <span class="errand-kpi-chip-label">بانتظار العميل</span>
+          </div>
+        </div>
+
+        <div class="errand-kpi-chip" [class.is-active]="bucket === 'in-progress'" (click)="selectBucket('in-progress')">
+          <div class="errand-kpi-chip-icon errand-kpi-chip-icon--orange">
+            <i class="fas fa-motorcycle"></i>
+          </div>
+          <div class="errand-kpi-chip-info">
+            <strong class="errand-kpi-chip-count text-warning">{{ stats.inProgress }}</strong>
+            <span class="errand-kpi-chip-label">قيد التنفيذ</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Operational Toolbar: Bucket Tabs + Search -->
+      <div class="errand-toolbar mb-4">
+        <!-- Bucket Tabs (Segmented Control) -->
+        <div class="errand-nav-pills" role="tablist">
+          <button
+            *ngFor="let option of buckets"
+            type="button"
+            class="errand-pill"
+            [class.is-active]="bucket === option.value"
+            (click)="selectBucket(option.value)"
+          >
+            <span>{{ option.label }}</span>
+            <span *ngIf="bucketCount(option.value) !== null" class="errand-pill-count"
+              [class.errand-pill-count--active]="(bucketCount(option.value) || 0) > 0">
+              {{ bucketCount(option.value) }}
+            </span>
+          </button>
+        </div>
+
+        <!-- Integrated Search Box (Logical RTL positioning) -->
+        <div class="errand-search-box">
+          <i class="fas fa-search errand-search-icon"></i>
+          <input
+            type="text"
+            class="form-control errand-search-input"
+            [(ngModel)]="searchInput"
+            (keyup.enter)="applySearch()"
+            placeholder="ابحث بالاسم، الهاتف، أو تفاصيل الطلب..."
+            maxlength="100"
+          />
+          <button
+            type="button"
+            class="btn errand-search-clear"
+            *ngIf="searchInput"
+            (click)="clearSearch()"
+            title="مسح البحث"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+          <button
+            type="button"
+            class="btn errand-search-submit"
+            (click)="applySearch()"
+            title="بحث"
+          >
+            بحث
+          </button>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error" class="alert errand-alert-danger mb-4">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-exclamation-triangle text-danger"></i>
+          <span>تعذر تحميل طلبات الشراء.</span>
+        </div>
+        <button class="btn btn-sm errand-btn-retry" (click)="load()">إعادة المحاولة</button>
+      </div>
+
+      <!-- 3. Errand Requests Table -->
+      <div class="table-responsive">
+        <table class="table errand-table align-middle">
+          <thead>
+            <tr>
+              <th class="min-w-90px">الطلب</th>
+              <th class="min-w-180px">العميل</th>
+              <th class="min-w-240px">تفاصيل الطلب</th>
+              <th class="min-w-180px">الحالة</th>
+              <th class="min-w-140px">المجموع المعروض</th>
+              <th class="min-w-130px">تاريخ الطلب</th>
+              <th class="min-w-120px text-end">إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let request of items">
+              <!-- Order ID -->
+              <td>
+                <span class="errand-order-id">#{{ request.id }}</span>
+              </td>
+
+              <!-- Customer -->
+              <td>
+                <div class="errand-customer-info">
+                  <span class="errand-customer-name">{{ request.senderName }}</span>
+                  <span class="errand-customer-phone" dir="ltr">{{ request.senderPhone }}</span>
+                </div>
+              </td>
+
+              <!-- Details snippet -->
+              <td>
+                <div class="errand-message-snippet" [title]="request.message">
+                  {{ summary(request.message) }}
+                </div>
+              </td>
+
+              <!-- Status -->
+              <td>
+                <span class="errand-status-badge">
+                  {{ statusLabel(request.errandStatus, request) }}
+                </span>
+                <div *ngIf="request.errandLatestException" class="errand-exception-badge mt-1">
+                  <i class="fas fa-exclamation-circle me-1"></i> {{ request.errandLatestException }}
+                </div>
+                <div *ngIf="request.errandDeliveryCodeFailedAttempts" class="errand-attempts-badge mt-1">
+                  <i class="fas fa-key me-1"></i> محاولات إكمال فاشلة: {{ request.errandDeliveryCodeFailedAttempts }}
+                </div>
+              </td>
+
+              <!-- Price -->
+              <td>
+                <span *ngIf="total(request) as amount" class="errand-price-value">
+                  {{ amount | number:'1.0-2' }} <small class="text-muted">ل.س</small>
+                </span>
+                <span *ngIf="total(request) === null" class="text-muted">—</span>
+              </td>
+
+              <!-- Date -->
+              <td>
+                <div class="errand-date-group">
+                  <span class="errand-date">{{ request.createdDate | date:'yyyy/MM/dd' }}</span>
+                  <span class="errand-time">{{ request.createdDate | date:'hh:mm a' }}</span>
+                </div>
+              </td>
+
+              <!-- Actions -->
+              <td class="text-end">
+                <button
+                  type="button"
+                  class="btn btn-sm errand-action-btn"
+                  (click)="open(request)"
+                  title="فتح ومتابعة تفاصيل الطلب"
+                >
+                  <i class="fas fa-folder-open me-1"></i>
+                  <span>فتح ومتابعة</span>
+                </button>
+              </td>
+            </tr>
+
+            <!-- Empty State -->
+            <tr *ngIf="!loading && !items.length">
+              <td colspan="7" class="text-center py-10">
+                <div class="errand-empty-state">
+                  <div class="errand-empty-icon">
+                    <i class="fas fa-clipboard-check"></i>
+                  </div>
+                  <h4 class="errand-empty-title">لا توجد طلبات في هذه الحالة</h4>
+                  <p class="errand-empty-desc">
+                    جميع طلبات الشراء الواردة من المستخدمين ستظهر هنا مصنفة حسب مرحلتها الحالية
+                  </p>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Loading State -->
+            <tr *ngIf="loading && !items.length">
+              <td colspan="7" class="text-center py-10">
+                <div class="d-flex justify-content-center align-items-center gap-3">
+                  <span class="spinner-border spinner-border-sm text-primary"></span>
+                  <span class="text-muted fs-7">جارٍ تحميل طلبات الشراء...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 4. Pagination Footer -->
+      <div class="errand-pagination">
+        <span class="errand-pagination-info">
+          <strong>{{ totalCount }}</strong> طلب · صفحة <strong>{{ page }}</strong> من <strong>{{ totalPages }}</strong>
+        </span>
+        <div class="errand-pagination-controls">
+          <button
+            class="btn btn-sm errand-page-btn"
+            type="button"
+            (click)="changePage(-1)"
+            [disabled]="page <= 1"
+          >
+            <i class="fas fa-chevron-right me-1"></i>
+            <span>السابق</span>
+          </button>
+          <button
+            class="btn btn-sm errand-page-btn"
+            type="button"
+            (click)="changePage(1)"
+            [disabled]="page >= totalPages"
+          >
+            <span>التالي</span>
+            <i class="fas fa-chevron-left ms-1"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -16,6 +16,7 @@ export interface SettleCaptainShiftRequest {
   currency?: string;
   notes?: string;
   discrepancyReason?: string;
+  shortageTreatment?: 'retain_driver_debt' | 'write_off';
 }
 
 export interface SettlementResult {
@@ -82,6 +83,7 @@ export interface DailySettlementBatch {
 export enum SettlementPartyType {
   Captain = 0,
   Merchant = 1,
+  CaptainEarnings = 2,
 }
 
 export enum SettlementRequestStatus {
@@ -107,6 +109,7 @@ export interface SettlementRequestItem {
   rejectionReason?: string;
   reviewedAt?: string;
   completedAt?: string;
+  settlementTransactionId?: string;
   createdDate: string;
   merchantAllocations: Array<{ merchantId: number; merchantTitle?: string; amount: number }>;
 }
@@ -156,11 +159,9 @@ export interface MerchantReconciliationItem {
 }
 
 export interface MerchantReconciliationDataTableRequest {
-  page?: number;
-  pageNumber?: number;
-  pageSize?: number;
-  searchTerm?: string;
-  search?: string;
+  page: number;
+  pageSize: number;
+  searchTerm: string;
   sortColumn?: string;
   sortDirection?: string;
 }

@@ -1,0 +1,955 @@
+// =============================================================================
+// JTAK Operations Dashboard - Modern Minimalist Enterprise UI (No Shadows)
+// Strict Color System: Slate Neutral + JTAK Orange Accent + Muted Semantics
+// Typography: Alexandria Font throughout
+// =============================================================================
+
+.ops-dashboard {
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+  padding-bottom: 2.5rem;
+
+  // Strict zero-shadow enforcement across the entire dashboard
+  *,
+  .card,
+  .btn,
+  .badge,
+  .form-control,
+  .form-select,
+  .input-group,
+  .input-group-text,
+  .alert,
+  .dropdown-menu {
+    box-shadow: none !important;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 1. Executive Header
+// -----------------------------------------------------------------------------
+.ops-header {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .ops-header-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .ops-live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #059669;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    width: fit-content;
+    margin-bottom: 0.25rem;
+
+    .ops-live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #059669;
+      display: inline-block;
+    }
+  }
+
+  .ops-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .ops-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0;
+    font-weight: 400;
+  }
+
+  .ops-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .ops-timestamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 0.45rem 0.85rem;
+    border-radius: 8px;
+    font-weight: 500;
+
+    i {
+      color: #94a3b8;
+      font-size: 0.8rem;
+    }
+  }
+
+  .ops-btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 0.48rem 1rem;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    cursor: pointer;
+
+    &.ops-btn-secondary {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+
+      &:hover:not(:disabled) {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #0f172a;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+
+    &.ops-btn-primary {
+      background: #ff5722;
+      border: 1px solid #ff5722;
+      color: #ffffff;
+
+      &:hover {
+        background: #e64a19;
+        border-color: #e64a19;
+        color: #ffffff;
+      }
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 2. High-Impact KPI Stat Cards (4-Column Grid)
+// -----------------------------------------------------------------------------
+.ops-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+
+  @media (max-width: 1199px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 575px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ops-kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  position: relative;
+
+  &:hover {
+    border-color: #cbd5e1;
+    background: #fafbfc;
+  }
+
+  .ops-kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+  }
+
+  .ops-kpi-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0;
+  }
+
+  .ops-kpi-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+
+  .ops-kpi-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .ops-kpi-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ops-kpi-unit {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .ops-kpi-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+    padding-top: 0.65rem;
+    border-top: 1px solid #f1f5f9;
+
+    .ops-kpi-link-text {
+      color: #ff5722;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      i {
+        font-size: 0.7rem;
+        transition: transform 0.15s ease;
+      }
+    }
+  }
+
+  &:hover .ops-kpi-footer .ops-kpi-link-text i {
+    transform: translateX(-3px);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 3. Operational Configuration Hub (3 Cohesive Cards in Grid)
+// -----------------------------------------------------------------------------
+.ops-config-hub {
+  margin-bottom: 1.25rem;
+}
+
+.ops-config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+
+  @media (max-width: 1199px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ops-config-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  .ops-config-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+
+    .ops-config-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #fff8f5;
+      border: 1px solid #ffccbc;
+      color: #ff5722;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+    }
+
+    .ops-config-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 0 0.2rem 0;
+    }
+
+    .ops-config-desc {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin: 0;
+      line-height: 1.4;
+    }
+  }
+
+  .ops-config-body {
+    flex: 1;
+    margin-bottom: 1rem;
+  }
+
+  .ops-config-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Form Controls & Inputs (Unified Crisp Styling)
+// -----------------------------------------------------------------------------
+.ops-input-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.35rem;
+}
+
+.ops-input-group {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+
+  &:focus-within {
+    border-color: #ff5722;
+  }
+
+  input {
+    border: none;
+    background: transparent;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+    width: 100%;
+    outline: none;
+    font-family: inherit;
+
+    &::placeholder {
+      color: #94a3b8;
+      font-weight: 400;
+    }
+
+    &:disabled {
+      background: #f8fafc;
+      color: #94a3b8;
+    }
+  }
+
+  .ops-input-addon {
+    background: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+    padding: 0 0.75rem;
+    display: flex;
+    align-items: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #64748b;
+    white-space: nowrap;
+  }
+}
+
+.ops-toggle-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+
+  .form-check-input {
+    cursor: pointer;
+    border-color: #cbd5e1;
+
+    &:checked {
+      background-color: #059669;
+      border-color: #059669;
+    }
+  }
+
+  .form-check-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+  }
+}
+
+.ops-sim-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+
+  .ops-sim-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .ops-sim-result {
+    font-weight: 700;
+    color: #059669;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 4. Main Operations Row: Live Orders Radar (2/3) + Financial Split (1/3)
+// -----------------------------------------------------------------------------
+.ops-radar-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ops-panel-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .ops-panel-header {
+    padding: 1.1rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+
+    .ops-panel-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+
+      .ops-panel-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 7px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+      }
+
+      .ops-panel-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+      }
+    }
+
+    .ops-panel-link {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #ff5722;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      &:hover {
+        color: #e64a19;
+      }
+    }
+  }
+
+  .ops-panel-body {
+    padding: 1.25rem;
+    flex: 1;
+
+    &.p-0 {
+      padding: 0 !important;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Financial Split Visualizer
+// -----------------------------------------------------------------------------
+.ops-split-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ops-split-bar-track {
+  height: 10px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  display: flex;
+  overflow: hidden;
+
+  .ops-split-bar-jTak {
+    background: #ff5722;
+    transition: width 0.3s ease;
+  }
+
+  .ops-split-bar-merchant {
+    background: #334155;
+    transition: width 0.3s ease;
+  }
+}
+
+.ops-split-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ops-split-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+
+  .ops-split-metric-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+
+    .ops-split-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+
+      &.dot-jTak {
+        background: #ff5722;
+      }
+      &.dot-merchant {
+        background: #334155;
+      }
+      &.dot-additional {
+        background: #94a3b8;
+      }
+    }
+  }
+
+  .ops-split-metric-val {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+
+    small {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: #64748b;
+      margin-right: 0.2rem;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Modern Tables (No Shadows, Crisp 1px Hairlines)
+// -----------------------------------------------------------------------------
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+
+  thead th {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    text-align: right;
+    letter-spacing: 0.01em;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.12s ease;
+
+    &:hover {
+      background: #fafbfc;
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  tbody td {
+    padding: 0.85rem 1rem;
+    color: #1e293b;
+    font-size: 0.84rem;
+    vertical-align: middle;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Unified Semantic Badges (Disciplined Minimal Palette)
+// -----------------------------------------------------------------------------
+.ops-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &.badge-success,
+  &.badge-light-success {
+    background: #ecfdf5 !important;
+    border: 1px solid #a7f3d0 !important;
+    color: #059669 !important;
+  }
+
+  &.badge-warning,
+  &.badge-light-warning {
+    background: #fffbeb !important;
+    border: 1px solid #fde68a !important;
+    color: #d97706 !important;
+  }
+
+  &.badge-danger,
+  &.badge-light-danger {
+    background: #fef2f2 !important;
+    border: 1px solid #fecaca !important;
+    color: #dc2626 !important;
+  }
+
+  &.badge-primary,
+  &.badge-light-primary {
+    background: #f1f5f9 !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+
+  &.badge-secondary,
+  &.badge-light-secondary {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #64748b !important;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 5. Settlements Grid (Merchant & Driver Balances)
+// -----------------------------------------------------------------------------
+.ops-settlements-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+
+  @media (max-width: 991px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ops-search-box {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+
+  .ops-search-input {
+    display: flex;
+    align-items: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    padding: 0.35rem 0.65rem;
+    background: #f8fafc;
+    gap: 0.5rem;
+
+    i {
+      color: #94a3b8;
+      font-size: 0.8rem;
+    }
+
+    input {
+      border: none;
+      background: transparent;
+      outline: none;
+      width: 100%;
+      font-size: 0.8rem;
+      color: #0f172a;
+      font-family: inherit;
+
+      &::placeholder {
+        color: #94a3b8;
+      }
+    }
+  }
+}
+
+.ops-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+// -----------------------------------------------------------------------------
+// 6. Top Products Ranking List
+// -----------------------------------------------------------------------------
+.ops-ranking-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+}
+
+.ops-ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #cbd5e1;
+    background: #ffffff;
+  }
+
+  .ops-rank-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    flex-shrink: 0;
+
+    &.rank-top {
+      background: #ff5722;
+      border-color: #ff5722;
+      color: #ffffff;
+    }
+  }
+
+  .ops-rank-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ops-rank-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+  }
+
+  .ops-rank-name {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ops-rank-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .ops-rank-progress-bg {
+    height: 6px;
+    border-radius: 3px;
+    background: #e2e8f0;
+    overflow: hidden;
+
+    .ops-rank-progress-fill {
+      height: 100%;
+      background: #ff5722;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 7. Quick Navigation Strip (Bottom Access)
+// -----------------------------------------------------------------------------
+.ops-quick-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+
+  @media (max-width: 991px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  @media (max-width: 575px) {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-quick-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 1rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #0f172a;
+    transition: all 0.15s ease;
+
+    i {
+      color: #ff5722;
+      font-size: 0.95rem;
+    }
+
+    .ops-quick-text {
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &:hover {
+      border-color: #ff5722;
+      background: #fff8f5;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Empty States & Feedback Messages
+// -----------------------------------------------------------------------------
+.ops-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: #64748b;
+
+  i {
+    font-size: 1.75rem;
+    color: #cbd5e1;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  strong {
+    display: block;
+    font-size: 0.88rem;
+    color: #334155;
+    margin-bottom: 0.2rem;
+  }
+
+  span {
+    font-size: 0.78rem;
+  }
+}
+
+.ops-alert {
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+
+  &.alert-success {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #059669;
+  }
+
+  &.alert-danger {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+  }
+}

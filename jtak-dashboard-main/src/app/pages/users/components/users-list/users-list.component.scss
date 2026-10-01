@@ -497,6 +497,36 @@
   }
 }
 
+// Captain Compensation Badges
+.ops-captain-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  &.type-salaried {
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    color: #4338ca;
+  }
+
+  &.type-km {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+  }
+
+  &.type-percent {
+    background: #faf5ff;
+    border: 1px solid #e9d5ff;
+    color: #7e22ce;
+  }
+}
+
 // Status Badges
 .ops-status-pill {
   display: inline-flex;

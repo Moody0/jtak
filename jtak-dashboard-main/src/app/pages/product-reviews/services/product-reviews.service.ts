@@ -10,7 +10,7 @@ import { productReview } from '../models/product-reviews.model';
 })
 export class productReviewsService extends TableService<productReview> implements OnDestroy {
   BASE_URL = environment.apiUrl;
-  GET_ALL_URL = 'Admin/ProductReviews/DataTable';
+  GET_ALL_URL = 'Admin/MerchantReviews/DataTable';
   GET_ONE_URL = '';
 
   httpOptions = {

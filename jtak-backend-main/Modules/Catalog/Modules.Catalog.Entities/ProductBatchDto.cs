@@ -138,6 +138,7 @@ namespace Modules.Catalog.Entities
     {
         public int Id { get; set; }
         public string Title { get; set; }
+        public App.Shared.Entities.Enums.MerchantKind MerchantKind { get; set; }
     }
 
     public class QuarantineBatchDto

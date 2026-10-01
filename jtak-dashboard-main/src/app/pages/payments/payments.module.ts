@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CreatePaymentModalComponent } from './components/create-payment-modal/create-payment-modal.component';
 import { PaymentsListComponent } from './components/payments-list/payments-list.component';
+import { DriverCashAdvanceModalComponent } from './components/driver-cash-advance-modal/driver-cash-advance-modal.component';
 import { RouterModule } from '@angular/router';
 import { ApplicationRoutes } from 'src/app/_metronic/config/settings';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -13,7 +14,8 @@ import { CRUDTableModule } from 'src/app/_metronic/shared/crud-table';
 @NgModule({
   declarations: [
     CreatePaymentModalComponent,
-    PaymentsListComponent
+    PaymentsListComponent,
+    DriverCashAdvanceModalComponent
   ],
   imports: [
     CommonModule,

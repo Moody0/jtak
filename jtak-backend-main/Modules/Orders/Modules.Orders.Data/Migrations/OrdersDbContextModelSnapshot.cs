@@ -3,7 +3,10 @@ using System;
 using App.Orders.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
 
 namespace Modules.Orders.Data.Migrations
 {
@@ -14,8 +17,10 @@ namespace Modules.Orders.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Relational:MaxIdentifierLength", 64)
-                .HasAnnotation("ProductVersion", "5.0.13");
+                .HasAnnotation("ProductVersion", "8.0.31")
+                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
             modelBuilder.Entity("App.Shared.Entities.GenericSetting", b =>
                 {
@@ -44,14 +49,88 @@ namespace Modules.Orders.Data.Migrations
                     b.ToTable("Orders_Settings");
                 });
 
+            modelBuilder.Entity("Modules.Orders.Entities.MerchantReview", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("MerchantId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Rate")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReviewerId")
+                        .IsRequired()
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<string>("TextReview")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MerchantId");
+
+                    b.HasIndex("OrderId", "MerchantId")
+                        .IsUnique();
+
+                    b.ToTable("Orders_MerchantReviews", (string)null);
+                });
+
             modelBuilder.Entity("Modules.Orders.Entities.Order", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountingLastError")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("AccountingPostedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("AccountingRetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AccountingStatus")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("ActualCashCollected")
+                        .HasColumnType("decimal(65,30)");
+
                     b.Property<string>("Address")
                         .HasColumnType("longtext");
+
+                    b.Property<decimal>("CaptainEarning")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("CourierMatchingCompletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("CourierMatchingDeadlineAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("CourierMatchingRound")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CourierMatchingStartedAtUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
@@ -60,17 +139,47 @@ namespace Modules.Orders.Data.Migrations
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime?>("DeletionDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("DeliveryFee")
+                        .HasColumnType("decimal(65,30)");
+
                     b.Property<Guid?>("DeliveryId")
                         .HasColumnType("char(36)");
 
                     b.Property<decimal?>("DeliveryLat")
                         .HasColumnType("decimal(65,30)");
 
+                    b.Property<decimal?>("DeliveryLng")
+                        .HasColumnType("decimal(65,30)");
+
                     b.Property<DateTime?>("DeliveryLocationUpdatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<decimal?>("DeliveryLng")
-                        .HasColumnType("decimal(65,30)");
+                    b.Property<string>("DeliveryNotes")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DeliveryOtp")
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<DateTime?>("DeliveryOtpExpiresAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("DeliveryOtpFailedAttempts")
+                        .HasColumnType("int");
 
                     b.Property<string>("DeliveryUser")
                         .HasColumnType("longtext");
@@ -78,11 +187,21 @@ namespace Modules.Orders.Data.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
                     b.Property<decimal>("Lat")
                         .HasColumnType("decimal(65,30)");
 
                     b.Property<decimal>("Lng")
                         .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("MoneySnapshotJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("MoneySnapshotVersion")
+                        .HasColumnType("int");
 
                     b.Property<string>("Notes")
                         .HasColumnType("longtext");
@@ -99,8 +218,24 @@ namespace Modules.Orders.Data.Migrations
                     b.Property<string>("Phonenumber")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("ProofOfDeliveryPhotoUrl")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ProofOfDeliverySignature")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("ProofPhotoUploadedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("ProofPhotoUploadedBy")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime?>("PurchaseDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
 
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(256)
@@ -117,6 +252,14 @@ namespace Modules.Orders.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AccountingStatus");
+
+                    b.HasIndex("UserId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("CourierMatchingDeadlineAtUtc", "CourierMatchingCompletedAtUtc")
+                        .HasDatabaseName("IX_Orders_Orders_CourierMatch_Deadline_Completed");
+
                     b.ToTable("Orders_Orders");
                 });
 
@@ -125,6 +268,12 @@ namespace Modules.Orders.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("CommissionRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
 
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
@@ -135,6 +284,9 @@ namespace Modules.Orders.Data.Migrations
 
                     b.Property<int>("Currency")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsPlatformOwnedSnapshot")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("MerchantId")
                         .HasColumnType("int");
@@ -190,6 +342,107 @@ namespace Modules.Orders.Data.Migrations
                     b.HasIndex("OrderId");
 
                     b.ToTable("Orders_OrderDetails");
+                });
+
+            modelBuilder.Entity("Modules.Orders.Entities.OrderDispatchOffer", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("DriverId")
+                        .IsRequired()
+                        .HasColumnType("varchar(36)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("MatchingRound")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("OfferedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RespondedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint unsigned");
+
+                    b.Property<int>("WaveNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverId", "Status", "ExpiresAtUtc");
+
+                    b.HasIndex("OrderId", "MatchingRound", "DriverId")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "Status", "ExpiresAtUtc");
+
+                    b.ToTable("Orders_OrderDispatchOffers", (string)null);
+                });
+
+            modelBuilder.Entity("Modules.Orders.Entities.OrderOutboxMessage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("BusinessKey")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("varchar(180)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<Guid?>("LockId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("LockedUntilUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessKey")
+                        .IsUnique();
+
+                    b.HasIndex("ProcessedAtUtc", "NextAttemptAtUtc", "LockedUntilUtc");
+
+                    b.ToTable("Orders_OrderOutboxMessages");
                 });
 
             modelBuilder.Entity("Modules.Orders.Entities.OrderStatusChangeLog", b =>

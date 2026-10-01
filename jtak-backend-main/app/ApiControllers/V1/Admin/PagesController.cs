@@ -29,27 +29,24 @@ namespace App.ApiControllers.V1.Admin
             return vm;
         }
 
-        //[HttpPut]
-        //[Route("PrivacyPolicy")]
-        //public async Task<ActionResult<PageVm>> PrivacyPolicy(PageVm vm)
-        //{
-        //    await _service.SetValue("PrivacyPolicy", vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
-        //    return vm;
-        //}
+        [HttpPut]
+        [Route("PrivacyPolicy")]
+        public async Task<ActionResult<PageVm>> PrivacyPolicy([FromBody] PageVm vm) => await SavePage("PrivacyPolicy", vm);
 
-        //[HttpPut]
-        //[Route("PaymentPolicy")]
-        //public async Task<ActionResult<PageVm>> PaymentPolicy(PageVm vm)
-        //{
-        //    await _service.SetValue("PaymentPolicy", vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
-        //    return vm;
-        //}
+        [HttpPut]
+        [Route("PaymentPolicy")]
+        public async Task<ActionResult<PageVm>> PaymentPolicy([FromBody] PageVm vm) => await SavePage("PaymentPolicy", vm);
 
         [HttpPut]
         [Route("TermsAndConditions")]
-        public async Task<ActionResult<PageVm>> TermsAndConditions(PageVm vm)
+        public async Task<ActionResult<PageVm>> TermsAndConditions(
+            [FromBody] PageVm vm,
+            [FromQuery] string app = "customer")
         {
-            await _service.SetValue("TermsAndConditions", vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+            if (!TryGetTermsSettingKey(app, out var settingKey))
+                return BadRequest(new { message = "Unknown app. Use customer, delivery, or warehouse." });
+
+            await _service.SetValue(settingKey, vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
             return vm;
         }
 
@@ -63,27 +60,27 @@ namespace App.ApiControllers.V1.Admin
         [HttpGet]
         [Route("About")]
         public async Task<ActionResult<PageVm>> About() =>
-            (await _service.GetValue<PageVm>("About", CultureInfo.CurrentCulture.TwoLetterISOLanguageName)) ?? new PageVm();
+            await PageSettingsReader.GetPage(_service, "About", CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
 
 
         // <summary>
         // Get PrivacyPolicy page
         // </summary>
         // <returns></returns>
-        //[HttpGet]
-        //[Route("PrivacyPolicy")]
-        //public async Task<ActionResult<PageVm>> PrivacyPolicy() =>
-        //    (await _service.GetValue<PageVm>("PrivacyPolicy", CultureInfo.CurrentCulture.TwoLetterISOLanguageName)) ?? new PageVm();
+        [HttpGet]
+        [Route("PrivacyPolicy")]
+        public async Task<ActionResult<PageVm>> PrivacyPolicy() =>
+            await PageSettingsReader.GetPage(_service, "PrivacyPolicy", CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
 
 
         // <summary>
         // Get PaymentPolicy page
         // </summary>
         // <returns></returns>
-        //[HttpGet]
-        //[Route("PaymentPolicy")]
-        //public async Task<ActionResult<PageVm>> PaymentPolicy() =>
-        //    (await _service.GetValue<PageVm>("PaymentPolicy", CultureInfo.CurrentCulture.TwoLetterISOLanguageName)) ?? new PageVm();
+        [HttpGet]
+        [Route("PaymentPolicy")]
+        public async Task<ActionResult<PageVm>> PaymentPolicy() =>
+            await PageSettingsReader.GetPage(_service, "PaymentPolicy", CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
 
 
 
@@ -93,7 +90,43 @@ namespace App.ApiControllers.V1.Admin
         // <returns></returns>
         [HttpGet]
         [Route("TermsAndConditions")]
-        public async Task<ActionResult<PageVm>> TermsAndConditions() =>
-            (await _service.GetValue<PageVm>("TermsAndConditions", CultureInfo.CurrentCulture.TwoLetterISOLanguageName)) ?? new PageVm();
+        public async Task<ActionResult<PageVm>> TermsAndConditions([FromQuery] string app = "customer")
+        {
+            if (!TryGetTermsSettingKey(app, out var settingKey))
+                return BadRequest(new { message = "Unknown app. Use customer, delivery, or warehouse." });
+
+            var language = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
+            var page = await PageSettingsReader.GetPage(_service, settingKey, language);
+            if (string.IsNullOrWhiteSpace(page.Body) && settingKey != "TermsAndConditions")
+                page = await PageSettingsReader.GetPage(_service, "TermsAndConditions", language);
+            return page;
+        }
+
+        private async Task<ActionResult<PageVm>> SavePage(string key, PageVm vm)
+        {
+            if (vm == null) return BadRequest("Page content is required");
+            vm.Title = string.IsNullOrWhiteSpace(vm.Title) ? key : vm.Title;
+            await _service.SetValue(key, vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+            return vm;
+        }
+
+        private static bool TryGetTermsSettingKey(string app, out string settingKey)
+        {
+            switch ((app ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "customer":
+                    settingKey = "TermsAndConditions";
+                    return true;
+                case "delivery":
+                    settingKey = "TermsAndConditions_Delivery";
+                    return true;
+                case "warehouse":
+                    settingKey = "TermsAndConditions_Warehouse";
+                    return true;
+                default:
+                    settingKey = null;
+                    return false;
+            }
+        }
     }
 }

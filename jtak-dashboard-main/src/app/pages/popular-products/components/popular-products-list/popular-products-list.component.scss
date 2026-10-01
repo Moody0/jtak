@@ -1,6 +1,38 @@
 .popular-products-container {
   padding: 0 0 2rem;
 
+  .nav-section-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f1f5f9;
+    padding: 0.35rem;
+    border-radius: 12px;
+
+    .tab-link {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #64748b;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: #0f172a;
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      &.active {
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      }
+    }
+  }
+
   // 1. Utility Bar
   .popular-utility-bar {
     display: flex;

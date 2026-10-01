@@ -92,12 +92,26 @@ namespace Modules.Accounting.Services
             // 2. Unread / New customer support messages
             var pendingSupportMessages = await _appDb.SupportMessages
                 .AsNoTracking()
-                .CountAsync(x => x.Status == SupportMessageStatus.New);
+                .CountAsync(x => x.ErrandStatus == null && x.Status == SupportMessageStatus.New);
+
+            // Count actionable purchase requests by their own workflow state,
+            // not by the unrelated Read/New support-ticket flag. In particular,
+            // customer approval must bring the request back to staff attention.
+            var pendingErrands = await _appDb.SupportMessages
+                .AsNoTracking()
+                .CountAsync(x => x.ErrandStatus == ErrandStatus.Submitted ||
+                                 x.ErrandStatus == ErrandStatus.Approved ||
+                                 x.ErrandStatus == ErrandStatus.Declined ||
+                                 x.ErrandStatus == ErrandStatus.Assigned ||
+                                 x.ErrandStatus == ErrandStatus.Purchased ||
+                                 x.ErrandStatus == ErrandStatus.PurchasePending ||
+                                 x.ErrandStatus == ErrandStatus.DeliveryPending ||
+                                 x.ErrandStatus == ErrandStatus.ReturnPending);
 
             // 3. Pending driver cash handover settlement requests
             var pendingDriverSettlements = await _accountingDb.SettlementRequests
                 .AsNoTracking()
-                .CountAsync(x => x.PartyType == SettlementPartyType.Captain && x.Status == SettlementRequestStatus.Pending);
+                .CountAsync(x => (x.PartyType == SettlementPartyType.Captain || x.PartyType == SettlementPartyType.CaptainEarnings) && x.Status == SettlementRequestStatus.Pending);
 
             // 4. Pending merchant settlement payout requests
             var pendingMerchantSettlements = await _accountingDb.SettlementRequests
@@ -110,11 +124,12 @@ namespace Modules.Accounting.Services
             {
                 Orders = pendingOrders,
                 SupportMessages = pendingSupportMessages,
+                ErrandRequests = pendingErrands,
                 DriverSettlements = pendingDriverSettlements,
                 MerchantSettlements = pendingMerchantSettlements,
                 Reconciliation = totalReconciliation,
                 Users = 0,
-                TotalActionable = pendingOrders + pendingSupportMessages + totalReconciliation
+                TotalActionable = pendingOrders + pendingSupportMessages + pendingErrands + totalReconciliation
             };
         }
     }

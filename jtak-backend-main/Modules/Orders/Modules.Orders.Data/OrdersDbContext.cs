@@ -46,8 +46,25 @@ namespace App.Orders.Data
                 b.Property(x => x.ProofOfDeliveryPhotoUrl).IsRequired(false);
                 b.Property(x => x.DeliveryNotes).IsRequired(false);
                 b.Property(x => x.DeleteReason).IsRequired(false).HasMaxLength(500);
+                b.Property(x => x.IdempotencyKey).IsRequired(false).HasMaxLength(128);
+                b.Property(x => x.MoneySnapshotJson).IsRequired(false).HasColumnType("longtext");
+                b.Property(x => x.CaptainEarning).HasPrecision(18, 2);
+                b.Property(x => x.DistanceInKm).HasPrecision(10, 2);
+                b.Property(x => x.CustomerRatePerKm).HasPrecision(18, 2);
+                b.Property(x => x.OriginalDeliveryFee).HasPrecision(18, 2);
+                b.Property(x => x.CaptainRate).HasColumnType("decimal(65,30)");
+                b.Property(x => x.IsSettled).HasDefaultValue(false);
+                b.Property(x => x.SettledAt).IsRequired(false);
+                b.Property(x => x.SettlementBatchId).IsRequired(false).HasMaxLength(64);
+                b.Property(x => x.RowVersion).IsConcurrencyToken();
                 b.Property(x => x.CreatedBy).IsRequired(false);
                 b.Property(x => x.UpdatedBy).IsRequired(false);
+                b.HasIndex(x => new { x.UserId, x.IdempotencyKey }).IsUnique();
+                b.HasIndex(x => new { x.CourierMatchingDeadlineAtUtc, x.CourierMatchingCompletedAtUtc })
+                    .HasDatabaseName("IX_Orders_Orders_CourierMatch_Deadline_Completed");
+                b.HasIndex(x => x.AccountingStatus);
+                b.HasIndex(x => new { x.DeliveryId, x.IsSettled, x.DeliveredAt })
+                    .HasDatabaseName("IX_Orders_Orders_DeliveryId_IsSettled_DeliveredAt");
             });
 
             builder.Entity<OrderDetail>(b =>
@@ -57,6 +74,7 @@ namespace App.Orders.Data
                 b.Property(x => x.ProductImage).IsRequired(false);
                 b.Property(x => x.MerchantTitle).IsRequired(false);
                 b.Property(x => x.Warning).IsRequired(false);
+                b.Property(x => x.CommissionRatePercent).HasPrecision(9, 4);
                 b.Property(x => x.CreatedBy).IsRequired(false);
                 b.Property(x => x.UpdatedBy).IsRequired(false);
             });
@@ -66,6 +84,36 @@ namespace App.Orders.Data
                 b.Property(x => x.OrdreDetails).IsRequired(false);
                 b.Property(x => x.CreatedBy).IsRequired(false);
                 b.Property(x => x.UpdatedBy).IsRequired(false);
+            });
+
+            builder.Entity<MerchantReview>(b =>
+            {
+                b.ToTable("Orders_MerchantReviews");
+                b.HasKey(x => x.Id);
+                b.Property(x => x.ReviewerId).HasColumnType("varchar(36)");
+                b.Property(x => x.TextReview).IsRequired(false).HasMaxLength(2000);
+                b.HasIndex(x => new { x.OrderId, x.MerchantId }).IsUnique();
+                b.HasIndex(x => x.MerchantId);
+            });
+
+            builder.Entity<OrderOutboxMessage>(b =>
+            {
+                b.Property(x => x.BusinessKey).IsRequired().HasMaxLength(180);
+                b.Property(x => x.EventType).IsRequired().HasMaxLength(80);
+                b.Property(x => x.Payload).IsRequired(false).HasColumnType("longtext");
+                b.Property(x => x.LastError).IsRequired(false).HasMaxLength(2000);
+                b.HasIndex(x => x.BusinessKey).IsUnique();
+                b.HasIndex(x => new { x.ProcessedAtUtc, x.NextAttemptAtUtc, x.LockedUntilUtc });
+            });
+
+            builder.Entity<OrderDispatchOffer>(b =>
+            {
+                b.ToTable("Orders_OrderDispatchOffers");
+                b.HasKey(x => x.Id);
+                b.Property(x => x.DriverId).HasColumnType("varchar(36)");
+                b.HasIndex(x => new { x.OrderId, x.MatchingRound, x.DriverId }).IsUnique();
+                b.HasIndex(x => new { x.DriverId, x.Status, x.ExpiresAtUtc });
+                b.HasIndex(x => new { x.OrderId, x.Status, x.ExpiresAtUtc });
             });
 
             #region Use updated datetime2 , decimal
@@ -159,6 +207,9 @@ namespace App.Orders.Data
         // Domain Entities
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderDetail> OrderDetails { get; set; }
+        public DbSet<MerchantReview> MerchantReviews { get; set; }
         public DbSet<OrderStatusChangeLog> OrderStatusChangeLogs { get; set; }
+        public DbSet<OrderOutboxMessage> OrderOutboxMessages { get; set; }
+        public DbSet<OrderDispatchOffer> OrderDispatchOffers { get; set; }
     }
 }

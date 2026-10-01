@@ -1,5 +1,6 @@
 using App.ApiModels;
 using App.Catalog.Data;
+using App.Shared.Data.MultiContext;
 using App.Shared.Entities;
 using App.Shared.Entities.Enums;
 using AutoMapper;
@@ -19,6 +20,8 @@ using MerchantDto = Modules.Catalog.Entities.MerchantDto;
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using Solf.Base;
+using URF.Core.Abstractions.Trackable;
 
 namespace App.ApiControllers.V1.Customer
 {
@@ -28,6 +31,7 @@ namespace App.ApiControllers.V1.Customer
     {
         private readonly IMerchantService _merchantService;
         private readonly IProductService _service;
+        private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepository;
         private readonly IProductCategoryService _categoryService;
         private readonly UserManager<AppUser> _userManager;
         private readonly ICatalogUnitOfWork _unitOfWork;
@@ -38,6 +42,7 @@ namespace App.ApiControllers.V1.Customer
 
         public ProductsController(
             IProductService service,
+            ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepository,
             IProductCategoryService categoryService,
             IMerchantService merchantService,
             UserManager<AppUser> userManager,
@@ -48,6 +53,7 @@ namespace App.ApiControllers.V1.Customer
             IOrderDetailService orderDetailsService = null)
         {
             _service = service;
+            _merchantProductRepository = merchantProductRepository;
             _categoryService = categoryService;
             _merchantService = merchantService;
             _userManager = userManager;
@@ -195,19 +201,19 @@ namespace App.ApiControllers.V1.Customer
             if (!categoryIds.Any())
                 return Array.Empty<MerchantDto>();
 
-            var offers = _service.Queryable().AsNoTracking()
-                                 .Where(x => x.DeletionDate == null && x.Active &&
-                                             x.ProductCategory.Active &&
-                                             x.ProductCategoryId.HasValue &&
-                                             categoryIds.Contains(x.ProductCategoryId.Value))
-                                 .SelectMany(x => x.MerchantProducts)
-                                 .Where(m => (m.MerchantPrice > 0 ||
-                                              (m.PriceUsd.HasValue && m.PriceUsd.Value > 0)) &&
-                                             m.Merchant.DeletionDate == null &&
-                                             m.Merchant.Active);
+            // Start at the join entity to avoid a provider-dependent APPLY query.
+            var offers = _merchantProductRepository.Queryable().AsNoTracking()
+                .Where(m => m.Product.DeletionDate == null &&
+                            m.Product.Active &&
+                            m.Product.ProductCategory.Active &&
+                            m.Product.ProductCategoryId.HasValue &&
+                            categoryIds.Contains(m.Product.ProductCategoryId.Value) &&
+                            m.MerchantPrice > 0 &&
+                            m.Merchant.DeletionDate == null &&
+                            m.Merchant.Active);
 
-            // Honour delivery coverage when the caller knows where it is, using
-            // the same rule search uses so the two can never disagree.
+            // Keep category listings aligned with the active merchants in search.
+            // Checkout validates the delivery pin against the city service area.
             if (lat.HasValue && lng.HasValue)
             {
                 var reachable = await _merchantService.GetSearchableMerchants(lat.Value, lng.Value);
@@ -221,6 +227,54 @@ namespace App.ApiControllers.V1.Customer
 
             return await _merchantService.Queryable().AsNoTracking()
                 .Where(x => x.DeletionDate == null && x.Active && merchantIds.Contains(x.Id))
+                .OrderBy(x => x.Title)
+                .Select(x => new MerchantDto
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    ShortDescription = x.ShortDescription,
+                    Description = x.Description,
+                    Phone1 = x.Phone1,
+                    Phone2 = x.Phone2,
+                    ShippingCoverageInMeters = x.ShippingCoverageInMeters,
+                    Lat = x.Lat,
+                    Lng = x.Lng,
+                    Active = x.Active,
+                    MerchantKind = x.MerchantKind,
+                    DeliveryTime = x.DeliveryTime,
+                    DeliveryFee = x.DeliveryFee,
+                    MinOrderAmount = x.MinOrderAmount,
+                    WorkingHours = x.WorkingHours,
+                    Address = x.Address,
+                    Photo = x.Photo
+                })
+                .ToArrayAsync();
+        }
+
+        /// <summary>Active merchants with at least one real, priced product offer.</summary>
+        [HttpGet]
+        [Route("MerchantsWithOffers")]
+        public async Task<ActionResult<MerchantDto[]>> MerchantsWithOffers([FromQuery] decimal? lat = null,
+                                                                           [FromQuery] decimal? lng = null)
+        {
+            var offers = _merchantProductRepository.Queryable().AsNoTracking()
+                .Where(x => x.Discount > 0m && x.MerchantPrice > 0m &&
+                            x.Product.Active && x.Product.DeletionDate == null &&
+                            x.Product.ProductCategory != null && x.Product.ProductCategory.Active &&
+                            x.Merchant.Active && x.Merchant.DeletionDate == null);
+
+            if (lat.HasValue && lng.HasValue)
+            {
+                var reachable = await _merchantService.GetSearchableMerchants(lat.Value, lng.Value);
+                if (reachable == null || reachable.Length == 0)
+                    return Array.Empty<MerchantDto>();
+                offers = offers.Where(x => reachable.Contains(x.MerchantId));
+            }
+
+            var merchantIds = await offers.Select(x => x.MerchantId).Distinct().ToArrayAsync();
+
+            return await _merchantService.Queryable().AsNoTracking()
+                .Where(x => x.Active && x.DeletionDate == null && merchantIds.Contains(x.Id))
                 .OrderBy(x => x.Title)
                 .Select(x => new MerchantDto
                 {
@@ -288,8 +342,11 @@ namespace App.ApiControllers.V1.Customer
                     var mp = mps[product.ProductId];
                     product.ProfitOutOfMerchantPricePercent = mp.ProfitOutOfMerchantPricePercent;
                     product.MerchantPrice = mp.MerchantPrice;
-                    product.AdditionalProfitPercent = mp.AdditionalProfitPercent;
                     product.Discount = mp.Discount;
+                    product.PriceUsd = mp.PriceUsd;
+                    product.OriginalPrice = mp.OriginalPrice;
+                    product.MaxOrderQuantity = mp.MaxOrderQuantity;
+                    product.MerchantKind = mp.MerchantKind;
                     product.MerchantId = mid;
                     result.Add(product);
                 }
@@ -329,9 +386,11 @@ namespace App.ApiControllers.V1.Customer
                     model.Price = mp.Price;
                     model.FinalPrice = mp.FinalPrice;
                     model.MerchantId = mp.MerchantId;
+                    model.MerchantKind = mp.MerchantKind;
                     model.PriceUsd = mp.PriceUsd;
                     model.OriginalPrice = mp.OriginalPrice;
                     model.Discount = mp.Discount;
+                    model.MaxOrderQuantity = mp.MaxOrderQuantity;
                 }
             }
             else
@@ -342,9 +401,11 @@ namespace App.ApiControllers.V1.Customer
                     model.Price = mp.Price;
                     model.FinalPrice = mp.FinalPrice;
                     model.MerchantId = mp.MerchantId;
+                    model.MerchantKind = mp.MerchantKind;
                     model.PriceUsd = mp.PriceUsd;
                     model.OriginalPrice = mp.OriginalPrice;
                     model.Discount = mp.Discount;
+                    model.MaxOrderQuantity = mp.MaxOrderQuantity;
                 }
             }
 
@@ -353,21 +414,25 @@ namespace App.ApiControllers.V1.Customer
                 var fallbackMp = item.MerchantProducts?.FirstOrDefault(m => m.MerchantPrice > 0);
                 if (fallbackMp != null)
                 {
-                    model.Price = fallbackMp.MerchantPrice;
-                    model.FinalPrice = fallbackMp.MerchantPrice;
+                    var fallbackBase = fallbackMp.MerchantPrice;
                     model.MerchantId = fallbackMp.MerchantId;
+                    var fallbackMerchant = await _merchantService.FindAsync(fallbackMp.MerchantId);
+                    model.MerchantKind = (int)(fallbackMerchant?.MerchantKind ?? MerchantKind.Grocery);
                     model.PriceUsd = fallbackMp.PriceUsd;
                     model.OriginalPrice = fallbackMp.OriginalPrice;
                     model.Discount = fallbackMp.Discount;
+                    model.MaxOrderQuantity = fallbackMp.MaxOrderQuantity;
                     if (fallbackMp.PriceUsd.HasValue && fallbackMp.PriceUsd.Value > 0)
                     {
                         var usdRate = await _merchantService.GetUsdRate();
                         if (usdRate > 0)
                         {
-                            model.Price = Math.Round(fallbackMp.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
-                            model.FinalPrice = model.Price;
+                            fallbackBase = Math.Round(fallbackMp.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
                         }
                     }
+                    var markup = Math.Round(fallbackBase * fallbackMp.ProfitOutOfMerchantPricePercent / 100m, 0, MidpointRounding.AwayFromZero);
+                    model.FinalPrice = fallbackBase + markup;
+                    model.Price = model.FinalPrice + fallbackMp.Discount;
                 }
             }
 
@@ -412,20 +477,40 @@ namespace App.ApiControllers.V1.Customer
                             .Where(x => !vm.ProductCategoryId.HasValue ||
                                 x.ProductCategoryId == vm.ProductCategoryId ||
                                 x.ProductCategory.ParentId == vm.ProductCategoryId)
-                            .Where(x => !doSearch || x.Title.ToLower().Contains(vm.q))
+                            .Where(x => !doSearch ||
+                                x.Title.ToLower().Contains(vm.q) ||
+                                (x.Description != null && x.Description.ToLower().Contains(vm.q)) ||
+                                (x.Brand != null && x.Brand.ToLower().Contains(vm.q)) ||
+                                (x.ProductCategory != null &&
+                                    (x.ProductCategory.Title.ToLower().Contains(vm.q) ||
+                                     (x.ProductCategory.Parent != null &&
+                                      x.ProductCategory.Parent.Title.ToLower().Contains(vm.q)))))
                             .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active) && x.Active);
+
+            if (vm.OnlyOffers)
+            {
+                q = q.Where(x => x.ProductCategory != null &&
+                                 x.MerchantProducts.Any(m => m.Discount > 0m && m.MerchantPrice > 0m &&
+                                                             m.Merchant.Active && m.Merchant.DeletionDate == null));
+            }
 
             int[] mids = null;
             // Restaurants are limited to their delivery coverage, markets are not.
             if (vm.Lat.HasValue && vm.Lng.HasValue)
             {
                 mids = await _merchantService.GetSearchableMerchants(vm.Lat.Value, vm.Lng.Value);
+                if (vm.OnlyOffers && (mids == null || mids.Length == 0))
+                    return Array.Empty<ProductLiteDto>();
                 // An unpriced row means the merchant does not actually stock the
                 // product. Excluding those here keeps this filter in step with
                 // the priced-only check applied to the results below, so a page
                 // of results cannot silently come back part empty.
                 if (mids != null && mids.Length > 0)
                     q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) && (m.MerchantPrice > 0 || (m.PriceUsd.HasValue && m.PriceUsd.Value > 0))));
+                if (vm.OnlyOffers)
+                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) &&
+                                     m.Discount > 0m && m.MerchantPrice > 0m &&
+                                     m.Merchant.Active && m.Merchant.DeletionDate == null));
             }
             else
             {
@@ -444,6 +529,7 @@ namespace App.ApiControllers.V1.Customer
                                           Title = x.Title,
                                           Description = x.Description,
                                           CategoryId = x.ProductCategory.Id,
+                                          Category = x.ProductCategory.Title,
                                           Photos = x.Photos,
                                           Unit = x.Unit
                                       })
@@ -452,15 +538,23 @@ namespace App.ApiControllers.V1.Customer
             // Load merchant prices from cache
             foreach (var product in productsPage)
             {
-                var mp = await _merchantService.GetBestProductPrice(product.Id, mids);
+                var mp = vm.OnlyOffers
+                    ? (await _merchantService.GetProductPrices(product.Id)).Values
+                        .Where(x => x.Discount > 0m && x.FinalPrice > 0m &&
+                                    (mids == null || mids.Contains(x.MerchantId)))
+                        .OrderBy(x => x.FinalPrice)
+                        .FirstOrDefault()
+                    : await _merchantService.GetBestProductPrice(product.Id, mids);
                 if (mp != null)
                 {
                     product.MerchantId = mp.MerchantId;
+                    product.MerchantKind = mp.MerchantKind;
                     product.Price = mp.Price;
                     product.FinalPrice = mp.FinalPrice;
                     product.PriceUsd = mp.PriceUsd;
                     product.OriginalPrice = mp.OriginalPrice;
                     product.Discount = mp.Discount;
+                    product.MaxOrderQuantity = mp.MaxOrderQuantity;
                 }
             }
 
@@ -517,16 +611,36 @@ namespace App.ApiControllers.V1.Customer
                             .Where(x => !vm.ProductCategoryId.HasValue ||
                                 (x.ProductCategoryId.HasValue &&
                                  categoryIds.Contains(x.ProductCategoryId.Value)))
-                            .Where(x => !doSearch || x.Title.ToLower().Contains(vm.q))
+                            .Where(x => !doSearch ||
+                                x.Title.ToLower().Contains(vm.q) ||
+                                (x.Description != null && x.Description.ToLower().Contains(vm.q)) ||
+                                (x.Brand != null && x.Brand.ToLower().Contains(vm.q)) ||
+                                (x.ProductCategory != null &&
+                                    (x.ProductCategory.Title.ToLower().Contains(vm.q) ||
+                                     (x.ProductCategory.Parent != null &&
+                                      x.ProductCategory.Parent.Title.ToLower().Contains(vm.q)))))
                             .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active) && x.Active);
+
+            if (vm.OnlyOffers)
+            {
+                q = q.Where(x => x.ProductCategory != null &&
+                                 x.MerchantProducts.Any(m => m.Discount > 0m && m.MerchantPrice > 0m &&
+                                                             m.Merchant.Active && m.Merchant.DeletionDate == null));
+            }
 
             int[] mids = null;
             // Restaurants are limited to their delivery coverage, markets are not.
             if (vm.Lat.HasValue && vm.Lng.HasValue)
             {
                 mids = await _merchantService.GetSearchableMerchants(vm.Lat.Value, vm.Lng.Value);
+                if (vm.OnlyOffers && (mids == null || mids.Length == 0))
+                    return Array.Empty<ProductCategoryLiteDto>();
                 if (mids != null && mids.Length > 0)
                     q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) && m.MerchantPrice > 0));
+                if (vm.OnlyOffers)
+                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) &&
+                                     m.Discount > 0m && m.MerchantPrice > 0m &&
+                                     m.Merchant.Active && m.Merchant.DeletionDate == null));
             }
             else
             {
@@ -552,17 +666,25 @@ namespace App.ApiControllers.V1.Customer
             // Load merchant prices from cache
             foreach (var product in products)
             {
-                var mp = await _merchantService.GetBestProductPrice(product.Id, mids);
+                var mp = vm.OnlyOffers
+                    ? (await _merchantService.GetProductPrices(product.Id)).Values
+                        .Where(x => x.Discount > 0m && x.FinalPrice > 0m &&
+                                    (mids == null || mids.Contains(x.MerchantId)))
+                        .OrderBy(x => x.FinalPrice)
+                        .FirstOrDefault()
+                    : await _merchantService.GetBestProductPrice(product.Id, mids);
                 //var mps = await _merchantService.GetProductPrices(product.Id);
                 //var mp = mps.Values.OrderBy(x => x.MerchantPrice).FirstOrDefault(x => x.MerchantPrice > 0 && mids.Contains(x.MerchantId));
                 if (mp != null)
                 {
                     product.MerchantId = mp.MerchantId;
+                    product.MerchantKind = mp.MerchantKind;
                     product.Price = mp.Price;
                     product.FinalPrice = mp.FinalPrice;
                     product.PriceUsd = mp.PriceUsd;
                     product.OriginalPrice = mp.OriginalPrice;
                     product.Discount = mp.Discount;
+                    product.MaxOrderQuantity = mp.MaxOrderQuantity;
                 }
             }
 
@@ -661,11 +783,13 @@ namespace App.ApiControllers.V1.Customer
 
             var activeMerchantIds = merchants.Keys.ToList();
 
-            var productsQuery = _service.Queryable()
+            var baseProductsQuery = _service.Queryable()
                 .AsNoTracking()
                 .Include(x => x.MerchantProducts)
                 .Include(x => x.ProductCategory)
-                .Where(x => x.DeletionDate == null && x.Active && (x.ProductCategory == null || x.ProductCategory.Active))
+                .Where(x => x.DeletionDate == null && x.Active && (x.ProductCategory == null || x.ProductCategory.Active));
+
+            var productsQuery = baseProductsQuery
                 .Where(x => x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId)));
 
             var candidateProducts = new System.Collections.Generic.List<Product>();
@@ -676,7 +800,7 @@ namespace App.ApiControllers.V1.Customer
                 var adminIds = activeConfigItems.Select(x => x.ProductId).Distinct().ToList();
                 if (adminIds.Any())
                 {
-                    var prods = await productsQuery
+                    var prods = await baseProductsQuery
                         .Where(x => adminIds.Contains(x.Id))
                         .ToListAsync();
 
@@ -694,7 +818,7 @@ namespace App.ApiControllers.V1.Customer
                 var adminIds = activeConfigItems.Select(x => x.ProductId).Distinct().ToList();
                 if (adminIds.Any())
                 {
-                    var adminProds = await productsQuery
+                    var adminProds = await baseProductsQuery
                         .Where(x => adminIds.Contains(x.Id))
                         .ToListAsync();
 
@@ -829,31 +953,32 @@ namespace App.ApiControllers.V1.Customer
                 if (!merchants.TryGetValue(mid, out var merchant)) continue;
                 decimal finalPrice = mp?.FinalPrice ?? 0m;
                 decimal price = mp?.Price ?? finalPrice;
+                int? maxOrderQuantity = mp?.MaxOrderQuantity;
 
                 if (finalPrice <= 0)
                 {
                     var fallbackPrice = p.MerchantProducts?.FirstOrDefault(m => m.MerchantId == mid);
                     if (fallbackPrice != null && fallbackPrice.MerchantPrice > 0)
                     {
+                        decimal fallbackBase = fallbackPrice.MerchantPrice;
                         if (fallbackPrice.PriceUsd.HasValue && fallbackPrice.PriceUsd.Value > 0)
                         {
                             var usdRate = await _merchantService.GetUsdRate();
                             if (usdRate > 0)
                             {
-                                price = Math.Round(fallbackPrice.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
-                                finalPrice = price;
-                            }
-                            else
-                            {
-                                price = fallbackPrice.MerchantPrice;
-                                finalPrice = fallbackPrice.MerchantPrice;
+                                fallbackBase = Math.Round(fallbackPrice.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
                             }
                         }
-                        else
+                        var quote = new MerchantProductDto
                         {
-                            price = fallbackPrice.MerchantPrice;
-                            finalPrice = fallbackPrice.MerchantPrice;
-                        }
+                            MerchantPrice = fallbackBase,
+                            ProfitOutOfMerchantPricePercent = fallbackPrice.ProfitOutOfMerchantPricePercent,
+                            Discount = fallbackPrice.Discount,
+                            MaxOrderQuantity = fallbackPrice.MaxOrderQuantity
+                        };
+                        finalPrice = quote.FinalPrice;
+                        price = quote.Price;
+                        maxOrderQuantity = quote.MaxOrderQuantity;
                     }
                 }
 
@@ -884,6 +1009,7 @@ namespace App.ApiControllers.V1.Customer
                     MerchantTitle = merchant?.Title ?? "متجر جيتك",
                     MerchantLogo = merchant?.Photo ?? "",
                     MerchantKind = (int)(merchant?.MerchantKind ?? MerchantKind.Restaurant),
+                    MaxOrderQuantity = maxOrderQuantity,
                     Eta = eta,
                     Distance = "1.8 كم",
                     OrdersCount = 1
@@ -893,6 +1019,305 @@ namespace App.ApiControllers.V1.Customer
             }
 
             return result.ToArray();
+        }
+
+        /// <summary>
+        /// Customer-facing metadata for the Most Popular home section.
+        /// Kept separate from /Popular so existing mobile list consumers remain
+        /// backward compatible while still honoring admin visibility and titles.
+        /// </summary>
+        [HttpGet]
+        [Route("PopularConfig")]
+        public async Task<ActionResult<object>> GetPopularConfig()
+        {
+            PopularSectionConfig config = null;
+            if (_genericSetting != null)
+            {
+                try
+                {
+                    config = await _genericSetting.GetValue<PopularSectionConfig>("PopularProductsConfig", null);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to read PopularProductsConfig metadata");
+                }
+            }
+
+            return Ok(new
+            {
+                enabled = config?.Enabled ?? true,
+                sectionTitle = config?.SectionTitle ?? "الأكثر طلباً",
+                sectionTitleEn = config?.SectionTitleEn ?? "Most Popular"
+            });
+        }
+
+        /// <summary>
+        /// Customer-facing metadata for Market Best Selling section.
+        /// Gives administrator full control over visibility, title, and product curation.
+        /// </summary>
+        [HttpGet]
+        [Route("MarketBestSellingConfig")]
+        public async Task<ActionResult<object>> GetMarketBestSellingConfig()
+        {
+            MarketBestSellingSectionConfig config = null;
+            if (_genericSetting != null)
+            {
+                try
+                {
+                    config = await _genericSetting.GetValue<MarketBestSellingSectionConfig>("MarketBestSellingConfig", null);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to read MarketBestSellingConfig metadata");
+                }
+            }
+
+            return Ok(new
+            {
+                enabled = config?.Enabled ?? true,
+                sectionTitle = config?.SectionTitle ?? "الأكثر مبيعًا",
+                sectionTitleEn = config?.SectionTitleEn ?? "Best Selling",
+                mode = config?.Mode ?? "Hybrid",
+                maxItems = config?.MaxItems > 0 ? config.MaxItems : 10,
+                curatedProductIds = config?.Items?
+                    .Where(x => x.Active && x.ProductId > 0)
+                    .OrderBy(x => x.Order)
+                    .Select(x => x.ProductId)
+                    .ToList() ?? new List<int>()
+            });
+        }
+
+        /// <summary>
+        /// Customer-facing product list for Market Best Selling shelf.
+        /// Honors admin configuration (Enabled, Mode, Curated Products, and Ordering).
+        /// </summary>
+        [HttpGet]
+        [Route("MarketBestSelling")]
+        public async Task<ActionResult<PopularProductDto[]>> GetMarketBestSelling(
+            [FromQuery] int? merchantId = null,
+            [FromQuery] int take = 10)
+        {
+            if (take <= 0 || take > 50) take = 10;
+
+            MarketBestSellingSectionConfig config = null;
+            if (_genericSetting != null)
+            {
+                try
+                {
+                    config = await _genericSetting.GetValue<MarketBestSellingSectionConfig>("MarketBestSellingConfig", null);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to read MarketBestSellingConfig in GetMarketBestSelling");
+                }
+            }
+
+            if (config != null && !config.Enabled)
+            {
+                return Array.Empty<PopularProductDto>();
+            }
+
+            // The administrator owns the shelf size. A client may request
+            // fewer items, but cannot override the configured maximum.
+            var configuredMaxItems = config?.MaxItems > 0 ? config.MaxItems : 10;
+            take = Math.Min(take, Math.Clamp(configuredMaxItems, 1, 50));
+
+            string mode = config?.Mode ?? "Hybrid";
+            var activeConfigItems = config?.Items?
+                .Where(x => x.Active && x.ProductId > 0)
+                .OrderBy(x => x.Order)
+                .ToList() ?? new List<MarketBestSellingItemConfig>();
+
+            var merchants = await _merchantService.Queryable()
+                .AsNoTracking()
+                .Where(x => x.DeletionDate == null && x.Active &&
+                            x.MerchantKind != MerchantKind.Restaurant &&
+                            (merchantId == null || x.Id == merchantId.Value))
+                .ToDictionaryAsync(x => x.Id, x => x);
+
+            var activeMerchantIds = merchants.Keys.ToList();
+
+            var baseProductsQuery = _service.Queryable()
+                .AsNoTracking()
+                .Include(x => x.MerchantProducts)
+                .Include(x => x.ProductCategory)
+                .Where(x => x.DeletionDate == null && x.Active && (x.ProductCategory == null || x.ProductCategory.Active));
+
+            var productsQuery = baseProductsQuery
+                .Where(x => x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0));
+
+            var candidateProducts = new List<Product>();
+
+            var topOrderedStats = new List<(int ProductId, int Count)>();
+            if (_orderDetailsService != null && activeMerchantIds.Any())
+            {
+                try
+                {
+                    var stats = await _orderDetailsService.Queryable()
+                        .AsNoTracking()
+                        .Where(x => x.ProductId > 0 && activeMerchantIds.Contains(x.MerchantId) &&
+                                    (x.OrderDetailStatus == OrderDetailStatus.Delivered ||
+                                     x.OrderDetailStatus == OrderDetailStatus.ShippingStarted ||
+                                     x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted ||
+                                     x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup))
+                        .GroupBy(x => x.ProductId)
+                        .Select(g => new { ProductId = g.Key, Count = g.Sum(x => x.Quantity) })
+                        .OrderByDescending(x => x.Count)
+                        .Take(take * 3)
+                        .ToListAsync();
+                    topOrderedStats = stats.Select(x => (x.ProductId, x.Count)).ToList();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to query sales statistics in GetMarketBestSelling");
+                }
+            }
+
+            // 1. Manual Mode
+            if (mode.Equals("Manual", StringComparison.OrdinalIgnoreCase))
+            {
+                var adminIds = activeConfigItems.Select(x => x.ProductId).Distinct().ToList();
+                if (adminIds.Any())
+                {
+                    var prods = await productsQuery
+                        .Where(x => adminIds.Contains(x.Id))
+                        .ToListAsync();
+
+                    candidateProducts = adminIds
+                        .Select(id => prods.FirstOrDefault(p => p.Id == id))
+                        .Where(p => p != null)
+                        .Take(take)
+                        .ToList();
+                }
+            }
+            // 2. Hybrid Mode
+            else if (mode.Equals("Hybrid", StringComparison.OrdinalIgnoreCase))
+            {
+                var adminIds = activeConfigItems.Select(x => x.ProductId).Distinct().ToList();
+                if (adminIds.Any())
+                {
+                    var adminProds = await productsQuery
+                        .Where(x => adminIds.Contains(x.Id))
+                        .ToListAsync();
+
+                    candidateProducts = adminIds
+                        .Select(id => adminProds.FirstOrDefault(p => p.Id == id))
+                        .Where(p => p != null)
+                        .ToList();
+                }
+
+                if (candidateProducts.Count < take)
+                {
+                    var existingIds = candidateProducts.Select(x => x.Id).ToList();
+                    var soldProductIds = topOrderedStats
+                        .Where(x => !existingIds.Contains(x.ProductId))
+                        .Select(x => x.ProductId)
+                        .ToList();
+                    if (soldProductIds.Any())
+                    {
+                        var soldProducts = await productsQuery
+                            .Where(x => soldProductIds.Contains(x.Id))
+                            .ToListAsync();
+                        var soldById = soldProducts.ToDictionary(x => x.Id);
+                        candidateProducts.AddRange(soldProductIds
+                            .Where(id => soldById.ContainsKey(id))
+                            .Select(id => soldById[id])
+                            .Take(take - candidateProducts.Count));
+                    }
+
+                    if (candidateProducts.Count < take)
+                    {
+                        var currentIds = candidateProducts.Select(x => x.Id).ToList();
+                        var supplementProducts = await productsQuery
+                            .Where(x => !currentIds.Contains(x.Id))
+                            .OrderByDescending(x => x.IsFeatured)
+                            .ThenByDescending(x => x.Id)
+                            .Take(take - candidateProducts.Count)
+                            .ToListAsync();
+                        candidateProducts.AddRange(supplementProducts);
+                    }
+                }
+            }
+            // 3. Auto Mode
+            else
+            {
+                var soldProductIds = topOrderedStats.Select(x => x.ProductId).ToList();
+                if (soldProductIds.Any())
+                {
+                    var soldProducts = await productsQuery
+                        .Where(x => soldProductIds.Contains(x.Id))
+                        .ToListAsync();
+                    var soldById = soldProducts.ToDictionary(x => x.Id);
+                    candidateProducts = soldProductIds
+                        .Where(id => soldById.ContainsKey(id))
+                        .Select(id => soldById[id])
+                        .Take(take)
+                        .ToList();
+                }
+
+                if (candidateProducts.Count < take)
+                {
+                    var existingIds = candidateProducts.Select(x => x.Id).ToList();
+                    var supplementProducts = await productsQuery
+                        .Where(x => !existingIds.Contains(x.Id))
+                        .OrderByDescending(x => x.IsFeatured)
+                        .ThenByDescending(x => x.Id)
+                        .Take(take - candidateProducts.Count)
+                        .ToListAsync();
+                    candidateProducts.AddRange(supplementProducts);
+                }
+            }
+
+            var result = new List<PopularProductDto>();
+            foreach (var p in candidateProducts)
+            {
+                var mp = p.MerchantProducts?
+                    .Where(m => merchants.ContainsKey(m.MerchantId) && m.MerchantPrice > 0)
+                    .OrderBy(m => m.MerchantPrice)
+                    .FirstOrDefault();
+
+                var mid = mp?.MerchantId ?? (merchantId ?? 0);
+                merchants.TryGetValue(mid, out var m);
+                MerchantProductDto priceQuote = null;
+                try
+                {
+                    priceQuote = mid > 0
+                        ? await _merchantService.GetBestProductPrice(p.Id, new[] { mid })
+                        : null;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to calculate market best-selling price for product {ProductId}", p.Id);
+                }
+                var itemConfig = mode.Equals("Auto", StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : activeConfigItems.FirstOrDefault(x => x.ProductId == p.Id);
+
+                result.Add(new PopularProductDto
+                {
+                    Id = p.Id,
+                    Title = string.IsNullOrWhiteSpace(itemConfig?.CustomTitle)
+                        ? p.Title
+                        : itemConfig.CustomTitle,
+                    Description = p.Description,
+                    CategoryId = p.ProductCategoryId ?? 0,
+                    Category = p.ProductCategory?.Title ?? "",
+                    Photos = p.Photos,
+                    Unit = p.Unit,
+                    Price = priceQuote?.Price ?? mp?.MerchantPrice ?? 0m,
+                    FinalPrice = priceQuote?.FinalPrice ?? mp?.MerchantPrice ?? 0m,
+                    MerchantId = mid,
+                    MerchantTitle = m?.Title ?? "سوبر ماركت جيتك",
+                    MerchantLogo = m?.Photo ?? "",
+                    MerchantKind = (int)(m?.MerchantKind ?? MerchantKind.Grocery),
+                    Eta = m?.DeliveryTime ?? "10 - 20 دقيقة",
+                    Distance = "1.5 كم",
+                    OrdersCount = 0,
+                    CustomBadge = itemConfig?.CustomBadge
+                });
+            }
+
+            return Ok(result.ToArray());
         }
     }
 }

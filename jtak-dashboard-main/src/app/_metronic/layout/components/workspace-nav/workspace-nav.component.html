@@ -1,0 +1,23 @@
+<section *ngIf="group as workspace" class="workspace-nav-wrapper container-fluid" [attr.aria-label]="workspace.label | translate">
+  <div class="workspace-nav-card">
+    <div class="workspace-nav-heading">
+      <span class="workspace-nav-icon">
+        <i [class]="workspace.icon" aria-hidden="true"></i>
+      </span>
+      <div class="workspace-nav-meta">
+        <h2 class="workspace-nav-title">{{ workspace.label | translate }}</h2>
+        <p class="workspace-nav-desc">{{ workspace.description | translate }}</p>
+      </div>
+    </div>
+
+    <nav class="workspace-nav-tabs" [attr.aria-label]="workspace.label | translate">
+      <a *ngFor="let item of workspace.items" [routerLink]="'/' + item.path"
+        class="workspace-nav-tab"
+        [class.is-active]="activePath === item.path"
+        [attr.aria-current]="activePath === item.path ? 'page' : null">
+        <i [class]="item.icon" aria-hidden="true"></i>
+        <span>{{ item.label | translate }}</span>
+      </a>
+    </nav>
+  </div>
+</section>

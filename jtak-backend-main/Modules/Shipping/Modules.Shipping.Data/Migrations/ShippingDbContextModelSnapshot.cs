@@ -3,7 +3,10 @@ using System;
 using App.Shipping.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
 
 namespace Modules.Shipping.Data.Migrations
 {
@@ -14,8 +17,10 @@ namespace Modules.Shipping.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Relational:MaxIdentifierLength", 64)
-                .HasAnnotation("ProductVersion", "5.0.13");
+                .HasAnnotation("ProductVersion", "8.0.31")
+                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
             modelBuilder.Entity("App.Shared.Entities.GenericSetting", b =>
                 {
@@ -44,11 +49,59 @@ namespace Modules.Shipping.Data.Migrations
                     b.ToTable("Shipping_Settings");
                 });
 
+            modelBuilder.Entity("Modules.Shipping.Entities.DeliveryDriverDuty", b =>
+                {
+                    b.Property<Guid>("DriverId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<double?>("Heading")
+                        .HasColumnType("double");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastLocationUpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Lat")
+                        .HasColumnType("decimal(18,9)");
+
+                    b.Property<decimal>("Lng")
+                        .HasColumnType("decimal(18,9)");
+
+                    b.Property<DateTime?>("ShiftStartedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<double?>("Speed")
+                        .HasColumnType("double");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("DriverId");
+
+                    b.ToTable("Shipping_DriverDuties");
+                });
+
             modelBuilder.Entity("Modules.Shipping.Entities.ShippingOrder", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("CompletedDate")
                         .HasColumnType("datetime(6)");
@@ -69,6 +122,9 @@ namespace Modules.Shipping.Data.Migrations
                     b.Property<int>("Index")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsDarkStore")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<decimal>("Lat")
                         .HasColumnType("decimal(65,30)");
 
@@ -78,8 +134,17 @@ namespace Modules.Shipping.Data.Migrations
                     b.Property<int?>("MerchantId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("longtext");
+
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
+
+                    b.Property<string>("StopTitle")
+                        .HasColumnType("longtext");
+
+                    b.Property<byte>("StopType")
+                        .HasColumnType("tinyint unsigned");
 
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(256)
@@ -88,7 +153,13 @@ namespace Modules.Shipping.Data.Migrations
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("VerificationCode")
+                        .HasColumnType("longtext");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("OrderId", "StopType", "MerchantId")
+                        .IsUnique();
 
                     b.ToTable("Shipping_ShippingOrders");
                 });

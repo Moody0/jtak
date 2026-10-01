@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Modules.Catalog.Entities;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -316,12 +317,16 @@ namespace Modules.Catalog.Services
         {
             return await _context.Merchants
                 .AsNoTracking()
-                .Where(m => m.DeletionDate == null && m.Active)
+                // Inactive dark stores are still valid internal warehouses for stock intake.
+                // Their inactive state keeps them hidden from customer storefronts.
+                .Where(m => m.DeletionDate == null &&
+                            (m.Active || m.MerchantKind == App.Shared.Entities.Enums.MerchantKind.DarkStore))
                 .OrderBy(m => m.Title)
                 .Select(m => new BatchMerchantLookupDto
                 {
                     Id = m.Id,
-                    Title = m.Title
+                    Title = m.Title,
+                    MerchantKind = m.MerchantKind
                 })
                 .ToListAsync();
         }
@@ -339,6 +344,9 @@ namespace Modules.Catalog.Services
             {
                 throw new InvalidOperationException($"Cannot adjust stock to {newQuantity} units because {batch.QuantityReserved} units are currently reserved.");
             }
+
+            var onHandBefore = batch.QuantityOnHand;
+            var reservedBefore = batch.QuantityReserved;
 
             batch.QuantityOnHand = newQuantity;
             batch.UpdatedBy = updatedBy ?? "System";
@@ -367,6 +375,24 @@ namespace Modules.Catalog.Services
                     ? $"Adjustment ({DateTime.UtcNow:yyyy-MM-dd}): {dto.Reason}"
                     : $"{batch.Notes} | Adjustment ({DateTime.UtcNow:yyyy-MM-dd}): {dto.Reason}";
             }
+
+            var movement = new InventoryMovement
+            {
+                ProductBatchId = batch.Id,
+                ProductId = batch.ProductId,
+                MerchantId = batch.MerchantId,
+                MovementType = InventoryMovementType.Adjustment,
+                Quantity = Math.Abs(dto.QuantityDelta),
+                QuantityOnHandBefore = onHandBefore,
+                QuantityOnHandAfter = batch.QuantityOnHand,
+                QuantityReservedBefore = reservedBefore,
+                QuantityReservedAfter = batch.QuantityReserved,
+                BusinessKey = $"Batch:{batch.Id}:Adjustment:{Guid.NewGuid():N}",
+                Reason = dto.Reason ?? "Manual inventory adjustment",
+                CreatedBy = updatedBy ?? "System",
+                CreatedDate = DateTime.UtcNow
+            };
+            await _context.InventoryMovements.AddAsync(movement);
 
             await _uow.SaveChangesAsync();
             return await GetBatchByIdAsync(batch.Id);
@@ -424,6 +450,35 @@ namespace Modules.Catalog.Services
                 return new List<BatchReservationDto>();
             }
 
+            await using var transaction = _context.Database.IsRelational() && _context.Database.CurrentTransaction == null
+                ? await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable)
+                : null;
+
+            // Idempotency check: if active reservations already exist for this order detail, return them without double reserving
+            var existingReservations = await _context.BatchReservations
+                .Include(r => r.ProductBatch)
+                .Where(r => r.OrderId == orderId && r.OrderDetailId == orderDetailId && !r.IsReleased)
+                .ToListAsync();
+
+            if (existingReservations.Any())
+            {
+                var existing = existingReservations.Select(r => new BatchReservationDto
+                {
+                    ReservationId = r.Id,
+                    OrderDetailId = r.OrderDetailId,
+                    ProductBatchId = r.ProductBatchId,
+                    BatchNumber = r.ProductBatch?.BatchNumber,
+                    Barcode = r.ProductBatch?.Barcode,
+                    LocationBin = r.ProductBatch?.LocationBin,
+                    ExpirationDate = r.ProductBatch?.ExpirationDate ?? DateTime.MinValue,
+                    Quantity = r.Quantity,
+                    IsDeducted = r.IsDeducted,
+                    IsReleased = r.IsReleased
+                }).ToList();
+                if (transaction != null) await transaction.CommitAsync();
+                return existing;
+            }
+
             var minValidDate = DateTime.UtcNow.Date.AddDays(minDaysToExpiry);
 
             // Fetch candidate batches ordered by ExpirationDate ASC (FEFO)
@@ -450,6 +505,7 @@ namespace Modules.Catalog.Services
 
             var remainingToReserve = quantity;
             var reservations = new List<BatchReservation>();
+            var now = DateTime.UtcNow;
 
             foreach (var batch in batches)
             {
@@ -458,6 +514,7 @@ namespace Modules.Catalog.Services
                 var availableInBatch = batch.QuantityOnHand - batch.QuantityReserved;
                 var allocate = Math.Min(remainingToReserve, availableInBatch);
 
+                var reservedBefore = batch.QuantityReserved;
                 batch.QuantityReserved += allocate;
                 remainingToReserve -= allocate;
 
@@ -469,15 +526,36 @@ namespace Modules.Catalog.Services
                     Quantity = allocate,
                     IsDeducted = false,
                     IsReleased = false,
-                    CreatedDate = DateTime.UtcNow,
+                    CreatedDate = now,
                     CreatedBy = "FEFO-Engine"
                 };
 
                 await _context.BatchReservations.AddAsync(reservation);
                 reservations.Add(reservation);
+
+                var movement = new InventoryMovement
+                {
+                    ProductBatchId = batch.Id,
+                    ProductId = productId,
+                    MerchantId = merchantId,
+                    OrderId = orderId,
+                    OrderDetailId = orderDetailId,
+                    MovementType = InventoryMovementType.Reserve,
+                    Quantity = allocate,
+                    QuantityOnHandBefore = batch.QuantityOnHand,
+                    QuantityOnHandAfter = batch.QuantityOnHand,
+                    QuantityReservedBefore = reservedBefore,
+                    QuantityReservedAfter = batch.QuantityReserved,
+                    BusinessKey = $"Order:{orderId}:Detail:{orderDetailId}:Batch:{batch.Id}:Reserve",
+                    Reason = "Checkout FEFO stock reservation",
+                    CreatedBy = "FEFO-Engine",
+                    CreatedDate = now
+                };
+                await _context.InventoryMovements.AddAsync(movement);
             }
 
             await _uow.SaveChangesAsync();
+            if (transaction != null) await transaction.CommitAsync();
 
             return reservations.Select(r => new BatchReservationDto
             {
@@ -498,7 +576,7 @@ namespace Modules.Catalog.Services
         {
             var query = _context.BatchReservations
                 .Include(r => r.ProductBatch)
-                .Where(r => r.OrderId == orderId && !r.IsReleased && !r.IsDeducted);
+                .Where(r => r.OrderId == orderId && !r.IsReleased);
 
             if (orderDetailId.HasValue)
             {
@@ -523,7 +601,64 @@ namespace Modules.Catalog.Services
             {
                 if (batches.TryGetValue(res.ProductBatchId, out var batch))
                 {
-                    batch.QuantityReserved = Math.Max(0, batch.QuantityReserved - res.Quantity);
+                    var onHandBefore = batch.QuantityOnHand;
+                    var reservedBefore = batch.QuantityReserved;
+
+                    if (res.IsDeducted)
+                    {
+                        // Was already deducted (e.g. cancelled after ReadyForPickup or returned by driver).
+                        // Restore sellable physical stock!
+                        batch.QuantityOnHand += res.Quantity;
+                        if (batch.Status == BatchStatus.Depleted && batch.QuantityOnHand > 0)
+                        {
+                            batch.Status = batch.ExpirationDate <= now.Date ? BatchStatus.Expired : BatchStatus.Active;
+                        }
+
+                        var returnMovement = new InventoryMovement
+                        {
+                            ProductBatchId = batch.Id,
+                            ProductId = batch.ProductId,
+                            MerchantId = batch.MerchantId,
+                            OrderId = orderId,
+                            OrderDetailId = res.OrderDetailId,
+                            MovementType = InventoryMovementType.Return,
+                            Quantity = res.Quantity,
+                            QuantityOnHandBefore = onHandBefore,
+                            QuantityOnHandAfter = batch.QuantityOnHand,
+                            QuantityReservedBefore = reservedBefore,
+                            QuantityReservedAfter = batch.QuantityReserved,
+                            BusinessKey = $"Order:{orderId}:Detail:{res.OrderDetailId}:Batch:{batch.Id}:Return",
+                            Reason = reason ?? "Post-deduction return / cancellation",
+                            CreatedBy = "Return-Engine",
+                            CreatedDate = now
+                        };
+                        await _context.InventoryMovements.AddAsync(returnMovement);
+                    }
+                    else
+                    {
+                        // Pre-deduction: unreserve only
+                        batch.QuantityReserved = Math.Max(0, batch.QuantityReserved - res.Quantity);
+
+                        var releaseMovement = new InventoryMovement
+                        {
+                            ProductBatchId = batch.Id,
+                            ProductId = batch.ProductId,
+                            MerchantId = batch.MerchantId,
+                            OrderId = orderId,
+                            OrderDetailId = res.OrderDetailId,
+                            MovementType = InventoryMovementType.Release,
+                            Quantity = res.Quantity,
+                            QuantityOnHandBefore = onHandBefore,
+                            QuantityOnHandAfter = batch.QuantityOnHand,
+                            QuantityReservedBefore = reservedBefore,
+                            QuantityReservedAfter = batch.QuantityReserved,
+                            BusinessKey = $"Order:{orderId}:Detail:{res.OrderDetailId}:Batch:{batch.Id}:Release",
+                            Reason = reason ?? "Reservation released",
+                            CreatedBy = "Release-Engine",
+                            CreatedDate = now
+                        };
+                        await _context.InventoryMovements.AddAsync(releaseMovement);
+                    }
                 }
                 res.IsReleased = true;
                 res.ReleasedDate = now;
@@ -562,6 +697,9 @@ namespace Modules.Catalog.Services
             {
                 if (batches.TryGetValue(res.ProductBatchId, out var batch))
                 {
+                    var onHandBefore = batch.QuantityOnHand;
+                    var reservedBefore = batch.QuantityReserved;
+
                     batch.QuantityOnHand = Math.Max(0, batch.QuantityOnHand - res.Quantity);
                     batch.QuantityReserved = Math.Max(0, batch.QuantityReserved - res.Quantity);
 
@@ -569,12 +707,150 @@ namespace Modules.Catalog.Services
                     {
                         batch.Status = BatchStatus.Depleted;
                     }
+
+                    var movement = new InventoryMovement
+                    {
+                        ProductBatchId = batch.Id,
+                        ProductId = batch.ProductId,
+                        MerchantId = batch.MerchantId,
+                        OrderId = orderId,
+                        OrderDetailId = res.OrderDetailId,
+                        MovementType = InventoryMovementType.Deduction,
+                        Quantity = res.Quantity,
+                        QuantityOnHandBefore = onHandBefore,
+                        QuantityOnHandAfter = batch.QuantityOnHand,
+                        QuantityReservedBefore = reservedBefore,
+                        QuantityReservedAfter = batch.QuantityReserved,
+                        BusinessKey = $"Order:{orderId}:Detail:{res.OrderDetailId}:Batch:{batch.Id}:Deduct",
+                        Reason = "Order marked ready / picked for dispatch",
+                        CreatedBy = "Warehouse-Engine",
+                        CreatedDate = now
+                    };
+                    await _context.InventoryMovements.AddAsync(movement);
                 }
                 res.IsDeducted = true;
                 res.DeductedDate = now;
             }
 
             await _uow.SaveChangesAsync();
+        }
+
+        public async Task ProcessReturnInventoryAsync(int orderId, int? orderDetailId = null, string reason = "Order Returned", bool returnToStock = true, string disposition = "Restocked", int? merchantId = null)
+        {
+            var query = _context.BatchReservations
+                .Include(r => r.ProductBatch)
+                .Where(r => r.OrderId == orderId && !r.IsReleased);
+
+            if (orderDetailId.HasValue)
+            {
+                query = query.Where(r => r.OrderDetailId == orderDetailId.Value);
+            }
+
+            if (merchantId.HasValue)
+            {
+                query = query.Where(r => r.ProductBatch.MerchantId == merchantId.Value);
+            }
+
+            var reservations = await query.ToListAsync();
+            if (!reservations.Any()) return;
+
+            var batchIds = reservations.Select(r => r.ProductBatchId).Distinct().ToList();
+            var batches = await _context.ProductBatches
+                .Where(b => batchIds.Contains(b.Id))
+                .ToDictionaryAsync(b => b.Id);
+
+            var now = DateTime.UtcNow;
+            foreach (var res in reservations)
+            {
+                if (batches.TryGetValue(res.ProductBatchId, out var batch))
+                {
+                    var onHandBefore = batch.QuantityOnHand;
+                    var reservedBefore = batch.QuantityReserved;
+
+                    if (!res.IsDeducted)
+                    {
+                        // Unreserve if not yet deducted
+                        batch.QuantityReserved = Math.Max(0, batch.QuantityReserved - res.Quantity);
+                    }
+
+                    var movementType = disposition?.ToLowerInvariant() switch
+                    {
+                        "damaged" or "damage" => InventoryMovementType.Damage,
+                        "missing" or "lost" => InventoryMovementType.Missing,
+                        _ => InventoryMovementType.Return
+                    };
+
+                    if (returnToStock && movementType == InventoryMovementType.Return && res.IsDeducted)
+                    {
+                        batch.QuantityOnHand += res.Quantity;
+                        if (batch.Status == BatchStatus.Depleted && batch.QuantityOnHand > 0)
+                        {
+                            batch.Status = batch.ExpirationDate <= now.Date ? BatchStatus.Expired : BatchStatus.Active;
+                        }
+                    }
+
+                    var movement = new InventoryMovement
+                    {
+                        ProductBatchId = batch.Id,
+                        ProductId = batch.ProductId,
+                        MerchantId = batch.MerchantId,
+                        OrderId = orderId,
+                        OrderDetailId = res.OrderDetailId,
+                        MovementType = movementType,
+                        Quantity = res.Quantity,
+                        QuantityOnHandBefore = onHandBefore,
+                        QuantityOnHandAfter = batch.QuantityOnHand,
+                        QuantityReservedBefore = reservedBefore,
+                        QuantityReservedAfter = batch.QuantityReserved,
+                        BusinessKey = $"Order:{orderId}:Detail:{res.OrderDetailId}:Batch:{batch.Id}:{movementType}",
+                        Reason = reason ?? $"Item disposition: {disposition}",
+                        CreatedBy = "Return-Engine",
+                        CreatedDate = now
+                    };
+                    await _context.InventoryMovements.AddAsync(movement);
+                }
+
+                res.IsReleased = true;
+                res.ReleasedDate = now;
+                res.ReleaseReason = $"{reason} (Disposition: {disposition})";
+            }
+
+            await _uow.SaveChangesAsync();
+        }
+
+        public async Task<List<InventoryMovementDto>> GetInventoryMovementsAsync(int? batchId = null, int? orderId = null, int? merchantId = null)
+        {
+            var query = _context.InventoryMovements
+                .AsNoTracking()
+                .Include(m => m.ProductBatch)
+                .AsQueryable();
+
+            if (batchId.HasValue) query = query.Where(m => m.ProductBatchId == batchId.Value);
+            if (orderId.HasValue) query = query.Where(m => m.OrderId == orderId.Value);
+            if (merchantId.HasValue) query = query.Where(m => m.MerchantId == merchantId.Value);
+
+            var list = await query.OrderByDescending(m => m.CreatedDate).ToListAsync();
+            return list.Select(m => new InventoryMovementDto
+            {
+                Id = m.Id,
+                ProductBatchId = m.ProductBatchId,
+                BatchNumber = m.ProductBatch?.BatchNumber,
+                ProductId = m.ProductId,
+                MerchantId = m.MerchantId,
+                OrderId = m.OrderId,
+                OrderDetailId = m.OrderDetailId,
+                MovementType = m.MovementType,
+                Quantity = m.Quantity,
+                QuantityOnHandBefore = m.QuantityOnHandBefore,
+                QuantityOnHandAfter = m.QuantityOnHandAfter,
+                QuantityReservedBefore = m.QuantityReservedBefore,
+                QuantityReservedAfter = m.QuantityReservedAfter,
+                BusinessKey = m.BusinessKey,
+                Reason = m.Reason,
+                Reference = m.Reference,
+                CreatedDate = m.CreatedDate,
+                CreatedBy = m.CreatedBy
+            }).ToList();
         }
 
         public async Task<BatchPickResultDto> VerifyPickItemBarcodeAsync(int orderId, int orderDetailId, string scannedBarcode, string pickedBy = null, int? merchantId = null)

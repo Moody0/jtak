@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import {
@@ -26,10 +26,10 @@ export class productReviewsListComponent implements OnInit, OnDestroy, ISortView
   selection = new TableSelection<any>((item) => item.id);
   isLoading: boolean;
   totalRecords: number;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public productReviewsService: productReviewsService,
     private modalService: NgbModal
   ) {}

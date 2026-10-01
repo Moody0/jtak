@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +11,7 @@ using Modules.Catalog.Services;
 using App.Extensions;
 using Modules.Accounting.Services;
 using Modules.Accounting.Entities;
+using System.Linq;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -33,32 +34,24 @@ namespace App.ApiControllers.V1.Admin
 
 
         /// <summary>
-        /// Get a paged/filtered/Billed list of Bills
+        /// Get a paged/filtered/sorted list of Bills
         /// </summary>
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
         public async Task<ActionResult<TableResponseModel<BillDto>>> DataTable([FromBody] MetronicTable request)
         {
-            var uid = User.GetUserId();
-            var merchants = await _merchantService.Queryable().ToDictionaryAsync(x => x.Id, x => x.Title);
-            var Bills = await _service.ListMetronicTableQueryable(request,
-                x => new BillDto
-                {
-                    Id = x.Id,
-                    OrderId = x.OrderId,
-                    MerchantId = x.MerchantId,
-                    MerchantTitle = merchants[x.MerchantId],
-                    PaymentMethod = x.PaymentMethod,
-                    MerchantAmount = x.MerchantAmount,
-                    JTakAdditionalAmount = x.JTakAdditionalAmount,
-                    JTakAmount = x.JTakAmount,
-                    TotalAmount = x.TotalAmount,
-                    CreatedDate = x.CreatedDate,
-                    DueDate = x.DueDate,
-                    IsAddedToDues = x.IsAddedToDues
-                });
-            return Bills;
+            var merchantsList = await _merchantService.Queryable()
+                .AsNoTracking()
+                .Select(m => new { m.Id, m.Title })
+                .ToListAsync();
+
+            var merchants = merchantsList
+                .GroupBy(x => x.Id)
+                .ToDictionary(g => g.Key, g => g.First().Title ?? string.Empty);
+
+            var bills = await _service.GetDataTableAsync(request, merchants);
+            return bills;
         }
     }
 }

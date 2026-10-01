@@ -25,6 +25,8 @@ namespace Modules.Catalog.Services
         Task<List<BatchReservationDto>> ReserveStockFEFOAsync(int orderId, int orderDetailId, int productId, int merchantId, int quantity, int minDaysToExpiry = 1);
         Task ReleaseReservationAsync(int orderId, int? orderDetailId = null, string reason = "Order Cancelled", int? merchantId = null);
         Task DeductReservedStockAsync(int orderId, int? orderDetailId = null, int? merchantId = null);
+        Task ProcessReturnInventoryAsync(int orderId, int? orderDetailId = null, string reason = "Order Returned", bool returnToStock = true, string disposition = "Restocked", int? merchantId = null);
+        Task<List<InventoryMovementDto>> GetInventoryMovementsAsync(int? batchId = null, int? orderId = null, int? merchantId = null);
         Task<BatchPickResultDto> VerifyPickItemBarcodeAsync(int orderId, int orderDetailId, string scannedBarcode, string pickedBy = null, int? merchantId = null);
         Task<List<BatchReservationDto>> GetOrderReservationsAsync(int orderId);
         Task<List<BatchProductLookupDto>> GetProductLookupAsync(string searchTerm = null, int? merchantId = null, int limit = 25);

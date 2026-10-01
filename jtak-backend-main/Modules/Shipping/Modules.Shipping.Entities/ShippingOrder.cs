@@ -60,7 +60,7 @@ namespace Modules.Shipping.Entities
     {
         public bool IsOnline { get; set; } = true;
         public DateTime? ShiftStartedAt { get; set; }
-        public (decimal Lat, decimal Lng) Loc { get; set; } = (37.05637741088867m, 37.33407211303711m);
+        public (decimal Lat, decimal Lng) Loc { get; set; }
         public double? Heading { get; set; }
         public double? Speed { get; set; }
         public DateTime? LastLocationUpdatedAt { get; set; }

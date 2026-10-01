@@ -1,18 +1,101 @@
-// Reconciliation Page Container & Layout
+// =============================================================================
+// JTAK Operations - Reconciliation & Treasury Settlements
+// Modern Minimalist Enterprise UI (Zero Shadows, Alexandria Font, High Density)
+// Strict Color System: Slate Neutral + JTAK Warm Orange (#ea580c)
+// =============================================================================
+
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+// Global Orange Button Rule across reconciliation and modals
+.btn-primary,
+button.btn-primary,
+a.btn-primary,
+.ops-btn-primary {
+  background-color: #ea580c !important;
+  border-color: #ea580c !important;
+  color: #ffffff !important;
+
+  i, .fas, .far, .fab, .bi, svg, span {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+  }
+
+  &:hover:not(:disabled),
+  &:focus:not(:disabled),
+  &:active:not(:disabled) {
+    background-color: #c2410c !important;
+    border-color: #c2410c !important;
+    color: #ffffff !important;
+
+    i, .fas, .far, .fab, .bi, svg, span {
+      color: #ffffff !important;
+      fill: #ffffff !important;
+    }
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 1. Reconciliation Page Container & Layout
+// -----------------------------------------------------------------------------
 .ops-reconciliation-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding-bottom: 30px;
+  gap: 16px;
+  padding-bottom: 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  direction: rtl;
 }
 
-// 1. Streamlined Operations Utility Bar
+// Keep the merchant statement header/actions visible while its long ledger body scrolls.
+.merchant-statement-print-area {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.merchant-statement-screen-header,
+.merchant-statement-modal-actions {
+  flex: 0 0 auto;
+}
+
+.merchant-statement-screen-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+// -----------------------------------------------------------------------------
+// 2. Streamlined Operations Utility Bar
+// -----------------------------------------------------------------------------
 .ops-utility-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 4px 0 2px;
+  padding: 12px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   flex-wrap: wrap;
 }
 
@@ -27,14 +110,14 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
+  padding: 5px 12px;
   border-radius: 20px;
   background: #ecfdf5;
   border: 1px solid #a7f3d0;
   color: #059669;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 750;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .ops-pulse-dot {
@@ -42,15 +125,14 @@
   height: 8px;
   border-radius: 50%;
   background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
   animation: ops-pulse 2s infinite;
   flex-shrink: 0;
 }
 
 @keyframes ops-pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
 }
 
 .ops-sync-meta {
@@ -58,12 +140,12 @@
   align-items: center;
   gap: 6px;
   color: #64748b;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
 
   strong {
     color: #0f172a;
-    font-weight: 750;
+    font-weight: 800;
   }
 }
 
@@ -76,175 +158,69 @@
 .ops-btn-refresh {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  border-radius: 10px;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
   color: #334155;
   font-weight: 700;
-  font-size: 0.82rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
 
   &:hover:not(:disabled) {
     background: #f8fafc;
     border-color: #94a3b8;
     color: #0f172a;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
   }
 }
 
-// 2. Financial KPI Metric Cards
-.ops-kpi-card {
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 18px 20px;
-  border: 1px solid #e2e8f0;
-  border-right: 4px solid #3b82f6; // RTL start by default
-  border-left: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  transition: all 0.2s ease-in-out;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-
-  // When viewing in LTR English
-  html[dir="ltr"] &,
-  body[dir="ltr"] & {
-    border-right: 1px solid #e2e8f0;
-    border-left: 4px solid #3b82f6;
-  }
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-  }
-
-  &--primary {
-    border-right-color: #3b82f6;
-    html[dir="ltr"] &, body[dir="ltr"] & { border-left-color: #3b82f6; }
-  }
-  &--info {
-    border-right-color: #8b5cf6;
-    html[dir="ltr"] &, body[dir="ltr"] & { border-left-color: #8b5cf6; }
-  }
-  &--warning {
-    border-right-color: #f59e0b;
-    html[dir="ltr"] &, body[dir="ltr"] & { border-left-color: #f59e0b; }
-  }
-  &--success {
-    border-right-color: #10b981;
-    html[dir="ltr"] &, body[dir="ltr"] & { border-left-color: #10b981; }
-  }
-}
-
-.ops-kpi-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.ops-kpi-card-label {
-  font-size: 0.78rem;
-  font-weight: 750;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.ops-kpi-card-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  font-size: 0.95rem;
-
-  &--primary {
-    background: #eff6ff;
-    color: #2563eb;
-  }
-  &--info {
-    background: #f5f3ff;
-    color: #7c3aed;
-  }
-  &--warning {
-    background: #fffbeb;
-    color: #d97706;
-  }
-  &--success {
-    background: #ecfdf5;
-    color: #059669;
-  }
-}
-
-.ops-kpi-card-value {
-  font-size: 1.55rem;
-  font-weight: 850;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  font-feature-settings: "tnum";
-}
-
-.ops-kpi-card-curr {
-  font-size: 0.78rem;
-  font-weight: 650;
-  color: #94a3b8;
-  margin-inline-start: 2px;
-}
-
-.ops-kpi-card-hint {
-  font-size: 0.72rem;
-  color: #94a3b8;
-  margin-top: 6px;
-  line-height: 1.35;
-}
-
+// -----------------------------------------------------------------------------
 // 3. Navigation Filter Tabs & Search Box
+// -----------------------------------------------------------------------------
 .ops-tabs-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
 .ops-status-tabs {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
   background: #f1f5f9;
+  border: 1px solid #e2e8f0;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .ops-status-tab {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 14px;
+  padding: 6px 14px;
   background: transparent;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   color: #64748b;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
 
   &:hover {
     color: #0f172a;
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.7);
   }
 
   &.active {
     background: #ffffff;
     color: #0f172a;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    border-color: #cbd5e1;
+    font-weight: 800;
   }
 }
 
@@ -253,19 +229,26 @@
   align-items: center;
   justify-content: center;
   padding: 2px 7px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 0.7rem;
   font-weight: 800;
   background: #e2e8f0;
   color: #475569;
 
+  &--orange {
+    background: #fff7ed;
+    color: #ea580c;
+    border: 1px solid #fed7aa;
+  }
+
   &--blue {
-    background: #dbeafe;
-    color: #1d4ed8;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
   }
 }
 
-// Search Box - Refined width and icon alignment
+// Search Box
 .ops-search-box {
   position: relative;
   display: inline-flex;
@@ -276,30 +259,34 @@
 
   .ops-search-icon {
     position: absolute;
-    inset-inline-start: 14px;
+    inset-inline-start: 12px;
     color: #94a3b8;
     pointer-events: none;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     z-index: 2;
   }
 
   .ops-search-input {
     width: 100%;
     height: 38px;
-    padding-inline-start: 38px;
-    padding-inline-end: 32px;
+    padding-inline-start: 36px;
+    padding-inline-end: 28px;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 0.82rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
     color: #0f172a;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    transition: border-color 0.15s ease;
 
     &:focus {
       background: #ffffff;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+      border-color: #ea580c !important;
+      outline: none;
+    }
+
+    &::placeholder {
+      color: #94a3b8;
+      font-size: 0.78rem;
     }
   }
 
@@ -310,8 +297,7 @@
     border: none;
     color: #94a3b8;
     padding: 4px;
-    font-size: 0.75rem;
-    border-radius: 50%;
+    font-size: 0.74rem;
     cursor: pointer;
     z-index: 2;
 
@@ -321,12 +307,110 @@
   }
 }
 
-// 4. Tables Card & Architecture
+// -----------------------------------------------------------------------------
+// 4. Financial KPI Metric Cards (Solid Modern Enterprise Design)
+// -----------------------------------------------------------------------------
+.ops-kpi-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: border-color 0.18s ease;
+
+  &:hover {
+    border-color: #cbd5e1;
+  }
+
+  &--primary {
+    border-top: 3px solid #2563eb;
+  }
+  &--info {
+    border-top: 3px solid #7c3aed;
+  }
+  &--warning {
+    border-top: 3px solid #ea580c;
+  }
+  &--success {
+    border-top: 3px solid #059669;
+  }
+}
+
+.ops-kpi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.ops-kpi-card-label {
+  font-size: 0.74rem;
+  font-weight: 750;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+
+.ops-kpi-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+
+  &--primary {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #dbeafe;
+  }
+  &--info {
+    background: #f5f3ff;
+    color: #7c3aed;
+    border: 1px solid #ddd6fe;
+  }
+  &--warning {
+    background: #fff7ed;
+    color: #ea580c;
+    border: 1px solid #fed7aa;
+  }
+  &--success {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
+  }
+}
+
+.ops-kpi-card-value {
+  font-size: 1.35rem;
+  font-weight: 850;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum";
+}
+
+.ops-kpi-card-curr {
+  font-size: 0.74rem;
+  font-weight: 650;
+  color: #94a3b8;
+  margin-inline-start: 2px;
+}
+
+.ops-kpi-card-hint {
+  font-size: 0.71rem;
+  color: #94a3b8;
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+// -----------------------------------------------------------------------------
+// 5. Tables Card & Architecture
+// -----------------------------------------------------------------------------
 .ops-orders-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -338,16 +422,16 @@
     background: #f8fafc;
 
     th {
-      padding: 12px 14px;
+      padding: 10px 12px;
       font-weight: 750;
-      font-size: 0.75rem;
-      letter-spacing: 0.02em;
+      font-size: 0.74rem;
+      letter-spacing: 0.01em;
       color: #475569;
-      text-transform: uppercase;
       background: #f8fafc !important;
       border-top: none !important;
       border-bottom: 1px solid #e2e8f0 !important;
       vertical-align: middle;
+      white-space: nowrap;
     }
   }
 
@@ -360,9 +444,10 @@
     }
 
     td {
-      padding: 12px 14px;
+      padding: 10px 12px;
       border: none;
       vertical-align: middle;
+      font-size: 0.8rem;
     }
   }
 }
@@ -372,23 +457,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 24px;
-  padding: 0 8px;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
   border-radius: 6px;
   font-size: 0.74rem;
   font-weight: 800;
   background: #f1f5f9;
   color: #64748b;
+  border: 1px solid #e2e8f0;
 
   &--active {
     background: #eff6ff;
     color: #2563eb;
-    border: 1px solid #bfdbfe;
+    border-color: #bfdbfe;
   }
 }
 
-// Courier Details
+// Courier / Merchant Avatar
 .ops-avatar {
   display: grid;
   place-items: center;
@@ -397,37 +483,44 @@
   border-radius: 50%;
   background: #f1f5f9;
   color: #334155;
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   font-weight: 800;
   flex-shrink: 0;
   border: 1px solid #e2e8f0;
 }
 
 .ops-customer-name {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 750;
   color: #0f172a;
 }
 
 .ops-courier-role {
-  font-size: 0.72rem;
+  font-size: 0.71rem;
   color: #64748b;
   display: flex;
   align-items: center;
   margin-top: 1px;
 }
 
-// Phone Number BiDi Enforced
+// Phone Number BiDi Enforced - Strictly No Wrap
 .ops-phone {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   font-size: 0.78rem;
   font-weight: 650;
-  color: #475569;
+  color: #334155;
   text-decoration: none;
-  font-family: monospace;
   direction: ltr !important;
   unicode-bidi: isolate;
+  white-space: nowrap !important;
+
+  i {
+    color: #059669;
+    font-size: 0.74rem;
+    flex-shrink: 0;
+  }
 
   &:hover {
     color: #2563eb;
@@ -436,7 +529,7 @@
 
 // Pricing & Balances
 .ops-price-amount {
-  font-size: 0.94rem;
+  font-size: 0.88rem;
   font-weight: 800;
   color: #0f172a;
   letter-spacing: -0.01em;
@@ -444,7 +537,7 @@
 }
 
 .ops-price-curr {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #64748b;
 }
@@ -454,9 +547,9 @@
   background: #f1f5f9;
   color: #64748b;
   border: 1px solid #e2e8f0;
-  font-size: 0.74rem;
+  font-size: 0.73rem;
   font-weight: 700;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
 }
 
@@ -464,9 +557,9 @@
   background: #fffbeb;
   color: #b45309;
   border: 1px solid #fde68a;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   font-feature-settings: "tnum";
 }
@@ -475,9 +568,9 @@
   background: #f5f3ff;
   color: #6d28d9;
   border: 1px solid #ddd6fe;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   font-feature-settings: "tnum";
 }
@@ -486,8 +579,8 @@
 .ops-order-meta {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.74rem;
+  gap: 4px;
+  font-size: 0.73rem;
   color: #64748b;
 }
 
@@ -504,11 +597,62 @@
   gap: 6px;
 }
 
-// Dedicated Ledger Statement Button (Neutral/Cool)
+// Dedicated Ledger Statement Button for Merchant Directory
+.ops-btn-statement-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8 !important;
+  font-weight: 750;
+  font-size: 0.75rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+
+  i {
+    color: #1d4ed8 !important;
+  }
+
+  &:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1e40af !important;
+  }
+}
+
+// Receipt Button for History Table
+.ops-btn-receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d !important;
+  font-weight: 750;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  i {
+    color: #15803d !important;
+  }
+
+  &:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534 !important;
+  }
+}
+
+// Dedicated Ledger Statement Icon Button for Couriers
 .ops-btn-statement {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -522,8 +666,6 @@
     background: #eff6ff;
     border-color: #bfdbfe;
     color: #2563eb;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
   }
 }
 
@@ -531,18 +673,16 @@
   display: inline-flex;
   align-items: center;
   padding: 5px 10px;
-  border-radius: 8px;
-  background: #10b981;
+  border-radius: 7px;
+  background: #059669;
   color: #ffffff !important;
   font-weight: 750;
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   border: none;
   transition: all 0.15s ease;
 
   &:hover {
-    background: #059669;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+    background: #047857;
   }
 }
 
@@ -550,18 +690,16 @@
   display: inline-flex;
   align-items: center;
   padding: 5px 10px;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #7c3aed;
   color: #ffffff !important;
   font-weight: 750;
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   border: none;
   transition: all 0.15s ease;
 
   &:hover {
     background: #6d28d9;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);
   }
 }
 
@@ -569,23 +707,68 @@
   display: inline-flex;
   align-items: center;
   padding: 5px 10px;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   color: #94a3b8 !important;
-  font-size: 0.74rem;
+  font-size: 0.73rem;
   font-weight: 650;
   cursor: not-allowed;
   opacity: 0.8;
 }
 
-// =========================================================================
-// SETTLEMENT HISTORY & RECEIPT STYLES
-// =========================================================================
+// -----------------------------------------------------------------------------
+// 6. Modal Specific Overhauls (Solid Borders, Zero Shadows, High Density)
+// -----------------------------------------------------------------------------
+
+// Merchant Statement Modal KPI Strip
+.merchant-statement-kpi-card {
+  padding: 12px 14px;
+  border-radius: 10px;
+  height: 100%;
+  border: 1px solid #e2e8f0;
+
+  &--primary {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+  &--warning {
+    background: #fffbeb;
+    border-color: #fde68a;
+  }
+  &--success {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+  }
+  &--info {
+    background: #f5f3ff;
+    border-color: #ddd6fe;
+  }
+}
+
+// Statement Tables
+.table-sm {
+  font-size: 0.76rem;
+
+  th {
+    padding: 7px 10px !important;
+    background: #f8fafc !important;
+    color: #475569 !important;
+    font-weight: 750 !important;
+    border-color: #e2e8f0 !important;
+  }
+
+  td {
+    padding: 6px 10px !important;
+    vertical-align: middle !important;
+    border-color: #f1f5f9 !important;
+  }
+}
+
+// Receipt Modal Styling
 .ops-receipt-card {
   background: #ffffff;
   color: #1e293b;
-  font-family: inherit;
 
   .ops-receipt-header {
     border-bottom: 2px solid #e2e8f0;
@@ -593,63 +776,25 @@
 
   .ops-receipt-amount-box {
     background-color: #f8fafc;
-    border-color: #3b82f6 !important;
+    border-color: #ea580c !important;
+    border-radius: 10px;
   }
 
   .ops-signature-line {
     border-top: 1px dashed #94a3b8;
-    margin: 30px auto 0;
+    margin: 24px auto 0;
     padding-top: 6px;
   }
 }
 
-.ops-filter-toolbar {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+.driver-statement-print-area {
+  background: #ffffff;
 }
 
-// =========================================================================
-// HIGH-FIDELITY PRINT MEDIA QUERIES (A4 RTL / LTR FINANCIAL PRINTING)
-// =========================================================================
+// -----------------------------------------------------------------------------
+// 7. Component-Level Print Styling
+// -----------------------------------------------------------------------------
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 10mm 12mm;
-  }
-
-  // Hide general dashboard layout chrome
-  .no-print,
-  .ops-utility-bar,
-  .ops-tabs-toolbar,
-  .ops-kpi-summary-row,
-  .ops-filter-toolbar,
-  .ops-pagination-row,
-  .modal-footer,
-  .modal-header .btn,
-  .modal-header .btn-close,
-  header,
-  aside,
-  footer,
-  nav,
-  .app-sidebar,
-  .app-header,
-  .app-footer,
-  .app-toolbar,
-  .btn,
-  .ngx-spinner-overlay {
-    display: none !important;
-  }
-
-  body, html {
-    background: #ffffff !important;
-    color: #000000 !important;
-    font-size: 11pt !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  // If printing history report container
   .ops-print-history-report {
     display: block !important;
     visibility: visible !important;
@@ -661,7 +806,7 @@
     .ops-print-table {
       width: 100% !important;
       border-collapse: collapse !important;
-      font-size: 8.5pt !important;
+      font-size: 8pt !important;
 
       th, td {
         border: 1px solid #cbd5e1 !important;
@@ -679,40 +824,9 @@
     }
   }
 
-  // If printing individual receipt inside modal
-  .modal {
-    position: static !important;
-    display: block !important;
-    padding: 0 !important;
-    overflow: visible !important;
-  }
-
-  .modal-dialog {
-    max-width: 100% !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
-
-  .modal-content {
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-  }
-
-  .modal-body {
-    padding: 0 !important;
-  }
-
-  .ops-receipt-card {
-    border: 1px solid #000000 !important;
-    padding: 20px !important;
-    margin: 0 !important;
-    page-break-inside: avoid !important;
-
-    .ops-receipt-amount-box {
-      border: 2px solid #000000 !important;
-      background-color: #f8fafc !important;
-    }
+  .merchant-statement-print-area,
+  .driver-statement-print-area {
+    width: 100% !important;
+    background: #ffffff !important;
   }
 }

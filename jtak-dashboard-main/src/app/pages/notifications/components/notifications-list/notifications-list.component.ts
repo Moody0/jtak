@@ -1,7 +1,7 @@
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import {
@@ -13,8 +13,8 @@ import {
 } from 'src/app/_metronic/shared/crud-table';
 import { ToastrService } from 'ngx-toastr';
 import { NotificationsService } from '../../services/notifications.service';
-import { Notification } from '../../models/notification.model';
 import { NotificationsCreateComponent } from '../notifications-create/notifications-create.component';
+import { BulkConfirmModalComponent } from 'src/app/modules/shared/components/bulk-confirm-modal/bulk-confirm-modal.component';
 
 
 
@@ -35,10 +35,10 @@ export class NotificationsListComponent implements
   selection = new TableSelection<any>((item) => item.id);
   isLoading: boolean;
   totalRecords: number;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public notificationsService: NotificationsService,
     private modalService: NgbModal,
     private toasterService: ToastrService
@@ -80,15 +80,47 @@ export class NotificationsListComponent implements
   }
 
   // form actions
-  create(item: Notification | null) {
+  create() {
     const modalRef = this.modalService.open(NotificationsCreateComponent, {
-      size: 'lg',
+      size: 'xl',
+      centered: true,
     });
-    modalRef.componentInstance.item = item;
     modalRef.result.then(
       () => this.notificationsService.fetchPost(),
       () => {}
     );
+  }
+
+  deleteSelected(items: any[]): void {
+    const selected = this.selection.selectedItems(items);
+    if (!selected.length) return;
+
+    const modalRef = this.modalService.open(BulkConfirmModalComponent);
+    modalRef.componentInstance.count = selected.length;
+    modalRef.componentInstance.itemLabel = 'notifications';
+    modalRef.componentInstance.actionLabel = 'حذف';
+    modalRef.componentInstance.description =
+      'سيؤدي ذلك إلى حذف الإشعارات المحددة من سجل التطبيق للمستخدمين. لا يمكن سحب إشعار سبق أن وصل إلى شريط إشعارات الهاتف.';
+    modalRef.componentInstance.action = () =>
+      this.notificationsService.deleteCampaigns(selected.map((item) => item.id));
+
+    modalRef.result.then(
+      () => {
+        this.selection.clear();
+        this.toasterService.success('تم حذف الإشعارات المحددة من سجل التطبيق.');
+        this.notificationsService.fetchPost();
+      },
+      () => {}
+    );
+  }
+
+  getAudienceLabel(topic?: string): string {
+    switch (topic) {
+      case 'all': return 'العملاء';
+      case 'campaign_delivery': return 'التوصيل';
+      case 'campaign_warehouse': return 'التاجر';
+      default: return 'غير محدد';
+    }
   }
 
   ngOnInit(): void {

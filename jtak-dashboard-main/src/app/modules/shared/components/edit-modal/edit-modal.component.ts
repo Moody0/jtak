@@ -14,6 +14,11 @@ export class EditModalComponent {
   @Output() saveClicked = new EventEmitter();
   @Output() cancelClicked = new EventEmitter();
 
+  get isEditMode(): boolean {
+    const id = this.item?.id;
+    return id !== undefined && id !== null && id !== '' && id !== 0;
+  }
+
   constructor(public translate: TranslateService) {}
 
   getLocalizedModuleName(): string {
@@ -25,6 +30,7 @@ export class EditModalComponent {
       'category': 'التصنيف',
       'user': 'المستخدم',
       'merchant': 'التاجر',
+      'warehouse': 'المستودع',
       'delivery captain': 'مندوب التوصيل',
       'payment': 'الدفعة المالية',
       'product': 'المنتج',

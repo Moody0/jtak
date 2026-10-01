@@ -21,12 +21,31 @@ export class CategoriesService extends TableService<Category> implements OnDestr
     }),
   };
 
+  private categoryLevel: 'all' | 'root' | 'sub' = 'all';
+
   constructor(@Inject(HttpClient) public http: HttpClient) {
     super(http);
   }
 
   ngOnDestroy() {
     this.subscriptions.forEach((sb) => sb.unsubscribe());
+  }
+
+  setCategoryLevel(level: 'all' | 'root' | 'sub'): void {
+    this.categoryLevel = level;
+  }
+
+  /** Keep the level filter on the server so it works across all pages. */
+  public fetchPost(queryParams: any = null): void {
+    const params = { ...(queryParams || {}) };
+
+    if (this.categoryLevel !== 'all') {
+      params.level = this.categoryLevel;
+    } else {
+      delete params.level;
+    }
+
+    super.fetchPost(params);
   }
 
   getAll(root: boolean = false, includeInactive: boolean = false): Observable<Category[]> {

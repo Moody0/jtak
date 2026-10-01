@@ -41,6 +41,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IBillService _billService;
         private readonly IBalanceService _balanceService;
         private readonly ILedgerService _ledgerService;
+        private readonly ISettlementHistoryService _settlementHistoryService;
         private readonly IAdminAuditService _auditService;
 
         public PaymentsController(IAppUnitOfWork unitOfWork,
@@ -53,6 +54,7 @@ namespace App.ApiControllers.V1.Admin
             IBillService billService,
             IBalanceService balanceService,
             ILedgerService ledgerService,
+            ISettlementHistoryService settlementHistoryService,
             IMapper mapper,
             IAdminAuditService auditService = null)
         {
@@ -67,6 +69,7 @@ namespace App.ApiControllers.V1.Admin
             _billService = billService;
             _balanceService = balanceService;
             _ledgerService = ledgerService;
+            _settlementHistoryService = settlementHistoryService;
             _auditService = auditService;
         }
 
@@ -79,21 +82,40 @@ namespace App.ApiControllers.V1.Admin
         [Route("DataTable")]
         public async Task<ActionResult<TableResponseModel<PaymentDto>>> DataTable([FromBody] MetronicTable request)
         {
-            var uid = User.GetUserId();
-            var payments = await _service.ListMetronicTableQueryable(request,
-                x => new PaymentDto
-                {
-                    Id = x.Id,
-                    Amount = x.Amount,
-                    ByUser = x.ByUser,
-                    ByUserId = x.ByUserId,
-                    ToUser = x.ToUser,
-                    ToUserId = x.ToUserId,
-                    CreatedDate = x.CreatedDate,
-                    HandoverDate = x.HandoverDate,
-                    NewBalance = x.NewBalance
-                });
-            return payments;
+            request ??= new MetronicTable();
+            var history = await _settlementHistoryService.GetDataTableAsync(new SettlementHistoryDataTableRequest
+            {
+                SearchTerm = request.Search,
+                PartyFilter = SettlementHistoryPartyFilter.All,
+                Page = request.PageNumber > 0 ? request.PageNumber : 1,
+                PageSize = request.PageSize > 0 ? request.PageSize : 10,
+                SortColumn = string.IsNullOrWhiteSpace(request.SortField) ? "CompletedAt" : request.SortField,
+                SortDirection = string.IsNullOrWhiteSpace(request.SortOrder) ? "DESC" : request.SortOrder
+            });
+
+            var items = history.Items.Select((item, index) => new PaymentDto
+            {
+                // The settlement request number is the authoritative reference;
+                // the legacy integer payment id is not applicable here.
+                Id = index + 1,
+                ReferenceNumber = item.RequestNumber,
+                PaymentType = item.PartyTypeLabel,
+                Currency = item.Currency,
+                Status = item.Status,
+                IsSettlement = true,
+                ToUser = item.PartyName,
+                ByUser = item.ConfirmedBy ?? item.ApprovedBy,
+                Amount = item.Amount,
+                CreatedDate = item.RequestedAt,
+                HandoverDate = item.CompletedAt,
+                NewBalance = 0m
+            }).ToList();
+
+            return Ok(new TableResponseModel<PaymentDto>
+            {
+                Items = items.ToArray(),
+                TotalRecords = history.TotalRecords
+            });
         }
 
         [HttpPost]

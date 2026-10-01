@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -49,18 +49,22 @@ namespace App.Shared.Services
 
         public async Task<AppUser[]> ListFromRoles(params string[] roleNames)
         {
-            roleNames = roleNames?.Select(r => r.ToUpper()).ToArray();
+            if (roleNames == null || roleNames.Length == 0) return Array.Empty<AppUser>();
+            roleNames = roleNames.Select(r => r.ToUpper()).ToArray();
             var rids = await _roleRepo.Queryable().Where(x => roleNames.Contains(x.NormalizedName)).Select(x => x.Id).ToArrayAsync();
+            if (rids.Length == 0) return Array.Empty<AppUser>();
 
-            var Users = _userRepo.Queryable() as DbSet<AppUser>;
-            var UserRoles = _userRoleRepo.Queryable() as DbSet<SolUserRole>;
+            var uids = await _userRoleRepo.Queryable()
+                .Where(x => rids.Contains(x.RoleId))
+                .Select(x => x.UserId)
+                .Distinct()
+                .ToArrayAsync();
 
-            var query = from userrole in UserRoles
-                        join user in Users on userrole.UserId equals user.Id
-                        where rids.Contains(userrole.RoleId)
-                        select user;
+            if (uids.Length == 0) return Array.Empty<AppUser>();
 
-            return await query.ToArrayAsync();
+            return await _userRepo.Queryable()
+                .Where(u => uids.Contains(u.Id))
+                .ToArrayAsync();
         }
         public List<AppUser> ListFromRole(string roleName, params Expression<Func<AppUser, Object>>[] eagerProperties)
         {

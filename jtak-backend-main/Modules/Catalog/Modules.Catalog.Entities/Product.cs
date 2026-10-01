@@ -87,8 +87,13 @@ namespace Modules.Catalog.Entities
         public decimal FinalPrice { get; set; }
         public decimal? OriginalPrice { get; set; }
         public decimal Discount { get; set; }
+        public int? MaxOrderQuantity { get; set; }
+        /// <summary>Administrative input percentage; the persisted discount remains a customer-currency amount.</summary>
+        public decimal? DiscountPercent { get; set; }
         public decimal? PriceUsd { get; set; }
+        public decimal ProfitOutOfMerchantPricePercent { get; set; }
         public int? MerchantId { get; set; }
+        public int MerchantKind { get; set; }
         public string Merchant { get; set; }
         public string MerchantTitle { get; set; }
         public Currency Currency { get; set; }
@@ -138,9 +143,11 @@ namespace Modules.Catalog.Entities
         //public double Rate { get; set; }
         //public int RateCount { get; set; }
         public int MerchantId { get; set; }
+        public int MerchantKind { get; set; }
         public decimal? PriceUsd { get; set; }
         public decimal? OriginalPrice { get; set; }
         public decimal Discount { get; set; }
+        public int? MaxOrderQuantity { get; set; }
     }
 
     public class PopularProductDto
@@ -161,6 +168,8 @@ namespace Modules.Catalog.Entities
         public string Eta { get; set; }
         public string Distance { get; set; }
         public int OrdersCount { get; set; }
+        public string CustomBadge { get; set; }
+        public int? MaxOrderQuantity { get; set; }
     }
 
 }

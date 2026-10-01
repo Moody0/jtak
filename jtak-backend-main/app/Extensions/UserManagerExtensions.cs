@@ -13,6 +13,7 @@ using App.Shared.Services.Helpers;
 using App.Shared.Services.Extentions;
 using App.Shared.Entities.Enums;
 using App.Shared.Entities;
+using App.Shared.Services;
 
 namespace App.Extensions
 {
@@ -86,6 +87,11 @@ namespace App.Extensions
         public static async Task<AppUser> FindByPhoneNumberAsync(this UserManager<AppUser> userManager, string phoneNumber)
         {
             if (string.IsNullOrWhiteSpace(phoneNumber)) return null;
+            if (SyrianPhoneIdentity.TryNormalize(phoneNumber, out var canonicalPhone))
+            {
+                var match = await SyrianPhoneIdentity.FindAsync(userManager, canonicalPhone);
+                return match.Ambiguous ? null : match.User;
+            }
             var variations = GetPhoneVariations(phoneNumber);
             return await userManager.Users.FirstOrDefaultAsync(x =>
                 (x.PhoneNumber != null && variations.Contains(x.PhoneNumber)) ||

@@ -1,0 +1,83 @@
+// =============================================================================
+// JTAK Operations - Create Payment Modal
+// Modern Minimalist Enterprise UI (Zero Shadows, Alexandria Font, High Density)
+// =============================================================================
+
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.form-control,
+.form-control-solid {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  font-size: 0.82rem;
+  color: #0f172a;
+  height: 40px;
+  padding: 8px 12px;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: #ea580c !important;
+    outline: none !important;
+  }
+
+  &::placeholder {
+    color: #94a3b8;
+  }
+}
+
+ng-select {
+  font-size: 0.82rem;
+
+  ::ng-deep .ng-select-container {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    min-height: 40px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  &.ng-select-opened ::ng-deep .ng-select-container {
+    border-color: #ea580c !important;
+  }
+}
+
+.badge-light-primary {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.badge-light-warning {
+  background: #fff7ed;
+  color: #ea580c;
+  border: 1px solid #fed7aa;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.alert-light-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+}

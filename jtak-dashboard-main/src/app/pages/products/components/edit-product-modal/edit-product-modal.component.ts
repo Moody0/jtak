@@ -1,5 +1,5 @@
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable, forkJoin, of } from 'rxjs';
@@ -13,6 +13,7 @@ import { InventoryBatchService } from 'src/app/pages/inventory-batches/services/
 import { BatchMerchantLookup } from 'src/app/pages/inventory-batches/models/product-batch.model';
 import { MerchantsService } from 'src/app/pages/merchant/services/merchants.service';
 import { DeleteProductModalComponent } from '../delete-product-modal/delete-product-modal.component';
+import { DashboardService } from 'src/app/pages/dashboard/services/dashboard.service';
 
 export interface CategoryOption {
   id: number;
@@ -26,6 +27,7 @@ export interface CategoryOption {
 const EMPTY_Product: Product = {
   id: null,
   title: '',
+  barcode: '',
   description: '',
   photos: '',
   unit: 'قطعة',
@@ -37,6 +39,8 @@ const EMPTY_Product: Product = {
   price: null,
   priceUsd: null,
   discount: null,
+  originalPrice: null,
+  discountPercent: 0,
 };
 
 @Component({
@@ -49,7 +53,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   @Input() item: Product;
 
   isLoading$: Observable<boolean>;
-  formGroup: FormGroup;
+  formGroup: UntypedFormGroup;
 
   // Category & Hierarchy structure
   categoriesList: CategoryOption[] = [];
@@ -57,6 +61,11 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
 
   // Merchants
   merchantsList: BatchMerchantLookup[] = [];
+  merchantOptions: BatchMerchantLookup[] = [];
+  merchantsLoading = false;
+  merchantsLoadError = false;
+  exchangeRate = 15000;
+  private syncingPriceInputs = false;
 
   // Quick Unit Presets
   unitPresets = ['قطعة', 'كغ', 'علبة', 'وجبة', 'لتر', 'صندوق', 'حبة'];
@@ -67,15 +76,17 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     private merchantsService: MerchantsService,
     private batchService: InventoryBatchService,
     public filesService: FilesService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
     private modalService: NgbModal,
-    private toasterService: ToastrService
+    private toasterService: ToastrService,
+    private dashboardService: DashboardService
   ) {}
 
   ngOnInit(): void {
     this.isLoading$ = this.service.isLoading$;
     this.initItemAndForm();
+    this.loadExchangeRate();
     this.loadLookups();
   }
 
@@ -91,20 +102,178 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     this.formGroup = this.fb.group({
       id: [this.item.id],
       title: [this.item.title || '', [Validators.required, Validators.minLength(2)]],
+      barcode: [this.item.barcode || ''],
       description: [this.item.description || ''],
       unit: [this.item.unit || 'قطعة', [Validators.required]],
       isFeatured: [this.item.isFeatured ?? false],
       active: [this.item.active ?? true],
       photos: [photoList],
       productCategoryId: [this.item.productCategoryId || null, [Validators.required]],
-      merchantId: [this.item.merchantId || null],
-      price: [this.item.price ?? null],
-      priceUsd: [this.item.priceUsd ?? null],
-      discount: [this.item.discount ?? null],
+      merchantId: [this.item.merchantId ? Number(this.item.merchantId) : null, [Validators.required]],
+      priceUsd: [this.item.originalPrice != null && Number(this.item.originalPrice) > 0
+        ? this.roundUsd(Number(this.item.originalPrice))
+        : this.item.priceUsd != null && Number(this.item.priceUsd) > 0
+          ? this.roundUsd(Number(this.item.priceUsd))
+          : null, [Validators.min(0)]],
+      discountPercent: [0, [Validators.min(0), Validators.max(99.99)]],
+    });
+
+    this.initializeDiscountInputs();
+  }
+
+  private loadExchangeRate(): void {
+    this.subs.sink = this.dashboardService.getSettings().pipe(catchError(() => of(null))).subscribe((settings) => {
+      const rate = Number(settings?.usdToSypExchangeRate);
+      if (Number.isFinite(rate) && rate > 0) this.exchangeRate = rate;
+      this.initializeDiscountInputs();
     });
   }
 
+  private initializeDiscountInputs(): void {
+    if (!this.formGroup || this.formGroup.dirty) return;
+
+    const storedDiscount = this.normalizeNumber(this.item?.discount, 0) || 0;
+    const storedPriceUsd = this.normalizeNumber(this.item?.priceUsd, 0) || 0;
+    const storedLocalPrice = this.normalizeNumber(this.item?.price, 0) || 0;
+    const storedOriginalUsd = this.normalizeNumber(this.item?.originalPrice, 0) || 0;
+    const explicitPercent = this.normalizeNumber(this.item?.discountPercent, null);
+
+    let percentage = 0;
+    if (explicitPercent !== null && explicitPercent > 0) {
+      percentage = Math.round(explicitPercent * 100) / 100;
+    } else if (storedOriginalUsd > 0 && storedPriceUsd > 0 && storedOriginalUsd > storedPriceUsd) {
+      percentage = Math.round((1 - storedPriceUsd / storedOriginalUsd) * 10000) / 100;
+    } else if (storedDiscount > 0) {
+      const saleLocalPrice = storedLocalPrice > 0 ? storedLocalPrice : this.toLocalPrice(storedPriceUsd);
+      if (saleLocalPrice > 0) {
+        percentage = Math.round((storedDiscount / (saleLocalPrice + storedDiscount)) * 10000) / 100;
+      }
+    }
+
+    percentage = Math.max(0, Math.min(99.99, percentage));
+
+    let oldPriceUsd: number | null = null;
+    if (storedOriginalUsd > 0) {
+      oldPriceUsd = storedOriginalUsd;
+    } else if (storedPriceUsd > 0) {
+      if (percentage > 0 && percentage < 100) {
+        oldPriceUsd = storedPriceUsd / (1 - percentage / 100);
+      } else {
+        oldPriceUsd = storedPriceUsd;
+      }
+    } else if (storedLocalPrice > 0 && this.exchangeRate > 0) {
+      const baseUsd = storedLocalPrice / this.exchangeRate;
+      if (percentage > 0 && percentage < 100) {
+        oldPriceUsd = baseUsd / (1 - percentage / 100);
+      } else {
+        oldPriceUsd = baseUsd;
+      }
+    }
+
+    this.formGroup.patchValue({
+      priceUsd: oldPriceUsd !== null ? this.roundUsd(oldPriceUsd) : null,
+      discountPercent: percentage,
+    }, { emitEvent: false });
+  }
+
+  roundUsd(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  onPriceUsdBlur(): void {
+    const val = this.formGroup?.get('priceUsd')?.value;
+    if (val !== null && val !== undefined && val !== '') {
+      const num = Number(val);
+      if (!isNaN(num)) {
+        this.formGroup.get('priceUsd')?.setValue(this.roundUsd(num));
+      }
+    }
+  }
+
+  onDiscountBlur(): void {
+    const val = this.formGroup?.get('discountPercent')?.value;
+    if (val !== null && val !== undefined && val !== '') {
+      const num = Number(val);
+      if (!isNaN(num)) {
+        const rounded = Math.round(num * 100) / 100;
+        this.formGroup.get('discountPercent')?.setValue(Math.max(0, Math.min(99.99, rounded)));
+      }
+    }
+  }
+
+  setDiscountPreset(percent: number): void {
+    this.formGroup?.get('discountPercent')?.setValue(percent);
+    this.formGroup?.get('discountPercent')?.markAsDirty();
+  }
+
+  get discountPreview(): {
+    oldPriceUsd: number;
+    oldPriceLocal: number;
+    salePriceUsd: number;
+    salePriceLocal: number;
+    percentage: number;
+  } | null {
+    if (!this.formGroup) return null;
+
+    const usdPrice = this.normalizeNumber(this.formGroup.get('priceUsd')?.value, 0) || 0;
+    const percentage = this.normalizeNumber(this.formGroup.get('discountPercent')?.value, 0) || 0;
+    if (usdPrice <= 0 || percentage <= 0 || percentage >= 100) return null;
+
+    const profitPercent = this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0) || 0;
+
+    // 1. Calculate base Syrian price from USD
+    const oldBasePriceLocal = Math.round(usdPrice * this.exchangeRate);
+
+    // 2. Calculate Syrian customer price before discount (including platform profit markup)
+    const oldProfitLocal = Math.round(oldBasePriceLocal * profitPercent / 100);
+    const oldPriceLocal = oldBasePriceLocal + oldProfitLocal;
+
+    // 3. Apply discount directly to the Syrian customer price (rounded to nearest integer Syrian Pound)
+    const salePriceLocal = Math.round(oldPriceLocal * (1 - percentage / 100));
+
+    // 4. Derive USD prices by dividing Syrian customer prices by exchange rate
+    const oldPriceUsd = this.exchangeRate > 0 ? this.roundUsd(oldPriceLocal / this.exchangeRate) : this.roundUsd(usdPrice * (1 + profitPercent / 100));
+    const salePriceUsd = this.exchangeRate > 0 ? this.roundUsd(salePriceLocal / this.exchangeRate) : this.roundUsd(oldPriceUsd * (1 - percentage / 100));
+
+    return {
+      oldPriceUsd,
+      oldPriceLocal,
+      salePriceUsd,
+      salePriceLocal,
+      percentage,
+    };
+  }
+
+  get customerPricePreview(): { oldPrice: number; salePrice: number; discountPercent: number } | null {
+    if (!this.formGroup) return null;
+
+    const priceUsd = this.normalizeNumber(this.formGroup.get('priceUsd')?.value, 0) || 0;
+    const discountPercent = this.normalizeNumber(this.formGroup.get('discountPercent')?.value, 0) || 0;
+    if (priceUsd <= 0 || discountPercent < 0 || discountPercent >= 100) return null;
+
+    const profitPercent = this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0) || 0;
+    const oldBasePriceLocal = Math.round(priceUsd * this.exchangeRate);
+    const oldProfitLocal = Math.round(oldBasePriceLocal * profitPercent / 100);
+    const oldPriceLocal = oldBasePriceLocal + oldProfitLocal;
+    const salePriceLocal = discountPercent > 0
+      ? Math.round(oldPriceLocal * (1 - discountPercent / 100))
+      : oldPriceLocal;
+
+    return {
+      oldPrice: oldPriceLocal,
+      salePrice: salePriceLocal,
+      discountPercent,
+    };
+  }
+
+  toLocalPrice(priceUsd: number | null | undefined): number {
+    if (priceUsd === null || priceUsd === undefined) return 0;
+    return Math.round(Number(priceUsd) * this.exchangeRate);
+  }
+
   loadLookups(): void {
+    this.merchantsLoading = true;
+    this.merchantsLoadError = false;
     forkJoin({
       roots: this.categoriesService.getAll(true).pipe(catchError(() => of([]))),
       subs: this.categoriesService.getAll(false).pipe(catchError(() => of([]))),
@@ -114,72 +283,127 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
           catchError(() => this.batchService.lookupMerchants()),
           catchError(() => of([]))
         ),
-    }).subscribe(({ roots, subs, merchants }) => {
-      const rootMap = new Map<number, string>();
-      (roots || []).forEach((r) => {
-        if (r && r.id) rootMap.set(r.id, r.title);
-      });
-
-      const seenCatIds = new Set<number>();
-      const allCats: CategoryOption[] = [];
-
-      // Add roots (Deduplicated by ID)
-      (roots || []).forEach((r) => {
-        if (!r || !r.id || seenCatIds.has(r.id)) return;
-        seenCatIds.add(r.id);
-        const option: CategoryOption = {
-          id: r.id,
-          title: r.title,
-          parentId: null,
-          fullPath: `[تصنيف رئيسي] ${r.title}`,
-          isRoot: true,
-        };
-        this.categoryMap.set(r.id, option);
-        allCats.push(option);
-      });
-
-      // Add subcategories (Deduplicated by ID, preserving distinct same-name hierarchies)
-      (subs || []).forEach((s) => {
-        if (!s || !s.id || seenCatIds.has(s.id)) return;
-        seenCatIds.add(s.id);
-        const parentTitle = s.parentId ? rootMap.get(s.parentId) : undefined;
-        const fullPath = parentTitle ? `${parentTitle} > ${s.title}` : s.title;
-        const option: CategoryOption = {
-          id: s.id,
-          title: s.title,
-          parentId: s.parentId || null,
-          parentTitle,
-          fullPath,
-          isRoot: !parentTitle && (!s.parentId || s.parentId === 0),
-        };
-        this.categoryMap.set(s.id, option);
-        allCats.push(option);
-      });
-
-      this.categoriesList = allCats.sort((a, b) => a.fullPath.localeCompare(b.fullPath));
-
-      // Merchants
-      const mList: BatchMerchantLookup[] = [];
-      if (merchants && merchants.length > 0) {
-        merchants.forEach((m: any) => {
-          const id = m.id;
-          const title = m.title || m.name || m.fullName || `متجر #${id}`;
-          if (!mList.some((existing) => existing.id === id)) {
-            mList.push({ id, title });
-          }
+    }).subscribe({
+      next: ({ roots, subs, merchants }) => {
+        const rootMap = new Map<number, string>();
+        (roots || []).forEach((r) => {
+          if (r && r.id) rootMap.set(r.id, r.title);
         });
-      }
-      this.merchantsList = mList;
 
-      if (this.item?.merchantId && this.item?.merchantTitle) {
-        if (!this.merchantsList.some((m) => m.id === this.item.merchantId)) {
-          this.merchantsList.unshift({
-            id: this.item.merchantId,
-            title: this.item.merchantTitle,
+        const seenCatIds = new Set<number>();
+        const allCats: CategoryOption[] = [];
+
+        // Add roots (Deduplicated by ID)
+        (roots || []).forEach((r) => {
+          if (!r || !r.id || seenCatIds.has(r.id)) return;
+          seenCatIds.add(r.id);
+          const option: CategoryOption = {
+            id: r.id,
+            title: r.title,
+            parentId: null,
+            fullPath: `[تصنيف رئيسي] ${r.title}`,
+            isRoot: true,
+          };
+          this.categoryMap.set(r.id, option);
+          allCats.push(option);
+        });
+
+        // Add subcategories (Deduplicated by ID, preserving distinct same-name hierarchies)
+        (subs || []).forEach((s) => {
+          if (!s || !s.id || seenCatIds.has(s.id)) return;
+          seenCatIds.add(s.id);
+          const parentTitle = s.parentId ? rootMap.get(s.parentId) : undefined;
+          const fullPath = parentTitle ? `${parentTitle} > ${s.title}` : s.title;
+          const option: CategoryOption = {
+            id: s.id,
+            title: s.title,
+            parentId: s.parentId || null,
+            parentTitle,
+            fullPath,
+            isRoot: !parentTitle && (!s.parentId || s.parentId === 0),
+          };
+          this.categoryMap.set(s.id, option);
+          allCats.push(option);
+        });
+
+        this.categoriesList = allCats.sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+
+        // Merchants
+        const mList: BatchMerchantLookup[] = [];
+        if (merchants && merchants.length > 0) {
+          merchants.forEach((m: any) => {
+            const id = Number(m.id ?? m.Id);
+            const title = m.title || m.Title || m.name || m.Name || m.fullName || `متجر #${id}`;
+            if (id > 0 && !mList.some((existing) => existing.id === id)) {
+              const rawKind = m.merchantKind ?? m.MerchantKind;
+              const merchantKind = rawKind === undefined || rawKind === null ? undefined : Number(rawKind);
+              mList.push({ id, title, merchantKind });
+            }
           });
         }
-      }
+        this.merchantsList = mList;
+
+        if (this.item?.merchantId && this.item?.merchantTitle) {
+          if (!this.merchantsList.some((m) => m.id === Number(this.item.merchantId))) {
+            this.merchantsList.unshift({
+              id: Number(this.item.merchantId),
+              title: this.item.merchantTitle,
+            });
+          }
+        }
+
+        const market = this.getMarketMerchant();
+        const currentMerchantId = Number(this.formGroup.get('merchantId')?.value || 0);
+        this.merchantOptions = this.merchantsList.filter(
+          (merchant) => merchant.merchantKind === 0 || merchant.id === market?.id || this.isMarketMerchant(merchant)
+        );
+        if (currentMerchantId && !this.merchantOptions.some((merchant) => merchant.id === currentMerchantId)) {
+          const current = this.merchantsList.find((merchant) => merchant.id === currentMerchantId);
+          if (current) this.merchantOptions.unshift(current);
+        }
+        if (!currentMerchantId && market) {
+          this.formGroup.patchValue({ merchantId: market.id });
+        }
+
+        this.merchantsLoading = false;
+
+        this.merchantsLoadError = this.merchantsList.length === 0;
+      },
+      error: () => {
+        this.merchantsLoading = false;
+        this.merchantsLoadError = true;
+      },
     });
+  }
+
+  retryMerchantLookup(): void {
+    this.loadLookups();
+  }
+
+  getSelectedMerchant(): BatchMerchantLookup | null {
+    const id = Number(this.formGroup?.get('merchantId')?.value || 0);
+    return id > 0 ? this.merchantsList.find((merchant) => Number(merchant.id) === id) || null : null;
+  }
+
+  getMarketMerchant(): BatchMerchantLookup | null {
+    const named = this.merchantsList.filter((merchant) => this.isMarketMerchant(merchant));
+    if (named.length === 1) return named[0];
+    if (named.length > 1) return null;
+
+    const groceryMerchants = this.merchantsList.filter((merchant) => merchant.merchantKind === 1);
+    return groceryMerchants.length === 1 ? groceryMerchants[0] : null;
+  }
+
+  isMarketMerchant(merchant: BatchMerchantLookup | null | undefined): boolean {
+    if (!merchant) return false;
+    const title = (merchant.title || '').toLowerCase().replace(/[\s_-]/g, '');
+    return title.includes('jtakmarket') || title.includes('جيتكماركت');
+  }
+
+  isSelectedMarket(): boolean {
+    const selected = this.getSelectedMerchant();
+    const market = this.getMarketMerchant();
+    return !!selected && (selected.id === market?.id || this.isMarketMerchant(selected));
   }
 
   setUnit(unit: string): void {
@@ -265,55 +489,119 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     const photosArray = raw.photos || [];
     const photosStr = Array.isArray(photosArray) ? photosArray.join(',') : (photosArray || '');
 
-    const price = this.normalizeNumber(raw.price, 0);
-    const priceUsd = this.normalizeNumber(raw.priceUsd, null);
-    const discount = this.normalizeNumber(raw.discount, 0);
+    const enteredPriceUsd = this.normalizeNumber(raw.priceUsd, null);
+    const preDiscountPriceUsd = enteredPriceUsd !== null ? this.roundUsd(enteredPriceUsd) : null;
+    const discountPercent = this.normalizeNumber(raw.discountPercent, 0) || 0;
     const catId = this.normalizeNumber(raw.productCategoryId, null);
     const merchantId = this.normalizeNumber(raw.merchantId, null);
+
+    let salePriceUsd: number | null = null;
+    let originalPriceUsd: number | null = null;
+    let salePriceLocal = 0;
+    let discountAmount = 0;
+
+    if (preDiscountPriceUsd !== null && preDiscountPriceUsd > 0) {
+      if (discountPercent > 0) {
+        originalPriceUsd = preDiscountPriceUsd;
+
+        const profitPercent = this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0) || 0;
+        const oldBasePriceLocal = Math.round(preDiscountPriceUsd * this.exchangeRate);
+        const oldProfitLocal = Math.round(oldBasePriceLocal * profitPercent / 100);
+        const oldCustomerPrice = oldBasePriceLocal + oldProfitLocal;
+
+        // Apply discount directly to the Syrian customer price
+        const saleCustomerPrice = Math.round(oldCustomerPrice * (1 - discountPercent / 100));
+        discountAmount = Math.max(0, oldCustomerPrice - saleCustomerPrice);
+
+        // Derive merchant base local price so that (salePriceLocal + profit) == saleCustomerPrice
+        if (profitPercent > 0) {
+          salePriceLocal = Math.round(saleCustomerPrice / (1 + profitPercent / 100));
+          const actualCustomerPrice = salePriceLocal + Math.round(salePriceLocal * profitPercent / 100);
+          if (actualCustomerPrice < saleCustomerPrice && ((salePriceLocal + 1) + Math.round((salePriceLocal + 1) * profitPercent / 100)) === saleCustomerPrice) {
+            salePriceLocal += 1;
+          } else if (actualCustomerPrice > saleCustomerPrice && ((salePriceLocal - 1) + Math.round((salePriceLocal - 1) * profitPercent / 100)) === saleCustomerPrice) {
+            salePriceLocal -= 1;
+          }
+        } else {
+          salePriceLocal = saleCustomerPrice;
+        }
+
+        salePriceUsd = this.exchangeRate > 0 ? this.roundUsd(salePriceLocal / this.exchangeRate) : null;
+      } else {
+        salePriceUsd = preDiscountPriceUsd;
+        originalPriceUsd = null;
+        salePriceLocal = this.toLocalPrice(preDiscountPriceUsd);
+        discountAmount = 0;
+      }
+    }
 
     const formValues: Product = {
       ...this.item,
       ...raw,
       title: (raw.title || '').trim(),
+      barcode: (raw.barcode || '').trim(),
       description: (raw.description || '').trim(),
       unit: (raw.unit || 'قطعة').trim(),
       photos: photosStr,
       productCategoryId: catId || this.item.productCategoryId,
       merchantId: merchantId ? Number(merchantId) : undefined,
-      price: price !== null ? price : 0,
-      priceUsd: priceUsd,
-      discount: discount !== null ? discount : 0,
+      price: preDiscountPriceUsd !== null ? this.toLocalPrice(preDiscountPriceUsd) : 0,
+      priceUsd: preDiscountPriceUsd,
+      originalPrice: originalPriceUsd,
+      discountPercent,
+      discount: discountAmount,
       active: !!raw.active,
       isFeatured: !!raw.isFeatured,
     };
 
+    const computedResult = {
+      merchantPrice: salePriceLocal,
+      priceUsd: salePriceUsd,
+      originalPrice: originalPriceUsd,
+      discount: discountAmount,
+      discountPercent,
+    };
+
     if (this.item.id) {
-      this.edit(formValues);
+      this.edit(formValues, computedResult);
     } else {
       delete formValues.id;
-      this.create(formValues);
+      this.create(formValues, computedResult);
     }
   }
 
-  create(formValues: Product): void {
+  private handleSaveError(error: any): void {
+    const message = typeof error?.error === 'string' ? error.error : error?.error?.message;
+    this.toasterService.error(message || 'تعذر حفظ المنتج وربطه بالمتجر، يرجى المحاولة مرة أخرى.');
+  }
+
+  create(formValues: Product, computedResult?: any): void {
     this.subs.sink = this.service
       .create(formValues)
       .pipe(
         tap((id) => {
           this.toasterService.success('تمت إضافة المنتج بنجاح');
-          this.modal.close(this.modalResult({ ...formValues, id }));
+          this.modal.close(this.modalResult({ ...formValues, id }, computedResult));
+        }),
+        catchError((error) => {
+          this.handleSaveError(error);
+          return of(null);
         })
       )
       .subscribe();
   }
 
-  edit(formValues: Product): void {
+  edit(formValues: Product, computedResult?: any): void {
     this.subs.sink = this.service
       .update(formValues)
       .pipe(
         tap(() => {
           this.toasterService.success('تم تحديث بيانات المنتج بنجاح');
-          this.modal.close(this.modalResult(formValues));
+          this.modal.close(this.modalResult(formValues, computedResult));
+        }),
+        catchError((error) => {
+          this.handleSaveError(error);
+          return of(null);
         })
       )
       .subscribe();
@@ -338,10 +626,11 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     );
   }
 
-  private modalResult(product: Product): Product {
+  private modalResult(product: Product, computedResult?: any): Product {
     const cat = this.categoryMap.get(product.productCategoryId);
     return {
       ...product,
+      ...(computedResult || {}),
       productCategory: cat?.title || product.productCategory || '',
       categoryHierarchy: cat?.fullPath || '',
       parentCategoryTitle: cat?.parentTitle || '',

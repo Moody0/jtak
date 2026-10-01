@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+﻿import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { forkJoin } from 'rxjs';
@@ -541,7 +541,8 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   get hasChanges(): boolean {
     return this.products.some((item) => {
       const original = this.originalProducts.find((candidate) => candidate.productId === item.productId);
-      return !original || original.isSelected !== item.isSelected || Number(original.additionalProfitPercent) !== Number(item.additionalProfitPercent);
+      return !original || original.isSelected !== item.isSelected ||
+        (this.merchant?.merchantKind === 0 && Number(original.maxOrderQuantity ?? 20) !== Number(item.maxOrderQuantity ?? 20));
     });
   }
 
@@ -592,7 +593,22 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   toggleProduct(item: ProductMerchant, selected: boolean): void {
+    if (selected && !item.isSelected && !this.canAddProductToCurrentMerchant(item)) {
+      this.toaster.warning(
+        this.merchant?.merchantKind === 1
+          ? 'هذا المنتج مرتبط بمطعم. انسخه كمنتج مستقل قبل إضافته إلى جيتك ماركت.'
+          : 'هذا المنتج مرتبط بجيتك ماركت. انسخه كمنتج مستقل قبل إضافته إلى المطعم.'
+      );
+      return;
+    }
     item.isSelected = selected;
+  }
+
+  canAddProductToCurrentMerchant(item: ProductMerchant): boolean {
+    if (item.isSelected) return true;
+    if (this.merchant?.merchantKind === 1 && item.hasRestaurantAssignment) return false;
+    if (this.merchant?.merchantKind === 0 && item.hasJtakMarketAssignment) return false;
+    return true;
   }
 
   get selectedProductsCount(): number {
@@ -697,21 +713,8 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  bulkSetExtraProfit(percent: number): void {
-    const ids = this.selectedProductIds;
-    if (!ids.size) return;
-    let modified = 0;
-    this.products.forEach((p) => {
-      if (ids.has(p.productId)) {
-        p.additionalProfitPercent = percent;
-        modified++;
-      }
-    });
-    this.toaster.success(`تم تطبيق نسبة ربح ${percent}% على ${modified} منتج`);
-    this.cdr.detectChanges();
-  }
-
   toggleCategory(category: MerchantCategorySummary, enabled: boolean): void {
+    let restaurantProductsSkipped = 0;
     if (category.isMain) {
       const subcategoryIds = new Set(category.subcategories.map((s) => s.id).filter((id) => id > 0));
       const subcategoryNames = new Set(category.subcategories.map((s) => s.name.trim().toLowerCase()));
@@ -727,6 +730,10 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
         const normItemCat1 = itemCat1 === 'اجبان' ? 'أجبان' : itemCat1;
         if (subcategoryNames.has(normItemCat1.toLowerCase()) || subcategoryNames.has(itemCat1.toLowerCase())) matches = true;
         if (matches) {
+          if (enabled && !this.canAddProductToCurrentMerchant(item)) {
+            restaurantProductsSkipped++;
+            return;
+          }
           item.isSelected = enabled;
         }
       });
@@ -742,9 +749,16 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
           }
         }
         if (matches) {
+          if (enabled && !this.canAddProductToCurrentMerchant(item)) {
+            restaurantProductsSkipped++;
+            return;
+          }
           item.isSelected = enabled;
         }
       });
+    }
+    if (restaurantProductsSkipped > 0) {
+      this.toaster.warning(`تم تخطي ${restaurantProductsSkipped} منتج تابع لمطعم؛ لا يمكن إضافته إلى جيتك ماركت.`);
     }
   }
 
@@ -811,7 +825,22 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   createProduct(): void {
-    this.openProductEditor(null);
+    this.openProductEditor({
+      id: null,
+      title: '',
+      description: '',
+      photos: '',
+      unit: 'قطعة',
+      active: true,
+      isFeatured: false,
+      productCategoryId: 0,
+      productCategory: '',
+      merchantId: this.merchantId,
+      merchantTitle: this.merchant?.title || `متجر #${this.merchantId}`,
+      price: 0,
+      priceUsd: null,
+      discount: 0,
+    });
   }
 
   editProduct(item: ProductMerchant): void {
@@ -825,7 +854,28 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
       isFeatured: !!item.productIsFeatured,
       productCategoryId: item.productCategoryId || 0,
       productCategory: item.productCat1 || '',
+      merchantId: item.merchantId || this.merchantId,
+      merchantTitle: this.merchant?.title || `متجر #${this.merchantId}`,
+      price: item.merchantPrice ?? 0,
+      priceUsd: item.priceUsd ?? null,
+      originalPrice: item.originalPrice ?? null,
+      discount: item.discount ?? 0,
+      discountPercent: this.getDiscountPercent(item),
+      profitOutOfMerchantPricePercent: item.profitOutOfMerchantPricePercent ?? this.merchant?.profitOutOfMerchantPricePercent ?? 0,
     });
+  }
+
+  getDiscountPercent(item: ProductMerchant): number | null {
+    if (item.discountPercent !== undefined && item.discountPercent !== null && item.discountPercent > 0) {
+      return item.discountPercent;
+    }
+    if (item.originalPrice && item.priceUsd && item.originalPrice > item.priceUsd) {
+      return Math.round((1 - item.priceUsd / item.originalPrice) * 100);
+    }
+    if (!item.discount || item.discount <= 0 || item.price <= item.finalPrice) {
+      return null;
+    }
+    return Math.round(((item.price - item.finalPrice) / item.price) * 100);
   }
 
   deleteProduct(item: ProductMerchant): void {
@@ -882,6 +932,12 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
 
   resetChanges(): void {
     this.products = this.originalProducts.map((item) => ({ ...item }));
+  }
+
+  setProductOrderLimit(item: ProductMerchant, value: string | number): void {
+    const parsed = Number(value);
+    item.maxOrderQuantity = Number.isInteger(parsed) && parsed >= 1 && parsed <= 999 ? parsed : null;
+    this.cdr.detectChanges();
   }
 
   saveCatalog(): void {
@@ -944,6 +1000,19 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
         existing.productIsFeatured = updated.isFeatured;
         existing.productCategoryId = updated.productCategoryId;
         existing.productCat1 = updated.productCategory;
+        if (updated.priceUsd !== undefined) existing.priceUsd = updated.priceUsd;
+        if (updated.originalPrice !== undefined) existing.originalPrice = updated.originalPrice;
+        if (updated.discount !== undefined) existing.discount = updated.discount ?? 0;
+        if (updated.discountPercent !== undefined) existing.discountPercent = updated.discountPercent;
+        const newMerchantPrice = (updated as any).merchantPrice ?? updated.price;
+        if (newMerchantPrice !== undefined && newMerchantPrice !== null) {
+          existing.merchantPrice = newMerchantPrice;
+          const markup = Math.round(existing.merchantPrice * (existing.profitOutOfMerchantPricePercent || 0) / 100);
+          existing.profitOutOfMerchantPrice = markup;
+          existing.merchantProfit = existing.merchantPrice;
+          existing.finalPrice = existing.merchantPrice + markup;
+          existing.price = existing.finalPrice + (existing.discount || 0);
+        }
       } else {
         this.reloadCatalogPreservingAssignments();
       }
@@ -1013,7 +1082,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   private reloadCatalogPreservingAssignments(): void {
     const pending = new Map(this.products.map((item) => [item.productId, {
       isSelected: item.isSelected,
-      additionalProfitPercent: item.additionalProfitPercent,
+      maxOrderQuantity: item.maxOrderQuantity,
     }]));
     this.productMerchantsService.getProducts(this.merchantId).subscribe((response: any) => {
       this.products = (response || []).map((item: ProductMerchant) => {
@@ -1023,7 +1092,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
           ...item,
           productCategoryId: item.productCategoryId || (resolvedCat ? resolvedCat.id : 0),
           isSelected: changed ? changed.isSelected : item.merchantId === this.merchantId,
-          additionalProfitPercent: changed ? changed.additionalProfitPercent : item.additionalProfitPercent,
+          maxOrderQuantity: changed ? changed.maxOrderQuantity : item.maxOrderQuantity,
         };
       });
       this.originalProducts = this.products.map((item) => ({ ...item }));

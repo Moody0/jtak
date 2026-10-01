@@ -1,0 +1,104 @@
+<div class="modal-header bg-light-danger py-3">
+  <h4 class="modal-title fw-bolder text-danger d-flex align-items-center gap-2 m-0">
+    <i class="fas fa-times-circle text-danger fs-3"></i>
+    <span *ngIf="!isBulk()">إلغاء الطلب #{{ order?.id }}</span>
+    <span *ngIf="isBulk()">إلغاء {{ getOrdersCount() }} طلبات محددة</span>
+  </h4>
+  <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body py-4">
+  <div *ngIf="errorMessage" class="alert alert-danger d-flex align-items-center mb-4">
+    <i class="fas fa-exclamation-triangle me-2 fs-4"></i>
+    <div>{{ errorMessage }}</div>
+  </div>
+
+  <div class="alert alert-custom alert-light-warning py-3 px-4 mb-4 d-flex align-items-center">
+    <i class="fas fa-exclamation-circle text-warning fs-3 me-3"></i>
+    <div class="fs-7 text-dark">
+      سيؤدي هذا الإجراء إلى <strong>إلغاء الطلب بالكامل</strong> ووقف المعالجة وإشعار الأطراف المعنية. هذا الإجراء لا يمكن التراجع عنه.
+    </div>
+  </div>
+
+  <!-- Single order preview summary -->
+  <div *ngIf="!isBulk() && order" class="card mb-4 bg-light border-0">
+    <div class="card-body py-3 px-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span class="text-muted fs-8 d-block">العميل</span>
+          <strong class="fs-7">{{ order.user || 'غير محدد' }}</strong>
+        </div>
+        <div>
+          <span class="text-muted fs-8 d-block">المبلغ الإجمالي</span>
+          <strong class="fs-7 text-danger">{{ (order.grandTotal ?? order.price) | number }} ل.س</strong>
+        </div>
+        <div>
+          <span class="text-muted fs-8 d-block">المندوب</span>
+          <span class="fs-7">{{ order.deliveryUser || 'غير معيّن' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk orders count preview -->
+  <div *ngIf="isBulk()" class="card mb-4 bg-light border-0">
+    <div class="card-body py-3 px-4">
+      <span class="text-muted fs-8 d-block">عدد الطلبات القابلة للإلغاء المحددة</span>
+      <strong class="fs-6 text-danger">{{ getOrdersCount() }} طلب</strong>
+    </div>
+  </div>
+
+  <!-- Quick reason suggestions -->
+  <div class="mb-3">
+    <label class="form-label fw-bold fs-7 mb-2">أسباب شائعة (انقر للاختيار السريع):</label>
+    <div class="d-flex flex-wrap gap-2">
+      <button
+        *ngFor="let qr of quickReasons"
+        type="button"
+        class="btn btn-sm"
+        [ngClass]="reason === qr ? 'btn-danger' : 'btn-light-secondary text-dark'"
+        (click)="selectReason(qr)"
+      >
+        {{ qr }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Custom reason textarea -->
+  <div class="mb-3">
+    <label class="form-label fw-bold fs-7 required">
+      سبب الإلغاء والرفض <span class="text-danger">*</span> (سيظهر للعميل وفي السجل):
+    </label>
+    <textarea
+      class="form-control"
+      rows="3"
+      placeholder="اكتب سبب إلغاء الطلب بالتفصيل هنا..."
+      [(ngModel)]="reason"
+      [disabled]="isLoading"
+    ></textarea>
+    <div class="form-text text-muted fs-8">
+      يرجى كتابة سبب واضح ومفهوم للعميل لتفادي الالتباس.
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer py-3">
+  <button
+    type="button"
+    class="btn btn-light"
+    (click)="modal.dismiss()"
+    [disabled]="isLoading"
+  >
+    تراجع
+  </button>
+  <button
+    type="button"
+    class="btn btn-danger d-flex align-items-center gap-2"
+    (click)="confirm()"
+    [disabled]="!canSubmit()"
+  >
+    <span *ngIf="isLoading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+    <i *ngIf="!isLoading" class="fas fa-check"></i>
+    <span>{{ isLoading ? 'جاري الإلغاء...' : 'تأكيد الإلغاء' }}</span>
+  </button>
+</div>

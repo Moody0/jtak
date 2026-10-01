@@ -186,9 +186,48 @@ namespace Modules.Accounting.Tests
             Assert.Equal("إلغاء إداري بناء على طلب المتجر", loaded.Notes);
         }
 
-        // 6. Invalid status transition rejected
+        // 6. Driver decline returns the order to courier assignment instead of canceling it
         [Fact]
-        public async Task Test06_InvalidStatusTransition_DeliveryFromPendingIsRejected()
+        public async Task Test06_DriverDecline_ReleasesAssignmentAndKeepsOrderActive()
+        {
+            using var context = CreateInMemoryOrdersContext();
+            var service = CreateOrderService(context);
+            var order = await SeedOrderWithDetailsAsync(context, OrderDetailStatus.ReadyForPickup);
+            var driverId = Guid.NewGuid();
+            order.DeliveryId = driverId;
+            order.DeliveryUser = "Captain Reham";
+            await context.SaveChangesAsync();
+
+            var declined = await service.DeliveryDeclineOrder(order.Id, driverId);
+
+            Assert.Null(declined.DeliveryId);
+            Assert.Null(declined.DeliveryUser);
+            Assert.Equal(OrderDetailStatus.ReadyForPickup, declined.OrderDetails.Single().OrderDetailStatus);
+            Assert.Empty(await context.OrderStatusChangeLogs
+                .Where(x => x.OrderId == order.Id && x.OrderDetailStatus == OrderDetailStatus.DeliveryCanceled)
+                .ToListAsync());
+        }
+
+        [Fact]
+        public async Task DriverDeclineBeforePreparation_PreservesMerchantAcceptedStatus()
+        {
+            using var context = CreateInMemoryOrdersContext();
+            var service = CreateOrderService(context);
+            var order = await SeedOrderWithDetailsAsync(context, OrderDetailStatus.MerchantAccepted);
+            var driverId = Guid.NewGuid();
+            order.DeliveryId = driverId;
+            order.DeliveryUser = "Captain Reham";
+            await context.SaveChangesAsync();
+
+            var declined = await service.DeliveryDeclineOrder(order.Id, driverId);
+
+            Assert.Null(declined.DeliveryId);
+            Assert.Equal(OrderDetailStatus.MerchantAccepted, declined.OrderDetails.Single().OrderDetailStatus);
+        }
+
+        // 7. Invalid status transition rejected
+        [Fact]
+        public async Task Test07_InvalidStatusTransition_DeliveryFromPendingIsRejected()
         {
             using var context = CreateInMemoryOrdersContext();
             var service = CreateOrderService(context);
@@ -202,9 +241,9 @@ namespace Modules.Accounting.Tests
             Assert.False(hasInTransit || allReadyOrShipping);
         }
 
-        // 7. Duplicate action remains idempotent
+        // 8. Duplicate action remains idempotent
         [Fact]
-        public async Task Test07_DuplicateAccept_RemainsIdempotent()
+        public async Task Test08_DuplicateAccept_RemainsIdempotent()
         {
             using var context = CreateInMemoryOrdersContext();
             var service = CreateOrderService(context);
@@ -221,9 +260,9 @@ namespace Modules.Accounting.Tests
             Assert.Equal(OrderDetailStatus.MerchantAccepted, secondResult);
         }
 
-        // 8. Delivered order cannot be delivered twice
+        // 9. Delivered order cannot be delivered twice
         [Fact]
-        public async Task Test08_DeliveredOrderCannotBeDeliveredTwice()
+        public async Task Test09_DeliveredOrderCannotBeDeliveredTwice()
         {
             using var context = CreateInMemoryOrdersContext();
             var service = CreateOrderService(context);
@@ -242,9 +281,9 @@ namespace Modules.Accounting.Tests
             Assert.All(delivered2.OrderDetails, d => Assert.Equal(OrderDetailStatus.Delivered, d.OrderDetailStatus));
         }
 
-        // 9. COD accounting runs exactly once
+        // 10. COD accounting runs exactly once
         [Fact]
-        public async Task Test09_CodAccounting_RunsExactlyOnceWithIdempotency()
+        public async Task Test10_CodAccounting_RunsExactlyOnceWithIdempotency()
         {
             using var accountingContext = CreateInMemoryAccountingContext();
             var ledgerService = new LedgerService(accountingContext, NullLogger<LedgerService>.Instance);
@@ -399,6 +438,16 @@ namespace Modules.Accounting.Tests
 
             Assert.False(string.IsNullOrWhiteSpace(liveTrack.DeliveryOtp));
             Assert.Equal("4826", liveTrack.DeliveryOtp);
+        }
+
+        [Fact]
+        public void DeliveryOtp_IsOmittedFromReadDtosWhenNotExplicitlyIncluded()
+        {
+            var adminOrderJson = System.Text.Json.JsonSerializer.Serialize(new OrderDto());
+            var adminLiveTrackJson = System.Text.Json.JsonSerializer.Serialize(new OrderLiveTrackDto());
+
+            Assert.DoesNotContain("DeliveryOtp", adminOrderJson);
+            Assert.DoesNotContain("DeliveryOtp", adminLiveTrackJson);
         }
 
         // 15. Guarded Reconciliation: Non-empty ledger table aborts and refuses to drop

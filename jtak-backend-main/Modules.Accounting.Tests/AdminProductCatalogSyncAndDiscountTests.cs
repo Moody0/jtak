@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using App.Catalog.Data;
 using Modules.Catalog.Entities;
+using App.ApiControllers.V1.Admin;
 using Xunit;
 
 namespace Modules.Accounting.Tests
@@ -701,5 +702,87 @@ namespace Modules.Accounting.Tests
             Assert.False(newFeaturedD);
             Assert.False(targetD.IsFeatured);
         }
+
+        [Fact]
+        public void CalculateDiscountPricing_AppliedDirectlyToSyrianCustomerPrice_UserScenario()
+        {
+            // Scenario reported by user:
+            // Base merchant price = 450 SYP
+            // Platform markup = 10% -> 450 + 45 = 495 SYP
+            // Discount = 10%
+            // Old calculation applied discount on USD cents, resulting in 445 SYP (50 SYP discount).
+            // Required fix: Apply 10% discount directly to Syrian customer price (495 * 0.9 = 445.5 -> 446 SYP),
+            // giving a discount amount of 49 SYP and customer price of 446 SYP.
+
+            // 1. Direct SYP pricing (without USD)
+            var (saleBasePriceSyp, _, discountAmountSyp, _) = ProductsController.CalculateDiscountPricing(
+                originalPriceLocal: 450m,
+                originalPriceUsd: null,
+                discountPercent: 10m,
+                usdRate: 1m,
+                profitOutOfMerchantPricePercent: 10m
+            );
+
+            // Customer price before discount = 450 + round(450 * 0.10) = 495 SYP
+            // Discount = 10% of 495 = 49.5 -> rounds to 50 SYP discount or 445.5 -> 446 SYP final price
+            // 495 - 446 = 49 SYP discount amount
+            Assert.Equal(49m, discountAmountSyp);
+
+            // Reconstructed customer price: saleBasePrice + round(saleBasePrice * 10%)
+            var customerPriceSyp = saleBasePriceSyp + Math.Round(saleBasePriceSyp * 0.10m, 0, MidpointRounding.AwayFromZero);
+            Assert.Equal(446m, customerPriceSyp);
+            Assert.Equal(405m, saleBasePriceSyp); // 405 + 41 = 446 SYP
+
+            // 2. USD pricing with Syrian conversion (e.g. $3.33 @ rate 135.135135)
+            const decimal usdRate = 135.135135135135m;
+            var (saleBasePriceFromUsd, salePriceUsd, discountAmountFromUsd, originalUsd) = ProductsController.CalculateDiscountPricing(
+                originalPriceLocal: 450m,
+                originalPriceUsd: 3.33m,
+                discountPercent: 10m,
+                usdRate: usdRate,
+                profitOutOfMerchantPricePercent: 10m
+            );
+
+            Assert.Equal(3.33m, originalUsd);
+            Assert.Equal(49m, discountAmountFromUsd);
+            Assert.Equal(405m, saleBasePriceFromUsd);
+            var customerPriceFromUsd = saleBasePriceFromUsd + Math.Round(saleBasePriceFromUsd * 0.10m, 0, MidpointRounding.AwayFromZero);
+            Assert.Equal(446m, customerPriceFromUsd);
+            Assert.Equal(3.00m, salePriceUsd); // 405 / 135.135135 = 2.997 -> rounds to $3.00
+        }
+
+        [Theory]
+        [InlineData(10000, 10, 10, 11000, 9900, 1100, 9000)]
+        [InlineData(25000, 15, 20, 28750, 23000, 5750, 20000)]
+        [InlineData(500, 0, 10, 500, 450, 50, 450)]
+        [InlineData(1000, 10, 0, 1100, 1100, 0, 1000)]
+        public void CalculateDiscountPricing_DirectSyrianCalculation_VariousRates(
+            decimal basePrice,
+            decimal markupPercent,
+            decimal discountPercent,
+            decimal expectedOldCustomerPrice,
+            decimal expectedSaleCustomerPrice,
+            decimal expectedDiscountAmount,
+            decimal expectedSaleBasePrice)
+        {
+            var (saleBasePrice, _, discountAmount, _) = ProductsController.CalculateDiscountPricing(
+                originalPriceLocal: basePrice,
+                originalPriceUsd: null,
+                discountPercent: discountPercent,
+                usdRate: 1m,
+                profitOutOfMerchantPricePercent: markupPercent
+            );
+
+            Assert.Equal(expectedDiscountAmount, discountAmount);
+            Assert.Equal(expectedSaleBasePrice, saleBasePrice);
+
+            var actualOldCustomerPrice = basePrice + Math.Round(basePrice * markupPercent / 100m, 0, MidpointRounding.AwayFromZero);
+            Assert.Equal(expectedOldCustomerPrice, actualOldCustomerPrice);
+
+            var actualSaleCustomerPrice = saleBasePrice + Math.Round(saleBasePrice * markupPercent / 100m, 0, MidpointRounding.AwayFromZero);
+            Assert.Equal(expectedSaleCustomerPrice, actualSaleCustomerPrice);
+            Assert.Equal(expectedOldCustomerPrice - expectedDiscountAmount, actualSaleCustomerPrice);
+        }
     }
 }
+

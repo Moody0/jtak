@@ -1,6 +1,12 @@
 import { BaseModel } from 'src/app/_metronic/shared/crud-table';
 import { AppRoleName } from '../enums/role.enum';
 
+export enum CaptainCompensationType {
+  SalariedEmployee = 0,
+  PerKilometer = 1,
+  Percentage = 2,
+}
+
 export interface User extends BaseModel {
   email: string;
   phoneNumber: string;
@@ -13,6 +19,9 @@ export interface User extends BaseModel {
   lang: string;
   countryPhoneCode: string;
   password?: string;
+  maxCashFloat?: number;
+  captainCompensationType?: CaptainCompensationType;
+  captainRate?: number;
 }
 export interface Balance extends BaseModel {
   name: string;

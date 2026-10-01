@@ -21,7 +21,8 @@
         </div>
         <div>
           <span class="text-muted fs-8 d-block">المبلغ الإجمالي</span>
-          <strong class="fs-7 text-primary">{{ order?.price | number }} ل.س</strong>
+          <strong class="fs-7 text-primary">{{ getGrandTotal() | number }} ل.س</strong>
+          <small class="text-muted d-block" *ngIf="order?.deliveryFee">المنتجات {{ order?.price | number }} + التوصيل {{ order?.deliveryFee | number }} ل.س</small>
         </div>
         <div>
           <span class="text-muted fs-8 d-block">طريقة الدفع</span>

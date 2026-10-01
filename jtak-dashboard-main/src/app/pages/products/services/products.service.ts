@@ -25,6 +25,12 @@ export class ProductsService extends TableService<Product> implements OnDestroy 
     super(http);
   }
 
+  public fetchPost(queryParams: any = null): void {
+    // Only the latest search/category/page request should update this table.
+    this.subscriptions.forEach((request) => request.unsubscribe());
+    super.fetchPost(queryParams);
+  }
+
   changeStatus(isActive: boolean, id: number){    
     this._isLoading$.next(true);
     return this.http

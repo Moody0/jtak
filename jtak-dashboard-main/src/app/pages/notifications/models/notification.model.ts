@@ -13,4 +13,29 @@ export interface Notification extends BaseModel {
     notificationType: number,
     image: string;
     url: string;
+    topic?: string;
+    createdDate?: string;
+}
+
+export interface CampaignAudiences {
+    customers: number;
+    delivery: number;
+    warehouse: number;
+    pushConfigured: boolean;
+}
+
+export interface CampaignRequest {
+    target: 'customers' | 'delivery' | 'warehouse';
+    titleAr: string;
+    textAr: string;
+    image?: string;
+    destination: 'home' | 'orders';
+}
+
+export interface CampaignResult {
+    recipientAccounts: number;
+    acceptedLanguages: number;
+    failedLanguages: number;
+    failureCode?: string;
+    historyRetained?: boolean;
 }

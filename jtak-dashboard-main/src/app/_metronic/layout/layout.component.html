@@ -21,9 +21,7 @@
         #ktHeader
       ></app-header>
       <div id="kt_content" class="content d-flex flex-column flex-column-fluid">
-        <ng-container *ngIf="toolbarDisplay">
-          <app-toolbar class="toolbar" id="kt_toolbar"></app-toolbar>
-        </ng-container>
+        <app-workspace-nav></app-workspace-nav>
 
         <div class="post d-flex flex-column-fluid" id="kt_post">
           <app-content
@@ -47,6 +45,8 @@
 <!-- <app-activity-drawer></app-activity-drawer>
 <app-messenger-drawer></app-messenger-drawer> -->
 <!-- end:: Drawers -->
+
+<app-order-sound-notifier></app-order-sound-notifier>
 
 <!-- begin:: Modals -->
 <app-main-modal></app-main-modal>

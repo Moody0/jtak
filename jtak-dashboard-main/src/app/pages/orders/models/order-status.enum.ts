@@ -9,3 +9,17 @@ export enum OrderDetailStatus {
   DeliveryCanceled = 7,
   ReadyForPickup = 8,
 }
+
+export enum AggregateOrderStatus {
+  Draft = 0,
+  Pending = 1,
+  MerchantAccepted = 2,
+  ReadyForPickup = 3,
+  InTransit = 4,
+  Delivered = 5,
+  PartiallyDelivered = 6,
+  CustomerCanceled = 7,
+  DeliveryCanceled = 8,
+  MerchantRejected = 9,
+}
+

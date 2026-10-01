@@ -9,7 +9,9 @@ namespace Modules.Accounting.Entities
     public enum SettlementPartyType : byte
     {
         Captain = 0,
-        Merchant = 1
+        Merchant = 1,
+        // Separate from the captain's COD custody deposit (value 0).
+        CaptainEarnings = 2
     }
 
     public enum SettlementRequestStatus : byte
@@ -22,8 +24,8 @@ namespace Modules.Accounting.Entities
 
     /// <summary>
     /// A user initiated cash handover/payout request. Money is only moved by the
-    /// ledger when a captain request is accepted or an approved merchant payout
-    /// is marked as received.
+    /// ledger when a captain custody request is accepted, or an approved
+    /// merchant/driver earnings payout is confirmed as actually paid.
     /// </summary>
     public class SettlementRequest : AuditableEntity
     {

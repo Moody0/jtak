@@ -15,6 +15,9 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
+using App.Shared.Services.Pricing;
+using Modules.Orders.Entities;
+
 namespace App.ApiControllers.V1.Admin
 {
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
@@ -30,8 +33,18 @@ namespace App.ApiControllers.V1.Admin
         private readonly ILogger _logger;
         private readonly IMapper _mapper;
         private readonly IAdminAuditService _auditService;
+        private readonly IDriverPricingService _driverPricingService;
 
-        public SettingsController(IProductService service, IProductCategoryService categoryService, IMerchantService merchantService, IGenericSettingService genericSetting, IAppUnitOfWork unitOfWork, IMapper mapper, ILogger<SettingsController> logger, IAdminAuditService auditService = null)
+        public SettingsController(
+            IProductService service,
+            IProductCategoryService categoryService,
+            IMerchantService merchantService,
+            IGenericSettingService genericSetting,
+            IAppUnitOfWork unitOfWork,
+            IMapper mapper,
+            ILogger<SettingsController> logger,
+            IAdminAuditService auditService = null,
+            IDriverPricingService driverPricingService = null)
         {
             _service = service;
             _categoryService = categoryService;
@@ -41,6 +54,7 @@ namespace App.ApiControllers.V1.Admin
             _logger = logger;
             _mapper = mapper;
             _auditService = auditService;
+            _driverPricingService = driverPricingService;
         }
 
         /// <summary>
@@ -50,6 +64,9 @@ namespace App.ApiControllers.V1.Admin
         [HttpPut]
         public async Task<ActionResult<bool>> SetSettings(SettingsVm vm)
         {
+            if (vm?.DriverPricing != null && !vm.DriverPricing.IsValid)
+                return BadRequest("إعدادات أجور السائق غير صالحة. يجب تحديد أجر موجب والتحقق من القيم والحد الأقصى للأجرة.");
+
             var previousSettings = await _genericSetting.GetValue<SettingsVm>(nameof(SettingsVm), CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
             var previousRate = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
 
@@ -79,6 +96,14 @@ namespace App.ApiControllers.V1.Admin
                                        vm.UsdToSypExchangeRate, repriced);
             }
 
+            if (vm.DriverPricing != null)
+            {
+                if (_driverPricingService != null)
+                    await _driverPricingService.SaveSettingAsync(vm.DriverPricing);
+                else
+                    await _genericSetting.SetValue(DriverPricingSetting.Key, vm.DriverPricing);
+            }
+
             if (_auditService != null)
             {
                 await _auditService.LogAsync(new AdminAuditLogEntry
@@ -94,7 +119,8 @@ namespace App.ApiControllers.V1.Admin
                     {
                         vm.UsdToSypExchangeRate,
                         vm.HomeFeaturedCategoryIds,
-                        vm.HomeFeaturedProductIds
+                        vm.HomeFeaturedProductIds,
+                        vm.DriverPricing
                     }
                 });
             }
@@ -122,6 +148,17 @@ namespace App.ApiControllers.V1.Admin
             {
                 settings.UsdToSypExchangeRate = rate.Rate;
             }
+
+            // Driver compensation pricing setting
+            if (_driverPricingService != null)
+            {
+                settings.DriverPricing = await _driverPricingService.GetSettingAsync();
+            }
+            else
+            {
+                settings.DriverPricing = (await _genericSetting.GetValue<DriverPricingSetting>(DriverPricingSetting.Key)) ?? new DriverPricingSetting();
+            }
+
             var featuredCategoryIds = settings.HomeFeaturedCategoryIds?
                 .Where(id => id > 0)
                 .Distinct()
@@ -149,6 +186,83 @@ namespace App.ApiControllers.V1.Admin
             settings.HomeFeaturedProducts = settings.HomeFeaturedProductIds?.Any() == true ? await _service.Queryable().Select(x => _mapper.Map<ProductDto>(x)).ToArrayAsync() : Array.Empty<ProductDto>();
 
             return settings;
+        }
+
+        /// <summary>
+        /// Get Driver Delivery Compensation Pricing Configuration
+        /// </summary>
+        [HttpGet("DriverPricing")]
+        public async Task<ActionResult<DriverPricingSetting>> GetDriverPricing()
+        {
+            if (_driverPricingService != null)
+                return Ok(await _driverPricingService.GetSettingAsync());
+
+            var setting = await _genericSetting.GetValue<DriverPricingSetting>(DriverPricingSetting.Key);
+            return Ok(setting ?? new DriverPricingSetting());
+        }
+
+        /// <summary>
+        /// Update Driver Delivery Compensation Pricing Configuration
+        /// </summary>
+        [HttpPut("DriverPricing")]
+        public async Task<ActionResult<bool>> SetDriverPricing([FromBody] DriverPricingSetting setting)
+        {
+            if (setting == null || !setting.IsValid)
+                return BadRequest("إعدادات أجور السائق غير صالحة. يجب تحديد أجر موجب، وتكون القيم غير سالبة والحد الأقصى صفراً أو مساوياً للحد الأدنى على الأقل.");
+
+            if (_driverPricingService != null)
+            {
+                if (!await _driverPricingService.SaveSettingAsync(setting))
+                    return BadRequest("تعذر حفظ إعدادات أجور السائق لأنها غير صالحة.");
+            }
+            else
+                await _genericSetting.SetValue(DriverPricingSetting.Key, setting);
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Settings",
+                    Action = "UpdateDriverPricing",
+                    EntityType = "DriverPricingSetting",
+                    EntityId = DriverPricingSetting.Key,
+                    Description = setting.Mode == DriverPricingMode.Fixed
+                        ? $"تحديث تسعير أجور الكباتن إلى مبلغ ثابت ({setting.FixedAmount:N0} ل.س)"
+                        : $"تحديث تسعير أجور الكباتن حسب المسافة ({setting.DistanceRatePerUnit:N0} ل.س/{(setting.Unit == DistanceUnit.Mile ? "ميل" : "كم")})",
+                    Result = "Success",
+                    AfterState = setting
+                });
+            }
+
+            return Ok(true);
+        }
+
+        /// <summary>Fixed driver wage, applied only to "اطلب ما تحتاجه" requests.</summary>
+        [HttpGet("ErrandDriverEarning")]
+        public async Task<ActionResult<ErrandDriverEarningSetting>> GetErrandDriverEarning()
+        {
+            var setting = await _genericSetting.GetValue<ErrandDriverEarningSetting>(ErrandDriverEarningSetting.Key);
+            return Ok(setting ?? new ErrandDriverEarningSetting());
+        }
+
+        [HttpPut("ErrandDriverEarning")]
+        public async Task<ActionResult<bool>> SetErrandDriverEarning([FromBody] ErrandDriverEarningSetting setting)
+        {
+            if (setting == null || !setting.IsValid)
+                return BadRequest("أدخل أجراً ثابتاً موجباً وصالحاً لمندوب طلبات اطلب ما تحتاجه.");
+
+            await _genericSetting.SetValue(ErrandDriverEarningSetting.Key, setting);
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Settings", Action = "UpdateErrandDriverEarning",
+                    EntityType = "ErrandDriverEarningSetting", EntityId = ErrandDriverEarningSetting.Key,
+                    Description = $"تحديث أجر مندوب اطلب ما تحتاجه إلى {setting.Amount:N2} ل.س لكل طلب",
+                    Result = "Success", AfterState = setting
+                });
+            }
+            return Ok(true);
         }
     }
 }

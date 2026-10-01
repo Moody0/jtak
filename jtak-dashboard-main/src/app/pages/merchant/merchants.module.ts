@@ -1,4 +1,4 @@
-import { NgModule } from '@angular/core';
+﻿import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MerchantsListComponent } from './components/merchants-list/merchants-list.component';
 import { EditMerchantModalComponent } from './components/edit-merchant-modal/edit-merchant-modal.component';

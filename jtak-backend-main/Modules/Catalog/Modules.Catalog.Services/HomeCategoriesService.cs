@@ -1,7 +1,11 @@
+using App.Catalog.Data;
+using App.Shared.Data.MultiContext;
 using App.Shared.Entities.Enums;
 using App.Shared.Services;
 using Microsoft.EntityFrameworkCore;
 using Modules.Catalog.Entities;
+using Solf.Base;
+using URF.Core.Abstractions.Trackable;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,27 +30,69 @@ namespace Modules.Catalog.Services
         private readonly IProductCategoryService _categoryService;
         private readonly IProductService _productService;
         private readonly IMerchantService _merchantService;
+        private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepository;
         private readonly IGenericSettingService _genericSetting;
 
         public HomeCategoriesService(IProductCategoryService categoryService,
                                      IProductService productService,
                                      IMerchantService merchantService,
+                                     ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepository,
                                      IGenericSettingService genericSetting)
         {
             _categoryService = categoryService;
             _productService = productService;
             _merchantService = merchantService;
+            _merchantProductRepository = merchantProductRepository;
             _genericSetting = genericSetting;
         }
 
-        public async Task<HomeCategoriesConfig> GetConfig() =>
-            await _genericSetting.GetValue<HomeCategoriesConfig>(HomeCategoriesConfig.SettingKey)
-                ?? new HomeCategoriesConfig();
+        public async Task<HomeCategoriesConfig> GetConfig()
+        {
+            var config = await _genericSetting.GetValue<HomeCategoriesConfig>(HomeCategoriesConfig.SettingKey);
+            if (config == null)
+            {
+                config = new HomeCategoriesConfig
+                {
+                    Tiles = await BuildDefaultTiles()
+                };
+            }
+            config.Tiles ??= new List<HomeCategoryTile>();
+
+            // Add the feature to existing customer grids once. Persisting the
+            // marker means an admin can later deactivate or remove the tile.
+            if (!config.ErrandRequestsTileInitialized)
+            {
+                if (!config.Tiles.Any())
+                    config.Tiles = await BuildDefaultTiles();
+
+                if (!config.Tiles.Any(x => x.LinkType == HomeCategoryLinkType.ErrandRequests))
+                {
+                    foreach (var tile in config.Tiles)
+                        tile.Order++;
+
+                    config.Tiles.Add(new HomeCategoryTile
+                    {
+                        Id = "errand-requests",
+                        Title = "طلبات",
+                        TitleEn = "Requests",
+                        Order = 0,
+                        Active = true,
+                        LinkType = HomeCategoryLinkType.ErrandRequests
+                    });
+                }
+
+                config.ErrandRequestsTileInitialized = true;
+                await SaveConfig(config);
+            }
+
+            return config;
+        }
 
         public async Task SaveConfig(HomeCategoriesConfig config)
         {
             config ??= new HomeCategoriesConfig();
             config.Tiles ??= new List<HomeCategoryTile>();
+            config.ErrandRequestsTileInitialized = true;
 
             // Give every tile a stable id and a gap-free order so the apps and
             // the dashboard always agree on the sequence.
@@ -123,21 +169,29 @@ namespace Modules.Catalog.Services
                                                   .Select(x => new { x.Id, x.Title, x.Photo, x.MerchantKind })
                                                   .ToDictionaryAsync(x => x.Id);
 
-            var availableOffers = await _productService.Queryable().AsNoTracking()
-                .Where(x => x.DeletionDate == null && x.Active &&
-                            x.ProductCategoryId.HasValue &&
-                            x.ProductCategory.Active)
-                .SelectMany(x => x.MerchantProducts
-                    .Where(mp => (mp.MerchantPrice > 0 ||
-                                  (mp.PriceUsd.HasValue && mp.PriceUsd.Value > 0)) &&
-                                 mp.Merchant.DeletionDate == null &&
-                                 mp.Merchant.Active)
-                    .Select(mp => new
-                    {
-                        ProductId = x.Id,
-                        CategoryId = x.ProductCategoryId.Value,
-                        mp.MerchantId
-                    }))
+            // Query the join entity directly. The previous Product.SelectMany
+            // shape produced CROSS APPLY SQL on the production provider and
+            // caused /Customer/Home to return HTTP 500, which also prevented
+            // the app from receiving its banners.
+            var availableOffers = await _merchantProductRepository.Queryable().AsNoTracking()
+                .Where(mp => mp.Product.DeletionDate == null &&
+                             mp.Product.Active &&
+                             mp.Product.ProductCategoryId.HasValue &&
+                             mp.Product.ProductCategory.Active &&
+                             // MerchantPrice is the persisted customer-facing
+                             // price and exists on older production schemas as
+                             // well. Do not make the home-categories endpoint
+                             // fail merely because the optional PriceUsd
+                             // migration has not been applied yet.
+                             mp.MerchantPrice > 0 &&
+                             mp.Merchant.DeletionDate == null &&
+                             mp.Merchant.Active)
+                .Select(mp => new
+                {
+                    ProductId = mp.ProductId,
+                    CategoryId = mp.Product.ProductCategoryId.Value,
+                    mp.MerchantId
+                })
                 .ToArrayAsync();
 
             var categoryParents = categories.ToDictionary(x => x.Key, x => x.Value.ParentId);
@@ -154,7 +208,9 @@ namespace Modules.Catalog.Services
                     Order = tile.Order,
                     LinkType = tile.LinkType,
                     ProductCategoryId = tile.ProductCategoryId,
+                    SecondaryProductCategoryId = tile.SecondaryProductCategoryId,
                     MerchantKind = tile.MerchantKind,
+                    RestaurantCategoryId = tile.RestaurantCategoryId,
                     MerchantId = tile.MerchantId,
                     SearchTerm = tile.SearchTerm
                 };
@@ -166,14 +222,27 @@ namespace Modules.Catalog.Services
                             categories.TryGetValue(tile.ProductCategoryId.Value, out var category))
                         {
                             dto.TargetLabel = category.Title;
+                            dto.TargetCategoryTitle = category.Title;
+
+                            var categoryIds = GetCategoryTreeIds(
+                                tile.ProductCategoryId.Value,
+                                categoryParents);
+
+                            if (tile.SecondaryProductCategoryId.HasValue &&
+                                categories.TryGetValue(tile.SecondaryProductCategoryId.Value, out var secCategory))
+                            {
+                                dto.SecondaryTargetCategoryTitle = secCategory.Title;
+                                dto.TargetLabel = $"{category.Title} + {secCategory.Title}";
+                                categoryIds.UnionWith(GetCategoryTreeIds(
+                                    tile.SecondaryProductCategoryId.Value,
+                                    categoryParents));
+                            }
+
                             if (string.IsNullOrWhiteSpace(dto.Title))
                                 dto.Title = category.Title;
                             if (string.IsNullOrWhiteSpace(dto.ImageUrl))
                                 dto.ImageUrl = category.Icon;
 
-                            var categoryIds = GetCategoryTreeIds(
-                                tile.ProductCategoryId.Value,
-                                categoryParents);
                             var matchingOffers = availableOffers
                                 .Where(x => categoryIds.Contains(x.CategoryId))
                                 .ToArray();
@@ -201,6 +270,7 @@ namespace Modules.Catalog.Services
                         if (tile.MerchantId.HasValue &&
                             merchants.TryGetValue(tile.MerchantId.Value, out var merchant))
                         {
+                            dto.MerchantKind = merchant.MerchantKind;
                             dto.TargetLabel = merchant.Title;
                             if (string.IsNullOrWhiteSpace(dto.Title))
                                 dto.Title = merchant.Title;
@@ -225,16 +295,8 @@ namespace Modules.Catalog.Services
                         if (tile.MerchantKind.HasValue)
                         {
                             dto.TargetLabel = tile.MerchantKind.Value.ToString();
-                            var merchantIds = merchants.Values
-                                .Where(x => x.MerchantKind == tile.MerchantKind.Value)
-                                .Select(x => x.Id)
-                                .ToHashSet();
-                            dto.AvailableMerchantCount = merchantIds.Count;
-                            dto.AvailableProductCount = availableOffers
-                                .Where(x => merchantIds.Contains(x.MerchantId))
-                                .Select(x => x.ProductId)
-                                .Distinct()
-                                .Count();
+                            dto.AvailableMerchantCount = merchants.Values
+                                .Count(x => x.MerchantKind == tile.MerchantKind.Value);
                             dto.HasAvailableContent = dto.AvailableMerchantCount > 0;
                             if (!dto.HasAvailableContent)
                                 dto.AvailabilityMessage = "لا يوجد متجر نشط من هذا النوع حالياً";
@@ -254,6 +316,45 @@ namespace Modules.Catalog.Services
                             dto.AvailableMerchantCount = merchants.Count;
                             if (!dto.HasAvailableContent)
                                 dto.AvailabilityMessage = "لا توجد متاجر نشطة للبحث حالياً";
+                        }
+                        else
+                        {
+                            dto.TargetExists = false;
+                            dto.HasAvailableContent = false;
+                        }
+                        break;
+
+                    case HomeCategoryLinkType.ErrandRequests:
+                        dto.TargetLabel = "طلبات";
+                        dto.HasAvailableContent = true;
+                        break;
+
+                    case HomeCategoryLinkType.MerchantCategory:
+                        if (tile.MerchantId.HasValue &&
+                            tile.ProductCategoryId.HasValue &&
+                            merchants.TryGetValue(tile.MerchantId.Value, out var mCategoryMerchant) &&
+                            categories.TryGetValue(tile.ProductCategoryId.Value, out var mCategoryCategory))
+                        {
+                            dto.MerchantKind = mCategoryMerchant.MerchantKind;
+                            dto.TargetLabel = $"{mCategoryMerchant.Title} - {mCategoryCategory.Title}";
+                            dto.TargetCategoryTitle = mCategoryCategory.Title;
+                            if (string.IsNullOrWhiteSpace(dto.Title))
+                                dto.Title = mCategoryCategory.Title;
+                            if (string.IsNullOrWhiteSpace(dto.ImageUrl))
+                                dto.ImageUrl = !string.IsNullOrWhiteSpace(mCategoryCategory.Icon)
+                                    ? mCategoryCategory.Icon
+                                    : mCategoryMerchant.Photo;
+
+                            var catIds = GetCategoryTreeIds(tile.ProductCategoryId.Value, categoryParents);
+                            var matchOffers = availableOffers
+                                .Where(x => x.MerchantId == tile.MerchantId.Value && catIds.Contains(x.CategoryId))
+                                .ToArray();
+
+                            dto.AvailableMerchantCount = 1;
+                            dto.AvailableProductCount = matchOffers.Select(x => x.ProductId).Distinct().Count();
+                            dto.HasAvailableContent = dto.AvailableProductCount > 0;
+                            if (!dto.HasAvailableContent)
+                                dto.AvailabilityMessage = $"لا توجد منتجات مسعّرة لهذا القسم لدى متجر \"{mCategoryMerchant.Title}\" حالياً";
                         }
                         else
                         {

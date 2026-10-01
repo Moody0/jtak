@@ -1,25 +1,5 @@
 <div class="orders-page-container">
-  <!-- 1. Streamlined Operations Utility Bar -->
-  <div class="ops-utility-bar mb-3">
-    <div class="ops-utility-left">
-      <div class="ops-live-pulse-badge">
-        <span class="ops-pulse-dot"></span>
-        <span class="fw-bold">{{ 'ORDERS_PAGE.LIVE_OPERATIONS' | translate }}</span>
-      </div>
-      <div class="ops-sync-meta">
-        <i class="fas fa-satellite text-primary me-1"></i>
-        <span>{{ 'ORDERS_PAGE.AUTO_REFRESH' | translate }}</span>
-        <span class="ops-sync-divider">•</span>
-        <span class="ops-sync-time">{{ lastUpdated | date:'shortTime' }}</span>
-      </div>
-    </div>
-    <div class="ops-utility-right">
-      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="refreshOrders()" [disabled]="isLoading" [title]="'ORDERS_PAGE.REFRESH_ORDERS' | translate">
-        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading" aria-hidden="true"></i>
-        <span>{{ 'ORDERS_PAGE.REFRESH_ORDERS' | translate }}</span>
-      </button>
-    </div>
-  </div>
+
 
   <ng-container *ngIf="ordersService.items$ | async as items">
     <!-- 2. Operational KPI Counters Strip (The authoritative top cards) -->
@@ -107,8 +87,11 @@
       </div>
 
       <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-sm"
-          [ngClass]="activeTab === 'ARCHIVED' ? 'btn-dark' : 'btn-outline-secondary'"
+        <button type="button" class="btn btn-sm ops-btn-refresh-icon" (click)="refreshOrders()" [disabled]="isLoading" [title]="'ORDERS_PAGE.REFRESH_ORDERS' | translate">
+          <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        </button>
+        <button type="button" class="btn btn-sm ops-btn-archived"
+          [class.ops-btn-archived--active]="activeTab === 'ARCHIVED'"
           (click)="setActiveTab(activeTab === 'ARCHIVED' ? 'ALL' : 'ARCHIVED')">
           <i class="fas fa-archive me-1"></i>
           <span>{{ 'ORDERS_PAGE.ARCHIVED_ORDERS' | translate }}</span>
@@ -158,21 +141,20 @@
                   [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)"
                   (change)="selection.toggleAll(items, $any($event.target).checked)" />
               </th>
-              <th scope="col" style="width: 165px;">
+              <th scope="col">
                 <div class="d-flex align-items-center cursor-pointer" (click)="sort('id')">
                   <span>{{ 'ORDERS_PAGE.COL_ORDER_NUM' | translate }}</span>
                   <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
                 </div>
               </th>
-              <th scope="col" style="min-width: 250px;">
+              <th scope="col">
                 <div class="d-flex align-items-center cursor-pointer" (click)="sort('purchaseDate')">
                   <span>{{ 'ORDERS_PAGE.COL_CUSTOMER_DEST' | translate }}</span>
                   <app-sort-icon column="purchaseDate" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
                 </div>
               </th>
-              <th scope="col" style="min-width: 220px;">{{ 'ORDERS_PAGE.COL_ITEMS_STATUS' | translate }}</th>
-              <th scope="col" style="width: 120px;">{{ 'ORDERS_PAGE.COL_TOTAL_PRICE' | translate }}</th>
-              <th scope="col" style="width: 150px;">{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</th>
+              <th scope="col">{{ 'ORDERS_PAGE.COL_ITEMS_STATUS' | translate }}</th>
+              <th scope="col">{{ 'ORDERS_PAGE.COL_PAYMENT_DELIVERY' | translate }}</th>
               <th scope="col" class="ops-actions-col text-center">{{ 'ORDERS_PAGE.COL_ACTIONS' | translate }}</th>
             </tr>
           </thead>
@@ -186,185 +168,187 @@
 
               <!-- 1. Order ID, Time & Overall Status -->
               <td>
-                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                  <span class="ops-order-id">#{{ o.id }}</span>
-                  <span class="ops-status-pill" [ngClass]="getOrderOverallStatus(o).badgeClass">
-                    <i class="fas me-1" [ngClass]="getOrderOverallStatus(o).icon"></i>{{ getOrderOverallStatus(o).label }}
-                  </span>
-                </div>
-                <div class="ops-order-meta">
-                  <span>{{ o.purchaseDate | date:'d MMM y' }}</span>
-                  <span class="ops-dot-sep">•</span>
-                  <span>{{ o.purchaseDate | date:'shortTime' }}</span>
-                </div>
-                <div *ngIf="o.deleteReason" class="small mt-1 text-muted">
-                  <span class="badge badge-light-danger fs-9">سبب الأرشفة: {{ o.deleteReason }}</span>
-                </div>
-                <div *ngIf="o.adminFlowMessage" class="small mt-2"
-                  [ngClass]="o.requiresMerchantDecision ? 'text-warning fw-bold' : 'text-muted'">
-                  <i class="fas" [ngClass]="o.requiresMerchantDecision ? 'fa-store-alt' : 'fa-info-circle'"></i>
-                  {{ o.adminFlowMessage }}
-                </div>
-                <div *ngIf="o.notes" class="small mt-1 text-danger fw-bold" [title]="o.notes">
-                  <i class="fas fa-comment-alt me-1"></i>{{ o.notes }}
+                <div class="ops-cell-compact">
+                  <div class="ops-cell-row-top">
+                    <span class="ops-order-id">#{{ o.id }}</span>
+                    <span class="ops-order-meta">
+                      <i class="far fa-clock ops-meta-clock me-1"></i>
+                      <span>{{ o.purchaseDate | date:'shortTime' }}</span>
+                      <span class="ops-dot-sep">•</span>
+                      <span>{{ o.purchaseDate | date:'d MMM y' }}</span>
+                    </span>
+                  </div>
+                  <div class="ops-cell-row-sub">
+                    <span class="ops-status-pill" [ngClass]="getOrderOverallStatus(o).badgeClass">
+                      <i class="fas me-1" [ngClass]="getOrderOverallStatus(o).icon"></i>{{ getOrderOverallStatus(o).label }}
+                    </span>
+                    <span *ngIf="getMerchantBadge(o) as badge" class="ops-merchant-badge" [ngClass]="badge.isMarket ? 'ops-merchant-badge--market' : 'ops-merchant-badge--store'">
+                      <i class="fas me-1" [ngClass]="badge.isMarket ? 'fa-store' : 'fa-utensils'"></i>{{ badge.name }}
+                    </span>
+                    <span *ngIf="o.accountingStatus === 1" class="badge badge-light-warning ops-accounting-tag"
+                      [title]="'ORDERS_PAGE.ACCOUNTING_PENDING_DESC' | translate">
+                      <i class="fas fa-hourglass-half me-1"></i>{{ 'ORDERS_PAGE.ACCOUNTING_PENDING' | translate }}
+                    </span>
+                  </div>
+                  <div *ngIf="o.adminFlowMessage || o.notes || o.deleteReason" class="ops-order-alert"
+                    [ngClass]="o.requiresMerchantDecision || o.notes ? 'ops-order-alert--attention' : ''"
+                    [title]="o.adminFlowMessage || o.notes || o.deleteReason">
+                    <i class="fas me-1" [ngClass]="o.deleteReason ? 'fa-archive' : (o.notes ? 'fa-comment-alt' : 'fa-info-circle')"></i>
+                    <span>{{ o.adminFlowMessage || o.notes || o.deleteReason }}</span>
+                  </div>
                 </div>
               </td>
 
               <!-- 2. Customer & Destination -->
               <td>
-                <div class="ops-customer-cell">
-                  <div class="ops-customer-primary">
+                <div class="ops-cell-compact">
+                  <div class="ops-cell-row-top">
                     <strong class="ops-customer-name" [title]="o.user">{{ o.user || ('ORDERS_PAGE.CUSTOMER' | translate) }}</strong>
                     <a *ngIf="o.phonenumber" [href]="'tel:' + o.phonenumber" class="ops-phone" dir="ltr" [title]="'ORDERS_PAGE.CALL_CUSTOMER' | translate">
                       <i class="fas fa-phone-alt me-1 text-success"></i>{{ formatPhoneNumber(o.phonenumber) }}
                     </a>
                   </div>
-                  <div class="ops-customer-meta">
-                    <span class="ops-customer-addr" [title]="o.address">
-                      <i class="fas fa-map-marker-alt text-danger me-1"></i>{{ o.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}
-                    </span>
+                  <div class="ops-cell-row-sub">
+                    <div class="ops-customer-address" [title]="o.address">
+                      <i class="fas fa-map-marker-alt me-1 text-danger"></i>
+                      <span>{{ o.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}</span>
+                    </div>
                     <a *ngIf="o.lat && o.lng" class="ops-micro-link" target="_blank"
                       [href]="'https://www.google.com/maps/search/?api=1&query=' + o.lat + ',' + o.lng" [title]="'ORDERS_PAGE.OPEN_MAP' | translate">
-                      <i class="fas fa-map-marked-alt text-primary"></i>
+                      <i class="fas fa-external-link-alt me-1"></i>{{ 'ORDERS_PAGE.OPEN_MAP' | translate }}
                     </a>
-                    <span *ngIf="o.deliveryOtp" class="ops-pin-chip" title="Proof of Delivery PIN">
-                      PIN <strong dir="ltr">{{ o.deliveryOtp }}</strong>
-                    </span>
-                    <span *ngIf="o.deliveredAt" class="text-success fs-9 ms-1" [title]="o.deliveredAt | date:'short'">
-                      <i class="fas fa-check-circle"></i>
-                    </span>
                   </div>
                 </div>
               </td>
 
-              <!-- 3. Items Manifest -->
+              <!-- 3. Compact Items Summary -->
               <td>
-                <div class="ops-manifest-list" *ngIf="o.orderDetails?.length; else noDetails">
-                  <div class="ops-manifest-item" *ngFor="let detail of (isExpanded(o.id) ? o.orderDetails : o.orderDetails.slice(0, 2))">
-                    <span class="ops-manifest-qty">{{ detail.quantity }}×</span>
-                    <span class="ops-manifest-title" [title]="detail.productTitle">{{ detail.productTitle }}</span>
-                    <span *ngIf="detail.warning" class="badge badge-light-danger ms-1 small" [title]="detail.warning">{{ detail.warning }}</span>
+                <div class="ops-cell-compact">
+                  <div class="ops-cell-row-top">
+                    <div class="d-flex align-items-center gap-1">
+                      <span class="ops-item-count">{{ getItemsCount(o) }} {{ getItemsCount(o) === 1 ? ('ORDERS_PAGE.ITEM_SINGULAR' | translate) : ('ORDERS_PAGE.ITEMS_COUNT' | translate) }}</span>
+                      <span *ngIf="getAdditionalItemLines(o) > 0" class="ops-items-more">+{{ getAdditionalItemLines(o) }}</span>
+                    </div>
+                    <button type="button" class="btn btn-link btn-sm ops-view-details p-0" (click)="openOrderDetails(o)">
+                      <i class="fas fa-eye me-1"></i>{{ 'ORDERS_PAGE.VIEW_DETAILS' | translate }}
+                    </button>
                   </div>
-
-                  <!-- Expand / Collapse Toggle if more than 2 items -->
-                  <button type="button" class="btn btn-link btn-sm ops-manifest-toggle p-0" *ngIf="o.orderDetails.length > 2" (click)="toggleExpand(o.id)">
-                    <span *ngIf="!isExpanded(o.id)">
-                      <i class="fas fa-chevron-down me-1"></i>+{{ o.orderDetails.length - 2 }} {{ 'ORDERS_PAGE.MORE_ITEMS_SHOW' | translate }}
-                    </span>
-                    <span *ngIf="isExpanded(o.id)">
-                      <i class="fas fa-chevron-up me-1"></i>{{ 'ORDERS_PAGE.MORE_ITEMS_HIDE' | translate }}
-                    </span>
-                  </button>
+                  <div class="ops-cell-row-sub">
+                    <span class="ops-item-preview text-truncate" [title]="getItemsPreview(o)">{{ getItemsPreview(o) }}</span>
+                  </div>
                 </div>
-                <ng-template #noDetails>
-                  <span class="text-muted fs-8 fst-italic">{{ 'ORDERS_PAGE.NO_ITEMS_RECORDED' | translate }}</span>
-                </ng-template>
               </td>
 
-              <!-- 4. Total Price & Payment Method -->
+              <!-- 4. Payment & Delivery -->
               <td>
-                <div class="ops-price-amount">
-                  {{ o.price | number }} <span class="ops-price-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
-                </div>
-                <div class="ops-payment-meta">
-                  <span class="ops-cod-badge">
-                    <i class="fas fa-money-bill-wave me-1"></i>{{ 'ORDERS_PAGE.CASH_ON_DELIVERY' | translate }}
-                  </span>
+                <div class="ops-cell-compact">
+                  <div class="ops-cell-row-top">
+                    <div class="ops-price-amount">
+                      {{ getGrandTotal(o) | number }} <span class="ops-price-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                    </div>
+                    <span class="ops-cod-badge">
+                      <i class="fas fa-money-bill-wave me-1"></i>{{ 'ORDERS_PAGE.CASH_ON_DELIVERY' | translate }}
+                    </span>
+                  </div>
+                  <div class="ops-cell-row-sub">
+                    <ng-container *ngIf="hasAssignedDriver(o); else unassignedDriver">
+                      <div class="ops-captain-summary">
+                        <i class="fas fa-motorcycle text-primary"></i>
+                        <strong class="ops-driver-name text-truncate">{{ getCleanDriverName(o.deliveryUser) }}</strong>
+                      </div>
+                      <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
+                        <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
+                      </button>
+                    </ng-container>
+                    <ng-template #unassignedDriver>
+                      <button *ngIf="isDeliveryEditable(o); else staticUnassigned" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
+                        <i class="fas fa-user-plus me-1"></i>{{ 'ORDERS_PAGE.ASSIGN_CAPTAIN' | translate }}
+                      </button>
+                      <ng-template #staticUnassigned>
+                        <span class="ops-unassigned-tag">{{ 'ORDERS_PAGE.UNASSIGNED' | translate }}</span>
+                      </ng-template>
+                    </ng-template>
+                  </div>
                 </div>
               </td>
 
-              <!-- 5. Delivery Captain -->
-              <td>
-                <div class="ops-captain-cell">
-                  <ng-container *ngIf="hasAssignedDriver(o); else unassignedDriver">
-                    <div class="d-flex align-items-center gap-1 mb-1">
-                      <i class="fas fa-motorcycle text-primary fs-8"></i>
-                      <strong class="ops-driver-name text-truncate">{{ getCleanDriverName(o.deliveryUser) }}</strong>
-                    </div>
-                    <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
-                      <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
-                    </button>
-                  </ng-container>
-                  <ng-template #unassignedDriver>
-                    <div class="d-flex align-items-center gap-1 mb-1">
-                      <span class="ops-unassigned-tag">{{ 'ORDERS_PAGE.UNASSIGNED' | translate }}</span>
-                    </div>
-                    <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
-                      <i class="fas fa-user-plus me-1"></i>{{ 'ORDERS_PAGE.ASSIGN_CAPTAIN' | translate }}
-                    </button>
-                  </ng-template>
-                </div>
-              </td>
-
-              <!-- 6. Actions Cluster -->
+              <!-- 5. Actions -->
               <td class="ops-actions-col text-center">
                 <div class="ops-actions-cluster">
-                  <button *ngIf="canApprove(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve"
+                  <button *ngIf="canApprove(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
                     (click)="approve(o)" [title]="'ORDERS_PAGE.APPROVE_TOOLTIP' | translate">
                     <i class="fas fa-check me-1"></i><span>{{ 'ORDERS_PAGE.APPROVE' | translate }}</span>
                   </button>
-                  <button *ngIf="canMarkReady(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve"
-                    (click)="markReady(o)" title="جاهز للاستلام من المندوب">
-                    <i class="fas fa-box-check me-1"></i><span>جاهز للاستلام</span>
+                  <button *ngIf="!canApprove(o) && canMarkReady(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
+                    (click)="markReady(o)" [title]="'ORDERS_PAGE.MARK_READY' | translate">
+                    <i class="fas fa-box-check me-1"></i><span>{{ 'ORDERS_PAGE.MARK_READY' | translate }}</span>
                   </button>
-                  <button *ngIf="canLiveTrack(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--radar"
+                  <button *ngIf="!canApprove(o) && !canMarkReady(o) && canConfirmPickup(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
+                    (click)="confirmPickup(o)" [title]="'ORDERS_PAGE.CONFIRM_PICKUP' | translate">
+                    <i class="fas fa-shipping-fast me-1"></i><span>{{ 'ORDERS_PAGE.CONFIRM_PICKUP' | translate }}</span>
+                  </button>
+                  <button *ngIf="!canApprove(o) && !canMarkReady(o) && !canConfirmPickup(o) && canDeliver(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
+                    (click)="openDeliverModal(o)" [title]="'ORDERS_PAGE.ADMIN_DELIVERY' | translate">
+                    <i class="fas fa-check-double me-1"></i><span>{{ 'ORDERS_PAGE.ADMIN_DELIVERY' | translate }}</span>
+                  </button>
+                  <button *ngIf="canLiveTrack(o) && !canApprove(o) && !canMarkReady(o) && !canConfirmPickup(o) && !canDeliver(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--radar"
                     (click)="openLiveTrack(o)" [title]="'ORDERS_PAGE.LIVE_RADAR_TOOLTIP' | translate">
                     <i class="fas fa-satellite-dish me-1"></i><span>{{ 'ORDERS_PAGE.LIVE_RADAR' | translate }}</span>
                   </button>
 
                   <!-- More Operations Dropdown -->
                   <div class="btn-group" ngbDropdown container="body" [placement]="['bottom-left', 'top-left', 'bottom-right', 'top-right']" dropdownClass="ops-actions-dropdown-wrapper">
-                    <button type="button" class="btn btn-sm ops-btn-act ops-btn-act--more" ngbDropdownToggle title="إجراءات وحالات الطلب" aria-label="إجراءات وحالات الطلب">
+                    <button type="button" class="btn btn-sm ops-btn-act ops-btn-act--more" ngbDropdownToggle [title]="'ORDERS_PAGE.ACTIONS_MENU' | translate" [attr.aria-label]="'ORDERS_PAGE.ACTIONS_MENU' | translate">
                       <i class="fas fa-ellipsis-v"></i>
                     </button>
                     <div ngbDropdownMenu class="dropdown-menu shadow-lg p-2 fs-7 ops-actions-menu">
                       <button type="button" class="dropdown-item py-2 px-3 text-dark d-flex align-items-center" (click)="openHistoryModal(o)">
                         <i class="fas fa-history text-primary me-2"></i>
-                        <span>سجل حالات الطلب والتدقيق</span>
+                        <span>{{ 'ORDERS_PAGE.ORDER_HISTORY' | translate }}</span>
                       </button>
 
                       <div class="dropdown-divider my-1"></div>
 
                       <button *ngIf="canAccept(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="acceptOrder(o)">
                         <i class="fas fa-check text-success me-2"></i>
-                        <span>قبول الطلب وتجهيزه</span>
+                        <span>{{ 'ORDERS_PAGE.ACCEPT_ORDER' | translate }}</span>
                       </button>
 
                       <button *ngIf="canPrepare(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="startPreparing(o)">
                         <i class="fas fa-utensils text-info me-2"></i>
-                        <span>بدء التجهيز</span>
+                        <span>{{ 'ORDERS_PAGE.START_PREPARING' | translate }}</span>
                       </button>
 
                       <button *ngIf="canMarkReady(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="markReady(o)">
                         <i class="fas fa-box-open text-primary me-2"></i>
-                        <span>جاهز للاستلام</span>
+                        <span>{{ 'ORDERS_PAGE.MARK_READY' | translate }}</span>
                       </button>
 
                       <button *ngIf="isDeliveryEditable(o) || canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
                         <i class="fas fa-motorcycle text-primary me-2"></i>
-                        <span>{{ hasAssignedDriver(o) ? 'تعيين / إعادة تعيين مندوب' : 'تعيين مندوب توصيل' }}</span>
+                        <span>{{ hasAssignedDriver(o) ? ('ORDERS_PAGE.ASSIGN_OR_REASSIGN' | translate) : ('ORDERS_PAGE.ASSIGN_CAPTAIN' | translate) }}</span>
                       </button>
 
                       <button *ngIf="canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="confirmPickup(o)">
                         <i class="fas fa-shipping-fast text-info me-2"></i>
-                        <span>تأكيد استلام المندوب</span>
+                        <span>{{ 'ORDERS_PAGE.CONFIRM_PICKUP' | translate }}</span>
                       </button>
 
                       <button *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
                         <i class="fas fa-check-double text-success me-2"></i>
-                        <span>تسليم إداري</span>
+                        <span>{{ 'ORDERS_PAGE.ADMIN_DELIVERY' | translate }}</span>
                       </button>
 
                       <div class="dropdown-divider my-1" *ngIf="canReject(o) || canCancel(o)"></div>
 
                       <button *ngIf="canReject(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="rejectOrder(o)">
                         <i class="fas fa-times-circle text-danger me-2"></i>
-                        <span>رفض الطلب</span>
+                        <span>{{ 'ORDERS_PAGE.REJECT_ORDER' | translate }}</span>
                       </button>
 
                       <button *ngIf="canCancel(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="confirmCancel(o)">
                         <i class="fas fa-ban text-danger me-2"></i>
-                        <span>إلغاء الطلب</span>
+                        <span>{{ 'ORDERS_PAGE.CANCEL' | translate }}</span>
                       </button>
 
                       <!-- Archive / Restore actions -->

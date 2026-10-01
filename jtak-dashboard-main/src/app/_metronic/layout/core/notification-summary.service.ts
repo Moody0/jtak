@@ -8,6 +8,7 @@ import { AuthService } from 'src/app/modules/auth';
 export interface NotificationSummary {
   orders: number;
   supportMessages: number;
+  errandRequests: number;
   driverSettlements: number;
   merchantSettlements: number;
   reconciliation: number;
@@ -93,6 +94,8 @@ export class NotificationSummaryService implements OnDestroy {
         return summary.orders || 0;
       case 'support-messages':
         return summary.supportMessages || 0;
+      case 'support-messages/errands':
+        return summary.errandRequests || 0;
       case 'reconciliation':
         return summary.reconciliation ?? ((summary.driverSettlements || 0) + (summary.merchantSettlements || 0));
       case 'users':

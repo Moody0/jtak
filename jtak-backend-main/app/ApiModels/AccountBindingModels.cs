@@ -91,7 +91,7 @@ namespace App.ApiModels
         [Display(ResourceType = typeof(_AppUser), Name = "Email")]
         public string Email { get; set; }
 
-        [RegularExpression(@"^\+?[1-9]\d{1,14}$", ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "InvalidNumber")]
+        [RegularExpression(@"^(?:\+?[1-9]\d{1,14}|0\d{9,14})$", ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "InvalidNumber")]
         [Display(ResourceType = typeof(_AppUser), Name = "PhoneNumber")]
         public string PhoneNumber { get; set; }
 
@@ -139,10 +139,43 @@ namespace App.ApiModels
     public class PhoneNumberModel
     {
         [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]
-        [RegularExpression(@"^\+?[1-9]\d{1,14}$", ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "InvalidNumber")]
+        [RegularExpression(@"^(?:\+?[1-9]\d{1,14}|0\d{9,14})$", ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "InvalidNumber")]
         [Display(ResourceType = typeof(_AppUser), Name = "PhoneNumber")]
         public string PhoneNumber { get; set; }
     }
+
+    public class PhoneSignInStartResponse
+    {
+        public bool RequiresProfileCompletion { get; set; }
+        public string VerificationCode { get; set; }
+    }
+
+    public class PhoneNumberCodeModel
+    {
+        [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]
+        [RegularExpression(@"^(?:\+?[1-9]\d{1,14}|0\d{9,14})$", ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "InvalidNumber")]
+        public string PhoneNumber { get; set; }
+
+        [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]
+        [StringLength(6, MinimumLength = 4, ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "LengthRangeError")]
+        public string Code { get; set; }
+    }
+
+    public class CompletePhoneSignupModel
+    {
+        [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]
+        [RegularExpression(@"^(?:\+?[1-9]\d{1,14}|0\d{9,14})$", ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "InvalidNumber")]
+        public string PhoneNumber { get; set; }
+
+        [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]
+        [StringLength(6, MinimumLength = 4, ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "LengthRangeError")]
+        public string Code { get; set; }
+
+        [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]
+        [StringLength(100, MinimumLength = 2, ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "LengthRangeError")]
+        public string FullName { get; set; }
+    }
+
     public class EmailModel
     {
         [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]

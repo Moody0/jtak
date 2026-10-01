@@ -35,6 +35,9 @@ namespace App.ApiModels
     public class NotificationMessageDto
     {
         public int Id { get; set; }
+        public string Url { get; set; }
+        public string EntityData { get; set; }
+        public string EventKey { get; set; }
 
         public string Title { get; set; }
 

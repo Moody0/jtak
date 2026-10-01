@@ -38,11 +38,12 @@ namespace Modules.Orders.Services
         Task<Order> CustomerAcceptOrderChange(int orderId, Guid? uid = null);
         Task<Order> CustomerCancelOrder(int orderId, Guid? uid = null);
         Task<Order> DeliveryCancelOrder(int orderId, Guid? uid = null);
+        Task<Order> DeliveryDeclineOrder(int orderId, Guid driverId);
         Task<Order> StartShippingOrder(int orderId, int merchantId, Guid derliveryId);
         Task<bool> CanDeliverOrder(int orderId, Guid derliveryId);
         Task<bool> CanStartShippingOrder(int orderId, int merchantId, Guid derliveryId);
         Task<Order> DeliverOrder(int orderId, Guid derliveryId, string photoUrl = null, string signature = null, string notes = null, bool isAdminOverride = false);
-        Task<Order> UpdateDeliveryLocation(int orderId, Guid deliveryId, decimal lat, decimal lng);
+        Task<Order> UpdateDeliveryLocation(int orderId, Guid deliveryId, decimal lat, decimal lng, DateTime? capturedAtUtc = null);
         void Log(int OrderId,
                      OrderDetailStatus orderDetailsStatus,
                      OrderDetail[] orderDetails = null,
@@ -300,6 +301,30 @@ namespace Modules.Orders.Services
             return order;
         }
 
+        public async Task<Order> DeliveryDeclineOrder(int orderId, Guid driverId)
+        {
+            var order = await FindAsync(orderId);
+            if (order == null || order.DeliveryId != driverId)
+                throw new Exception("You cannot decline this order!");
+
+            if (order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.Delivered))
+                throw new Exception("لا يمكن إلغاء أو رفض طلب تم تسليمه بالفعل.");
+            if (order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted))
+                throw new Exception("بعد استلام الطلب من المتجر، يجب إعادة تعيينه عبر الدعم.");
+
+            order.DeliveryId = null;
+            order.DeliveryUser = null;
+            order.DeliveryLat = null;
+            order.DeliveryLng = null;
+            order.DeliveryLocationUpdatedAt = null;
+
+            // Unassigning a courier is not a merchant-preparation transition.
+            // Preserve MerchantAccepted before preparation and ReadyForPickup
+            // after preparation; the dispatch service starts a new matching round.
+            await _uow.SaveChangesAsync();
+            return order;
+        }
+
         public async Task<Order> MerchantAccept(int orderId, params int[] merchantIds)
         {
             var order = await FindAsync(orderId);
@@ -360,16 +385,31 @@ namespace Modules.Orders.Services
             if (!isDelivery)
                 throw new Exception("You Cannot Start Shipping this order!");
 
-            var merchantOrderdetails = order.OrderDetails.Where(x => x.MerchantId == merchantId && x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup)
-                                                         .ToArray();
+            var activeMerchantDetails = order.OrderDetails
+                .Where(x => x.MerchantId == merchantId &&
+                            x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                            x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                            x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
+                .ToArray();
 
-            if (merchantOrderdetails.Length > 0)
+            if (activeMerchantDetails.Length == 0)
+                throw new InvalidOperationException("لا توجد منتجات نشطة للاستلام من هذا المتجر.");
+
+            var unreadyDetails = activeMerchantDetails
+                .Where(x => x.OrderDetailStatus != OrderDetailStatus.ReadyForPickup && x.OrderDetailStatus != OrderDetailStatus.ShippingStarted)
+                .ToArray();
+
+            if (unreadyDetails.Length > 0)
+                throw new InvalidOperationException("يجب تجهيز كافة منتجات هذا المتجر وتحديدها كجاهزة للاستلام قبل بدء الشحن.");
+
+            var readyDetails = activeMerchantDetails.Where(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup).ToArray();
+            if (readyDetails.Length > 0)
             {
-                foreach (var merchantOrderdetail in merchantOrderdetails)
+                foreach (var item in readyDetails)
                 {
-                    merchantOrderdetail.OrderDetailStatus = OrderDetailStatus.ShippingStarted;
+                    item.OrderDetailStatus = OrderDetailStatus.ShippingStarted;
                 }
-                Log(orderId, OrderDetailStatus.ShippingStarted, merchantOrderdetails);
+                Log(orderId, OrderDetailStatus.ShippingStarted, readyDetails);
                 await _uow.SaveChangesAsync();
             }
             return order;
@@ -387,9 +427,16 @@ namespace Modules.Orders.Services
                                                                    x.OrderDetailStatus == OrderDetailStatus.Delivered));
 
         public async Task<bool> CanStartShippingOrder(int orderId, int merchantId, Guid deliveryId) =>
-            await Queryable().AnyAsync(o => o.DeliveryId == deliveryId &&
-                                            o.OrderDetails.Any(x => x.OrderId == orderId && x.MerchantId == merchantId &&
-                                                (x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup || x.OrderDetailStatus == OrderDetailStatus.ShippingStarted)));
+            await Queryable().AnyAsync(o => o.Id == orderId &&
+                                            o.DeliveryId == deliveryId &&
+                                            o.OrderDetails.Any(x => x.MerchantId == merchantId &&
+                                                (x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup || x.OrderDetailStatus == OrderDetailStatus.ShippingStarted)) &&
+                                            o.OrderDetails.Where(x => x.MerchantId == merchantId &&
+                                                                     x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                                                                     x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                                                     x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
+                                                          .All(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup ||
+                                                                    x.OrderDetailStatus == OrderDetailStatus.ShippingStarted));
 
 
         public async Task<Order> DeliverOrder(int orderId, Guid deliveryId, string photoUrl = null, string signature = null, string notes = null, bool isAdminOverride = false)
@@ -425,7 +472,7 @@ namespace Modules.Orders.Services
             return order;
         }
 
-        public async Task<Order> UpdateDeliveryLocation(int orderId, Guid deliveryId, decimal lat, decimal lng)
+        public async Task<Order> UpdateDeliveryLocation(int orderId, Guid deliveryId, decimal lat, decimal lng, DateTime? capturedAtUtc = null)
         {
             var order = await FindAsync(orderId);
             if (order == null || order.DeliveryId != deliveryId)
@@ -435,9 +482,13 @@ namespace Modules.Orders.Services
             if (!isShipping)
                 throw new InvalidOperationException("Location can only be shared while an order is shipping.");
 
+            var captured = capturedAtUtc ?? DateTime.UtcNow;
+            captured = captured.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(captured, DateTimeKind.Utc) : captured.ToUniversalTime();
+            if (order.DeliveryLocationUpdatedAt.HasValue && captured < order.DeliveryLocationUpdatedAt.Value) return order;
             order.DeliveryLat = lat;
             order.DeliveryLng = lng;
-            order.DeliveryLocationUpdatedAt = DateTime.UtcNow;
+            order.DeliveryLocationUpdatedAt = captured;
             await _uow.SaveChangesAsync();
             return order;
         }

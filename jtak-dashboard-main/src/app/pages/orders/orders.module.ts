@@ -11,6 +11,8 @@ import { EditDilevry } from './components/orders-list/EditDilevry/edit-dilevry.c
 import { LiveTrackModalComponent } from './components/orders-list/LiveTrackModal/live-track-modal.component';
 import { AdminDeliverModalComponent } from './components/orders-list/AdminDeliverModal/admin-deliver-modal.component';
 import { OrderStatusHistoryModalComponent } from './components/orders-list/OrderStatusHistoryModal/order-status-history-modal.component';
+import { OrderDetailsModalComponent } from './components/orders-list/OrderDetailsModal/order-details-modal.component';
+import { CancelOrderModalComponent } from './components/orders-list/CancelOrderModal/cancel-order-modal.component';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { GoogleMapsModule } from '@angular/google-maps';
 
@@ -20,7 +22,9 @@ import { GoogleMapsModule } from '@angular/google-maps';
     EditDilevry,
     LiveTrackModalComponent,
     AdminDeliverModalComponent,
-    OrderStatusHistoryModalComponent
+    OrderStatusHistoryModalComponent,
+    OrderDetailsModalComponent,
+    CancelOrderModalComponent
   ],
   imports: [
     CommonModule,

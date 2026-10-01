@@ -18,17 +18,19 @@ namespace Modules.Accounting.Services
         private readonly ILedgerService _ledgerService;
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger<EodReconciliationService> _logger;
+        private readonly DriverFinancialSafetyService _safety;
 
         public EodReconciliationService(
             AccountingDbContext context,
             ILedgerService ledgerService,
             UserManager<AppUser> userManager,
-            ILogger<EodReconciliationService> logger)
+            ILogger<EodReconciliationService> logger, DriverFinancialSafetyService safety = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _ledgerService = ledgerService ?? throw new ArgumentNullException(nameof(ledgerService));
             _userManager = userManager;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _safety = safety ?? new DriverFinancialSafetyService(context, ledgerService);
         }
 
         public async Task<List<CaptainSettlementSummaryDto>> GetFleetSettlementSummariesAsync()
@@ -166,7 +168,9 @@ namespace Modules.Accounting.Services
         }
 
         public Task<SettlementResultDto> SettleCaptainShiftAsync(SettleCaptainShiftRequest request, Guid handledByAdminId) =>
-            InFinancialTransactionAsync(() => SettleCaptainShiftCoreAsync(request, handledByAdminId));
+            request == null ? throw new ArgumentNullException(nameof(request)) :
+            _safety.WithDriverLockAsync(request.CaptainUserId,
+                () => InFinancialTransactionAsync(() => SettleCaptainShiftCoreAsync(request, handledByAdminId)));
 
         private async Task<SettlementResultDto> SettleCaptainShiftCoreAsync(SettleCaptainShiftRequest request, Guid handledByAdminId)
         {
@@ -175,6 +179,18 @@ namespace Modules.Accounting.Services
             if (request.PhysicalCashReceived < 0m) throw new ArgumentException("PhysicalCashReceived cannot be negative.", nameof(request));
 
             var currency = (request.Currency ?? "SYP").ToUpperInvariant();
+            if (decimal.Round(request.PhysicalCashReceived, 2) != request.PhysicalCashReceived)
+                throw new ArgumentException("المبلغ النقدي يجب ألا يتجاوز منزلتين عشريتين.");
+            var position = await _safety.GetPositionAsync(request.CaptainUserId, currency: currency);
+            if (position.HasUnfinishedAccounting || position.ReservedForPurchases > 0m)
+                throw new InvalidOperationException("أكمل العمليات المحاسبية وطلبات الشراء المحجوزة قبل تسوية الوردية.");
+
+            // An EOD offset must not spend wages already reserved for a payout,
+            // or clear cash reserved for a separate custody handover request.
+            if (await _context.SettlementRequests.AnyAsync(x => x.RequestedByUserId == request.CaptainUserId &&
+                x.Currency == currency && (x.PartyType == SettlementPartyType.Captain || x.PartyType == SettlementPartyType.CaptainEarnings) &&
+                (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved)))
+                throw new InvalidOperationException("يوجد طلب توريد عهدة أو صرف مستحقات قيد المعالجة. أكمله أو ارفضه قبل تسوية الوردية.");
 
             string captainName = $"Captain {request.CaptainUserId}";
             if (_userManager != null)
@@ -211,10 +227,20 @@ namespace Modules.Accounting.Services
             {
                 throw new InvalidOperationException($"Captain {captainName} has no unsettled cash or wages balance.");
             }
+            if (floatBal <= 0m)
+                throw new InvalidOperationException("لا توجد عهدة نقدية لتوريدها. استخدم طلب صرف مستحقات السائق لدفع الأرباح المتبقية.");
 
             var wagesToOffset = Math.Min(floatBal, Math.Max(0m, wagesBal));
             var expectedNetCash = floatBal - wagesToOffset;
             var discrepancy = request.PhysicalCashReceived - expectedNetCash;
+            if (discrepancy != 0m && (string.IsNullOrWhiteSpace(request.DiscrepancyReason) || request.DiscrepancyReason.Trim().Length > 400))
+                throw new InvalidOperationException("اكتب سبب فرق النقد (حتى 400 حرف) قبل التسوية.");
+            var retainShortage = discrepancy < 0m && request.ShortageTreatment == "retain_driver_debt";
+            if (discrepancy < 0m && !retainShortage && request.ShortageTreatment != "write_off")
+                throw new InvalidOperationException("حدد معالجة العجز: إبقاء المبلغ على عهدة المندوب أو شطبه كمصروف معتمد.");
+            var shortage = discrepancy < 0m ? -discrepancy : 0m;
+            if (retainShortage && floatBal - shortage <= 0m)
+                throw new InvalidOperationException("لم يُستلم نقد ولم تُسوَّ مستحقات. يبقى العجز على العهدة؛ لا يوجد مبلغ لتسجيل تسويته.");
 
             var txnRequest = new PostTransactionRequest
             {
@@ -251,7 +277,7 @@ namespace Modules.Accounting.Services
             }
 
             // Shortage: Cash shortage expense (Expense Debit)
-            if (discrepancy < 0)
+            if (discrepancy < 0 && !retainShortage)
             {
                 var shortageExpenseAcc = await _ledgerService.GetOrCreateSystemAccountAsync(
                     SystemAccountCodes.CashShortageExpense,
@@ -276,7 +302,7 @@ namespace Modules.Accounting.Services
                 {
                     AccountId = floatAcc.Id,
                     Debit = 0m,
-                    Credit = floatBal,
+                    Credit = floatBal - (retainShortage ? shortage : 0m),
                     Currency = currency,
                     Memo = $"Clearing cash float in custody for captain {captainName}"
                 });
@@ -317,7 +343,9 @@ namespace Modules.Accounting.Services
                 DiscrepancyReason = request.DiscrepancyReason,
                 HandledByAdminId = handledByAdminId,
                 SettlementTransactionId = txnDto.Id,
-                Notes = request.Notes,
+                Notes = discrepancy < 0m
+                    ? $"ShortageTreatment={request.ShortageTreatment}\n{request.Notes}".Substring(0, Math.Min(500, $"ShortageTreatment={request.ShortageTreatment}\n{request.Notes}".Length))
+                    : request.Notes,
                 IsLocked = true
             };
 
@@ -388,7 +416,7 @@ namespace Modules.Accounting.Services
         private async Task<T> InFinancialTransactionAsync<T>(Func<Task<T>> action)
         {
             // The in-memory provider used by unit tests does not support transactions.
-            if (!_context.Database.IsRelational())
+            if (!_context.Database.IsRelational() || _context.Database.CurrentTransaction != null)
                 return await action();
 
             await using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);

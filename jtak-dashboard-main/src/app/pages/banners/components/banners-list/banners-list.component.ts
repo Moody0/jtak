@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
@@ -34,7 +34,7 @@ export class BannersListComponent
   selection = new TableSelection<Banner>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   // Real Operational KPIs
   kpiTotal = 0;
@@ -51,7 +51,7 @@ export class BannersListComponent
   merchantsMap = new Map<number, Merchant>();
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public bannersService: BannersService,
     private merchantsService: MerchantsService,
     public filesService: FilesService,

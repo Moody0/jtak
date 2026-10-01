@@ -10,7 +10,7 @@ namespace Modules.Catalog.Entities.EAV
         public int DynamicFieldId { get; set; }
         public virtual DynamicField DynamicField { get; set; }
 
-        public long ProductId { set; get; }
+        public int ProductId { set; get; }
         [JsonIgnore]
         public virtual Product Product { set; get; }
 

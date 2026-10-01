@@ -6,6 +6,7 @@ namespace Modules.Accounting.Entities
     {
         public int Orders { get; set; }
         public int SupportMessages { get; set; }
+        public int ErrandRequests { get; set; }
         public int DriverSettlements { get; set; }
         public int MerchantSettlements { get; set; }
         public int Reconciliation { get; set; }

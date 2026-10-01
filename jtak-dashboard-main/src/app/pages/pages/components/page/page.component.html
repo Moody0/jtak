@@ -1,27 +1,70 @@
 <div class="card card-custom gutter-b">
   <div class="card-header">
     <div class="card-title">
-      <h3 class="card-label fw-bolder">{{ 'PAGES.EDIT_STATIC_PAGE' | translate }}</h3>
+      <div>
+        <h3 class="card-label fw-bolder mb-1">
+          {{ isTermsPage ? ('PAGES.TERMS_ADMIN_TITLE' | translate) : ('PAGES.EDIT_STATIC_PAGE' | translate) }}
+        </h3>
+        <div *ngIf="isTermsPage" class="text-muted fs-7">
+          {{ 'PAGES.TERMS_ADMIN_DESCRIPTION' | translate }}
+        </div>
+      </div>
     </div>
     <div class="card-toolbar"></div>
   </div>
-  <div class="card-body" *ngIf="_pageData">
+  <div class="card-body">
+    <div *ngIf="isTermsPage" class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-5">
+      <div class="btn-group" role="group" [attr.aria-label]="'PAGES.TERMS_APP_SELECTOR' | translate">
+        <button
+          *ngFor="let app of termsApps"
+          type="button"
+          class="btn"
+          [ngClass]="selectedTermsApp === app.key ? 'btn-primary' : 'btn-light-primary'"
+          [disabled]="isLoadingPage || isSaving"
+          (click)="selectTermsApp(app.key)"
+        >{{ app.labelKey | translate }}</button>
+      </div>
+      <button
+        *ngIf="selectedTermsApp !== 'customer'"
+        type="button"
+        class="btn btn-light"
+        [disabled]="isLoadingPage || isSaving"
+        (click)="copyCustomerTerms()"
+      >{{ 'PAGES.TERMS_COPY_CUSTOMER' | translate }}</button>
+    </div>
+
+    <div *ngIf="isLoadingPage" class="d-flex justify-content-center py-10">
+      <span class="spinner-border text-primary" role="status" [attr.aria-label]="'PAGES.TERMS_LOADING' | translate"></span>
+    </div>
+
+    <div *ngIf="!isLoadingPage && formGroup">
     <form [formGroup]="formGroup" (ngSubmit)="save()">
       <div class="mt-5">
         <div class="form-group">
           <div class="NgxEditor__Wrapper">
             <ngx-editor-menu [editor]="editor" [toolbar]="toolbar"></ngx-editor-menu>
-            <ngx-editor [editor]="editor" outputFormat="html"
-            formControlName="body"
-            placeholder=""></ngx-editor>
+            <div class="page-editor-content">
+              <ngx-editor
+                [editor]="editor"
+                outputFormat="html"
+                formControlName="body"
+                [disabled]="isSaving"
+                [placeholder]="''"
+              ></ngx-editor>
+              <div *ngIf="isPageBodyEmpty" class="page-editor-placeholder" aria-hidden="true">
+                {{ 'PAGES.TERMS_PLACEHOLDER' | translate }}
+              </div>
+            </div>
           </div>
         </div>
         <div class="text-end mt-4">
-          <button type="submit" class="btn btn-primary font-weight-bold">
+          <button type="submit" class="btn btn-primary font-weight-bold" [disabled]="isSaving || formGroup.invalid">
+            <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-2" role="status"></span>
             {{ 'COMMON.SAVE' | translate }}
           </button>
         </div>
       </div>
     </form>
+    </div>
   </div>
 </div>

@@ -18,7 +18,11 @@ namespace Modules.Catalog.Entities
         /// <summary>One specific store, opened directly.</summary>
         Merchant = 2,
         /// <summary>Search results for a fixed term.</summary>
-        Search = 3
+        Search = 3,
+        /// <summary>A specific category inside a specific market or merchant.</summary>
+        MerchantCategory = 4,
+        /// <summary>Customer request form for items outside the catalog.</summary>
+        ErrandRequests = 5
     }
 
     /// <summary>
@@ -49,9 +53,16 @@ namespace Modules.Catalog.Entities
 
         /// <summary>Target for <see cref="HomeCategoryLinkType.ProductCategory"/>.</summary>
         public int? ProductCategoryId { get; set; }
+        public int? SecondaryProductCategoryId { get; set; }
 
         /// <summary>Target for <see cref="HomeCategoryLinkType.MerchantKind"/>.</summary>
         public MerchantKind? MerchantKind { get; set; }
+
+        /// <summary>
+        /// Optional restaurant-list filter to preselect when this tile opens
+        /// restaurants. The ID refers to an item in RestaurantCategoriesConfig.
+        /// </summary>
+        public int? RestaurantCategoryId { get; set; }
 
         /// <summary>Target for <see cref="HomeCategoryLinkType.Merchant"/>.</summary>
         public int? MerchantId { get; set; }
@@ -74,6 +85,12 @@ namespace Modules.Catalog.Entities
         public string SectionTitleEn { get; set; } = "Shop by category";
 
         /// <summary>
+        /// One-time seed marker so existing configurations get a requests
+        /// tile while allowing an administrator to hide or remove it later.
+        /// </summary>
+        public bool ErrandRequestsTileInitialized { get; set; }
+
+        /// <summary>
         /// How many tiles the app shows. Zero means show every active tile.
         /// </summary>
         public int MaxItems { get; set; } = 8;
@@ -94,7 +111,9 @@ namespace Modules.Catalog.Entities
         public int Order { get; set; }
         public HomeCategoryLinkType LinkType { get; set; }
         public int? ProductCategoryId { get; set; }
+        public int? SecondaryProductCategoryId { get; set; }
         public MerchantKind? MerchantKind { get; set; }
+        public int? RestaurantCategoryId { get; set; }
         public int? MerchantId { get; set; }
         public string SearchTerm { get; set; }
 
@@ -103,6 +122,12 @@ namespace Modules.Catalog.Entities
         /// show what a tile actually opens without re-deriving it.
         /// </summary>
         public string TargetLabel { get; set; }
+
+        /// <summary>
+        /// Exact title of the targeted category when the tile links to a category or merchant category.
+        /// </summary>
+        public string TargetCategoryTitle { get; set; }
+        public string SecondaryTargetCategoryTitle { get; set; }
 
         /// <summary>
         /// False when the tile points at something that has since been deleted

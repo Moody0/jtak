@@ -99,6 +99,10 @@ export class RestaurantCategoriesListComponent implements OnInit, OnDestroy {
     return !!this.searchTerm && this.searchTerm.trim().length > 0;
   }
 
+  clearSearch(): void {
+    this.searchTerm = '';
+  }
+
   get activeItemsCount(): number {
     return this.items.filter((x) => x.active).length;
   }

@@ -15,13 +15,22 @@ namespace Modules.Accounting.Services
     {
         public decimal AvailableAmount { get; set; }
         public decimal PendingAmount { get; set; }
+        public decimal ReservedPurchaseAmount { get; set; }
         public decimal GrossAmount { get; set; }
+        public decimal CustodyBalance { get; set; }
+        public decimal WagesOffset { get; set; }
+        public decimal NetCashDue { get; set; }
+        public bool IsCoveredByCustody { get; set; }
         public string Currency { get; set; } = "SYP";
         public bool HasPendingRequest { get; set; }
+        public bool HasPendingAccountingOrders { get; set; }
     }
 
     public interface ISettlementRequestService
     {
+        Task<CaptainEarningsWalletDto> GetCaptainEarningsAsync(Guid captainUserId, string currency = "SYP");
+        Task<SettlementRequestDto> CreateCaptainEarningsRequestAsync(Guid userId, string name, string phone, CreateSettlementRequestDto request);
+        Task<SettlementRequestDto> CompleteCaptainEarningsPayoutAsync(Guid requestId, Guid adminId, string notes = null);
         Task<SettlementBalanceDto> GetCaptainBalanceAsync(Guid captainUserId, string currency = "SYP");
         Task<SettlementBalanceDto> GetMerchantBalanceAsync(IEnumerable<int> merchantIds, string currency = "SYP");
         Task<SettlementRequestDto> CreateCaptainRequestAsync(Guid userId, string name, string phone, CreateSettlementRequestDto request);
@@ -32,5 +41,12 @@ namespace Modules.Accounting.Services
         Task<SettlementRequestDto> RejectAsync(Guid requestId, Guid adminId, string reason = null);
         Task<SettlementRequestDto> CompleteMerchantPayoutAsync(Guid requestId, Guid adminId, string notes = null);
         Task<SettlementRequestDto> ConfirmMerchantReceiptAsync(Guid requestId, Guid merchantUserId, string notes = null);
+    }
+
+    public class CaptainEarningsWalletDto : SettlementBalanceDto
+    {
+        public decimal TotalEarned { get; set; }
+        public decimal TotalPaid { get; set; }
+        public List<SettlementRequestDto> Requests { get; set; } = new();
     }
 }

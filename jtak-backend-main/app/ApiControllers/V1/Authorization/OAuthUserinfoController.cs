@@ -48,6 +48,13 @@ namespace App.ApiControllers.V1.Authorization
                     }));
             }
 
+            if (user.DeletionDate != null || !user.IsActive)
+                return StatusCode(403, new
+                {
+                    error = "ACCOUNT_DISABLED",
+                    errorDescription = "تم تعطيل حسابك. يرجى التواصل مع الدعم الفني."
+                });
+
             var uid = await _userManager.GetUserIdAsync(user);
 
             var claims = new Dictionary<string, object>(StringComparer.Ordinal)

@@ -9,12 +9,12 @@
 >
   <ng-container *ngIf="item">
     <form class="form form-label-right" [formGroup]="formGroup">
-      <div class="row">
+      <div class="row g-3">
 
         <div class="col-md-4">
-          <div class="mb-8">
+          <div class="mb-3">
             <label for="byUser" class="form-label fw-bold mb-2">{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</label>
-            <ng-select placeholder="اختر مندوب التوصيل" formControlName="byUser"
+            <ng-select placeholder="اختر مندوب التوصيل" formControlName="byUser" appendTo="body"
             (change)="changedDelivery($event)">
               <ng-option [value]="i" *ngFor="let i of deliveries">
                 {{ i.fullName }}
@@ -24,9 +24,9 @@
           </div>
         </div>
         <div class="col-md-4">
-          <div class="mb-8">
+          <div class="mb-3">
             <label for="toUser" class="form-label fw-bold mb-2">{{ 'MERCHANTS_PAGE.TITLE' | translate }}</label>
-            <ng-select placeholder="اختر المتجر" formControlName="toUser"
+            <ng-select placeholder="اختر المتجر" formControlName="toUser" appendTo="body"
             (change)="changedMerchant($event)">
               <ng-option [value]="i" *ngFor="let i of merchants">
                 {{ i.fullName }}
@@ -37,7 +37,7 @@
         </div>
 
         <div class="col-md-4">
-          <div class="mb-8">
+          <div class="mb-3">
             <label for="amount" class="form-label fw-bold mb-2">{{ 'PAYMENTS_PAGE.COL_AMOUNT' | translate }}</label>
             <app-input-container [control]="formGroup.controls.amount">
               <input

@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +33,7 @@ namespace App.ApiControllers.V1.Warehouse
 
 
         /// <summary>
-        /// Get a paged/filtered/Billed list of Bills
+        /// Get a paged/filtered/sorted list of Bills
         /// </summary>
         /// <returns></returns>
         [HttpPost]
@@ -42,22 +42,8 @@ namespace App.ApiControllers.V1.Warehouse
         {
             var uid = User.GetUserId();
             var mids = await _merchantService.GetMerchantIds(uid.Value);
-            var Bills = await _service.ListMetronicTableQueryable(request,
-                x => new BillDto
-                {
-                    Id = x.Id,
-                    OrderId = x.OrderId,
-                    MerchantId = x.MerchantId,
-                    PaymentMethod = x.PaymentMethod,
-                    MerchantAmount = x.MerchantAmount,
-                    JTakAdditionalAmount = x.JTakAdditionalAmount,
-                    JTakAmount = x.JTakAmount,
-                    TotalAmount = x.TotalAmount,
-                    CreatedDate = x.CreatedDate,
-                    DueDate = x.DueDate,
-                    IsAddedToDues = x.IsAddedToDues
-                }, x => mids.Contains(x.MerchantId));
-            return Bills;
+            var bills = await _service.GetDataTableAsync(request, null, mids);
+            return bills;
         }
     }
 }

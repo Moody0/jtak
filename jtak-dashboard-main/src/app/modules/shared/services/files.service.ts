@@ -35,6 +35,12 @@ export class FilesService {
     return `${environment.apiUrl}/Services/Download/${id}`;
   }
 
+  getErrandReceipt(requestId: number): Observable<Blob> {
+    return this.http.get(`${environment.apiUrl}/Services/ErrandReceipt/${requestId}`, {
+      responseType: 'blob',
+    });
+  }
+
   ///api/v1/Services/Play/{id}/{fileName}
   getVideoUrl(id?: string) {
     return `${environment.apiUrl}/Services/Play/${id}/master.${

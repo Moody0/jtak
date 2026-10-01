@@ -3,7 +3,10 @@ using System;
 using App.Catalog.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
 
 namespace Modules.Catalog.Data.Migrations
 {
@@ -14,8 +17,10 @@ namespace Modules.Catalog.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Relational:MaxIdentifierLength", 64)
-                .HasAnnotation("ProductVersion", "5.0.13");
+                .HasAnnotation("ProductVersion", "8.0.31")
+                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
             modelBuilder.Entity("App.Shared.Entities.GenericSetting", b =>
                 {
@@ -44,11 +49,87 @@ namespace Modules.Catalog.Data.Migrations
                     b.ToTable("Catalog_Settings");
                 });
 
+            modelBuilder.Entity("Modules.Catalog.Entities.BatchReservation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("DeductedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsDeducted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsPicked")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsReleased")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("OrderDetailId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PickedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<DateTime?>("PickedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("ProductBatchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReleaseReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime?>("ReleasedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderDetailId");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ProductBatchId");
+
+                    b.HasIndex("OrderDetailId", "ProductBatchId")
+                        .IsUnique();
+
+                    b.ToTable("Catalog_BatchReservations");
+                });
+
             modelBuilder.Entity("Modules.Catalog.Entities.EAV.DynamicField", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<byte>("ControlType")
                         .HasColumnType("tinyint unsigned");
@@ -80,8 +161,8 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<int>("DynamicFieldId")
                         .HasColumnType("int");
 
-                    b.Property<long>("ProductId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
 
                     b.Property<bool?>("BoolVal")
                         .HasColumnType("tinyint(1)");
@@ -95,18 +176,94 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<decimal?>("NumberVal")
                         .HasColumnType("decimal(65,30)");
 
-                    b.Property<int?>("ProductId1")
-                        .HasColumnType("int");
-
                     b.Property<string>("StringVal")
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
 
                     b.HasKey("DynamicFieldId", "ProductId");
 
-                    b.HasIndex("ProductId1");
+                    b.HasIndex("ProductId");
 
                     b.ToTable("DynamicFieldValue");
+                });
+
+            modelBuilder.Entity("Modules.Catalog.Entities.InventoryMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BusinessKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("MerchantId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MovementType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OrderDetailId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductBatchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityOnHandAfter")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityOnHandBefore")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityReservedAfter")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityReservedBefore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(512)
+                        .HasColumnType("varchar(512)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessKey")
+                        .IsUnique();
+
+                    b.HasIndex("ProductBatchId");
+
+                    b.HasIndex("OrderId", "OrderDetailId");
+
+                    b.ToTable("Catalog_InventoryMovements");
                 });
 
             modelBuilder.Entity("Modules.Catalog.Entities.Merchant", b =>
@@ -114,6 +271,8 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Active")
                         .HasColumnType("tinyint(1)");
@@ -138,6 +297,12 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<DateTime?>("DeletionDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<decimal>("DeliveryFee")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("DeliveryTime")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Description")
                         .HasColumnType("longtext");
 
@@ -156,8 +321,15 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<byte>("MerchantKind")
                         .HasColumnType("tinyint unsigned");
 
+                    b.Property<decimal>("MinOrderAmount")
+                        .HasColumnType("decimal(65,30)");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("OwnerName")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
 
                     b.Property<string>("Phone1")
                         .HasColumnType("longtext");
@@ -190,13 +362,16 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("WorkingHours")
+                        .HasColumnType("longtext");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Lat");
 
                     b.HasIndex("Lng");
 
-                    b.ToTable("Catalog_Merchant");
+                    b.ToTable("Catalog_Merchant", (string)null);
                 });
 
             modelBuilder.Entity("Modules.Catalog.Entities.MerchantProduct", b =>
@@ -223,6 +398,15 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<decimal>("MerchantPrice")
                         .HasColumnType("decimal(65,30)");
 
+                    b.Property<decimal?>("OriginalPrice")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal?>("PriceUsd")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int?>("MaxOrderQuantity")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("ProfitOutOfMerchantPricePercent")
                         .HasColumnType("decimal(65,30)");
 
@@ -237,7 +421,7 @@ namespace Modules.Catalog.Data.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("Catalog_MerchantProduct");
+                    b.ToTable("Catalog_MerchantProduct", (string)null);
                 });
 
             modelBuilder.Entity("Modules.Catalog.Entities.Product", b =>
@@ -246,8 +430,18 @@ namespace Modules.Catalog.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<bool>("Active")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
 
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
@@ -267,6 +461,9 @@ namespace Modules.Catalog.Data.Migrations
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("Description")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DescriptionEn")
                         .HasColumnType("longtext");
 
                     b.Property<DateTime?>("ExpiryDate")
@@ -289,8 +486,12 @@ namespace Modules.Catalog.Data.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<string>("TitleEn")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
 
                     b.Property<string>("Unit")
                         .HasColumnType("longtext");
@@ -309,11 +510,110 @@ namespace Modules.Catalog.Data.Migrations
                     b.ToTable("Catalog_Products");
                 });
 
+            modelBuilder.Entity("Modules.Catalog.Entities.ProductBatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("BatchNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<decimal>("CostPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime?>("DeletionDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("ExpirationDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LocationBin")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("ManufactureDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("MerchantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityOnHand")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityReserved")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("SellingPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Sku")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Barcode");
+
+                    b.HasIndex("BatchNumber");
+
+                    b.HasIndex("ExpirationDate");
+
+                    b.HasIndex("MerchantId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("Catalog_ProductBatches");
+                });
+
             modelBuilder.Entity("Modules.Catalog.Entities.ProductCategory", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Active")
                         .HasColumnType("tinyint(1)");
@@ -399,6 +699,8 @@ namespace Modules.Catalog.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
@@ -430,6 +732,17 @@ namespace Modules.Catalog.Data.Migrations
                     b.ToTable("Catalog_Tags");
                 });
 
+            modelBuilder.Entity("Modules.Catalog.Entities.BatchReservation", b =>
+                {
+                    b.HasOne("Modules.Catalog.Entities.ProductBatch", "ProductBatch")
+                        .WithMany()
+                        .HasForeignKey("ProductBatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProductBatch");
+                });
+
             modelBuilder.Entity("Modules.Catalog.Entities.EAV.DynamicField", b =>
                 {
                     b.HasOne("Modules.Catalog.Entities.ProductCategory", "ProductCategory")
@@ -451,11 +764,23 @@ namespace Modules.Catalog.Data.Migrations
 
                     b.HasOne("Modules.Catalog.Entities.Product", "Product")
                         .WithMany()
-                        .HasForeignKey("ProductId1");
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("DynamicField");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Modules.Catalog.Entities.InventoryMovement", b =>
+                {
+                    b.HasOne("Modules.Catalog.Entities.ProductBatch", "ProductBatch")
+                        .WithMany()
+                        .HasForeignKey("ProductBatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ProductBatch");
                 });
 
             modelBuilder.Entity("Modules.Catalog.Entities.MerchantProduct", b =>
@@ -485,6 +810,23 @@ namespace Modules.Catalog.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ProductCategory");
+                });
+
+            modelBuilder.Entity("Modules.Catalog.Entities.ProductBatch", b =>
+                {
+                    b.HasOne("Modules.Catalog.Entities.Merchant", "Merchant")
+                        .WithMany()
+                        .HasForeignKey("MerchantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Modules.Catalog.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Merchant");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Modules.Catalog.Entities.ProductCategory", b =>

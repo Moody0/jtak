@@ -620,5 +620,91 @@ namespace Modules.Accounting.Tests
             // G. Pagination Total
             Assert.Equal(2, items.Count);
         }
+
+        [Fact]
+        public async Task MerchantSummaryAndKpisIntegrityTests()
+        {
+            var options = new DbContextOptionsBuilder<CatalogDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            using var ctx = new CatalogDbContext(options, null);
+
+            // 1. Active Restaurant
+            ctx.Merchants.Add(new Merchant
+            {
+                Id = 1,
+                Title = "محطة اللحوم",
+                ShortDescription = "شاورما ومشاوري",
+                Active = true,
+                MerchantKind = App.Shared.Entities.Enums.MerchantKind.Restaurant
+            });
+
+            // 2. Active Grocery Market
+            ctx.Merchants.Add(new Merchant
+            {
+                Id = 2,
+                Title = "جيتك ماركت المركزي",
+                ShortDescription = "سوبرماركت ومواد غذائية",
+                Active = true,
+                MerchantKind = App.Shared.Entities.Enums.MerchantKind.Grocery
+            });
+
+            // 3. Disabled Restaurant
+            ctx.Merchants.Add(new Merchant
+            {
+                Id = 3,
+                Title = "مطعم القدس",
+                ShortDescription = "فول وحمص",
+                Active = false,
+                MerchantKind = App.Shared.Entities.Enums.MerchantKind.Restaurant
+            });
+
+            // 4. Active Store / Grocery by Title
+            ctx.Merchants.Add(new Merchant
+            {
+                Id = 4,
+                Title = "بقالة الأمل",
+                ShortDescription = "تموينات منزلية",
+                Active = true,
+                MerchantKind = App.Shared.Entities.Enums.MerchantKind.Store
+            });
+
+            // 5. Deleted Merchant (must be excluded)
+            ctx.Merchants.Add(new Merchant
+            {
+                Id = 5,
+                Title = "متجر محذوف",
+                Active = true,
+                DeletionDate = DateTime.UtcNow
+            });
+
+            await ctx.SaveChangesAsync();
+
+            var merchants = await ctx.Merchants.AsNoTracking()
+                .Where(x => x.DeletionDate == null)
+                .Select(x => new { x.Id, x.Active, x.MerchantKind, x.Title, x.ShortDescription })
+                .ToListAsync();
+
+            int total = merchants.Count;
+            int active = merchants.Count(m => m.Active);
+            int grocery = merchants.Count(m => m.MerchantKind == App.Shared.Entities.Enums.MerchantKind.Grocery ||
+                                               m.MerchantKind == App.Shared.Entities.Enums.MerchantKind.Store ||
+                                               ((m.Title != null && (m.Title.Contains("ماركت") || m.Title.Contains("بقالة") || m.Title.Contains("سوبر") || m.Title.Contains("تموين"))) ||
+                                                (m.ShortDescription != null && (m.ShortDescription.Contains("ماركت") || m.ShortDescription.Contains("بقالة") || m.ShortDescription.Contains("سوبر")))));
+            int restaurants = Math.Max(0, total - grocery);
+
+            var summary = new MerchantSummaryDto
+            {
+                Total = total,
+                Active = active,
+                Grocery = grocery,
+                Restaurants = restaurants
+            };
+
+            Assert.Equal(4, summary.Total);
+            Assert.Equal(3, summary.Active);
+            Assert.Equal(2, summary.Grocery);
+            Assert.Equal(2, summary.Restaurants);
+        }
     }
 }

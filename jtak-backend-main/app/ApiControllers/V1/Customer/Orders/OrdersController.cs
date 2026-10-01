@@ -23,6 +23,7 @@ using Modules.Shipping.Services;
 using Modules.Catalog.Services;
 using Modules.Shipping.Entities;
 using System.Collections.Generic;
+using App.Shared.Services.Pricing;
 
 namespace App.ApiControllers.V1.Customer.Orders
 {
@@ -41,6 +42,7 @@ namespace App.ApiControllers.V1.Customer.Orders
         private readonly IMapper _mapper;
         private readonly ILogger _logger;
         private readonly IOrderService _service;
+        private readonly IOrderMoneyCalculationService _moneyCalculationService;
 
         public OrdersController(IOrdersUnitOfWork unitOfWork,
             UserManager<AppUser> userManager,
@@ -50,7 +52,8 @@ namespace App.ApiControllers.V1.Customer.Orders
             IInventoryBatchService batchService,
             IOrderService service,
             ILogger<OrdersController> logger,
-            IMapper mapper)
+            IMapper mapper,
+            IOrderMoneyCalculationService moneyCalculationService = null)
         {
             _uow = unitOfWork;
             _userManager = userManager;
@@ -61,6 +64,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             _logger = logger;
             _mapper = mapper;
             _service = service;
+            _moneyCalculationService = moneyCalculationService;
         }
 
         /// <summary>
@@ -78,6 +82,9 @@ namespace App.ApiControllers.V1.Customer.Orders
                     Id = x.Id,
                     UserId = x.UserId,
                     DeliveryId = x.DeliveryId,
+                    CourierMatchingStartedAtUtc = x.CourierMatchingStartedAtUtc,
+                    CourierMatchingDeadlineAtUtc = x.CourierMatchingDeadlineAtUtc,
+                    CourierMatchingCompletedAtUtc = x.CourierMatchingCompletedAtUtc,
                     DeliveryUser = x.DeliveryUser,
                     DeliveryLat = x.DeliveryLat,
                     DeliveryLng = x.DeliveryLng,
@@ -94,6 +101,11 @@ namespace App.ApiControllers.V1.Customer.Orders
                     Lat = x.Lat,
                     Lng = x.Lng,
                     Address = x.Address,
+                    PaymentMethod = x.PaymentMethod,
+                    DeliveryFee = x.DeliveryFee,
+                    MoneySnapshotVersion = x.MoneySnapshotVersion,
+                    MoneySnapshotJson = x.MoneySnapshotJson,
+                    CaptainEarning = x.CaptainEarning,
                     OrderDetails = x.OrderDetails
                                     .Select(d => new OrderDetailDto
                                     {
@@ -110,9 +122,19 @@ namespace App.ApiControllers.V1.Customer.Orders
                                         Currency = d.Currency,
                                         OrderId = d.OrderId,
                                         OrderDetailStatus = d.OrderDetailStatus,
+                                        CommissionRatePercent = d.CommissionRatePercent,
+                                        IsPlatformOwnedSnapshot = d.IsPlatformOwnedSnapshot,
                                         Warning = d.Warning
                                     }).ToArray()
                 }, x => x.UserId == uid.Value && x.OrderStatus == OrderStatus.Success, x => x.OrderDetails);
+            if (orders?.Items != null)
+            {
+                foreach (var order in orders.Items)
+                {
+                    order.Money = ResolveMoney(order);
+                }
+                await PopulateMerchantLogosAsync(orders.Items);
+            }
             return orders;
         }
 
@@ -134,6 +156,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             if (string.IsNullOrEmpty(order.DeliveryOtp))
             {
                 order.DeliveryOtp = System.Security.Cryptography.RandomNumberGenerator.GetInt32(1000, 10000).ToString();
+                order.DeliveryOtpExpiresAt = null;
                 await _uow.SaveChangesAsync();
             }
 
@@ -142,6 +165,9 @@ namespace App.ApiControllers.V1.Customer.Orders
                 Id = order.Id,
                 UserId = order.UserId,
                 DeliveryId = order.DeliveryId,
+                CourierMatchingStartedAtUtc = order.CourierMatchingStartedAtUtc,
+                CourierMatchingDeadlineAtUtc = order.CourierMatchingDeadlineAtUtc,
+                CourierMatchingCompletedAtUtc = order.CourierMatchingCompletedAtUtc,
                 DeliveryUser = order.DeliveryUser,
                 DeliveryLat = order.DeliveryLat,
                 DeliveryLng = order.DeliveryLng,
@@ -158,6 +184,11 @@ namespace App.ApiControllers.V1.Customer.Orders
                 Lat = order.Lat,
                 Lng = order.Lng,
                 Address = order.Address,
+                PaymentMethod = order.PaymentMethod,
+                DeliveryFee = order.DeliveryFee,
+                MoneySnapshotVersion = order.MoneySnapshotVersion,
+                MoneySnapshotJson = order.MoneySnapshotJson,
+                CaptainEarning = order.CaptainEarning,
                 OrderDetails = order.OrderDetails
                                     .Select(d => new OrderDetailDto
                                     {
@@ -174,9 +205,12 @@ namespace App.ApiControllers.V1.Customer.Orders
                                         Currency = d.Currency,
                                         OrderId = d.OrderId,
                                         OrderDetailStatus = d.OrderDetailStatus,
+                                        CommissionRatePercent = d.CommissionRatePercent,
+                                        IsPlatformOwnedSnapshot = d.IsPlatformOwnedSnapshot,
                                         Warning = d.Warning
                                     }).ToArray()
             };
+            result.Money = ResolveMoney(result);
 
             if (order.DeliveryId.HasValue)
             {
@@ -194,7 +228,63 @@ namespace App.ApiControllers.V1.Customer.Orders
                 }
             }
 
+            await PopulateMerchantLogosAsync(new[] { result });
+
             return result;
+        }
+
+        private async Task PopulateMerchantLogosAsync(IEnumerable<OrderDto> orders)
+        {
+            var details = orders?
+                .Where(order => order?.OrderDetails != null)
+                .SelectMany(order => order.OrderDetails)
+                .Where(detail => detail != null)
+                .ToArray() ?? Array.Empty<OrderDetailDto>();
+            var merchantIds = details.Select(detail => detail.MerchantId).Distinct().ToArray();
+            if (merchantIds.Length == 0) return;
+
+            var merchantLogos = await _merchantService.Queryable()
+                .Where(merchant => merchantIds.Contains(merchant.Id))
+                .Select(merchant => new { merchant.Id, merchant.Photo })
+                .ToDictionaryAsync(merchant => merchant.Id, merchant => merchant.Photo);
+
+            foreach (var detail in details)
+            {
+                if (merchantLogos.TryGetValue(detail.MerchantId, out var logo))
+                {
+                    detail.MerchantLogo = logo;
+                }
+            }
+        }
+
+        private CanonicalOrderMoneyDto ResolveMoney(OrderDto order)
+        {
+            var snapshot = OrderMoneySnapshot.Deserialize(order.MoneySnapshotJson);
+            if (snapshot != null) return snapshot;
+            if (_moneyCalculationService == null) return null;
+
+            var details = order.OrderDetails ?? Array.Empty<OrderDetailDto>();
+            var commissions = details
+                .GroupBy(x => x.MerchantId)
+                .Select(g => new MerchantCommissionInfo
+                {
+                    MerchantId = g.Key,
+                    MerchantTitle = g.FirstOrDefault()?.MerchantTitle,
+                    CommissionRatePercent = g.FirstOrDefault()?.CommissionRatePercent ?? 0m,
+                    IsDarkStore = g.All(x => x.IsPlatformOwnedSnapshot)
+                });
+
+            var captainEarning = order.MoneySnapshotVersion > 0
+                ? order.CaptainEarning
+                : order.DeliveryFee;
+            return _moneyCalculationService.CalculateOrderMoney(
+                details,
+                order.DeliveryFee,
+                order.PaymentMethod,
+                merchantCommissionInfos: commissions,
+                captainEarning: captainEarning,
+                commissionIsMarkup: order.MoneySnapshotVersion == 2,
+                commissionIsPercentageOfGross: order.MoneySnapshotVersion >= 3);
         }
 
         /// <summary>
@@ -213,6 +303,11 @@ namespace App.ApiControllers.V1.Customer.Orders
                 {
                     x.Id,
                     x.OrderStatus,
+                    HasActiveItems = x.OrderDetails.Any(d =>
+                        d.OrderDetailStatus != OrderDetailStatus.Delivered &&
+                        d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                        d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                        d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled),
                     x.DeliveryId,
                     x.DeliveryUser,
                     x.DeliveryLat,
@@ -230,13 +325,13 @@ namespace App.ApiControllers.V1.Customer.Orders
             var stops = await _deliveryService.GetOrderStops(id);
 
             // Fetch live cached driver telemetry if available
-            decimal? driverLat = order.DeliveryLat;
-            decimal? driverLng = order.DeliveryLng;
+            decimal? driverLat = order.HasActiveItems ? order.DeliveryLat : null;
+            decimal? driverLng = order.HasActiveItems ? order.DeliveryLng : null;
             double? heading = null;
             double? speed = null;
-            DateTime? updatedAt = order.DeliveryLocationUpdatedAt;
+            DateTime? updatedAt = order.HasActiveItems ? order.DeliveryLocationUpdatedAt : null;
 
-            if (order.DeliveryId.HasValue)
+            if (order.HasActiveItems && order.DeliveryId.HasValue)
             {
                 var driverStatus = await _deliveryService.GetDeliveryStatus(order.DeliveryId.Value);
                 if (driverStatus != null && driverStatus.LastLocationUpdatedAt.HasValue)
@@ -253,28 +348,31 @@ namespace App.ApiControllers.V1.Customer.Orders
                 }
             }
 
-            var isLive = updatedAt.HasValue && (DateTime.UtcNow - updatedAt.Value).TotalMinutes < 5;
+            var isLive = order.HasActiveItems && order.DeliveryId.HasValue && order.DeliveryId != Guid.Empty &&
+                driverLat.HasValue && driverLng.HasValue &&
+                LiveTrackingPolicy.HasCoordinates(driverLat.Value, driverLng.Value) &&
+                LiveTrackingPolicy.IsFresh(updatedAt, DateTime.UtcNow);
 
             // Compute remaining distance through pending stops to customer destination
             int remainingDistanceMeters = 0;
-            var currentPos = driverLat.HasValue && driverLng.HasValue ? (driverLat.Value, driverLng.Value) : (order.Lat, order.Lng);
             var pendingStops = stops.Where(s => !s.CompletedDate.HasValue).OrderBy(s => s.Index).ToList();
-
-            var runner = currentPos;
-            foreach (var stop in pendingStops)
+            var hasDestination = LiveTrackingPolicy.HasCoordinates(order.Lat, order.Lng);
+            var hasRoute = isLive && hasDestination &&
+                pendingStops.All(s => LiveTrackingPolicy.HasCoordinates(s.Lat, s.Lng));
+            if (hasRoute)
             {
-                remainingDistanceMeters += (int)runner.DistanceInMeters((stop.Lat, stop.Lng));
-                runner = (stop.Lat, stop.Lng);
+                var runner = (driverLat.Value, driverLng.Value);
+                foreach (var stop in pendingStops)
+                {
+                    remainingDistanceMeters += (int)runner.DistanceInMeters((stop.Lat, stop.Lng));
+                    runner = (stop.Lat, stop.Lng);
+                }
+                remainingDistanceMeters += (int)runner.DistanceInMeters((order.Lat, order.Lng));
             }
-            // Add the final delivery transit leg to the customer destination
-            remainingDistanceMeters += (int)runner.DistanceInMeters((order.Lat, order.Lng));
 
             // ETA: Average urban courier speed ~ 25 km/h (416 m/min) + 2 mins per remaining stop
-            int etaMinutes = 0;
-            if (remainingDistanceMeters > 0)
-            {
-                etaMinutes = (int)System.Math.Ceiling(remainingDistanceMeters / 400.0) + (pendingStops.Count * 2);
-            }
+            int etaMinutes = LiveTrackingPolicy.EstimateEta(hasRoute,
+                remainingDistanceMeters, pendingStops.Count);
 
             var currentStop = pendingStops.FirstOrDefault();
 
@@ -307,7 +405,11 @@ namespace App.ApiControllers.V1.Customer.Orders
                 DriverLng = driverLng,
                 Heading = heading,
                 Speed = speed,
-                LocationUpdatedAt = updatedAt,
+                LocationUpdatedAt = updatedAt.HasValue
+                    ? (updatedAt.Value.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(updatedAt.Value, DateTimeKind.Utc)
+                        : updatedAt.Value.ToUniversalTime())
+                    : null,
                 IsLive = isLive,
                 EtaMinutes = etaMinutes,
                 RemainingDistanceMeters = remainingDistanceMeters,
@@ -363,7 +465,17 @@ namespace App.ApiControllers.V1.Customer.Orders
             foreach (var merchantId in merchantIds)
             {
                 var ownerId = await _merchantService.GetOwnerId(merchantId);
-                await _notificationService.SendOrderCanceled(new[] { ownerId }, id, order.OrderDetails.Where(x => x.MerchantId == merchantId).ToArray());
+                if (ownerId != Guid.Empty)
+                {
+                    try
+                    {
+                        await _notificationService.SendOrderCanceled(new[] { ownerId }, id, order.OrderDetails.Where(x => x.MerchantId == merchantId).ToArray());
+                    }
+                    catch
+                    {
+                        // Defensive notification dispatch
+                    }
+                }
             }
             return true;
         }

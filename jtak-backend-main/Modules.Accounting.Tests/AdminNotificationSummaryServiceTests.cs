@@ -218,7 +218,12 @@ public class AdminNotificationSummaryServiceTests
             new SupportMessage { Title = "Msg 1", Status = SupportMessageStatus.New },
             new SupportMessage { Title = "Msg 2", Status = SupportMessageStatus.Read },
             new SupportMessage { Title = "Msg 3", Status = SupportMessageStatus.Resolved },
-            new SupportMessage { Title = "Msg 4", Status = SupportMessageStatus.New }
+            new SupportMessage { Title = "Msg 4", Status = SupportMessageStatus.New },
+            new SupportMessage { Title = "طلبات", Status = SupportMessageStatus.New, ErrandStatus = ErrandStatus.Submitted },
+            new SupportMessage { Title = "طلبات", Status = SupportMessageStatus.Read, ErrandStatus = ErrandStatus.Approved },
+            new SupportMessage { Title = "طلبات", Status = SupportMessageStatus.Read, ErrandStatus = ErrandStatus.Assigned },
+            new SupportMessage { Title = "طلبات", Status = SupportMessageStatus.Read, ErrandStatus = ErrandStatus.Purchased },
+            new SupportMessage { Title = "طلبات", Status = SupportMessageStatus.Read, ErrandStatus = ErrandStatus.Quoted }
         );
         await appDb.SaveChangesAsync();
 
@@ -226,6 +231,8 @@ public class AdminNotificationSummaryServiceTests
         var summary = await service.GetSummaryAsync();
 
         Assert.Equal(2, summary.SupportMessages);
+        Assert.Equal(4, summary.ErrandRequests);
+        Assert.Equal(6, summary.TotalActionable);
     }
 
     [Fact]

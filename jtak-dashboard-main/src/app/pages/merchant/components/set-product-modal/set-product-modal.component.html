@@ -1,108 +1,111 @@
-<div class="card card-custom gutter-b">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <div class="card-title">
-      <h3 class="card-label fw-bolder">تعيين منتجات المتجر</h3>
+<div class="set-product-modal-container">
+  <div class="modal-header border-0 pb-0 d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2">
+      <div class="set-product-icon">
+        <i class="fas fa-boxes"></i>
+      </div>
+      <div>
+        <h5 class="modal-title fw-bolder fs-5 text-dark mb-0">تعيين منتجات المتجر</h5>
+        <span class="text-muted fs-8">تحديد المنتجات المعروضة لدى هذا المتجر في التطبيق</span>
+      </div>
     </div>
-    <div>
-      <button class="btn btn-success" (click)="save()">{{ 'COMMON.SAVE' | translate }}</button>
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-sm btn-light" (click)="modal.dismiss()">إلغاء</button>
+      <button type="button" class="btn btn-sm btn-primary" (click)="save()">
+        <i class="fas fa-check text-white me-1"></i>
+        <span class="text-white">{{ 'COMMON.SAVE' | translate }}</span>
+      </button>
     </div>
   </div>
-  <div class="card-body" style="max-height: 90vh; overflow-y: scroll">
-    <table class="table">
-      <tr>
-        <td>
-          <label class="d-flex align-items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              class="form-check-input mt-0"
-              (change)="toggleAllChanged($event)"
-              [checked]="toggleAll"
-            />
-            <span class="fw-bold">تحديد الكل</span>
-          </label>
-        </td>
-        <td>
-          <input
-            type="text"
-            class="form-control"
-            name="searchText"
-            [placeholder]="'COMMON.SEARCH' | translate"
-            [(ngModel)]="search"
-            (ngModelChange)="onSearchChange($event)"
-          />
-        </td>
-      </tr>
-    </table>
 
-    <table class="table table-sm mt-3">
-      <thead>
-        <tr class="fw-bolder text-muted bg-light fs-7">
-          <td>{{ 'COMMON.ENABLED' | translate }}</td>
-          <td>{{ 'MERCHANT_WORKSPACE.COL_PRODUCT' | translate }}</td>
-          <td>{{ 'MERCHANT_WORKSPACE.COL_CUSTOMER_PRICE' | translate }}</td>
-          <td>{{ 'MERCHANT_WORKSPACE.COL_ADDITIONAL_PROFIT' | translate }} %</td>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          *ngFor="
-            let i of search.length > 0
-              ? productMerchantsDraft
-              : productMerchants
-          "
-          class="border-bottom"
-          style="vertical-align: middle"
-        >
-          <td style="width: 50px">
-            <input
-              type="checkbox"
-              class="form-check-input"
-              name="checkbox"
-              [checked]="i.isSelected"
-              (change)="changeIsSelected(i.productId)"
-            />
-          </td>
-          <td class="d-flex border-none">
-            <div>
-              <img
-                loading="lazy"
-                height="50"
-                [src]="filesService.getFile(i.productPhotos, 50, 50)"
-                alt="productImg"
+  <div class="modal-body py-4">
+    <!-- Filter bar -->
+    <div class="d-flex align-items-center justify-content-between gap-3 mb-3 p-2 bg-light rounded-3 border">
+      <label class="d-flex align-items-center gap-2 cursor-pointer mb-0 ms-2">
+        <input
+          type="checkbox"
+          class="form-check-input mt-0"
+          (change)="toggleAllChanged($event)"
+          [checked]="toggleAll"
+        />
+        <span class="fw-bold fs-7">تحديد الكل</span>
+      </label>
+
+      <div class="position-relative flex-grow-1" style="max-width: 320px;">
+        <i class="fas fa-search position-absolute top-50 translate-middle-y text-muted" style="right: 12px;"></i>
+        <input
+          type="text"
+          class="form-control form-control-sm"
+          style="padding-right: 34px;"
+          name="searchText"
+          [placeholder]="'COMMON.SEARCH' | translate"
+          [(ngModel)]="search"
+          (ngModelChange)="onSearchChange($event)"
+        />
+      </div>
+    </div>
+
+    <!-- Products list table -->
+    <div class="table-responsive rounded-3 border" style="max-height: 60vh; overflow-y: auto;">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="bg-light">
+          <tr class="fw-bold text-muted fs-8 text-uppercase">
+            <th style="width: 50px; text-align: center;">{{ 'COMMON.ENABLED' | translate }}</th>
+            <th>{{ 'MERCHANT_WORKSPACE.COL_PRODUCT' | translate }}</th>
+            <th style="width: 140px; text-align: center;">{{ 'MERCHANT_WORKSPACE.COL_CUSTOMER_PRICE' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let i of (search.length > 0 ? productMerchantsDraft : productMerchants)"
+            [class.table-active]="i.isSelected"
+          >
+            <td style="text-align: center;">
+              <input
+                type="checkbox"
+                class="form-check-input"
+                name="checkbox"
+                [checked]="i.isSelected"
+                (change)="changeIsSelected(i.productId)"
               />
-            </div>
-            <div class="px-2">
-              <div style="font-weight: 700">{{ i.product }}</div>
-              <div>
-                <span class="badge badge-light-success"
-                  >{{ i.productCat1 }}
-                </span>
-                <i class="fas fa-chevron-left rtl-flip m-1"></i>
-                <span class="badge badge-success"> {{ i.productCat2 }}</span>
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <img
+                  loading="lazy"
+                  class="rounded-3 border"
+                  style="width: 44px; height: 44px; object-fit: cover;"
+                  [src]="filesService.getFile(i.productPhotos, 50, 50)"
+                  alt=""
+                  (error)="$any($event.target).src = './assets/media/svg/files/blank-image.svg'"
+                />
+                <div class="d-flex flex-column">
+                  <span class="fw-bold fs-7 text-dark">{{ i.product }}</span>
+                  <div class="d-flex align-items-center gap-1 fs-9 mt-1">
+                    <span class="badge bg-light text-muted border" *ngIf="i.productCat1">{{ i.productCat1 }}</span>
+                    <i class="fas fa-chevron-left rtl-flip text-muted fs-9" *ngIf="i.productCat1 && i.productCat2"></i>
+                    <span class="badge bg-light text-muted border" *ngIf="i.productCat2">{{ i.productCat2 }}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </td>
-          <td>
-            <span *ngIf="i.price === i.finalPrice">{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span></span>
-            <span *ngIf="i.price !== i.finalPrice">
-              <span style="text-decoration: line-through" class="text-muted me-1">{{ i.price | number }}</span>
-              <span>{{ i.finalPrice | number }} <span class="badge badge-light-primary ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span></span>
-            </span>
-          </td>
-          <td>
-            <input
-              style="max-width: 80px"
-              [name]="i.product"
-              type="number"
-              max="100"
-              min="0"
-              (change)="onPercentChange(i.productId, $event)"
-              [(ngModel)]="i.additionalProfitPercent"
-              class="form-control form-control-solid"
-            />
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            </td>
+            <td style="text-align: center;">
+              <span class="fw-bold text-dark fs-7" *ngIf="i.price === i.finalPrice">
+                {{ i.finalPrice | number }} <span class="text-muted fs-8">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+              </span>
+              <div class="d-flex flex-column align-items-center" *ngIf="i.price !== i.finalPrice">
+                <span style="text-decoration: line-through" class="text-muted fs-8">{{ i.price | number }}</span>
+                <span class="fw-bold text-dark fs-7">
+                  {{ i.finalPrice | number }} <span class="text-muted fs-8">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+                </span>
+                <span *ngIf="i.discount > 0 && i.price > i.finalPrice" class="badge bg-light-danger text-danger fs-9 mt-1">
+                  خصم {{ ((i.price - i.finalPrice) / i.price * 100) | number:'1.0-0' }}%
+                </span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>

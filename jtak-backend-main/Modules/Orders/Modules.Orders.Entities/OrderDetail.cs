@@ -26,8 +26,14 @@ namespace Modules.Orders.Entities
         public string ProductImage { get; set; }
         public int MerchantId { get; set; }
         public string MerchantTitle { get; set; }
+        /// <summary>Immutable merchant contract captured when the customer checked out.</summary>
+        public decimal CommissionRatePercent { get; set; }
+        public bool IsPlatformOwnedSnapshot { get; set; }
         public int OrderId { get; set; }
         public virtual Order Order { get; set; }
+        public decimal UnitSalePrice => SingleFinalPrice > 0 ? SingleFinalPrice : SinglePrice;
+        public decimal TotalFinalPrice => UnitSalePrice * Quantity;
+        public decimal TotalPrice => TotalFinalPrice;
         public OrderDetailDto ToDto() =>
             new()
             {
@@ -39,8 +45,12 @@ namespace Modules.Orders.Entities
                 ProductImage = ProductImage,
                 MerchantId = MerchantId,
                 MerchantTitle = MerchantTitle,
+                CommissionRatePercent = CommissionRatePercent,
+                IsPlatformOwnedSnapshot = IsPlatformOwnedSnapshot,
                 SinglePrice = SinglePrice,
                 SingleFinalPrice = SingleFinalPrice,
+                SingleMerchantProfit = SingleMerchantProfit,
+                SingleAdditionalProfit = SingleAdditionalProfit,
                 OrderDetailStatus = OrderDetailStatus,
                 Warning = Warning,
                 Currency = Currency,
@@ -54,12 +64,32 @@ namespace Modules.Orders.Entities
         public int Quantity { get; set; }
         public decimal SinglePrice { get; set; }
         public decimal SingleFinalPrice { get; set; }
-        public decimal TotalPrice => Quantity * SinglePrice;
-        public decimal TotalFinalPrice => Quantity * SingleFinalPrice;
+        public decimal SingleMerchantProfit { get; set; }
+        public decimal SingleAdditionalProfit { get; set; }
+        /// <summary>Display-only CompareAt / crossed-out original price</summary>
+        public decimal CompareAtPrice => SinglePrice;
+        /// <summary>Canonical unit sale price charged to customer</summary>
+        public decimal UnitSalePrice => SingleFinalPrice > 0m ? SingleFinalPrice : SinglePrice;
+        /// <summary>Canonical line total charged to customer: Quantity * UnitSalePrice</summary>
+        public decimal TotalPrice => Quantity * (SingleFinalPrice > 0m ? SingleFinalPrice : SinglePrice);
+        /// <summary>Display-only total before discount</summary>
+        public decimal TotalCompareAtPrice => Quantity * SinglePrice;
+        /// <summary>Backward-compatible alias for canonical charged line total</summary>
+        public decimal TotalFinalPrice => TotalPrice;
         public Currency Currency { get; set; } = Currency.TRY;
         public string CurrencyString => Currency.ToLocalizedName();
         public OrderDetailStatus OrderDetailStatus { get; set; }
         public string OrderDetailStatusString => OrderDetailStatus.ToLocalizedName();
+        public bool IsAccepted => OrderDetailStatus == OrderDetailStatus.MerchantAccepted ||
+                                  OrderDetailStatus == OrderDetailStatus.ReadyForPickup ||
+                                  OrderDetailStatus == OrderDetailStatus.ShippingStarted ||
+                                  OrderDetailStatus == OrderDetailStatus.Delivered;
+        public bool IsRejected => OrderDetailStatus == OrderDetailStatus.MerchantRejected;
+        public bool IsCanceled => OrderDetailStatus == OrderDetailStatus.CustomerCanceled ||
+                                  OrderDetailStatus == OrderDetailStatus.DeliveryCanceled;
+        public int AcceptedQuantity => IsAccepted ? Quantity : 0;
+        public int RejectedQuantity => IsRejected ? Quantity : 0;
+        public decimal MerchantPayable => IsAccepted ? (SingleMerchantProfit > 0m ? SingleMerchantProfit * Quantity : TotalPrice) : 0m;
         public string Warning { get; set; }
         public int ProductId { get; set; }
         public string ProductTitle { get; set; }
@@ -67,8 +97,12 @@ namespace Modules.Orders.Entities
         public string ProductImage { get; set; }
         public int MerchantId { get; set; }
         public string MerchantTitle { get; set; }
+        public string MerchantLogo { get; set; }
+        public decimal CommissionRatePercent { get; set; }
+        public bool IsPlatformOwnedSnapshot { get; set; }
         public int OrderId { get; set; }
     }
+
     public class DeliveryOrderDetailDto
     {
         public OrderDetailStatus OrderDetailStatus { get; set; }

@@ -1,3 +1,5 @@
+using App.Catalog.Data;
+using App.Shared.Data.MultiContext;
 using App.Shared.Entities.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -5,10 +7,12 @@ using Microsoft.EntityFrameworkCore;
 using Modules.Catalog.Entities;
 using Modules.Catalog.Services;
 using OpenIddict.Validation.AspNetCore;
+using Solf.Base;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using URF.Core.Abstractions.Trackable;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -24,18 +28,18 @@ namespace App.ApiControllers.V1.Admin
     {
         private readonly IHomeCategoriesService _service;
         private readonly IProductCategoryService _categoryService;
-        private readonly IProductService _productService;
         private readonly IMerchantService _merchantService;
+        private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepository;
 
         public HomeCategoriesController(IHomeCategoriesService service,
                                         IProductCategoryService categoryService,
-                                        IProductService productService,
-                                        IMerchantService merchantService)
+                                        IMerchantService merchantService,
+                                        ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepository)
         {
             _service = service;
             _categoryService = categoryService;
-            _productService = productService;
             _merchantService = merchantService;
+            _merchantProductRepository = merchantProductRepository;
         }
 
         /// <summary>
@@ -74,21 +78,22 @@ namespace App.ApiControllers.V1.Admin
                                                   })
                                                   .ToArrayAsync();
 
-            var availableOffers = await _productService.Queryable().AsNoTracking()
-                .Where(x => x.DeletionDate == null && x.Active &&
-                            x.ProductCategoryId.HasValue &&
-                            x.ProductCategory.Active)
-                .SelectMany(x => x.MerchantProducts
-                    .Where(mp => (mp.MerchantPrice > 0 ||
-                                  (mp.PriceUsd.HasValue && mp.PriceUsd.Value > 0)) &&
-                                 mp.Merchant.DeletionDate == null &&
-                                 mp.Merchant.Active)
-                    .Select(mp => new
-                    {
-                        ProductId = x.Id,
-                        CategoryId = x.ProductCategoryId.Value,
-                        mp.MerchantId
-                    }))
+            // Match HomeCategoriesService: query offers directly so Pomelo does
+            // not translate a correlated Product.SelectMany into CROSS APPLY.
+            var availableOffers = await _merchantProductRepository.Queryable().AsNoTracking()
+                .Where(mp => mp.Product.DeletionDate == null &&
+                             mp.Product.Active &&
+                             mp.Product.ProductCategoryId.HasValue &&
+                             mp.Product.ProductCategory.Active &&
+                             mp.MerchantPrice > 0 &&
+                             mp.Merchant.DeletionDate == null &&
+                             mp.Merchant.Active)
+                .Select(mp => new
+                {
+                    ProductId = mp.ProductId,
+                    CategoryId = mp.Product.ProductCategoryId.Value,
+                    mp.MerchantId
+                })
                 .ToArrayAsync();
 
             var categoryParents = categories.ToDictionary(x => x.Id, x => x.ParentId);
@@ -115,6 +120,16 @@ namespace App.ApiControllers.V1.Admin
                 .GroupBy(x => x.MerchantKind)
                 .ToDictionary(x => x.Key, x => x.Count());
 
+            var merchantCategoryMap = availableOffers
+                .GroupBy(x => x.MerchantId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.SelectMany(x => GetCategoryAncestorIds(x.CategoryId, categoryParents))
+                          .Distinct()
+                          .OrderBy(id => id)
+                          .ToArray()
+                );
+
             return new HomeCategoriesAdminVm
             {
                 Config = config,
@@ -131,7 +146,8 @@ namespace App.ApiControllers.V1.Admin
                                                      ? count
                                                      : 0
                                              })
-                                             .ToArray()
+                                             .ToArray(),
+                MerchantCategoryMap = merchantCategoryMap
             };
         }
 
@@ -153,6 +169,12 @@ namespace App.ApiControllers.V1.Admin
                     return BadRequest(error);
             }
 
+            if ((config.Tiles ?? new List<HomeCategoryTile>())
+                .Count(tile => tile.LinkType == HomeCategoryLinkType.ErrandRequests) > 1)
+            {
+                return BadRequest("يمكن إضافة فئة «طلبات» مرة واحدة فقط.");
+            }
+
             await _service.SaveConfig(config);
             return await _service.GetTiles(activeOnly: false);
         }
@@ -166,6 +188,13 @@ namespace App.ApiControllers.V1.Admin
             if (string.IsNullOrWhiteSpace(tile.Title))
                 return "كل فئة يجب أن تحتوي على اسم";
 
+            if (tile.RestaurantCategoryId.HasValue &&
+                (tile.LinkType != HomeCategoryLinkType.MerchantKind ||
+                 tile.MerchantKind != MerchantKind.Restaurant))
+            {
+                return $"الفئة \"{tile.Title}\" يمكنها اختيار فلتر مطاعم فقط عند فتح قائمة المطاعم";
+            }
+
             switch (tile.LinkType)
             {
                 case HomeCategoryLinkType.ProductCategory when !tile.ProductCategoryId.HasValue:
@@ -176,6 +205,10 @@ namespace App.ApiControllers.V1.Admin
                     return $"الفئة \"{tile.Title}\" يجب أن ترتبط بنوع متاجر";
                 case HomeCategoryLinkType.Search when string.IsNullOrWhiteSpace(tile.SearchTerm):
                     return $"الفئة \"{tile.Title}\" يجب أن تحتوي على كلمة بحث";
+                case HomeCategoryLinkType.MerchantCategory when !tile.MerchantId.HasValue || !tile.ProductCategoryId.HasValue:
+                    return $"الفئة \"{tile.Title}\" يجب أن ترتبط بمتجر وقسم محددين";
+                case HomeCategoryLinkType.ErrandRequests:
+                    return null;
                 default:
                     return null;
             }
@@ -203,6 +236,21 @@ namespace App.ApiControllers.V1.Admin
 
             return result;
         }
+
+        private static HashSet<int> GetCategoryAncestorIds(
+            int categoryId,
+            IReadOnlyDictionary<int, int?> parentByCategoryId)
+        {
+            var result = new HashSet<int> { categoryId };
+            var currentId = categoryId;
+            while (parentByCategoryId.TryGetValue(currentId, out var parentId) &&
+                   parentId.HasValue && result.Add(parentId.Value))
+            {
+                currentId = parentId.Value;
+            }
+
+            return result;
+        }
     }
 
     public class HomeCategoriesAdminVm
@@ -212,6 +260,7 @@ namespace App.ApiControllers.V1.Admin
         public HomeCategoryTargetDto[] AvailableCategories { get; set; }
         public HomeCategoryMerchantDto[] AvailableMerchants { get; set; }
         public HomeCategoryMerchantKindDto[] AvailableMerchantKinds { get; set; }
+        public Dictionary<int, int[]> MerchantCategoryMap { get; set; } = new Dictionary<int, int[]>();
     }
 
     public class HomeCategoryTargetDto

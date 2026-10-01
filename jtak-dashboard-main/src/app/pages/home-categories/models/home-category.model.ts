@@ -7,13 +7,20 @@ export enum HomeCategoryLinkType {
   MerchantKind = 1,
   Merchant = 2,
   Search = 3,
+  MerchantCategory = 4,
+  ErrandRequests = 5,
 }
 
 export const LINK_TYPE_LABELS: { value: HomeCategoryLinkType; label: string; hint: string }[] = [
   {
     value: HomeCategoryLinkType.ProductCategory,
     label: 'قسم من الأقسام',
-    hint: 'يفتح صفحة القسم مع منتجاته والمتاجر التي تبيعه',
+    hint: 'الاسم والصورة للعرض فقط؛ العميل يفتح القسم المحدد أدناه مع منتجاته والمتاجر التي تبيعه.',
+  },
+  {
+    value: HomeCategoryLinkType.MerchantCategory,
+    label: 'قسم داخل متجر محدد',
+    hint: 'يفتح قسماً معيناً داخل متجر أو سوبرماركت أو مطعم محدد',
   },
   {
     value: HomeCategoryLinkType.MerchantKind,
@@ -30,6 +37,11 @@ export const LINK_TYPE_LABELS: { value: HomeCategoryLinkType; label: string; hin
     label: 'كلمة بحث',
     hint: 'يفتح نتائج البحث عن كلمة محددة',
   },
+  {
+    value: HomeCategoryLinkType.ErrandRequests,
+    label: 'طلبات',
+    hint: 'يفتح نموذج طلب غرض من خارج الأقسام والمتاجر المعروضة',
+  },
 ];
 
 export interface HomeCategoryTile {
@@ -41,7 +53,9 @@ export interface HomeCategoryTile {
   active: boolean;
   linkType: HomeCategoryLinkType;
   productCategoryId?: number | null;
+  secondaryProductCategoryId?: number | null;
   merchantKind?: number | null;
+  restaurantCategoryId?: number | null;
   merchantId?: number | null;
   searchTerm?: string | null;
 }
@@ -51,12 +65,14 @@ export interface HomeCategoriesConfig {
   sectionTitle: string;
   sectionTitleEn: string;
   maxItems: number;
+  errandRequestsTileInitialized?: boolean;
   tiles: HomeCategoryTile[];
 }
 
 /** A tile with its destination resolved, as the app receives it. */
 export interface ResolvedHomeCategoryTile extends HomeCategoryTile {
   targetLabel?: string | null;
+  secondaryTargetCategoryTitle?: string | null;
   targetExists: boolean;
   hasAvailableContent: boolean;
   availableProductCount: number;
@@ -72,6 +88,7 @@ export interface HomeCategoryTarget {
   parentTitle?: string | null;
   productCount: number;
   merchantCount: number;
+  displayLabel?: string;
 }
 
 export interface HomeCategoryMerchant {
@@ -80,6 +97,7 @@ export interface HomeCategoryMerchant {
   photo?: string | null;
   merchantKind: number;
   productCount: number;
+  displayLabel?: string;
 }
 
 export interface HomeCategoryMerchantKind {
@@ -94,6 +112,7 @@ export interface HomeCategoriesAdminVm {
   availableCategories: HomeCategoryTarget[];
   availableMerchants: HomeCategoryMerchant[];
   availableMerchantKinds: HomeCategoryMerchantKind[];
+  merchantCategoryMap?: { [merchantId: number]: number[] };
 }
 
 /** Arabic names for the backend MerchantKind values. */

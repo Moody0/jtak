@@ -88,6 +88,7 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<MerchantStatementDto>> GetMerchantStatementGet(
             int merchantId,
             [FromQuery] string searchTerm = null,
+            [FromQuery] string search = null,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50,
             [FromQuery] DateTime? fromDate = null,
@@ -95,9 +96,10 @@ namespace App.ApiControllers.V1.Admin
         {
             try
             {
+                var effectiveSearch = !string.IsNullOrWhiteSpace(searchTerm) ? searchTerm : search;
                 var request = new MerchantStatementRequestDto
                 {
-                    SearchTerm = searchTerm,
+                    SearchTerm = effectiveSearch,
                     Page = page,
                     PageSize = pageSize,
                     FromDate = fromDate,

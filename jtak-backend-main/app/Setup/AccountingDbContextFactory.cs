@@ -22,10 +22,14 @@ namespace App.Setup
                 .SetBasePath(basePath)
                 .AddJsonFile("appsettings.json", optional: true)
                 .AddJsonFile("appsettings.Development.json", optional: true)
+                .AddEnvironmentVariables()
                 .Build();
 
-            var connectionString = configuration.GetConnectionString("AccountingDbConnection")
-                ?? "Server=localhost;Database=jtak_accounting;Uid=root;Pwd=;";
+            var connectionString = configuration.GetConnectionString("AccountingDbConnection");
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                connectionString = "Server=localhost;Database=jtak_accounting;Uid=root;Pwd=;";
+            }
 
             var optionsBuilder = new DbContextOptionsBuilder<AccountingDbContext>();
             var serverVersion = new MySqlServerVersion(new Version(8, 0, 21));

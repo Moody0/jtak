@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -84,7 +84,7 @@ namespace App.Helpers
             if (fileUpload == null)
                 return null;
 
-            var ext = Path.GetExtension(fileUpload.FileName);
+            var ext = Path.GetExtension(fileUpload.FileName)?.ToLowerInvariant();
             var token = env.GeneratNewToken(ext);
             var fullPhysicalPath = env.GetPhysicalPath(token);
 
@@ -260,12 +260,13 @@ namespace App.Helpers
 
         private static bool IsValidExt(FileTypesAllowed type, string ext)
         {
-            var imageExts = new[] { ".png", ".jpg", ".jpeg" };
+            var normalized = ext?.Trim().ToLowerInvariant();
+            var imageExts = new[] { ".png", ".jpg", ".jpeg", ".webp" };
             var pdfExts = new[] { ".pdf" };
 
             return type == FileTypesAllowed.All ||
-                  (type == FileTypesAllowed.Image && imageExts.Contains(ext)) ||
-                  (type == FileTypesAllowed.Pdf && pdfExts.Contains(ext));
+                  (type == FileTypesAllowed.Image && imageExts.Contains(normalized)) ||
+                  (type == FileTypesAllowed.Pdf && pdfExts.Contains(normalized));
         }
 
         /*

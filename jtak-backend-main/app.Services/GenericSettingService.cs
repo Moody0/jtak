@@ -33,32 +33,33 @@ namespace App.Shared.Services
         public async Task<T> GetValue<T>(string key, string lang)
         {
             key = lang == null ? key : $"{key}_{lang}";
+            var cacheKey = GetTypedCacheKey<T>(key);
             // Look for cache key.
-            if (!_cache.TryGetValue(key, out T result))
+            if (!_cache.TryGetValue(cacheKey, out T result))
             {
                 var setting = await Repository.FindAsync(key);
                 if (setting == null)
                 {
-                    _cache.Set<T>(key, default, TimeSpan.FromDays(1));
+                    _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
                 }
                 else if (setting.Value != null)
                 {
                     try
                     {
                         result = JsonSerializer.Deserialize<T>(setting.Value);
-                        _cache.Set(key, result, TimeSpan.FromDays(1));
+                        _cache.Set(cacheKey, result, TimeSpan.FromDays(1));
                     }
                     catch (Exception)
                     {
                         // Invalid settings should behave like a missing setting, but must not
                         // make every request fail. Cache the fallback for the same period.
                         result = default;
-                        _cache.Set<T>(key, default, TimeSpan.FromDays(1));
+                        _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
                     }
                 }
                 else
                 {
-                    _cache.Set<T>(key, default, TimeSpan.FromDays(1));
+                    _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
                 }
             }
 
@@ -68,6 +69,7 @@ namespace App.Shared.Services
         public async Task SetValue<T>(string key, T val, string lang)
         {
             key = lang == null ? key : $"{key}_{lang}";
+            var cacheKey = GetTypedCacheKey<T>(key);
             var value = val != null ? JsonSerializer.Serialize(val) : null;
             var setting = await Repository.FindAsync(key);
             if (setting == null)
@@ -80,22 +82,28 @@ namespace App.Shared.Services
                 setting.Value = value;
             }
             await _unitOfWork.SaveChangesAsync();
-            _cache.Set(key, JsonSerializer.Deserialize<T>(setting.Value), TimeSpan.FromDays(1));
+            _cache.Set(cacheKey, JsonSerializer.Deserialize<T>(setting.Value), TimeSpan.FromDays(1));
         }
 
         public T GetCachedValue<T>(string key, string lang = null)
         {
-            if (!_cache.TryGetValue(key, out T result))
+            key = lang == null ? key : $"{key}_{lang}";
+            var cacheKey = GetTypedCacheKey<T>(key);
+            if (!_cache.TryGetValue(cacheKey, out T result))
             {
-                _cache.Set<T>(key, default, TimeSpan.FromDays(1));
+                _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
                 return default;
             }
             return result;
         }
         public void SetCachedValue<T>(string key, T val, string lang = null)
         {
+            key = lang == null ? key : $"{key}_{lang}";
+            var cacheKey = GetTypedCacheKey<T>(key);
             var value = val != null ? JsonSerializer.Serialize(val) : null;
-            _cache.Set(key, JsonSerializer.Deserialize<T>(value), TimeSpan.FromDays(1));
+            _cache.Set(cacheKey, JsonSerializer.Deserialize<T>(value), TimeSpan.FromDays(1));
         }
+
+        private static string GetTypedCacheKey<T>(string key) => $"{key}:{typeof(T).FullName}";
     }
 }

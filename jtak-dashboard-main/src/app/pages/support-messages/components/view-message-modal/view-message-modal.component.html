@@ -1,157 +1,474 @@
-<div class="modal-header border-0 pb-0 pt-6 px-7">
-  <div class="d-flex align-items-center gap-3">
-    <div class="symbol symbol-45px symbol-circle bg-light-primary">
-      <span class="symbol-label text-primary">
-        <i class="fas fa-headset fs-3"></i>
-      </span>
+<!-- Modal Header -->
+<div class="modal-header">
+  <div class="modal-header-right">
+    <div class="modal-header-icon" [ngClass]="isErrand ? 'modal-header-icon--errand' : 'modal-header-icon--support'">
+      <i [class]="isErrand ? 'fas fa-clipboard-list' : 'fas fa-headset'"></i>
     </div>
-    <div>
-      <h3 class="modal-title fw-bolder text-dark mb-1">
-        {{ message?.title || 'رسالة إلى الدعم الفني' }}
+    <div class="modal-header-meta">
+      <h3 class="modal-header-title">
+        {{ isErrand ? ('طلب شراء (اطلب أي شيء) #' + message.id) : (message?.title || 'رسالة إلى الدعم الفني') }}
       </h3>
-      <span class="text-muted fs-7">
-        تاريخ الإرسال: {{ message?.createdDate | date: 'yyyy/MM/dd - hh:mm a' }}
+      <span class="modal-header-subtitle">
+        {{ isErrand ? 'تاريخ الطلب:' : 'تاريخ الإرسال:' }} {{ message?.createdDate | date: 'yyyy/MM/dd - hh:mm a' }}
       </span>
     </div>
   </div>
-  <button type="button" class="btn btn-sm btn-icon btn-active-color-primary" (click)="modal.dismiss()">
-    <i class="fas fa-times fs-4"></i>
-  </button>
+
+  <div class="modal-header-left">
+    <span *ngIf="isErrand" class="errand-status-tag" [ngClass]="errandStatusClass">
+      {{ errandStatusText }}
+    </span>
+    <button type="button" class="btn btn-sm btn-icon modal-close-btn" (click)="modal.dismiss()" title="إغلاق">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
 </div>
 
-<div class="modal-body py-5 px-7">
-  <!-- Sender Overview Card -->
-  <div class="card bg-light-dark border-0 rounded-3 mb-6">
-    <div class="card-body p-5">
-      <div class="row g-4 align-items-center">
-        <!-- Sender Name -->
-        <div class="col-sm-4">
-          <div class="d-flex align-items-center gap-3">
-            <div class="symbol symbol-40px symbol-circle bg-white border border-gray-300">
-              <span class="symbol-label text-gray-800 fw-bolder fs-6">
-                {{ (message?.senderName?.charAt(0) || 'ع') }}
-              </span>
-            </div>
-            <div>
-              <div class="text-muted fs-8 fw-semibold">المرسل</div>
-              <div class="text-gray-900 fw-bolder fs-6">{{ message?.senderName }}</div>
-            </div>
+<!-- Modal Body -->
+<div class="modal-body">
+  <!-- 1. Customer / Sender Info Card -->
+  <div class="modal-client-card mb-5">
+    <div class="row g-3 align-items-center">
+      <!-- Sender Name -->
+      <div class="col-sm-4">
+        <div class="d-flex align-items-center gap-3">
+          <div class="modal-avatar">
+            <span>{{ (message?.senderName ? message.senderName.charAt(0) : 'ع') }}</span>
+          </div>
+          <div class="d-flex flex-column">
+            <span class="modal-client-label">العميل</span>
+            <strong class="modal-client-name">{{ message?.senderName || '—' }}</strong>
           </div>
         </div>
+      </div>
 
-        <!-- Sender Phone -->
-        <div class="col-sm-4">
-          <div class="text-muted fs-8 fw-semibold mb-1">رقم الهاتف</div>
+      <!-- Sender Phone -->
+      <div class="col-sm-4">
+        <div class="d-flex flex-column">
+          <span class="modal-client-label mb-1">رقم الهاتف</span>
           <div class="d-flex align-items-center gap-2">
-            <span class="text-gray-900 fw-bold fs-6 dir-ltr" style="direction: ltr;">
+            <span class="modal-client-phone" dir="ltr">
               {{ message?.senderPhone || 'غير محدد' }}
             </span>
-            <div *ngIf="message?.senderPhone" class="d-flex gap-1">
+            <div *ngIf="message?.senderPhone" class="contact-action-buttons d-flex gap-1">
               <button
                 type="button"
-                class="btn btn-icon btn-sm btn-light-success w-30px h-30px"
+                class="btn btn-icon btn-sm btn-contact-whatsapp"
                 title="مراسلة عبر واتساب"
                 (click)="openWhatsApp()"
               >
-                <i class="fab fa-whatsapp fs-5 text-success"></i>
+                <i class="fab fa-whatsapp"></i>
               </button>
               <button
                 type="button"
-                class="btn btn-icon btn-sm btn-light-primary w-30px h-30px"
+                class="btn btn-icon btn-sm btn-contact-phone"
                 title="اتصال هاتفي"
                 (click)="callPhone()"
               >
-                <i class="fas fa-phone-alt fs-6 text-primary"></i>
+                <i class="fas fa-phone-alt"></i>
               </button>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Sender Email -->
-        <div class="col-sm-4">
-          <div class="text-muted fs-8 fw-semibold mb-1">البريد الإلكتروني</div>
-          <div class="text-gray-900 fw-semibold fs-7 text-truncate">
+      <!-- Sender Email -->
+      <div class="col-sm-4">
+        <div class="d-flex flex-column">
+          <span class="modal-client-label mb-1">البريد الإلكتروني</span>
+          <span class="modal-client-email text-truncate">
             {{ message?.senderEmail || 'غير متوفر' }}
-          </div>
+          </span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Inquiry Message Content Card -->
-  <div class="mb-6">
-    <label class="form-label fw-bolder text-gray-800 fs-6 mb-2">
-      <i class="fas fa-comment-alt text-primary me-2 ms-1"></i> نص الرسالة والاستفسار
+  <!-- 2. Request Details / Message Content -->
+  <div class="modal-content-section mb-5">
+    <label class="modal-section-title">
+      <i [class]="isErrand ? 'fas fa-shopping-basket text-warning' : 'fas fa-comment-alt text-primary'"></i>
+      <span>{{ isErrand ? 'تفاصيل الأغراض والمواد المطلوبة من العميل' : 'نص الرسالة والاستفسار' }}</span>
     </label>
-    <div class="p-5 bg-light-primary rounded-3 border border-primary border-opacity-25">
-      <p class="text-gray-800 fs-6 mb-0 lh-lg" style="white-space: pre-wrap;">
-        {{ message?.message }}
-      </p>
+
+    <div class="modal-message-box">
+      <p class="modal-message-text">{{ message?.message }}</p>
+    </div>
+
+    <!-- Map Links -->
+    <div class="d-flex flex-wrap gap-2 mt-3" *ngIf="deliveryMapUrl || pickupMapUrl">
+      <a *ngIf="deliveryMapUrl" [href]="deliveryMapUrl" target="_blank" rel="noopener noreferrer"
+         class="btn btn-sm modal-map-btn modal-map-btn--delivery">
+        <i class="fas fa-map-marker-alt"></i>
+        <span>فتح موقع التوصيل على الخريطة</span>
+      </a>
+      <a *ngIf="pickupMapUrl" [href]="pickupMapUrl" target="_blank" rel="noopener noreferrer"
+         class="btn btn-sm modal-map-btn modal-map-btn--store">
+        <i class="fas fa-store"></i>
+        <span>فتح موقع الشراء على الخريطة</span>
+      </a>
     </div>
   </div>
 
-  <!-- Status Changer Segment -->
-  <div class="mb-6">
-    <label class="form-label fw-bolder text-gray-800 fs-6 mb-3">حالة متابعة الاستفسار</label>
-    <div class="d-flex gap-3 flex-wrap">
+  <!-- 3. Errand Operations Workflow (Only for Purchase Requests) -->
+  <div *ngIf="isErrand" class="errand-ops-card mb-4">
+    <!-- Errand Card Header -->
+    <div class="errand-ops-header">
+      <div class="d-flex align-items-center gap-2">
+        <i class="fas fa-tasks text-primary"></i>
+        <h4 class="errand-ops-title">إدارة وتنفيذ مراحل الطلب</h4>
+      </div>
+
       <button
+        *ngIf="message.errandStatus === ErrandStatus.Assigned || message.errandStatus === ErrandStatus.PurchasePending"
+        class="btn btn-sm errand-btn-refresh-data"
         type="button"
-        class="btn btn-sm d-flex align-items-center gap-2 px-4 py-3"
-        [ngClass]="selectedStatus === SupportMessageStatus.New ? 'btn-warning' : 'btn-light-warning'"
-        (click)="setStatus(SupportMessageStatus.New)"
+        [disabled]="isRefreshingErrand"
+        (click)="refreshErrand()"
+        title="تحديث بيانات المندوب"
       >
+        <i class="fas" [ngClass]="isRefreshingErrand ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i>
+        <span>تحديث بيانات المندوب</span>
+      </button>
+    </div>
+
+    <div class="errand-ops-body">
+      <!-- Special Alerts & Notices -->
+      <div *ngIf="message.errandStatus === ErrandStatus.Unavailable" class="alert modal-alert-warning mb-3">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+          <strong>الغرض غير متوفر:</strong> {{ message.errandUnavailableReason }}. لا تسمح للمندوب باستبداله. أرسل عرضاً جديداً فقط إذا أمكن توفير الغرض نفسه بسعر جديد، أو ألغِ الطلب.
+        </div>
+      </div>
+
+      <div *ngIf="message.errandDeliveryCodeFailedAttempts && !isErrandFinalized" class="alert modal-alert-warning mb-3">
+        <i class="fas fa-key"></i>
+        <div>محاولات تأكيد التسليم الفاشلة: {{ message.errandDeliveryCodeFailedAttempts }}</div>
+      </div>
+
+      <div *ngIf="message.errandLatestException && !isErrandFinalized" class="alert modal-alert-danger mb-3">
         <i class="fas fa-exclamation-circle"></i>
-        <span>جديدة (بحاجة متابعة)</span>
-      </button>
+        <div>آخر مشكلة أبلغ عنها المندوب: {{ cleanExceptionMessage }}</div>
+      </div>
 
-      <button
-        type="button"
-        class="btn btn-sm d-flex align-items-center gap-2 px-4 py-3"
-        [ngClass]="selectedStatus === SupportMessageStatus.Read ? 'btn-primary' : 'btn-light-primary'"
-        (click)="setStatus(SupportMessageStatus.Read)"
-      >
-        <i class="fas fa-envelope-open-text"></i>
-        <span>قيد المتابعة</span>
-      </button>
+      <!-- Financial Margin / Profit Indicator -->
+      <div *ngIf="recordedOrderProfit !== null" class="alert modal-alert-finance mb-3"
+           [ngClass]="recordedOrderProfit! < 0 ? 'modal-alert-finance--loss' : (recordedOrderProfit! > 0 ? 'modal-alert-finance--profit' : 'modal-alert-finance--even')">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <i [class]="recordedOrderProfit! < 0 ? 'fas fa-arrow-down' : 'fas fa-chart-line'"></i>
+          <strong>
+            {{ recordedOrderProfit! < 0 ? 'خسارة الشركة لهذا الطلب' : (recordedOrderProfit! > 0 ? 'ربح الشركة لهذا الطلب' : 'هامش الشركة لهذا الطلب') }}:
+            {{ recordedOrderProfitAmount | number:'1.0-2' }} ل.س
+          </strong>
+        </div>
+        <div class="modal-finance-note" *ngIf="message.errandStatus === ErrandStatus.Delivered">
+          إجمالي العميل − تكلفة الشراء − أجر المندوب (المبلغ الفعلي المسجل بعد إتمام التسليم والتحصيل، قبل المصروفات الأخرى).
+        </div>
+        <div class="modal-finance-note" *ngIf="message.errandStatus !== ErrandStatus.Delivered">
+          إجمالي العميل − تكلفة الشراء − أجر المندوب. هذا المبلغ تقديري قبل المصروفات الأخرى، ولا يتحقق إلا بعد التسليم والتحصيل.
+        </div>
+      </div>
 
-      <button
-        type="button"
-        class="btn btn-sm d-flex align-items-center gap-2 px-4 py-3"
-        [ngClass]="selectedStatus === SupportMessageStatus.Resolved ? 'btn-success' : 'btn-light-success'"
-        (click)="setStatus(SupportMessageStatus.Resolved)"
-      >
+      <!-- Purchase Receipt Internal Document -->
+      <div *ngIf="message.errandPurchaseCost !== null && message.errandPurchaseCost !== undefined || message.errandReceiptReference || message.errandReceiptPhotoToken"
+           class="errand-receipt-box mb-4">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="fas fa-receipt text-success"></i>
+          <strong class="text-success">إيصال المحل — مستند داخلي للإدارة والمحاسبة</strong>
+        </div>
+        <div class="d-flex flex-wrap gap-4 mb-2">
+          <span *ngIf="message.errandPurchaseCost !== null && message.errandPurchaseCost !== undefined">
+            تكلفة الشراء من المحل: <strong>{{ message.errandPurchaseCost | number:'1.0-2' }} ل.س</strong>
+          </span>
+          <span *ngIf="message.errandReceiptReference">
+            رقم الإيصال: <strong>{{ message.errandReceiptReference }}</strong>
+          </span>
+        </div>
+        <div *ngIf="receiptPhotoUrl && !receiptPhotoError" class="mt-2">
+          <a [href]="receiptPhotoUrl" target="_blank" rel="noopener noreferrer">
+            <img [src]="receiptPhotoUrl" (error)="onReceiptPhotoError()" alt="صورة فاتورة الشراء" class="errand-receipt-img" />
+          </a>
+        </div>
+        <span *ngIf="receiptPhotoError" class="text-danger fs-8 mt-1 d-block">تعذر تحميل صورة الفاتورة أو غير متوفرة على الخادم.</span>
+      </div>
+
+      <!-- Stage 1: Quoting -->
+      <ng-container *ngIf="message.errandStatus === ErrandStatus.Submitted || message.errandStatus === ErrandStatus.Declined || message.errandStatus === ErrandStatus.Quoted || message.errandStatus === ErrandStatus.Unavailable">
+        <ng-container *ngIf="!hasActiveQuote; else quotePendingApproval">
+          <div class="errand-stage-box mb-3">
+            <h5 class="errand-stage-title mb-3">
+              <i class="fas fa-file-invoice-dollar me-2 text-warning"></i>
+              <span>{{ message.errandStatus === ErrandStatus.Quoted ? 'إرسال عرض سعر جديد' : 'تسعير الطلب وإرسال العرض للعميل' }}</span>
+            </h5>
+            <div class="row g-3 mb-3">
+              <div class="col-sm-6">
+                <label class="form-label">سعر الغرض للعميل (ل.س)</label>
+                <input class="form-control" type="number" min="1" step="0.01" [(ngModel)]="itemPrice" placeholder="مثال: 5000" />
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label">أجرة التوصيل على العميل (ل.س)</label>
+                <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="deliveryFee" (ngModelChange)="acceptDriverSubsidy = false" placeholder="مثال: 1500" />
+              </div>
+            </div>
+
+            <div class="errand-proposed-total mb-3" *ngIf="itemPrice !== null && deliveryFee !== null">
+              <span>المجموع المقترح للعميل:</span>
+              <strong class="text-primary">{{ proposedTotal | number:'1.0-2' }} ل.س</strong>
+            </div>
+
+            <div class="alert modal-alert-info mb-3">
+              <i class="fas fa-info-circle"></i>
+              <div>أجر المندوب من الشركة: <strong>{{ errandDriverEarning !== null ? (errandDriverEarning | number:'1.0-2') + ' ل.س' : 'راجع إعدادات أجر المندوب' }}</strong>. يُسجل ضمن مستحقاته ولا يُضاف إلى فاتورة العميل.</div>
+            </div>
+
+            <div *ngIf="proposedDriverSubsidy > 0" class="alert modal-alert-warning mb-3">
+              <i class="fas fa-exclamation-triangle"></i>
+              <div>
+                أجر المندوب أعلى من أجرة التوصيل بمقدار <strong>{{ proposedDriverSubsidy | number:'1.0-2' }} ل.س</strong>. تتحمل الشركة هذا الفرق، وقد يجعل الطلب خاسراً.
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" id="acceptDriverSubsidyCheck" [(ngModel)]="acceptDriverSubsidy" />
+                  <label class="form-check-label fw-bold" for="acceptDriverSubsidyCheck">أوافق على دعم أجر المندوب بهذا الفرق من الشركة</label>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn errand-btn-action" [disabled]="isSaving" (click)="runErrandAction('quote')">
+              <i class="fas fa-paper-plane me-1"></i>
+              <span>{{ message.errandStatus === ErrandStatus.Quoted ? 'إرسال عرض سعر جديد' : 'إرسال عرض السعر للعميل' }}</span>
+            </button>
+            <span class="text-muted fs-8 d-block mt-2">العرض صالح لمدة 24 ساعة. لا تعيّن مندوباً قبل موافقة العميل داخل التطبيق.</span>
+          </div>
+        </ng-container>
+
+        <ng-template #quotePendingApproval>
+          <div class="alert modal-alert-info mb-3">
+            <i class="fas fa-clock"></i>
+            <div>
+              <strong>يوجد عرض سعر بانتظار موافقة العميل.</strong>
+              <div class="mt-1">
+                سعر الغرض: <strong>{{ message.errandItemPrice | number:'1.0-2' }} ل.س</strong> ·
+                أجرة التوصيل: <strong>{{ message.errandDeliveryFee | number:'1.0-2' }} ل.س</strong> ·
+                الإجمالي: <strong class="text-primary">{{ errandTotal | number:'1.0-2' }} ل.س</strong>
+              </div>
+              <div class="text-muted fs-8 mt-1">صالح حتى {{ message.errandQuoteExpiresAt | date:'yyyy/MM/dd hh:mm a' }}. يمكن إرسال عرض بديل بعد انتهاء الصلاحية إذا لم يوافق العميل.</div>
+            </div>
+          </div>
+        </ng-template>
+      </ng-container>
+
+      <!-- Stage 2: Driver Assignment (Approved) -->
+      <ng-container *ngIf="message.errandStatus === ErrandStatus.Approved">
+        <div class="errand-stage-box mb-3">
+          <h5 class="errand-stage-title mb-2">
+            <i class="fas fa-user-plus me-2 text-success"></i>
+            <span>وافق العميل — تعيين مندوب التوصيل</span>
+          </h5>
+          <div class="errand-invoice-summary mb-3">
+            فاتورة العميل: سعر الغرض <strong>{{ message.errandItemPrice | number:'1.0-2' }} ل.س</strong> ·
+            أجرة التوصيل <strong>{{ message.errandDeliveryFee | number:'1.0-2' }} ل.س</strong> ·
+            المجموع <strong class="text-primary">{{ errandTotal | number:'1.0-2' }} ل.س</strong>
+            <div class="text-muted fs-8 mt-1">
+              أجر المندوب من الشركة: <strong>{{ (message.errandDriverEarning ?? message.errandDeliveryFee) | number:'1.0-2' }} ل.س</strong> (يُسجل ضمن مستحقاته ولا يُضاف إلى فاتورة العميل).
+            </div>
+          </div>
+
+          <label class="form-label">مندوب التوصيل صاحب عهدة الشركة</label>
+          <select class="form-select mb-3" [(ngModel)]="driverUserId">
+            <option value="">اختر المندوب</option>
+            <option *ngFor="let driver of drivers" [value]="driver.id">
+              {{ driver.name }} — سقف العهدة {{ driver.maxCashFloat | number:'1.0-2' }} ل.س
+              <ng-container *ngIf="driver.availableCashFloat !== undefined">
+                · الرصيد {{ driver.availableCashFloat | number:'1.0-2' }} ل.س · المهام الحالية {{ (driver.activeDeliveryOrders || 0) + (driver.activePurchaseRequests || 0) }}
+              </ng-container>
+            </option>
+          </select>
+          <button class="btn errand-btn-action" [disabled]="isSaving || !driverUserId" (click)="runErrandAction('assign')">
+            <i class="fas fa-check-circle me-1"></i>
+            <span>تعيين المندوب</span>
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- Stage 3: Purchasing -->
+      <ng-container *ngIf="message.errandStatus === ErrandStatus.Assigned || message.errandStatus === ErrandStatus.PurchasePending">
+        <div class="errand-stage-box mb-3">
+          <h5 class="errand-stage-title mb-2">
+            <i class="fas fa-shopping-cart me-2 text-primary"></i>
+            <span>تسجيل الشراء من المحل (من عهدة المندوب)</span>
+          </h5>
+          <p class="text-muted fs-8 mb-3">يدفع المندوب من عهدة الشركة. يدفع العميل السعر المعتمد، ويُضاف أجر المندوب المحدد وقت عرض السعر إلى مستحقاته عند إتمام التسليم.</p>
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label">المبلغ المدفوع للمحل (ل.س)</label>
+              <input class="form-control" type="number" min="1" step="0.01" [(ngModel)]="purchaseCost" placeholder="المبلغ الفعلي المدفوع" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">رقم فاتورة/إيصال الشراء</label>
+              <input class="form-control" maxlength="200" [(ngModel)]="receiptReference" placeholder="اختياري عند وجود صورة إيصال" />
+            </div>
+          </div>
+          <button class="btn errand-btn-action" [disabled]="isSaving" (click)="runErrandAction('purchase')">
+            <i class="fas fa-receipt me-1"></i>
+            <span>تسجيل الشراء من العهدة</span>
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- Stage 4: Admin Delivery Recovery -->
+      <ng-container *ngIf="message.errandStatus === ErrandStatus.Purchased || message.errandStatus === ErrandStatus.DeliveryPending">
+        <div class="errand-stage-box mb-3">
+          <h5 class="errand-stage-title mb-2">
+            <i class="fas fa-shield-alt me-2 text-warning"></i>
+            <span>استعادة التسليم الإداري (إجراء استثنائي)</span>
+          </h5>
+          <div class="alert modal-alert-warning mb-3">
+            <i class="fas fa-info-circle"></i>
+            <div>هذا مسار استعادة إداري عند تعذّر الإكمال من تطبيق المندوب. المسار المعتاد هو أن يؤكد المندوب التسليم من التطبيق.</div>
+          </div>
+          <div class="errand-invoice-summary mb-3">
+            تكلفة الشراء: <strong>{{ message.errandPurchaseCost | number:'1.0-2' }} ل.س</strong> · رقم الإيصال: <strong>{{ message.errandReceiptReference || '—' }}</strong><br />
+            المبلغ الواجب تحصيله من العميل: <strong class="text-primary fs-6">{{ errandTotal | number:'1.0-2' }} ل.س</strong>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">رمز التسليم (OTP) الذي أعطاه العميل للمندوب</label>
+            <input class="form-control errand-code-input" maxlength="6" inputmode="numeric" [(ngModel)]="deliveryCode" placeholder="6 أرقام" />
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="customerReceivedCheck" [(ngModel)]="customerReceived" />
+            <label class="form-check-label" for="customerReceivedCheck">أكد المندوب استلام العميل للغرض</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cashCollectedCheck" [(ngModel)]="cashCollected" />
+            <label class="form-check-label" for="cashCollectedCheck">أكد المندوب تحصيل كامل المبلغ نقداً</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">سبب الإكمال من لوحة الإدارة</label>
+            <textarea class="form-control" rows="2" maxlength="500" [(ngModel)]="recoveryReason" placeholder="مثال: تعطل هاتف المندوب بعد تسليم الطلب"></textarea>
+          </div>
+          <button class="btn errand-btn-success" [disabled]="isSaving || !customerReceived || !cashCollected || deliveryCode.length !== 6 || !recoveryReason.trim()" (click)="runErrandAction('deliver')">
+            <i class="fas fa-check-double me-1"></i>
+            <span>استعادة التسليم وتسجيل التحصيل</span>
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- Stage 5: Cancellation / Return -->
+      <div *ngIf="message.errandStatus === ErrandStatus.Submitted || message.errandStatus === ErrandStatus.Quoted || message.errandStatus === ErrandStatus.Declined || message.errandStatus === ErrandStatus.Approved || message.errandStatus === ErrandStatus.Assigned || message.errandStatus === ErrandStatus.Unavailable"
+           class="errand-cancel-box mt-3 pt-3">
+        <label class="form-label text-danger">سبب إلغاء الطلب قبل الشراء</label>
+        <div class="d-flex gap-2">
+          <input class="form-control" maxlength="500" [(ngModel)]="returnReason" placeholder="اكتب سبب إلغاء الطلب..." />
+          <button class="btn errand-btn-danger" [disabled]="isSaving || !returnReason.trim()" (click)="runErrandAction('cancel')">
+            <span>إلغاء الطلب</span>
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="message.errandStatus === ErrandStatus.Purchased || message.errandStatus === ErrandStatus.ReturnPending"
+           class="errand-cancel-box mt-3 pt-3">
+        <h5 class="text-danger mb-1">إرجاع الغرض قبل التسليم</h5>
+        <p class="text-muted fs-8 mb-2">سجّل المبلغ الذي أعاده المحل فعلياً إلى عهدة المندوب. الفرق غير المسترد يُسجل مصروفاً تشغيلياً.</p>
+        <div class="row g-2 mb-2">
+          <div class="col-sm-5">
+            <label class="form-label">المبلغ المسترد من المحل (ل.س)</label>
+            <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="refundAmount" placeholder="0" />
+          </div>
+          <div class="col-sm-7">
+            <label class="form-label">سبب الإرجاع أو رقم المستند</label>
+            <input class="form-control" maxlength="500" [(ngModel)]="returnReason" placeholder="اكتب التفاصيل..." />
+          </div>
+        </div>
+        <button class="btn errand-btn-danger" [disabled]="isSaving || refundAmount === null || !returnReason.trim()" (click)="runErrandAction('return')">
+          <span>تسجيل إرجاع الطلب</span>
+        </button>
+      </div>
+
+      <!-- Finalized Status Messages -->
+      <div *ngIf="message.errandStatus === ErrandStatus.Delivered" class="alert modal-alert-success mt-3 mb-0">
         <i class="fas fa-check-circle"></i>
-        <span>تمت المعالجة بنجاح</span>
-      </button>
+        <div>تم تسليم الطلب وتحصيل <strong>{{ message.errandCashCollected | number:'1.0-2' }} ل.س</strong> وتسجيلها في عهدة المندوب بنجاح.</div>
+      </div>
+      <div *ngIf="message.errandStatus === ErrandStatus.Returned" class="alert modal-alert-warning mt-3 mb-0">
+        <i class="fas fa-undo"></i>
+        <div>الطلب مرتجع. المبلغ المسترد: <strong>{{ message.errandRefundAmount | number:'1.0-2' }} ل.س</strong> · سبب الإرجاع: {{ message.errandReturnReason }}</div>
+      </div>
+      <div *ngIf="message.errandStatus === ErrandStatus.Cancelled" class="alert modal-alert-danger mt-3 mb-0">
+        <i class="fas fa-times-circle"></i>
+        <div>الطلب ملغى. السبب: {{ message.errandReturnReason || 'ألغاه العميل' }}<span *ngIf="message.errandRefundAmount"> · المبلغ المسترد: {{ message.errandRefundAmount | number:'1.0-2' }} ل.س</span></div>
+      </div>
     </div>
   </div>
 
-  <!-- Admin Resolution Notes -->
-  <div class="mb-2">
-    <label class="form-label fw-bolder text-gray-800 fs-6 mb-2">
-      <i class="fas fa-sticky-note text-warning me-2 ms-1"></i> ملاحظات الإدارة وسجل المتابعة
-    </label>
-    <textarea
-      class="form-control form-control-solid fs-6"
-      rows="3"
-      [(ngModel)]="adminNotes"
-      placeholder="اكتب ملاحظات حول التواصل مع العميل أو كيفية معالجة المشكلة..."
-    ></textarea>
-  </div>
+  <!-- 4. Support Messages Status & Admin Notes (Only for regular support inquiries) -->
+  <ng-container *ngIf="!isErrand">
+    <div class="mb-5">
+      <label class="modal-section-title mb-2">
+        <i class="fas fa-flag text-primary"></i>
+        <span>حالة متابعة الاستفسار</span>
+      </label>
+      <div class="modal-status-selector">
+        <button
+          type="button"
+          class="modal-status-choice"
+          [class.is-active]="selectedStatus === SupportMessageStatus.New"
+          (click)="setStatus(SupportMessageStatus.New)"
+        >
+          <i class="fas fa-exclamation-circle text-warning"></i>
+          <span>جديدة (بحاجة متابعة)</span>
+        </button>
+
+        <button
+          type="button"
+          class="modal-status-choice"
+          [class.is-active]="selectedStatus === SupportMessageStatus.Read"
+          (click)="setStatus(SupportMessageStatus.Read)"
+        >
+          <i class="fas fa-envelope-open-text text-primary"></i>
+          <span>قيد المتابعة</span>
+        </button>
+
+        <button
+          type="button"
+          class="modal-status-choice"
+          [class.is-active]="selectedStatus === SupportMessageStatus.Resolved"
+          (click)="setStatus(SupportMessageStatus.Resolved)"
+        >
+          <i class="fas fa-check-circle text-success"></i>
+          <span>تمت المعالجة بنجاح</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Admin Resolution Notes -->
+    <div class="mb-3">
+      <label class="modal-section-title mb-2">
+        <i class="fas fa-sticky-note text-warning"></i>
+        <span>ملاحظات الإدارة وسجل المتابعة</span>
+      </label>
+      <textarea
+        class="form-control modal-notes-input"
+        rows="3"
+        [(ngModel)]="adminNotes"
+        placeholder="اكتب ملاحظات حول التواصل مع العميل أو تفاصيل معالجة الطلب..."
+      ></textarea>
+    </div>
+  </ng-container>
 </div>
 
-<div class="modal-footer border-0 pt-0 pb-6 px-7 d-flex justify-content-between">
-  <button type="button" class="btn btn-light" (click)="modal.dismiss()">
+<!-- Modal Footer -->
+<div class="modal-footer">
+  <button type="button" class="btn modal-btn-secondary" (click)="modal.dismiss()">
     إغلاق
   </button>
   <button
+    *ngIf="!isErrand"
     type="button"
-    class="btn btn-primary d-flex align-items-center gap-2 px-6"
+    class="btn modal-btn-primary"
     [disabled]="isSaving"
     (click)="saveChanges()"
   >
     <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-2"></span>
-    <i *ngIf="!isSaving" class="fas fa-save"></i>
+    <i *ngIf="!isSaving" class="fas fa-save me-1"></i>
     <span>حفظ التعديلات</span>
   </button>
 </div>

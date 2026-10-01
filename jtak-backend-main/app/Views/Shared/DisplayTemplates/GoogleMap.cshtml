@@ -1,6 +1,8 @@
 ﻿@using App.Extensions
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @model string
 @{
+    var googleMapsApiKey = Configuration["GoogleMaps:ApiKey"] ?? string.Empty;
     var defaultHtmlAttributesObject = new { style = "border-radius:0px;border-bottom-width:0px" };
 
     var latitudeVal = "40.986189";
@@ -28,7 +30,7 @@
 
 
 @Html.Script(
-    @<script defer src="https://maps.google.com/maps/api/js?key=AIzaSyBk2cKUejJ6r1R4juhCF4DKpelMc-twebU&callback=initMap&sensor=false"></script>
+    @<script defer src="https://maps.google.com/maps/api/js?key=@googleMapsApiKey&callback=initMap&sensor=false"></script>
 )
 
 @Html.Script(@<script type="text/javascript">

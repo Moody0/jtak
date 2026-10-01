@@ -681,5 +681,63 @@ namespace Modules.Accounting.Tests
             var searchNoMatch = await service.GetDataTableAsync(new MerchantReconciliationDataTableRequest { SearchTerm = "9999999" });
             Assert.Empty(searchNoMatch.Items);
         }
+
+        [Fact]
+        public async Task GetDataTableAsync_UsesDeliveredBillShare_WithoutDroppingAdditionalProfit()
+        {
+            using var accountingDb = CreateInMemoryAccountingContext();
+            using var catalogDb = CreateInMemoryCatalogContext();
+            using var ordersDb = CreateInMemoryOrdersContext();
+
+            const int merchantId = 27;
+            catalogDb.Merchants.Add(new CatalogMerchant
+            {
+                Id = merchantId,
+                Title = "محطة اللحوم",
+                Active = true
+            });
+            await catalogDb.SaveChangesAsync();
+
+            accountingDb.Bills.AddRange(
+                new Bill
+                {
+                    MerchantId = merchantId,
+                    OrderId = 8001,
+                    TotalAmount = 4400m,
+                    MerchantAmount = 3960m,
+                    JTakAmount = 440m,
+                    IsAddedToDues = true
+                },
+                new Bill
+                {
+                    MerchantId = merchantId,
+                    OrderId = 8002,
+                    TotalAmount = 2200m,
+                    MerchantAmount = 1980m,
+                    JTakAmount = 220m,
+                    IsAddedToDues = true
+                },
+                new Bill
+                {
+                    MerchantId = merchantId,
+                    OrderId = 8003,
+                    TotalAmount = 1000m,
+                    MerchantAmount = 900m,
+                    JTakAmount = 100m,
+                    IsAddedToDues = false
+                });
+            await accountingDb.SaveChangesAsync();
+
+            var ledgerService = new LedgerService(accountingDb, NullLogger<LedgerService>.Instance);
+            var service = new MerchantReconciliationService(accountingDb, catalogDb, ordersDb, ledgerService, NullLogger<MerchantReconciliationService>.Instance);
+
+            var result = await service.GetDataTableAsync(new MerchantReconciliationDataTableRequest { Page = 1, PageSize = 10 });
+            var row = Assert.Single(result.Items);
+
+            Assert.Equal(2, row.OrdersCount);
+            Assert.Equal(6600m, row.GrossSales);
+            Assert.Equal(5940m, row.MerchantNet);
+            Assert.Equal(660m, row.JTakShare);
+        }
     }
 }

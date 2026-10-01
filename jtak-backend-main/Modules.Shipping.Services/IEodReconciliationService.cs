@@ -25,6 +25,7 @@ namespace Modules.Accounting.Services
         public string Currency { get; set; } = "SYP";
         public string Notes { get; set; }
         public string DiscrepancyReason { get; set; }
+        public string ShortageTreatment { get; set; }
     }
 
     public class SettlementResultDto

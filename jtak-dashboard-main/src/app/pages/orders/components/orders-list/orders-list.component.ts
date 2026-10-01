@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import {
@@ -18,6 +18,8 @@ import { EditDilevry } from './EditDilevry/edit-dilevry.component';
 import { LiveTrackModalComponent } from './LiveTrackModal/live-track-modal.component';
 import { AdminDeliverModalComponent } from './AdminDeliverModal/admin-deliver-modal.component';
 import { OrderStatusHistoryModalComponent } from './OrderStatusHistoryModal/order-status-history-modal.component';
+import { OrderDetailsModalComponent } from './OrderDetailsModal/order-details-modal.component';
+import { CancelOrderModalComponent } from './CancelOrderModal/cancel-order-modal.component';
 import { forkJoin, interval } from 'rxjs';
 import { BulkConfirmModalComponent } from 'src/app/modules/shared/components/bulk-confirm-modal/bulk-confirm-modal.component';
 import { DeleteModalComponent } from 'src/app/modules/shared/components/delete-modal/delete-modal.component';
@@ -43,7 +45,7 @@ export class OrdersListComponent
   selection = new TableSelection<any>((item) => item.id);
   isLoading: boolean;
   totalRecords: number;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
   order: Order;
   lastUpdated = new Date();
   activeTab: 'ALL' | 'PENDING' | 'READY' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELED' | 'UNASSIGNED' | 'ARCHIVED' = 'ALL';
@@ -58,8 +60,10 @@ export class OrdersListComponent
     cancelledRejected: 0,
   };
 
+  private newOrderHandler: any = null;
+
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public ordersService: OrdersService,
     private modalService: NgbModal,
     private translate: TranslateService,
@@ -92,6 +96,24 @@ export class OrdersListComponent
     if (!orders || !orders.length) return [];
     if (this.activeTab === 'ALL') return orders;
     return orders.filter(o => {
+      if (o.aggregateStatusKey) {
+        const isDelivered = o.aggregateStatusKey === 'DELIVERED' || o.aggregateStatusKey === 'PARTIALLY_DELIVERED';
+        const isCanceled = o.aggregateStatusKey === 'CUSTOMER_CANCELED' || o.aggregateStatusKey === 'DELIVERY_CANCELED' || o.aggregateStatusKey === 'MERCHANT_REJECTED';
+        const isInTransit = o.aggregateStatusKey === 'IN_TRANSIT';
+        const isReady = o.aggregateStatusKey === 'READY_FOR_PICKUP';
+        const isPending = o.aggregateStatusKey === 'PENDING' || o.aggregateStatusKey === 'MERCHANT_ACCEPTED' || o.aggregateStatusKey === 'DRAFT';
+
+        switch (this.activeTab) {
+          case 'PENDING': return isPending;
+          case 'READY': return isReady;
+          case 'IN_TRANSIT': return isInTransit;
+          case 'DELIVERED': return isDelivered;
+          case 'CANCELED': return isCanceled;
+          case 'UNASSIGNED': return !this.hasAssignedDriver(o) && !isDelivered && !isCanceled;
+          default: return true;
+        }
+      }
+
       const details = o.orderDetails || [];
       const allTerminal = details.length > 0 && details.every(d =>
         d.orderDetailStatus === OrderDetailStatus.CustomerCanceled ||
@@ -134,6 +156,25 @@ export class OrdersListComponent
     }
     let pending = 0, ready = 0, inTransit = 0, delivered = 0, canceled = 0, unassigned = 0;
     for (const o of orders) {
+      if (o.aggregateStatusKey) {
+        const isDelivered = o.aggregateStatusKey === 'DELIVERED' || o.aggregateStatusKey === 'PARTIALLY_DELIVERED';
+        const isCanceled = o.aggregateStatusKey === 'CUSTOMER_CANCELED' || o.aggregateStatusKey === 'DELIVERY_CANCELED' || o.aggregateStatusKey === 'MERCHANT_REJECTED';
+        const isInTransit = o.aggregateStatusKey === 'IN_TRANSIT';
+        const isReady = o.aggregateStatusKey === 'READY_FOR_PICKUP';
+        const isPending = o.aggregateStatusKey === 'PENDING' || o.aggregateStatusKey === 'MERCHANT_ACCEPTED' || o.aggregateStatusKey === 'DRAFT';
+
+        if (isDelivered) delivered++;
+        else if (isCanceled) canceled++;
+        else if (isInTransit) inTransit++;
+        else if (isReady) ready++;
+        else if (isPending) pending++;
+
+        if (!this.hasAssignedDriver(o) && !isDelivered && !isCanceled) {
+          unassigned++;
+        }
+        continue;
+      }
+
       const details = o.orderDetails || [];
       const allTerminal = details.length > 0 && details.every(d =>
         d.orderDetailStatus === OrderDetailStatus.CustomerCanceled ||
@@ -257,32 +298,17 @@ export class OrdersListComponent
       window.alert('لا يمكن إلغاء طلب مكتمل أو ملغي مسبقاً.');
       return;
     }
-    const orderId = order.id;
-    const reason = window.prompt('سبب رفض / إلغاء الطلب (سيظهر للعميل):');
-    if (reason === null) return;
-    if (!reason.trim()) {
-      window.alert('يرجى كتابة سبب واضح للرفض أو الإلغاء.');
-      return;
-    }
-    const modalRef = this.modalService.open(DeleteModalComponent);
-    modalRef.componentInstance.title = `Cancel order #${orderId}?`;
-    modalRef.componentInstance.confirmationText = 'This stops fulfillment for the entire order. This action cannot be undone.';
-    modalRef.componentInstance.deletingText = 'Cancelling order…';
-    modalRef.componentInstance.confirmLabel = 'Cancel order';
-    this.subs.sink = modalRef.componentInstance.cancelClicked.subscribe(() => modalRef.dismiss());
-    this.subs.sink = modalRef.componentInstance.deleteClicked.subscribe(() => {
-      if (modalRef.componentInstance.isLoading) return;
-      modalRef.componentInstance.isLoading = true;
-      this.ordersService.cancel(orderId, reason.trim()).subscribe({
-        next: (res) => {
-          modalRef.close();
+    const modalRef = this.modalService.open(CancelOrderModalComponent, { centered: true });
+    modalRef.componentInstance.order = order;
+    modalRef.result.then(
+      (res) => {
+        if (res) {
           this.ordersService.fetchPost();
-        },
-        error: () => {
-          modalRef.componentInstance.isLoading = false;
+          this.loadSummary();
         }
-      });
-    });
+      },
+      () => {}
+    );
   }
 
   canCancel(order: Order): boolean {
@@ -452,19 +478,18 @@ export class OrdersListComponent
       window.alert('لا توجد طلبات قابلة للإلغاء من بين الطلبات المحددة.');
       return;
     }
-    const reason = window.prompt(`أدخل سبب رفض/إلغاء الطلبات المحددة (${cancelable.length}):`);
-    if (reason === null) return;
-    if (!reason.trim()) {
-      window.alert('يرجى كتابة سبب واضح للرفض أو الإلغاء.');
-      return;
-    }
-    const modalRef = this.modalService.open(BulkConfirmModalComponent);
-    modalRef.componentInstance.count = cancelable.length;
-    modalRef.componentInstance.itemLabel = cancelable.length === 1 ? 'order' : 'orders';
-    modalRef.componentInstance.actionLabel = 'Cancel';
-    modalRef.componentInstance.description = 'This stops fulfillment for every selected cancelable order. This action cannot be undone.';
-    modalRef.componentInstance.action = () => forkJoin(cancelable.map((item) => this.ordersService.cancel(item.id, reason.trim())));
-    modalRef.result.then(() => { this.selection.clear(); this.ordersService.fetchPost(); }, () => {});
+    const modalRef = this.modalService.open(CancelOrderModalComponent, { centered: true });
+    modalRef.componentInstance.orders = cancelable;
+    modalRef.result.then(
+      (res) => {
+        if (res) {
+          this.selection.clear();
+          this.ordersService.fetchPost();
+          this.loadSummary();
+        }
+      },
+      () => {}
+    );
   }
 
   edit(item: Order) {
@@ -498,7 +523,59 @@ export class OrdersListComponent
     this.subs.sink = this.ordersService.items$.subscribe(() => this.notificationSummaryService.refresh());
     this.sorting = this.ordersService.sorting;
     this.paginator = this.ordersService.paginator;
+    this.newOrderHandler = () => {
+      this.refreshOrders();
+    };
+    window.addEventListener('order-sound:order-received', this.newOrderHandler);
   }
+
+  getItemsCount(order: Order): number {
+    return (order?.orderDetails || []).reduce((total, detail) => total + (Number(detail.quantity) || 0), 0);
+  }
+
+  getAdditionalItemLines(order: Order): number {
+    const len = order?.orderDetails?.length || 0;
+    return len > 1 ? len - 1 : 0;
+  }
+
+  getItemsPreview(order: Order): string {
+    if (!order?.orderDetails || order.orderDetails.length === 0) {
+      return '-';
+    }
+    const first = order.orderDetails[0];
+    const firstTitle = first.productTitle || `Item #${first.id || 1}`;
+    const qty = first.quantity || 1;
+    return `${qty}× ${firstTitle}`;
+  }
+
+  getMerchantBadge(order: Order): { name: string; isMarket: boolean } {
+    if (order?.isJtakMarketOrder) {
+      return { name: 'جيتك ماركت', isMarket: true };
+    }
+    const details = order?.orderDetails || [];
+    const firstMerchant = details.find(d => !!d.merchantTitle)?.merchantTitle;
+    if (firstMerchant) {
+      const isMarket = firstMerchant.includes('ماركت') || firstMerchant.includes('صيدل') || firstMerchant.includes('سوبر') || firstMerchant.includes('بقالة');
+      return { name: firstMerchant, isMarket };
+    }
+    if (order?.description && order.description.trim()) {
+      const isMarket = order.description.includes('ماركت') || order.description.includes('صيدل') || order.description.includes('سوبر') || order.description.includes('بقالة');
+      return { name: order.description, isMarket };
+    }
+    return { name: 'طلب مستقل', isMarket: false };
+  }
+
+  getGrandTotal(order: Order): number {
+    const fee = Number(order?.deliveryFee || 0);
+    return Number(order?.grandTotal ?? ((order?.price || 0) + fee));
+  }
+
+  openOrderDetails(order: Order): void {
+    const modalRef = this.modalService.open(OrderDetailsModalComponent, { size: 'lg', centered: true, scrollable: true });
+    modalRef.componentInstance.order = order;
+    modalRef.componentInstance.statusLabel = this.getOrderOverallStatus(order).label;
+  }
+
   isDeliveryEditable(order: Order): boolean {
     if (!order || !order.orderDetails || order.orderDetails.length === 0) return false;
     const active = order.orderDetails.filter(d =>
@@ -521,7 +598,15 @@ export class OrdersListComponent
   }
 
   canLiveTrack(order: Order): boolean {
-    return this.hasAssignedDriver(order) || (order.orderDetails && order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted || d.orderDetailStatus === OrderDetailStatus.MerchantAccepted));
+    if (!order || !order.orderDetails || order.orderDetails.length === 0) return false;
+    const isTerminal = order.orderDetails.every(d =>
+      d.orderDetailStatus === OrderDetailStatus.Delivered ||
+      d.orderDetailStatus === OrderDetailStatus.CustomerCanceled ||
+      d.orderDetailStatus === OrderDetailStatus.DeliveryCanceled ||
+      d.orderDetailStatus === OrderDetailStatus.MerchantRejected
+    );
+    if (isTerminal) return false;
+    return this.hasAssignedDriver(order) || order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.ShippingStarted || d.orderDetailStatus === OrderDetailStatus.MerchantAccepted);
   }
 
   formatPhoneNumber(phone?: string): string {
@@ -622,6 +707,36 @@ export class OrdersListComponent
     if (order.isArchived || order.deletionDate) {
       return { label: isAr ? 'مؤرشف' : 'Archived', badgeClass: 'badge-light-dark text-gray-700 border border-gray-400', icon: 'fa-archive' };
     }
+
+    if (order.aggregateStatusKey) {
+      switch (order.aggregateStatusKey) {
+        case 'DELIVERED':
+          return {
+            label: isAr ? (order.hasPartialFulfillment ? 'مكتمل (تعديل جزئي)' : 'مكتمل') : (order.hasPartialFulfillment ? 'Partially Delivered' : 'Delivered'),
+            badgeClass: 'badge-light-success text-success',
+            icon: 'fa-check-double'
+          };
+        case 'PARTIALLY_DELIVERED':
+          return { label: isAr ? 'مكتمل (تعديل جزئي)' : 'Partially Delivered', badgeClass: 'badge-light-success text-success', icon: 'fa-check-double' };
+        case 'IN_TRANSIT':
+          return { label: isAr ? 'جاري التوصيل' : 'In Transit', badgeClass: 'badge-light-info text-info', icon: 'fa-motorcycle' };
+        case 'READY_FOR_PICKUP':
+          return { label: isAr ? 'جاهز للتوصيل' : 'Ready', badgeClass: 'badge-light-primary text-primary', icon: 'fa-box-open' };
+        case 'MERCHANT_ACCEPTED':
+          return { label: isAr ? 'جاري التجهيز' : 'Preparing', badgeClass: 'badge-light-info text-info', icon: 'fa-utensils' };
+        case 'PENDING':
+          return { label: isAr ? 'قيد الانتظار' : 'Pending', badgeClass: 'badge-light-warning text-warning', icon: 'fa-hourglass-half' };
+        case 'MERCHANT_REJECTED':
+          return { label: isAr ? 'مرفوض من التاجر' : 'Rejected by Merchant', badgeClass: 'badge-light-danger text-danger', icon: 'fa-ban' };
+        case 'CUSTOMER_CANCELED':
+          return { label: isAr ? 'ملغي من العميل' : 'Canceled by Customer', badgeClass: 'badge-light-danger text-danger', icon: 'fa-ban' };
+        case 'DELIVERY_CANCELED':
+          return { label: isAr ? 'فشل التوصيل / مرتجع' : 'Delivery Failed / Returned', badgeClass: 'badge-light-danger text-danger', icon: 'fa-undo' };
+        case 'DRAFT':
+          return { label: isAr ? 'مسودة' : 'Draft', badgeClass: 'badge-light-secondary text-muted', icon: 'fa-file' };
+      }
+    }
+
     if (!order || !order.orderDetails || order.orderDetails.length === 0) {
       return { label: isAr ? 'طلب جديد' : 'New Order', badgeClass: 'badge-light-warning text-warning', icon: 'fa-clock' };
     }
@@ -664,5 +779,8 @@ export class OrdersListComponent
 
   ngOnDestroy() {
     this.subs.unsubscribe();
+    if (this.newOrderHandler) {
+      window.removeEventListener('order-sound:order-received', this.newOrderHandler);
+    }
   }
 }

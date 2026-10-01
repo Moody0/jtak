@@ -61,6 +61,10 @@ namespace App.ApiControllers.V1.Warehouse
         [Route("DataTable")]
         public async Task<ActionResult<TableResponseModel<ProductDto>>> DataTable([FromBody] MetronicTable request)
         {
+            if (request != null && request.PageNumber > 0)
+            {
+                request.PageNumber -= 1;
+            }
             var list = await _service.ListMetronicTableQueryable(request, x => new ProductDto
             {
                 Id = x.Id,
@@ -141,8 +145,9 @@ namespace App.ApiControllers.V1.Warehouse
                         var mp = mps[product.ProductId];
                         product.ProfitOutOfMerchantPricePercent = mp.ProfitOutOfMerchantPricePercent;
                         product.MerchantPrice = mp.MerchantPrice;
-                        product.AdditionalProfitPercent = mp.AdditionalProfitPercent;
-                        product.Discount = mp.Discount;
+                    product.Discount = mp.Discount;
+                    product.MaxOrderQuantity = mp.MaxOrderQuantity;
+                    product.MerchantKind = mp.MerchantKind;
                         product.MerchantId = mid;
                         resultList.Add(product);
                     }
@@ -191,6 +196,9 @@ namespace App.ApiControllers.V1.Warehouse
             if (!uid.HasValue) return Unauthorized();
             var mids = await _merchantService.GetMerchantIds(uid.Value);
             if (mids == null || mids.Length == 0) return Forbid();
+            if (dto.MaxOrderQuantity.HasValue && (dto.MaxOrderQuantity.Value < 1 || dto.MaxOrderQuantity.Value > 999))
+                return BadRequest("يجب أن يكون الحد الأقصى للطلب بين 1 و999.");
+            var maxOrderQuantity = await AreRestaurantMerchants(mids) ? dto.MaxOrderQuantity : null;
 
             var product = new Product
             {
@@ -210,7 +218,8 @@ namespace App.ApiControllers.V1.Warehouse
                 new MerchantProductPriceDto
                 {
                     ProductId = product.Id,
-                    MerchantPrice = dto.Price
+                    MerchantPrice = dto.Price,
+                    MaxOrderQuantity = maxOrderQuantity
                 }
             });
 
@@ -238,6 +247,9 @@ namespace App.ApiControllers.V1.Warehouse
             if (!uid.HasValue) return Unauthorized();
             var mids = await _merchantService.GetMerchantIds(uid.Value);
             if (mids == null || mids.Length == 0) return Forbid();
+            if (dto.MaxOrderQuantity.HasValue && (dto.MaxOrderQuantity.Value < 1 || dto.MaxOrderQuantity.Value > 999))
+                return BadRequest("يجب أن يكون الحد الأقصى للطلب بين 1 و999.");
+            var maxOrderQuantity = await AreRestaurantMerchants(mids) ? dto.MaxOrderQuantity : null;
 
             var product = await _service.FindAsync(id);
             if (product == null) return NotFound();
@@ -267,7 +279,8 @@ namespace App.ApiControllers.V1.Warehouse
                     new MerchantProductPriceDto
                     {
                         ProductId = product.Id,
-                        MerchantPrice = dto.Price
+                        MerchantPrice = dto.Price,
+                        MaxOrderQuantity = maxOrderQuantity
                     }
                 });
             }
@@ -346,6 +359,17 @@ namespace App.ApiControllers.V1.Warehouse
             return Ok(true);
         }
 
+        private async Task<bool> AreRestaurantMerchants(int[] merchantIds)
+        {
+            foreach (var merchantId in merchantIds)
+            {
+                var merchant = await _merchantService.FindAsync(merchantId);
+                if (merchant == null || merchant.MerchantKind != MerchantKind.Restaurant)
+                    return false;
+            }
+            return true;
+        }
+
         /// <summary>
         /// Get a specific Product by id
         /// </summary>
@@ -378,6 +402,7 @@ namespace App.ApiControllers.V1.Warehouse
         public decimal Price { get; set; }
         public int? ProductCategoryId { get; set; }
         public bool Active { get; set; } = true;
+        public int? MaxOrderQuantity { get; set; }
     }
 
     public class ProductAvailabilityDto

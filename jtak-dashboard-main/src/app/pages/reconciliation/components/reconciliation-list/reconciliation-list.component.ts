@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, TemplateRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, TemplateRef, HostListener } from '@angular/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { interval } from 'rxjs';
@@ -99,8 +99,12 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     return this.settlementRequests.filter(r => r.partyType === SettlementPartyType.Captain);
   }
 
+  get driverEarningsRequests(): SettlementRequestItem[] {
+    return this.settlementRequests.filter(r => r.partyType === SettlementPartyType.CaptainEarnings);
+  }
+
   get pendingCourierRequestsCount(): number {
-    return this.courierRequests.filter(r => r.status === SettlementRequestStatus.Pending).length;
+    return [...this.courierRequests, ...this.driverEarningsRequests].filter(r => r.status === SettlementRequestStatus.Pending).length;
   }
 
   isLoading: boolean = false;
@@ -111,6 +115,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   settleCashReceived: number = 0;
   settleNotes: string = '';
   settleReason: string = '';
+  shortageTreatment: 'retain_driver_debt' | 'write_off' = 'retain_driver_debt';
   isSettling: boolean = false;
   settlementError: string | null = null;
   settlementSuccess: SettlementResult | null = null;
@@ -172,9 +177,9 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   loadMerchants(): void {
     this.isLoadingMerchants = true;
     const req: MerchantReconciliationDataTableRequest = {
-      pageNumber: this.merchantPageNumber,
+      page: this.merchantPageNumber,
       pageSize: this.merchantPageSize,
-      search: this.merchantSearchTerm,
+      searchTerm: this.merchantSearchTerm.trim(),
     };
     this.reconciliationService.getMerchantReconciliationDataTable(req).subscribe({
       next: (res) => {
@@ -198,9 +203,9 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       next: (s) => {
         this.merchantSummary = s;
         const req: MerchantReconciliationDataTableRequest = {
-          pageNumber: this.merchantPageNumber,
+          page: this.merchantPageNumber,
           pageSize: this.merchantPageSize,
-          search: this.merchantSearchTerm,
+          searchTerm: this.merchantSearchTerm.trim(),
         };
         this.reconciliationService.getMerchantReconciliationDataTable(req).subscribe({
           next: (res) => {
@@ -247,7 +252,14 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   }
 
   openMerchantStatement(content: TemplateRef<any>, merchant: MerchantReconciliationItem): void {
-    this.selectedMerchantForStatement = merchant;
+    // The reconciliation API currently returns the display name as
+    // `merchantName`; keep `merchantTitle` as the template's canonical field,
+    // with a safe fallback for older/newer API payloads.
+    const merchantTitle = merchant.merchantTitle?.trim() || merchant.merchantName?.trim();
+    this.selectedMerchantForStatement = {
+      ...merchant,
+      merchantTitle: merchantTitle || `التاجر #${merchant.merchantId}`,
+    };
     this.statementSearchTerm = '';
     this.statementActiveTab = 'statement';
     this.merchantStatementData = null;
@@ -274,6 +286,24 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     });
   }
 
+  get filteredStatementTransactions(): MerchantStatementTransaction[] {
+    const list = this.merchantStatementData?.items || this.merchantStatementData?.transactions || [];
+    if (!this.statementSearchTerm?.trim()) {
+      return list;
+    }
+    const q = this.statementSearchTerm.toLowerCase().trim();
+    return list.filter((tx: any) =>
+      (tx.transactionNumber && tx.transactionNumber.toLowerCase().includes(q)) ||
+      (tx.description && tx.description.toLowerCase().includes(q)) ||
+      (tx.orderId && tx.orderId.toString().includes(q)) ||
+      (tx.type && tx.type.toLowerCase().includes(q))
+    );
+  }
+
+  onStatementSearchInputChange(): void {
+    this.cdr.detectChanges();
+  }
+
   onStatementSearch(): void {
     if (!this.selectedMerchantForStatement) return;
     this.loadMerchantStatementData(this.selectedMerchantForStatement.merchantId, this.statementSearchTerm);
@@ -284,6 +314,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     if (this.selectedMerchantForStatement) {
       this.loadMerchantStatementData(this.selectedMerchantForStatement.merchantId);
     }
+    this.cdr.detectChanges();
   }
 
   pollSettlementRequests(): void {
@@ -360,8 +391,11 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   }
 
   acceptSettlementRequest(item: SettlementRequestItem): void {
+    if (this.processingRequestId) return;
     const message = item.partyType === SettlementPartyType.Captain
-      ? `تأكيد استلام ${item.amount.toLocaleString()} ل.س من المندوب؟ سيتم تصفير عهدته وإضافة المبلغ لخزنة جيتك.`
+      ? `تأكيد استلام ${item.amount.toLocaleString()} ل.س فعلياً من المندوب؟ سيتم تخفيض عهدته بهذا المبلغ وإضافته لخزنة جيتك.`
+      : item.partyType === SettlementPartyType.CaptainEarnings
+      ? `قبول طلب صرف أرباح السائق ${item.requestNumber}؟ المبلغ يظل محجوزاً ولن يُخصم إلا بعد تأكيد دفعه فعلياً.`
       : `قبول طلب التاجر ${item.requestNumber}؟ سيبقى المبلغ محجوزاً حتى تأكيد الاستلام.`;
     if (!window.confirm(message)) return;
     this.processingRequestId = item.id;
@@ -372,6 +406,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   }
 
   rejectSettlementRequest(item: SettlementRequestItem): void {
+    if (this.processingRequestId) return;
     const reason = window.prompt('اكتب سبب رفض طلب التسوية (سيصل لصاحب الطلب):');
     if (reason === null || !reason.trim()) return;
     this.processingRequestId = item.id;
@@ -385,6 +420,15 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     if (!window.confirm(`تأكيد أن التاجر استلم ${item.amount.toLocaleString()} ل.س؟ سيتم خصم المبلغ من خزنة جيتك وإغلاق التسوية.`)) return;
     this.processingRequestId = item.id;
     this.reconciliationService.completeMerchantRequest(item.id).subscribe({
+      next: () => this.finishRequestAction(),
+      error: (err) => this.failRequestAction(err),
+    });
+  }
+
+  completeDriverEarnings(item: SettlementRequestItem): void {
+    if (this.processingRequestId || !window.confirm(`هل دفعت للسائق فعلياً ${item.amount.toLocaleString()} ل.س؟ سيتم خصمها من مستحقاته وخزينة جيتك مرة واحدة، دون تغيير عهدته النقدية.`)) return;
+    this.processingRequestId = item.id;
+    this.reconciliationService.completeDriverEarningsRequest(item.id).subscribe({
       next: () => this.finishRequestAction(),
       error: (err) => this.failRequestAction(err),
     });
@@ -518,6 +562,26 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     return Math.ceil(this.historyTotalRecords / this.historyPageSize) || 1;
   }
 
+  openSettlementRequestReceipt(content: TemplateRef<any>, request: SettlementRequestItem): void {
+    const targetId = request.settlementTransactionId || request.id;
+    this.selectedReceipt = null;
+    this.isLoadingReceipt = true;
+    this.modalService.open(content, { size: 'lg', centered: true, scrollable: true });
+
+    this.reconciliationService.getSettlementReceipt(targetId).subscribe({
+      next: (receipt) => {
+        this.selectedReceipt = receipt;
+        this.isLoadingReceipt = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load settlement receipt', err);
+        this.isLoadingReceipt = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
   openReceiptModal(content: TemplateRef<any>, item: SettlementHistoryItem): void {
     this.selectedReceipt = null;
     this.isLoadingReceipt = true;
@@ -538,7 +602,11 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   }
 
   printReceipt(): void {
+    document.body.classList.add('print-individual-receipt');
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('print-individual-receipt');
+    }, 2000);
   }
 
   printActiveHistory(): void {
@@ -559,9 +627,13 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         this.historyPrintItems = items || [];
         this.isPrintingHistory = false;
         this.cdr.detectChanges();
+        document.body.classList.add('print-history-report');
         setTimeout(() => {
           window.print();
-        }, 100);
+        }, 150);
+        setTimeout(() => {
+          document.body.classList.remove('print-history-report');
+        }, 3000);
       },
       error: (err) => {
         console.error('Failed to load print dataset', err);
@@ -611,6 +683,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     this.settleCashReceived = captain.expectedNetCashDue > 0 ? captain.expectedNetCashDue : 0;
     this.settleNotes = '';
     this.settleReason = '';
+    this.shortageTreatment = 'retain_driver_debt';
     this.settlementError = null;
     this.settlementSuccess = null;
     this.isSettling = false;
@@ -635,6 +708,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       currency: this.selectedCaptain.currency || 'SYP',
       notes: this.settleNotes,
       discrepancyReason: this.settleReason,
+      shortageTreatment: this.settleDiscrepancy < 0 ? this.shortageTreatment : undefined,
     };
 
     this.reconciliationService.settleShift(request).subscribe({
@@ -701,6 +775,24 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     return clean;
   }
 
+  formatSettlementMethod(method?: string): string {
+    if (!method) return 'نقداً من الخزينة';
+    const clean = method.trim().toLowerCase();
+    switch (clean) {
+      case 'cash_to_admin':
+        return 'توريد نقدي للخزينة / الإدارة';
+      case 'cash':
+        return 'نقداً من الخزينة';
+      case 'bank_transfer':
+        return 'حوالة مصرفية معتمدة';
+      case 'cheque':
+      case 'check':
+        return 'شيك مصرفي معتمد';
+      default:
+        return method;
+    }
+  }
+
   getInitials(name?: string): string {
     if (!name || !name.trim()) return 'M';
     const parts = name.trim().split(' ');
@@ -718,8 +810,32 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     window.print();
   }
 
+  get printDate(): Date {
+    return new Date();
+  }
+
+  @HostListener('window:afterprint')
+  onAfterPrint(): void {
+    document.body.classList.remove('print-merchant-statement');
+    document.body.classList.remove('print-individual-receipt');
+    document.body.classList.remove('print-driver-statement');
+    document.body.classList.remove('print-history-report');
+  }
+
   printMerchantStatement(): void {
+    document.body.classList.add('print-merchant-statement');
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('print-merchant-statement');
+    }, 2000);
+  }
+
+  printDriverStatement(): void {
+    document.body.classList.add('print-driver-statement');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('print-driver-statement');
+    }, 2000);
   }
 
   ngOnDestroy(): void {

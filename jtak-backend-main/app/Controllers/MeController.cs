@@ -15,6 +15,7 @@ using URF.Core.Abstractions;
 using App.Models.ManageViewModels;
 using Solf.Services;
 using App.Shared.Entities;
+using App.Shared.Services;
 
 namespace App.Controllers
 {
@@ -78,12 +79,24 @@ namespace App.Controllers
                 try
                 {
                     var oldEmail = target.Email;
+                    var phoneNumber = vm.PhoneNumber;
+                    if (SyrianPhoneIdentity.TryNormalize(phoneNumber, out var canonicalPhone))
+                    {
+                        var phoneMatch = await SyrianPhoneIdentity.FindAsync(UserManager, canonicalPhone);
+                        if (phoneMatch.Ambiguous || (phoneMatch.User != null && phoneMatch.User.Id != target.Id))
+                        {
+                            ModelState.AddModelError(nameof(vm.PhoneNumber), "رقم الهاتف مرتبط بحساب آخر.");
+                            ViewBag.Title = _Account.Profile + " - " + _Common.Edit;
+                            return View(vm);
+                        }
+                        phoneNumber = canonicalPhone;
+                    }
 
                     target.FirstName = vm.FirstName;
                     target.LastName = vm.LastName;
                     target.FullName = $"{vm.FirstName} {vm.LastName}";
                     target.Gender = vm.Gender;
-                    target.PhoneNumber = vm.PhoneNumber;
+                    target.PhoneNumber = phoneNumber;
 
                     var result = await UserManager.UpdateAsync(target);
 

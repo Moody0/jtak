@@ -1,4 +1,5 @@
 <app-edit-modal
+  class="product-edit-modal"
   [item]="item"
   [itemName]="item.title || ''"
   moduleName="Product"
@@ -177,73 +178,193 @@
                   id="merchantId"
                   formControlName="merchantId"
                   [placeholder]="'PRODUCTS_PAGE.MERCHANT_PLACEHOLDER' | translate"
-                  [items]="merchantsList"
+                  [items]="merchantOptions"
                   bindValue="id"
                   bindLabel="title"
-                  [clearable]="true"
+                  [loading]="merchantsLoading"
+                  [searchable]="true"
+                  [clearable]="false"
+                  [notFoundText]="merchantsLoadError ? 'تعذر تحميل المتاجر' : 'لا توجد متاجر متاحة'"
                 >
                 </ng-select>
+
+                <div class="d-flex align-items-center justify-content-between mt-2" *ngIf="merchantsLoadError">
+                  <small class="text-danger">
+                    <i class="fas fa-exclamation-circle me-1"></i>تعذر تحميل قائمة المتاجر.
+                  </small>
+                  <button type="button" class="btn btn-sm btn-light-danger" (click)="retryMerchantLookup()">
+                    <i class="fas fa-sync-alt me-1"></i>إعادة المحاولة
+                  </button>
+                </div>
+
+                <div class="alert alert-light-warning py-2 px-3 mt-2 mb-0" *ngIf="!merchantsLoading && !merchantsLoadError && !merchantsList.length">
+                  <i class="fas fa-info-circle me-1"></i>لا يوجد متجر متاح لربط هذا المنتج به.
+                </div>
+
+                <div class="alert alert-light-info py-2 px-3 mt-2 mb-0" *ngIf="isSelectedMarket()">
+                  <i class="fas fa-store me-1"></i>المنتج مرتبط بجيتك ماركت. المنتجات الخاصة بالمطاعم اختر لها المطعم من القائمة. لن يظهر المنتج للعملاء حتى يكون مفعّلاً وسعره أكبر من صفر.
+                </div>
+
+                <div class="alert alert-light-warning py-2 px-3 mt-2 mb-0" *ngIf="!merchantsLoading && !getMarketMerchant() && !formGroup.get('merchantId')?.value">
+                  <i class="fas fa-exclamation-triangle me-1"></i>لم يتم العثور على متجر جيتك ماركت تلقائياً؛ اختر المطعم الذي يبيع المنتج أو راجع إعداد نوع متجر الماركت.
+                </div>
+
+                <div class="d-flex align-items-center gap-2 mt-2" *ngIf="getSelectedMerchant() as selectedMerchant">
+                  <span class="badge badge-light-primary">
+                    <i class="fas fa-link me-1"></i>مرتبط بـ: {{ selectedMerchant.title }}
+                  </span>
+                  <small class="text-muted">#{{ selectedMerchant.id }}</small>
+                </div>
+                <small class="text-muted d-block mt-2" *ngIf="!formGroup.get('merchantId')?.value">
+                  اختر جيتك ماركت للمنتجات العامة أو اختر المطعم للمنتجات التي يبيعها.
+                </small>
               </div>
 
-              <!-- Selling Price (SYP) -->
-              <div class="col-md-4">
-                <label for="productPrice" class="form-label fw-bold mb-2">
-                  سعر البيع (ل.س)
+              <!-- Barcode -->
+              <div class="col-md-6">
+                <label for="productBarcode" class="form-label fw-bold mb-2">الباركود</label>
+                <input
+                  id="productBarcode"
+                  type="text"
+                  class="form-control font-monospace"
+                  formControlName="barcode"
+                  maxlength="64"
+                  placeholder="أدخل أو امسح باركود المنتج"
+                  dir="ltr"
+                />
+              </div>
+
+              <!-- Original Price (USD) -->
+              <div class="col-md-6">
+                <label for="productPriceUsd" class="form-label fw-bold mb-2">
+                  السعر الأصلي بالدولار ($)
                   <span class="text-danger" *ngIf="formGroup.get('merchantId')?.value">*</span>
                 </label>
-                <div class="input-group">
-                  <input
-                    id="productPrice"
-                    type="number"
-                    min="0"
-                    step="500"
-                    class="form-control"
-                    formControlName="price"
-                    placeholder="مثال: 35000"
-                  />
-                  <span class="input-group-text bg-light text-muted">ل.س</span>
-                </div>
-                <div class="form-text fs-9 text-muted">السعر الأساسي المعتمد في المتجر.</div>
-              </div>
-
-              <!-- Selling Price (USD - Optional) -->
-              <div class="col-md-4">
-                <label for="productPriceUsd" class="form-label fw-bold mb-2">
-                  سعر البيع بالدولار ($)
-                </label>
-                <div class="input-group">
+                <div class="input-group" dir="ltr">
                   <input
                     id="productPriceUsd"
                     type="number"
                     min="0"
-                    step="0.05"
-                    class="form-control"
+                    step="0.01"
+                    inputmode="decimal"
+                    class="form-control text-end fs-6 fw-bold"
                     formControlName="priceUsd"
-                    placeholder="مثال: 2.50"
+                    placeholder="0.00"
+                    (blur)="onPriceUsdBlur()"
+                    aria-describedby="productPriceUsdHelp"
                   />
-                  <span class="input-group-text bg-light text-muted">$</span>
+                  <span class="input-group-text bg-light fw-bold text-dark">$</span>
                 </div>
-                <div class="form-text fs-9 text-muted">اختياري — يُحسب تلقائياً من الصرف.</div>
+                <div id="productPriceUsdHelp" class="d-flex align-items-center justify-content-between mt-1">
+                  <span class="fs-9 text-muted">حتى منزلتين عشريتين</span>
+                  <span class="badge badge-light-primary fs-9" *ngIf="formGroup.get('priceUsd')?.value as pUsd">
+                    ~ {{ toLocalPrice(pUsd) | number:'1.0-0' }} ل.س
+                  </span>
+                </div>
               </div>
 
-              <!-- Discount Amount (SYP - Optional) -->
-              <div class="col-md-4">
+              <!-- Discount Percentage -->
+              <div class="col-md-6">
                 <label for="productDiscount" class="form-label fw-bold mb-2">
-                  قيمة الخصم (ل.س)
+                  نسبة الخصم
                 </label>
-                <div class="input-group">
+                <div class="input-group" dir="ltr">
+                  <span class="input-group-text bg-light fw-bold text-dark">%</span>
                   <input
                     id="productDiscount"
                     type="number"
                     min="0"
-                    step="500"
-                    class="form-control"
-                    formControlName="discount"
-                    placeholder="مثال: 0"
+                    max="99.99"
+                    step="0.01"
+                    inputmode="decimal"
+                    class="form-control text-end fs-6 fw-bold"
+                    formControlName="discountPercent"
+                    placeholder="0"
+                    (blur)="onDiscountBlur()"
+                    aria-describedby="productDiscountHelp"
                   />
-                  <span class="input-group-text bg-light text-muted">ل.س</span>
                 </div>
-                <div class="form-text fs-9 text-muted">اختياري — خصم تسويقي للمنتج.</div>
+                <!-- Quick Discount Preset Chips -->
+                <div class="discount-presets-row">
+                  <button
+                    type="button"
+                    class="discount-preset-pill"
+                    [class.active]="!formGroup.get('discountPercent')?.value || formGroup.get('discountPercent')?.value == 0"
+                    (click)="setDiscountPreset(0)"
+                  >
+                    بدون
+                  </button>
+                  <button
+                    type="button"
+                    class="discount-preset-pill"
+                    [class.active]="formGroup.get('discountPercent')?.value == 10"
+                    (click)="setDiscountPreset(10)"
+                  >
+                    10%
+                  </button>
+                  <button
+                    type="button"
+                    class="discount-preset-pill"
+                    [class.active]="formGroup.get('discountPercent')?.value == 15"
+                    (click)="setDiscountPreset(15)"
+                  >
+                    15%
+                  </button>
+                  <button
+                    type="button"
+                    class="discount-preset-pill"
+                    [class.active]="formGroup.get('discountPercent')?.value == 20"
+                    (click)="setDiscountPreset(20)"
+                  >
+                    20%
+                  </button>
+                  <button
+                    type="button"
+                    class="discount-preset-pill"
+                    [class.active]="formGroup.get('discountPercent')?.value == 25"
+                    (click)="setDiscountPreset(25)"
+                  >
+                    25%
+                  </button>
+                  <button
+                    type="button"
+                    class="discount-preset-pill"
+                    [class.active]="formGroup.get('discountPercent')?.value == 30"
+                    (click)="setDiscountPreset(30)"
+                  >
+                    30%
+                  </button>
+                  <button
+                    type="button"
+                    class="discount-preset-pill"
+                    [class.active]="formGroup.get('discountPercent')?.value == 50"
+                    (click)="setDiscountPreset(50)"
+                  >
+                    50%
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Discount Pricing Breakdown Alert -->
+              <div class="col-12" *ngIf="discountPreview as preview">
+                <div class="alert alert-light-success d-flex flex-wrap align-items-center justify-content-between gap-3 py-3 px-4 mb-0 border border-success border-opacity-25 rounded-3">
+                  <div>
+                    <strong class="d-block text-dark fs-7">
+                      <i class="fas fa-tags text-success me-1"></i> معاينة تسعير العرض في التطبيق
+                    </strong>
+                    <small class="text-muted">السعر الذي سيدفعه العميل بعد تطبيق الخصم</small>
+                  </div>
+                  <div class="d-flex flex-wrap align-items-center gap-3">
+                    <span class="text-muted fs-8">
+                      قبل الخصم:
+                      <strong class="text-decoration-line-through text-danger">${{ preview.oldPriceUsd | number:'1.2-2' }} ({{ preview.oldPriceLocal | number:'1.0-0' }} ل.س)</strong>
+                    </span>
+                    <span class="text-success fw-bold fs-7">
+                      بعد الخصم: ${{ preview.salePriceUsd | number:'1.2-2' }} ({{ preview.salePriceLocal | number:'1.0-0' }} ل.س)
+                    </span>
+                    <span class="badge badge-light-danger fw-bolder fs-8">خصم {{ preview.percentage | number:'1.0-2' }}%</span>
+                  </div>
+                </div>
               </div>
 
               <!-- Publication Rule Guidance Banner -->
@@ -341,15 +462,15 @@
           </section>
 
           <!-- Danger Zone: Delete Product -->
-          <section class="edit-section border border-danger border-dashed rounded p-4 mt-4 bg-light-danger" *ngIf="item.id">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <section class="product-danger-zone" *ngIf="item.id">
+            <div class="product-danger-zone-content">
               <div>
-                <h4 class="text-danger mb-1 font-weight-bolder">حذف المنتج من الكتالوج</h4>
-                <p class="text-muted mb-0 fs-7">سيتم أرشفة المنتج بأمان مع الاحتفاظ بسجلات الطلبات والفواتير وحركات المخزون في النظام.</p>
+                <h4 class="product-danger-zone-title">حذف المنتج من الكتالوج</h4>
+                <p class="product-danger-zone-desc">سيتم أرشفة المنتج بأمان مع الاحتفاظ بسجلات الطلبات والفواتير وحركات المخزون في النظام.</p>
               </div>
               <button
                 type="button"
-                class="btn btn-outline-danger btn-sm font-weight-bolder px-4 py-2"
+                class="btn product-btn-delete-current"
                 (click)="deleteCurrentProduct()"
               >
                 <i class="fas fa-trash-alt me-1"></i> حذف هذا المنتج
@@ -390,6 +511,11 @@
                   <i class="fas fa-star me-1"></i> {{ 'PRODUCTS_PAGE.FEATURED_BADGE' | translate }}
                 </span>
 
+                <!-- Discount Ribbon -->
+                <span class="customer-discount-ribbon" *ngIf="customerPricePreview && customerPricePreview.discountPercent > 0">
+                  <i class="fas fa-bolt me-1"></i> خصم {{ customerPricePreview.discountPercent | number:'1.0-0' }}%
+                </span>
+
                 <!-- Status Pill -->
                 <span
                   class="customer-status-pill"
@@ -401,6 +527,9 @@
 
               <!-- Card Content -->
               <div class="customer-card-content">
+                <div class="small text-muted mb-2" *ngIf="getSelectedMerchant() as selectedMerchant">
+                  <i class="fas fa-store-alt text-primary me-1"></i>{{ selectedMerchant.title }}
+                </div>
                 <!-- Category Tag -->
                 <div class="customer-cat-tag">
                   <i class="fas fa-folder-open"></i>
@@ -418,6 +547,18 @@
                 <p class="customer-product-desc" *ngIf="formGroup.get('description')?.value">
                   {{ formGroup.get('description')?.value }}
                 </p>
+
+                <div class="customer-card-pricing" *ngIf="customerPricePreview as pricePreview">
+                  <span class="customer-card-old-price" *ngIf="pricePreview.discountPercent > 0">
+                    {{ pricePreview.oldPrice | number:'1.0-0' }} ل.س
+                  </span>
+                  <div class="customer-card-current-price">
+                    <strong>{{ pricePreview.salePrice | number:'1.0-0' }} ل.س</strong>
+                    <span class="customer-card-discount" *ngIf="pricePreview.discountPercent > 0">
+                      خصم {{ pricePreview.discountPercent | number:'1.0-2' }}%
+                    </span>
+                  </div>
+                </div>
 
                 <!-- Bottom Unit and Add Button -->
                 <div class="customer-card-bottom">

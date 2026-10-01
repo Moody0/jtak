@@ -5,6 +5,10 @@ export interface productReview extends BaseModel {
   reviewerId: any;
   productId: any;
   productTitle: any;
+  orderId: any;
+  merchantId: any;
+  merchantTitle: any;
+  reviewerName: any;
   productImage: any;
   rate: any;
   textReview: any;

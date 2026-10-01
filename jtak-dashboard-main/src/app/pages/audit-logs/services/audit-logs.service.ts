@@ -19,12 +19,22 @@ export class AuditLogsService extends TableService<AdminAuditLog> implements OnD
     }),
   };
 
+  private lastSummary: AdminAuditLogSummary | null = null;
+
   constructor(@Inject(HttpClient) public http: HttpClient) {
     super(http);
   }
 
   getSummary(): Observable<AdminAuditLogSummary> {
     return this.http.get<AdminAuditLogSummary>(`${this.BASE_URL}/Admin/AuditLogs/Summary`);
+  }
+
+  getCachedSummary(): AdminAuditLogSummary | null {
+    return this.lastSummary;
+  }
+
+  cacheSummary(summary: AdminAuditLogSummary): void {
+    this.lastSummary = summary;
   }
 
   getAuditLog(id: string): Observable<AdminAuditLog> {

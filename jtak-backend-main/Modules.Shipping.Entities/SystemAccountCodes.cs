@@ -8,6 +8,7 @@ namespace Modules.Accounting.Entities
         public const string BankMain = "1020-BANK-MAIN";
         public const string CaptainCashFloatPrefix = "1010-CAP-";
         public const string ElectronicPaymentGateway = "1030-PGW-CLEARING";
+        public const string ErrandGoodsInTransit = "1040-ERRAND-GOODS";
 
         // Liabilities (2xxx)
         public const string VendorPayablePrefix = "2010-VND-";
@@ -19,10 +20,13 @@ namespace Modules.Accounting.Entities
         public const string PlatformDeliveryFeeRevenue = "4020";
         public const string CashOverageRevenue = "4030";
         public const string JtakMarketSalesRevenue = "4040";
+        public const string ErrandProductMarginRevenue = "4050-ERRAND-MARGIN";
+        public const string ErrandDeliveryFeeRevenue = "4060-ERRAND-DELIVERY";
 
         // Expense (5xxx)
         public const string OperationalExpense = "5010";
         public const string PromotionalDiscountExpense = "5020";
         public const string CashShortageExpense = "5030";
+        public const string DriverEarningSubsidyExpense = "5040";
     }
 }

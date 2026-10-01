@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import {
@@ -13,6 +13,7 @@ import {
 } from 'src/app/_metronic/shared/crud-table';
 import { paymentsService } from '../../services/payments.service';
 import { CreatePaymentModalComponent } from '../create-payment-modal/create-payment-modal.component';
+import { DriverCashAdvanceModalComponent } from '../driver-cash-advance-modal/driver-cash-advance-modal.component';
 import { Payment } from '../../models/payments.model';
 
 // Financial Payments & Settlements Component
@@ -28,7 +29,7 @@ export class PaymentsListComponent
   selection = new TableSelection<Payment>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
-  searchGroup: FormGroup;
+  searchGroup: UntypedFormGroup;
 
   // Real Financial KPIs
   kpiTotalPaid = 0;
@@ -40,7 +41,7 @@ export class PaymentsListComponent
   sorting: SortState;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     public paymentsService: paymentsService,
     private modalService: NgbModal,
     private cdr: ChangeDetectorRef
@@ -129,6 +130,19 @@ export class PaymentsListComponent
       () => {
         this.refresh();
       },
+      () => {}
+    );
+  }
+
+  createDriverCashAdvance(): void {
+    const modalRef = this.modalService.open(DriverCashAdvanceModalComponent, {
+      size: 'lg',
+      backdrop: 'static',
+      keyboard: false,
+      scrollable: true,
+    });
+    modalRef.result.then(
+      () => this.refresh(),
       () => {}
     );
   }

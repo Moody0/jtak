@@ -1,80 +1,123 @@
-// Edit Category Modal Two-Column Architecture & Live Customer App Preview
+// =============================================================================
+// JTAK Operations - Category Add / Edit Modal & Live Mobile App Preview
+// Modern Minimalist Enterprise UI (No Shadows, Alexandria Font, Medium Rounded)
+// Strict Color System: Slate Neutral + JTAK Warm Orange + Clean Semantics
+// =============================================================================
+
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  // Zero-shadow enforcement across the modal
+  *,
+  .edit-section,
+  .custom-switch-card,
+  .preview-phone-card,
+  .customer-category-bubble,
+  .customer-app-row-preview,
+  .order-preset-pill,
+  .btn,
+  .badge,
+  .form-control,
+  .form-select {
+    box-shadow: none !important;
+  }
+}
 
 .category-editor-layout {
   display: flex;
   gap: 24px;
   align-items: flex-start;
+  padding: 4px 20px 20px;
 
-  @media (max-width: 991px) {
-    flex-direction: column;
+  @media (max-width: 991.98px) {
+    flex-direction: column-reverse;
+    gap: 16px;
   }
 }
 
 .category-form-column {
-  flex: 1 1 62%;
+  flex: 1 1 0;
   min-width: 0;
+  width: 100%;
 }
 
 .category-preview-column {
-  flex: 0 0 320px;
+  flex: 0 0 310px;
+  width: 310px;
+  max-width: 100%;
   position: sticky;
   top: 16px;
 
-  @media (max-width: 991px) {
+  @media (max-width: 991.98px) {
     flex: 1 1 100%;
     width: 100%;
+    max-width: 360px;
     position: static;
+    margin: 0 auto;
   }
 }
 
-// Section Architecture
+// -----------------------------------------------------------------------------
+// Form Architecture & Sections
+// -----------------------------------------------------------------------------
 .jtak-edit-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 0;
 }
 
 .edit-section {
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  padding: 20px 0;
+  border-bottom: 1px solid #e2e8f0;
+  min-width: 0;
 
-  .edit-section-heading {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 18px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #f1f5f9;
+  &:last-of-type {
+    border-bottom: none;
+    padding-bottom: 8px;
+  }
 
-    span {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      background: #fff7ed;
-      color: #ea580c;
-      font-size: 0.8rem;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
+  .form-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 6px;
+  }
+}
 
-    h3 {
-      font-size: 0.96rem;
-      font-weight: 750;
-      color: #0f172a;
-      margin: 0 0 3px;
-    }
+.edit-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
 
-    p {
-      font-size: 0.77rem;
-      color: #64748b;
-      margin: 0;
-    }
+  > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #ea580c;
+    font-size: 0.76rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  h3 {
+    font-size: 0.92rem;
+    font-weight: 750;
+    color: #0f172a;
+    margin: 0 0 2px;
+  }
+
+  p {
+    font-size: 0.74rem;
+    color: #64748b;
+    margin: 0;
   }
 }
 
@@ -87,7 +130,7 @@
   flex-wrap: wrap;
 
   .order-preset-pill {
-    padding: 3px 10px;
+    padding: 4px 10px;
     border-radius: 6px;
     border: 1px solid #e2e8f0;
     background: #f8fafc;
@@ -114,15 +157,16 @@
 
 // Hierarchy Information Box
 .category-hierarchy-box {
-  margin-top: 10px;
-  padding: 12px 16px;
-  border-radius: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
   background: #f8fafc;
   border: 1px dashed #cbd5e1;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
 
   .cat-hierarchy-label {
     font-weight: 750;
@@ -154,7 +198,7 @@
     }
 
     .cat-root-badge {
-      color: #c2410c;
+      color: #ea580c;
       background: #fff7ed;
       border: 1px solid #fed7aa;
       padding: 3px 10px;
@@ -169,12 +213,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 
   &:hover {
     background: #ffffff;
@@ -187,7 +231,7 @@
     gap: 2px;
 
     .switch-title {
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       font-weight: 750;
       color: #0f172a;
     }
@@ -204,18 +248,19 @@
     cursor: pointer;
 
     &:checked {
-      background-color: #10b981;
-      border-color: #10b981;
+      background-color: #059669;
+      border-color: #059669;
     }
   }
 }
 
-// Phone Mockup & Customer App Live Preview
+// -----------------------------------------------------------------------------
+// Phone Mockup & Customer App Live Preview (Zero Shadows, Clean Neutral Frame)
+// -----------------------------------------------------------------------------
 .preview-phone-card {
   background: #ffffff;
-  border-radius: 24px;
-  border: 2px solid #e2e8f0;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -242,7 +287,6 @@
       height: 7px;
       border-radius: 50%;
       background: #22c55e;
-      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
     }
   }
 
@@ -255,40 +299,38 @@
 }
 
 .preview-card-viewport {
-  padding: 20px 16px;
+  padding: 16px 14px;
   background: #f8fafc;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
 
 // Category Customer Bubble Mockup
 .customer-category-bubble {
   width: 100%;
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
-  padding: 20px 16px;
+  padding: 18px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 
   .customer-icon-wrapper {
-    width: 80px;
-    height: 80px;
-    border-radius: 20px;
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
     background: #fff7ed;
-    border: 2px solid #fed7aa;
+    border: 1px solid #fed7aa;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    margin-bottom: 12px;
-    box-shadow: 0 4px 10px rgba(249, 115, 22, 0.12);
+    margin-bottom: 10px;
 
     img {
       width: 100%;
@@ -297,18 +339,18 @@
     }
 
     i.fa-custom-icon {
-      font-size: 2.2rem;
+      font-size: 2rem;
       color: #ea580c;
     }
 
     .fallback-icon {
-      font-size: 2rem;
-      color: #cbd5e1;
+      font-size: 1.8rem;
+      color: #94a3b8;
     }
   }
 
   .customer-cat-name {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 800;
     color: #0f172a;
     margin: 0 0 6px;
@@ -320,14 +362,14 @@
     color: #2563eb;
     background: #eff6ff;
     padding: 3px 10px;
-    border-radius: 12px;
-    margin-bottom: 10px;
+    border-radius: 10px;
+    margin-bottom: 8px;
     display: inline-flex;
     align-items: center;
     gap: 4px;
 
     &.is-root {
-      color: #c2410c;
+      color: #ea580c;
       background: #fff7ed;
       border: 1px solid #fed7aa;
     }
@@ -337,15 +379,15 @@
     font-size: 0.72rem;
     font-weight: 600;
     color: #94a3b8;
-    margin-top: 4px;
+    margin-top: 2px;
   }
 
   .customer-status-badge {
     margin-top: 10px;
-    font-size: 0.74rem;
+    font-size: 0.72rem;
     font-weight: 750;
     padding: 3px 10px;
-    border-radius: 20px;
+    border-radius: 12px;
 
     &.active {
       background: #ecfdf5;
@@ -354,9 +396,9 @@
     }
 
     &.inactive {
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
     }
   }
 }
@@ -365,12 +407,12 @@
 .customer-app-row-preview {
   width: 100%;
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   padding: 12px;
 
   .preview-row-title {
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     font-weight: 750;
     color: #64748b;
     margin-bottom: 8px;
@@ -381,22 +423,22 @@
 
   .mini-bubbles-scroll {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding-bottom: 2px;
 
     .mini-bubble-item {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
-      min-width: 56px;
+      min-width: 52px;
 
       .mini-bubble-circle {
-        width: 46px;
-        height: 46px;
-        border-radius: 14px;
-        background: #f1f5f9;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: #f8fafc;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -410,13 +452,13 @@
         }
 
         i {
-          font-size: 1.1rem;
+          font-size: 1rem;
           color: #94a3b8;
         }
 
         &.active-circle {
           background: #fff7ed;
-          border-color: #f97316;
+          border-color: #fed7aa;
 
           i {
             color: #ea580c;
@@ -425,13 +467,13 @@
       }
 
       .mini-bubble-text {
-        font-size: 0.68rem;
+        font-size: 0.66rem;
         font-weight: 700;
         color: #334155;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 60px;
+        max-width: 56px;
         text-align: center;
       }
     }
@@ -439,7 +481,7 @@
 }
 
 .preview-card-meta {
-  padding: 10px 16px;
+  padding: 10px 14px;
   background: #ffffff;
   border-top: 1px solid #e2e8f0;
   font-size: 0.72rem;

@@ -370,6 +370,30 @@ namespace Modules.Accounting.Tests
         }
 
         [Fact]
+        public async Task UpdateDeliveryLocation_PreservesCaptureTimestampAndIgnoresOlderFix()
+        {
+            var (_, _, _, _, service) = CreateTestContext();
+            var driverId = Guid.NewGuid();
+            var captured = DateTime.UtcNow.AddSeconds(-20);
+            await service.UpdateDeliveryLocation(driverId, (34.7301m, 36.7101m), capturedAtUtc: captured);
+            var status = await service.GetDeliveryStatus(driverId);
+            Assert.Equal(captured, status.LastLocationUpdatedAt);
+            await service.UpdateDeliveryLocation(driverId, (34.7m, 36.7m), capturedAtUtc: captured.AddSeconds(-10));
+            status = await service.GetDeliveryStatus(driverId);
+            Assert.Equal((34.7301m, 36.7101m), status.Loc);
+            Assert.Equal(captured, status.LastLocationUpdatedAt);
+        }
+
+        [Fact]
+        public async Task DriverWithoutGps_HasNoDefaultCityOrLiveTimestamp()
+        {
+            var (_, _, _, _, service) = CreateTestContext();
+            var status = await service.GetDeliveryStatus(Guid.NewGuid());
+            Assert.Equal((0m, 0m), status.Loc);
+            Assert.Null(status.LastLocationUpdatedAt);
+        }
+
+        [Fact]
         public void LiveTrack_ChainedDistanceAndEtaCalculation_ProducesAccurateEstimates()
         {
             // Simulates the exact chained multi-stop formula in GetLiveTrack:

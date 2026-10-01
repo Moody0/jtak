@@ -19,9 +19,10 @@ namespace App.Extensions
         // can authorize the request correctly
         public async Task Invoke(HttpContext context)
         {
-            if (context.Request.Query.TryGetValue("token", out var token))
+            if (context.Request.Query.TryGetValue("token", out var token)
+                && !context.Request.Headers.ContainsKey("Authorization"))
             {
-                context.Request.Headers.Add("Authorization", "Bearer " + token.First());
+                context.Request.Headers["Authorization"] = "Bearer " + token.First();
             }
             await _next.Invoke(context);
         }

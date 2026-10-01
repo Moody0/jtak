@@ -1,5 +1,5 @@
 import { Injectable, Inject, OnDestroy } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
 import { Page } from '../models/pages.model';
 import { Observable } from 'rxjs';
@@ -17,14 +17,24 @@ export class PagesService {
 
   constructor(@Inject(HttpClient) public http: HttpClient) {}
 
-  getPage(pageName: string): Observable<Page> {
-    return this.http.get<Page>(environment.apiUrl + '/Admin/Pages/' + pageName);
+  getPage(pageName: string, app?: string): Observable<Page> {
+    const params = this.isTermsPage(pageName) && app
+      ? new HttpParams().set('app', app)
+      : undefined;
+    return this.http.get<Page>(environment.apiUrl + '/Admin/Pages/' + pageName, { params });
   }
-  setPage(pageName: string, page: any): Observable<boolean> {
-    console.log(page);
-    return this.http.put<boolean>(
+  setPage(pageName: string, page: any, app?: string): Observable<Page> {
+    const params = this.isTermsPage(pageName) && app
+      ? new HttpParams().set('app', app)
+      : undefined;
+    return this.http.put<Page>(
       environment.apiUrl + '/Admin/Pages/' + pageName,
-      page
+      page,
+      { params }
     );
+  }
+
+  private isTermsPage(pageName: string): boolean {
+    return pageName.toLowerCase() === 'termsandconditions';
   }
 }

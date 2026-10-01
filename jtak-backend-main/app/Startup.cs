@@ -55,12 +55,21 @@ namespace App
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            // Fail before starting API endpoints/background workers if the
+            // deployment is missing database configuration. Otherwise the
+            // application starts and emits recurring HTTP 500/worker errors.
+            DatabaseConnectionConfiguration.ValidateRequired(Configuration);
+
             services.AddCommonCors();
             services.AddRazorPages()
                     .AddRazorRuntimeCompilation();
 
             services.AddControllersWithViews()
-                    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new DateTimeConverter()));
+                    .AddJsonOptions(o =>
+                    {
+                        o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+                        o.JsonSerializerOptions.Converters.Add(new DateTimeConverter());
+                    });
 
             services.AddApiVersioning(options =>
             {
@@ -73,7 +82,6 @@ namespace App
                 options.GroupNameFormat = "VVV";
                 options.SubstituteApiVersionInUrl = true;
             });
-            services.AddAutoMapper(typeof(Startup));
             services.AddSingleton<IActionContextAccessor, ActionContextAccessor>();
 
             ServerVersion version;
@@ -141,7 +149,14 @@ namespace App
             {
                 foreach (var permission in Enum.GetValues<AppPermissionKey>())
                 {
-                    options.AddPolicy(permission.ToString(), policy => policy.Requirements.Add(new PermissionRequirement((int)permission)));
+                    if (permission == AppPermissionKey.CustomerPermission)
+                    {
+                        options.AddPolicy(permission.ToString(), policy => policy.RequireAuthenticatedUser());
+                    }
+                    else
+                    {
+                        options.AddPolicy(permission.ToString(), policy => policy.Requirements.Add(new PermissionRequirement((int)permission)));
+                    }
                 }
             });
 
@@ -221,16 +236,30 @@ namespace App
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
+            app.UseMiddleware<CorrelationIdMiddleware>();
             app.UseMiddleware<ExceptionMiddleware>();
 
             using (var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>().CreateScope())
             {
                 var logger = serviceScope.ServiceProvider.GetService<ILogger<Startup>>();
-                try { serviceScope.ServiceProvider.GetService<AppDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate AppDbContext"); }
-                try { serviceScope.ServiceProvider.GetService<CatalogDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate CatalogDbContext"); }
-                try { serviceScope.ServiceProvider.GetService<OrdersDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate OrdersDbContext"); }
-                try { serviceScope.ServiceProvider.GetService<AccountingDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate AccountingDbContext"); }
-                try { serviceScope.ServiceProvider.GetService<ShippingDbContext>()?.Database.Migrate(); } catch (Exception ex) { logger?.LogError(ex, "Failed to migrate ShippingDbContext"); }
+                try
+                {
+                    var appDbContext = serviceScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    ReconcileExistingCashFloatColumn(appDbContext);
+                    ReconcileCaptainCompensationColumns(appDbContext);
+                    var ordersDbContext = serviceScope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+                    ReconcileOrderCaptainSnapshotColumns(ordersDbContext);
+                    appDbContext.Database.Migrate();
+                    serviceScope.ServiceProvider.GetRequiredService<CatalogDbContext>().Database.Migrate();
+                    serviceScope.ServiceProvider.GetRequiredService<OrdersDbContext>().Database.Migrate();
+                    serviceScope.ServiceProvider.GetRequiredService<AccountingDbContext>().Database.Migrate();
+                    serviceScope.ServiceProvider.GetRequiredService<ShippingDbContext>().Database.Migrate();
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogCritical(ex, "Database migration failed. Application startup has been stopped to prevent schema drift.");
+                    throw;
+                }
                 try { serviceScope.ServiceProvider.EnsureSeedData().Wait(); } catch (Exception ex) { logger?.LogError(ex, "Failed to execute EnsureSeedData"); }
             }
 
@@ -252,6 +281,9 @@ namespace App
             app.UseSwaggerWithConfiguration("v1");
 
             app.UseAuthentication();
+            // Re-check IsActive on every authenticated request so disabling an
+            // account immediately invalidates already-issued access tokens.
+            app.UseMiddleware<DisabledAccountMiddleware>();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
@@ -262,6 +294,151 @@ namespace App
                 //endpoints.MapHub<NotificationHub>("/chat");
                 endpoints.MapHub<App.Shared.Services.Hubs.TrackingHub>("/hubs/tracking");
             });
+        }
+
+        private static void ReconcileExistingCashFloatColumn(AppDbContext context)
+        {
+            const string migrationId = "20260919093000_AddDeliveryDriverCashFloatLimit";
+            if (context.Database.GetAppliedMigrations().Contains(migrationId)) return;
+
+            context.Database.OpenConnection();
+            try
+            {
+                var connection = context.Database.GetDbConnection();
+                using (var table = connection.CreateCommand())
+                {
+                    table.CommandText = "SHOW TABLES LIKE 'AspNetUsers'";
+                    if (table.ExecuteScalar() == null) return;
+                }
+
+                string columnType;
+                string nullable;
+                using (var column = connection.CreateCommand())
+                {
+                    column.CommandText = "SHOW COLUMNS FROM `AspNetUsers` LIKE 'MaxCashFloat'";
+                    using var reader = column.ExecuteReader();
+                    if (!reader.Read()) return;
+                    columnType = reader.GetString(reader.GetOrdinal("Type"));
+                    nullable = reader.GetString(reader.GetOrdinal("Null"));
+                }
+
+                if (!string.Equals(columnType, "decimal(65,30)", StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(nullable, "NO", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"AspNetUsers.MaxCashFloat exists with type {columnType} and nullable={nullable}; expected decimal(65,30) NOT NULL.");
+                }
+
+                using (var historyTable = connection.CreateCommand())
+                {
+                    historyTable.CommandText = "SHOW TABLES LIKE '__EFMigrationsHistory'";
+                    if (historyTable.ExecuteScalar() == null)
+                    {
+                        throw new InvalidOperationException("AspNetUsers.MaxCashFloat exists but __EFMigrationsHistory is missing.");
+                    }
+                }
+
+                using var insert = connection.CreateCommand();
+                insert.CommandText = @"
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+SELECT '20260919093000_AddDeliveryDriverCashFloatLimit', '8.0.31'
+WHERE NOT EXISTS (
+    SELECT 1 FROM `__EFMigrationsHistory`
+    WHERE `MigrationId` = '20260919093000_AddDeliveryDriverCashFloatLimit'
+);";
+                insert.ExecuteNonQuery();
+            }
+            finally
+            {
+                context.Database.CloseConnection();
+            }
+        }
+
+        private static void ReconcileOrderCaptainSnapshotColumns(OrdersDbContext context)
+        {
+            try
+            {
+                context.Database.OpenConnection();
+                var connection = context.Database.GetDbConnection();
+                using (var table = connection.CreateCommand())
+                {
+                    table.CommandText = "SHOW TABLES LIKE 'Orders_Orders'";
+                    if (table.ExecuteScalar() == null) return;
+                }
+
+                var columns = new[]
+                {
+                    ("DistanceInKm", "decimal(10,2) NULL DEFAULT NULL"),
+                    ("CustomerRatePerKm", "decimal(18,2) NULL DEFAULT NULL"),
+                    ("OriginalDeliveryFee", "decimal(18,2) NULL DEFAULT NULL"),
+                    ("CaptainCompensationType", "int NULL DEFAULT NULL"),
+                    ("CaptainRate", "decimal(65,30) NULL DEFAULT NULL")
+                };
+
+                foreach (var (colName, colDef) in columns)
+                {
+                    using var checkCol = connection.CreateCommand();
+                    checkCol.CommandText = $"SHOW COLUMNS FROM `Orders_Orders` LIKE '{colName}'";
+                    if (checkCol.ExecuteScalar() == null)
+                    {
+                        using var addCol = connection.CreateCommand();
+                        addCol.CommandText = $"ALTER TABLE `Orders_Orders` ADD COLUMN `{colName}` {colDef};";
+                        addCol.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch
+            {
+                // In SQLite/InMemory testing contexts, ignore raw MySQL commands.
+            }
+            finally
+            {
+                try { context.Database.CloseConnection(); } catch { }
+            }
+        }
+
+        private static void ReconcileCaptainCompensationColumns(AppDbContext context)
+        {
+            try
+            {
+                context.Database.OpenConnection();
+                var connection = context.Database.GetDbConnection();
+                using (var table = connection.CreateCommand())
+                {
+                    table.CommandText = "SHOW TABLES LIKE 'AspNetUsers'";
+                    if (table.ExecuteScalar() == null) return;
+                }
+
+                using (var checkCol = connection.CreateCommand())
+                {
+                    checkCol.CommandText = "SHOW COLUMNS FROM `AspNetUsers` LIKE 'CaptainCompensationType'";
+                    if (checkCol.ExecuteScalar() == null)
+                    {
+                        using var addCol = connection.CreateCommand();
+                        addCol.CommandText = "ALTER TABLE `AspNetUsers` ADD COLUMN `CaptainCompensationType` int NOT NULL DEFAULT 0;";
+                        addCol.ExecuteNonQuery();
+                    }
+                }
+
+                using (var checkCol = connection.CreateCommand())
+                {
+                    checkCol.CommandText = "SHOW COLUMNS FROM `AspNetUsers` LIKE 'CaptainRate'";
+                    if (checkCol.ExecuteScalar() == null)
+                    {
+                        using var addCol = connection.CreateCommand();
+                        addCol.CommandText = "ALTER TABLE `AspNetUsers` ADD COLUMN `CaptainRate` decimal(65,30) NOT NULL DEFAULT 0;";
+                        addCol.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch
+            {
+                // In SQLite/InMemory testing contexts, ignore raw MySQL commands.
+            }
+            finally
+            {
+                try { context.Database.CloseConnection(); } catch { }
+            }
         }
     }
 

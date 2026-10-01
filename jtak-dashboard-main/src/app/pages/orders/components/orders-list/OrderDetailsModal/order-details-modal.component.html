@@ -1,0 +1,134 @@
+<div class="modal-header order-details-header">
+  <div class="d-flex align-items-center gap-3">
+    <div>
+      <div class="order-details-eyebrow">{{ 'ORDERS_PAGE.ORDER_DETAILS' | translate }}</div>
+      <h4 class="modal-title">#{{ order?.id }}</h4>
+    </div>
+    <span *ngIf="order?.hasPartialFulfillment" class="badge badge-light-warning text-warning border border-warning fs-8 px-2 py-1">
+      <i class="fas fa-exclamation-triangle me-1"></i>تعديل جزئي (مواد مستبعدة)
+    </span>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <button type="button" class="btn btn-sm btn-light-primary print-receipt-btn" (click)="printReceipt()" title="طباعة الفاتورة الرسمية A4">
+      <i class="fas fa-print me-1"></i>طباعة الفاتورة A4
+    </button>
+    <button type="button" class="btn-close" [attr.aria-label]="'COMMON.CLOSE' | translate" (click)="modal.dismiss()"></button>
+  </div>
+</div>
+
+<div class="modal-body order-details-body" *ngIf="order">
+  <!-- PRINT-ONLY RECEIPT HEADER (Rendered only on A4 print) -->
+  <div class="print-only-header d-none">
+    <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+      <div>
+        <h3 class="fw-bolder text-dark mb-0">شركة جتك لخدمات التوصيل والتجارة</h3>
+        <div class="text-muted fs-7">فاتورة طلب عميل رسمية - A4 Standard Receipt</div>
+      </div>
+      <div class="text-end">
+        <h4 class="text-primary fw-bolder mb-0">طلب #{{ order.id }}</h4>
+        <div class="text-muted fs-8">{{ order.purchaseDate | date:'yyyy-MM-dd HH:mm' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTIAL FULFILLMENT ALERT BANNER -->
+  <div *ngIf="order.hasPartialFulfillment" class="alert alert-warning d-flex align-items-center p-3 mb-0 rounded-3 border border-warning">
+    <i class="fas fa-info-circle fs-3 text-warning me-3"></i>
+    <div class="d-flex flex-column flex-grow-1">
+      <strong class="text-dark fs-7">تم تعديل الطلب من قبل المتجر (استبعاد مواد غير متوفرة)</strong>
+      <span class="text-muted fs-8">
+        المجموع الأصلي: <strong>{{ (order.originalGrandTotal || getGrandTotal()) | number }} ل.س</strong>
+        &nbsp;|&nbsp;
+        المبلغ المستبعد: <strong class="text-danger">-{{ (order.rejectedItemsTotal || 0) | number }} ل.س</strong>
+        &nbsp;|&nbsp;
+        المجموع النهائي المعتمد: <strong class="text-success">{{ getGrandTotal() | number }} ل.س</strong>
+      </span>
+    </div>
+  </div>
+
+  <div class="order-details-summary">
+    <div>
+      <span class="order-details-label">{{ 'ORDERS_PAGE.STATUS' | translate }}</span>
+      <span class="order-details-value fw-bold">{{ statusLabel || ('ORDERS_PAGE.STATUS_PROCESSING' | translate) }}</span>
+    </div>
+    <div>
+      <span class="order-details-label">{{ 'ORDERS_PAGE.COL_TOTAL_PRICE' | translate }}</span>
+      <strong class="order-details-total">{{ getGrandTotal() | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+    </div>
+    <div>
+      <span class="order-details-label">المبلغ المطلوب تحصيله (COD)</span>
+      <strong class="order-details-value text-primary fw-bold">{{ getCashToCollect() | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+    </div>
+  </div>
+
+  <div class="order-details-grid">
+    <section class="order-details-section">
+      <h5><i class="fas fa-user text-primary me-2"></i>{{ 'ORDERS_PAGE.CUSTOMER_DETAILS' | translate }}</h5>
+      <div class="order-details-line"><span>{{ 'ORDERS_PAGE.CUSTOMER' | translate }}</span><strong>{{ order.user || ('ORDERS_PAGE.CUSTOMER' | translate) }}</strong></div>
+      <div class="order-details-line" *ngIf="order.phonenumber"><span>{{ 'ORDERS_PAGE.PHONE' | translate }}</span><a [href]="'tel:' + order.phonenumber" dir="ltr">{{ order.phonenumber }}</a></div>
+      <div class="order-details-line"><span>{{ 'ORDERS_PAGE.DESTINATION' | translate }}</span><span>{{ order.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}</span></div>
+      <a *ngIf="order.lat && order.lng" class="order-details-map no-print" target="_blank" [href]="'https://www.google.com/maps/search/?api=1&query=' + order.lat + ',' + order.lng">
+        <i class="fas fa-map-marked-alt me-2"></i>{{ 'ORDERS_PAGE.OPEN_MAP' | translate }}
+      </a>
+    </section>
+
+    <section class="order-details-section">
+      <h5><i class="fas fa-motorcycle text-primary me-2"></i>{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</h5>
+      <div class="order-details-line"><span>{{ 'ORDERS_PAGE.COL_DELIVERY_CAPTAIN' | translate }}</span><strong>{{ order.deliveryUser || ('ORDERS_PAGE.UNASSIGNED' | translate) }}</strong></div>
+      <div class="order-details-line"><span>{{ 'ORDERS_PAGE.PAYMENT_METHOD' | translate }}</span><span>{{ order.paymentMethod === 0 ? ('ORDERS_PAGE.CASH_ON_DELIVERY' | translate) : 'دفع إلكتروني' }}</span></div>
+      <div class="order-details-line"><span>{{ 'ORDERS_PAGE.ORDER_DATE' | translate }}</span><span dir="ltr">{{ order.purchaseDate | date:'medium' }}</span></div>
+    </section>
+  </div>
+
+  <section class="order-details-section order-details-items">
+    <h5><i class="fas fa-shopping-basket text-primary me-2"></i>{{ 'ORDERS_PAGE.COL_ITEMS_STATUS' | translate }} ({{ getItemsCount() }} مواد)</h5>
+    <div class="order-details-item" *ngFor="let detail of order.orderDetails"
+         [class.item-rejected]="detail.orderDetailStatus === OrderDetailStatus.MerchantRejected || detail.orderDetailStatus === OrderDetailStatus.CustomerCanceled || detail.orderDetailStatus === OrderDetailStatus.DeliveryCanceled">
+      <span class="order-details-quantity">{{ detail.quantity }}×</span>
+      <div class="d-flex flex-column flex-grow-1 min-w-0">
+        <span class="order-details-product">{{ detail.productTitle }}</span>
+        <span *ngIf="detail.merchantTitle" class="text-muted fs-8">{{ detail.merchantTitle }}</span>
+      </div>
+      <span class="order-details-item-price" [class.text-decoration-line-through]="detail.orderDetailStatus === OrderDetailStatus.MerchantRejected">
+        {{ detail.totalFinalPrice | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+      </span>
+      <span *ngIf="detail.orderDetailStatus === OrderDetailStatus.MerchantRejected" class="badge badge-light-danger text-danger">مرفوض من المتجر</span>
+      <span *ngIf="detail.orderDetailStatus === OrderDetailStatus.CustomerCanceled" class="badge badge-light-danger text-danger">ملغي</span>
+      <span *ngIf="detail.orderDetailStatus === OrderDetailStatus.Delivered" class="badge badge-light-success text-success">تم التسليم</span>
+      <span *ngIf="detail.warning" class="badge badge-light-warning">{{ detail.warning }}</span>
+    </div>
+    <div *ngIf="!order.orderDetails?.length" class="text-muted">{{ 'ORDERS_PAGE.NO_ITEMS_RECORDED' | translate }}</div>
+
+    <div class="order-details-line order-details-total-line mt-3 pt-2">
+      <span>المجموع الجزئي للمواد المقبولة</span>
+      <strong>{{ order.price | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+    </div>
+    <div class="order-details-line order-details-total-line" *ngIf="order.hasPartialFulfillment && order.rejectedItemsTotal">
+      <span class="text-danger">المواد المستبعدة / المرفوضة</span>
+      <strong class="text-danger">-{{ order.rejectedItemsTotal | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+    </div>
+    <div class="order-details-line order-details-total-line">
+      <span>أجور التوصيل</span>
+      <strong>{{ getDeliveryFee() | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+    </div>
+    <div class="order-details-line order-details-total-line order-details-grand-total">
+      <span>المجموع الكلي النهائي</span>
+      <strong>{{ getGrandTotal() | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+    </div>
+    <div class="order-details-line order-details-total-line text-primary">
+      <span class="fw-bold">المطلوب نقداً من العميل (COD)</span>
+      <strong class="fw-bolder text-primary fs-6">{{ getCashToCollect() | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+    </div>
+  </section>
+
+  <div *ngIf="order.notes" class="order-details-note">
+    <i class="fas fa-comment-alt"></i><span>{{ order.notes }}</span>
+  </div>
+</div>
+
+<div class="modal-footer order-details-footer d-flex justify-content-between">
+  <button type="button" class="btn btn-primary btn-sm" (click)="printReceipt()">
+    <i class="fas fa-print me-1"></i>طباعة الفاتورة A4
+  </button>
+  <button type="button" class="btn btn-light btn-sm" (click)="modal.dismiss()">{{ 'COMMON.CLOSE' | translate }}</button>
+</div>
