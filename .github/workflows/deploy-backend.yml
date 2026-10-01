@@ -8,6 +8,7 @@ on:
     paths:
       - 'jtak-backend-main/**'
       - '.github/workflows/deploy-backend.yml'
+      - 'tools/manage-app-offline.cjs'
   workflow_dispatch:
 
 jobs:
@@ -39,6 +40,27 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: ⬇️ Checkout Repository (for scripts)
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: 📦 Install FTP Helper Dependencies
+        run: |
+          npm install --no-save basic-ftp
+
+      - name: ⏸️ Take App Offline (Release IIS DLL Locks)
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_BACKEND_DIR: ${{ vars.FTP_BACKEND_DIR || 'api.jtak.app/' }}
+        run: |
+          node tools/manage-app-offline.cjs offline
+
       - name: ⬇️ Download Build Artifact
         uses: actions/download-artifact@v4
         with:
@@ -64,3 +86,14 @@ jobs:
             **/logs/**
             **/keys/**
             **/*.pdb
+            app_offline.htm
+
+      - name: ▶️ Bring App Online (Reload IIS with New DLLs)
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_BACKEND_DIR: ${{ vars.FTP_BACKEND_DIR || 'api.jtak.app/' }}
+        run: |
+          node tools/manage-app-offline.cjs online

@@ -111,3 +111,4 @@ tools/FreshDeploymentSql/
 tools/__pycache__/
 *.sql
 *.cjs
+!tools/manage-app-offline.cjs
