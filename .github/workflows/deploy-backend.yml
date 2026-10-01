@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
-    name: Build & Deploy Backend
+  build:
+    name: 🔨 Build Backend
     runs-on: windows-latest
     steps:
       - name: ⬇️ Checkout Repository
@@ -26,6 +26,24 @@ jobs:
       - name: 🔨 Publish .NET Backend
         run: |
           dotnet publish jtak-backend-main/app/app.csproj -c Release -o ./publish-backend --no-self-contained
+
+      - name: 📦 Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-publish
+          path: ./publish-backend/
+          retention-days: 1
+
+  deploy:
+    name: 🚀 Deploy Backend via FTP
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-publish
+          path: ./publish-backend
 
       - name: 🚀 Deploy via FTP to api.jtak.app
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
