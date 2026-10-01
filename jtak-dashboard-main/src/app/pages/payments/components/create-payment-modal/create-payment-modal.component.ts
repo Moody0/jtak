@@ -38,8 +38,8 @@ export class CreatePaymentModalComponent implements OnInit {
   @Input() item: Payment;
   isLoading$: Observable<boolean>;
   formGroup: UntypedFormGroup;
-  merchantBalance:number = 0;
-  deliveryBalance:number = 0;
+  merchantBalance: number | null = null;
+  deliveryBalance: number | null = null;
   constructor(
     private usersService: UsersService,
     private paymentsService: paymentsService,
@@ -76,7 +76,7 @@ export class CreatePaymentModalComponent implements OnInit {
       id: [this.item?.id],
       toUser: [this.item.toUser, [Validators.required]],
       byUser: [this.item.byUser, [Validators.required]],
-      amount: [this.item.amount, [Validators.required]],
+      amount: [this.item.amount, [Validators.required, Validators.min(1)]],
       //newBalance: [this.item.newBalance, [Validators.required]],
       //handoverDate: [this.item.handoverDate, [Validators.required]]
     });
@@ -96,24 +96,25 @@ export class CreatePaymentModalComponent implements OnInit {
   }
 
   save() {
+    const amount = Number(this.formGroup.value.amount) || 0;
+    if (this.deliveryBalance !== null && amount > this.deliveryBalance) {
+      this.toasterService.warning(`المبلغ المطلوب يتجاوز عهدة المندوب المتاحة (${this.deliveryBalance} ل.س).`);
+      return;
+    }
+
     const formValues = {
       id: this.formGroup.value.id,
       toUserId: this.formGroup.value.toUser.id,
       toUser: this.formGroup.value.toUser.fullName,
       byUserId: this.formGroup.value.byUser.id,
       byUser: this.formGroup.value.byUser.fullName,
-      amount: this.formGroup.value.amount,
+      amount: amount,
       newBalance: 0,
       handoverDate: null,
       createdDate: null,
-      //newBalance: this.formGroup.value.newBalance,
-      //handoverDate: this.formGroup.value.handoverDate
     }
     delete formValues.id;
     this.create(formValues);
-    console.log(formValues);
-
-
   }
 
 
@@ -122,7 +123,7 @@ export class CreatePaymentModalComponent implements OnInit {
       .create(formValues)
       .pipe(
         tap(() => {
-          this.toasterService.success('Payment Added');
+          this.toasterService.success('تم تسجيل الدفعة المالية بنجاح');
           this.modal.close();
         })
       )
@@ -130,13 +131,21 @@ export class CreatePaymentModalComponent implements OnInit {
   }
 
   changedMerchant(e: Merchant) {
-    this.merchantBalance = 0;
-    this.usersService.getBalance(e.id).subscribe(b=>this.merchantBalance = b.amount);
+    this.merchantBalance = null;
+    if (e?.id) {
+      this.usersService.getBalance(e.id).subscribe(b => {
+        this.merchantBalance = b?.amount ?? 0;
+      });
+    }
   }
-  changedDelivery(e: Deliver) {
-    this.deliveryBalance = 0;
-    this.usersService.getBalance(e.id).subscribe(b=>this.deliveryBalance = b.amount);
 
+  changedDelivery(e: Deliver) {
+    this.deliveryBalance = null;
+    if (e?.id) {
+      this.usersService.getBalance(e.id).subscribe(b => {
+        this.deliveryBalance = b?.amount ?? 0;
+      });
+    }
   }
 
   ngOnDestroy(): void {

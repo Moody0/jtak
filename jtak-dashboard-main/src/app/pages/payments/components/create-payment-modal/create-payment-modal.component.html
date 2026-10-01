@@ -3,7 +3,7 @@
   [itemName]="item.toUser"
   moduleName="Payment"
   [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid"
+  [saveDisabled]="formGroup.invalid || (deliveryBalance !== null && formGroup.controls.amount.value > deliveryBalance)"
   (cancelClicked)="modal.dismiss()"
   (saveClicked)="save()"
 >
@@ -20,7 +20,7 @@
                 {{ i.fullName }}
               </ng-option>
             </ng-select>
-            <span *ngIf="deliveryBalance !== 0" class="badge badge-light-primary mt-1">{{ 'PAYMENTS_PAGE.DRIVER_BALANCE' | translate }}: {{ deliveryBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            <span *ngIf="deliveryBalance !== null" class="badge badge-light-primary mt-1">{{ 'PAYMENTS_PAGE.DRIVER_BALANCE' | translate }}: {{ deliveryBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
         </div>
         <div class="col-md-4">
@@ -32,7 +32,7 @@
                 {{ i.fullName }}
               </ng-option>
             </ng-select>
-            <span *ngIf="merchantBalance !== 0" class="badge badge-light-warning mt-1">{{ 'PAYMENTS_PAGE.MERCHANT_BALANCE' | translate }}: {{ merchantBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            <span *ngIf="merchantBalance !== null" class="badge badge-light-warning mt-1">{{ 'PAYMENTS_PAGE.MERCHANT_BALANCE' | translate }}: {{ merchantBalance | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
         </div>
 
@@ -49,6 +49,9 @@
                 #input
               />
             </app-input-container>
+            <div *ngIf="deliveryBalance !== null && formGroup.controls.amount.value > deliveryBalance" class="text-danger fs-8 mt-1">
+              المبلغ المدخل يتجاوز عهدة المندوب المتاحة ({{ deliveryBalance | number }} ل.س).
+            </div>
           </div>
         </div>
         <div class="col-12 mt-2">

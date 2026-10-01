@@ -45,6 +45,7 @@ namespace App.ApiControllers.V1.Admin
 
         private readonly RoleManager<SolRole> _roleManager;
         private readonly ITrackableRepository<SolUserRole> _userRoleRepo;
+        private readonly ILedgerService _ledgerService;
 
         public BalancesController(IAppUnitOfWork unitOfWork,
             IAccountingUnitOfWork auow,
@@ -57,7 +58,8 @@ namespace App.ApiControllers.V1.Admin
             IBalanceService service,
             //IBillService billService,
             IBalanceService balanceService,
-            IMapper mapper)
+            IMapper mapper,
+            ILedgerService ledgerService = null)
         {
             _uow = unitOfWork;
             _auow = auow;
@@ -71,6 +73,7 @@ namespace App.ApiControllers.V1.Admin
             _service = service;
             //_billService = billService;
             _balanceService = balanceService;
+            _ledgerService = ledgerService;
         }
 
 
@@ -282,8 +285,67 @@ namespace App.ApiControllers.V1.Admin
 
         [HttpGet]
         [Route("{id}")]
-        public async Task<ActionResult<BalanceDto>> Get(Guid id) =>
-            await _balanceService.GetBalance(id);
+        public async Task<ActionResult<BalanceDto>> Get(Guid id)
+        {
+            // 1. Check if user is a Delivery Driver / Captain
+            var driverRoleIds = await _roleManager.Roles.AsNoTracking()
+                .Where(r => r.NormalizedName == "DELIVERY" || r.NormalizedName == "DRIVER" || r.NormalizedName == "CAPTAIN")
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            if (!driverRoleIds.Any())
+            {
+                var deliveryRole = await _roleManager.FindByNameAsync("Delivery");
+                if (deliveryRole != null) driverRoleIds.Add(deliveryRole.Id);
+            }
+
+            var isDriver = await _userRoleRepo.Queryable().AsNoTracking()
+                .AnyAsync(ur => ur.UserId == id && driverRoleIds.Contains(ur.RoleId));
+
+            if (isDriver && _ledgerService != null)
+            {
+                var floatBal = await _ledgerService.GetUserCashFloatBalanceAsync(id);
+                var wageBal = await _ledgerService.GetUserEarningsBalanceAsync(id);
+                var user = await _userManager.FindByIdAsync(id.ToString());
+                return new BalanceDto
+                {
+                    Id = id,
+                    Name = user?.FullName ?? user?.UserName,
+                    Phone = user?.PhoneNumber,
+                    Amount = floatBal,
+                    WagesAmount = wageBal,
+                    PendingAmount = 0m,
+                    CreatedDate = user?.CreatedDate ?? DateTime.UtcNow
+                };
+            }
+
+            // 2. Check if user is a Merchant Owner (or if id corresponds to a Merchant)
+            var mids = await _merchantService.GetMerchantIds(id);
+            if (mids != null && mids.Length > 0)
+            {
+                var merchantId = mids[0];
+                var merchant = await _merchantService.FindAsync(merchantId);
+                var vendorBal = await _auow.Context.Accounts.AsNoTracking()
+                    .Where(a => a.OwnerMerchantId == merchantId &&
+                                a.Type == AccountType.Liability &&
+                                a.AccountCode.StartsWith(SystemAccountCodes.VendorPayablePrefix))
+                    .SelectMany(a => a.LedgerEntries)
+                    .SumAsync(e => (decimal?)(e.Credit - e.Debit)) ?? 0m;
+
+                return new BalanceDto
+                {
+                    Id = id,
+                    EntityId = merchantId,
+                    Name = merchant?.Title,
+                    Phone = merchant?.Phone1 ?? merchant?.Phone2,
+                    Amount = vendorBal,
+                    PendingAmount = 0m,
+                    CreatedDate = merchant?.CreatedDate ?? DateTime.UtcNow
+                };
+            }
+
+            return await _balanceService.GetBalance(id);
+        }
 
     }
 }
