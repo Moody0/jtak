@@ -63,13 +63,14 @@ import { DashboardService } from './services/dashboard.service';
                 </div>
 
                 <!-- Quick Presets -->
-                <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
-                  <span class="small text-muted me-1">تحديد سريع:</span>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                  <span class="small text-muted">تحديد سريع:</span>
                   <a role="button" *ngFor="let p of [10, 15, 20, 25, 30]"
-                    class="btn btn-sm btn-preset py-1 px-2"
+                    class="ops-preset-pill"
                     [class.active]="radiusKm === p"
                     (click)="setRadius(p)">
-                    {{ p }} كم
+                    <span>{{ p }}</span>
+                    <span>كم</span>
                   </a>
                 </div>
 
@@ -172,24 +173,43 @@ import { DashboardService } from './services/dashboard.service';
       background: #f8fafc;
       border: 1px solid #e2e8f0;
     }
-    .btn-preset {
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #475569;
-      font-size: 0.75rem;
-      border-radius: 20px;
+    .ops-preset-pill {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 4px;
+      height: 28px !important;
+      min-height: 28px !important;
+      max-height: 28px !important;
+      padding: 0 12px !important;
+      border-radius: 6px !important;
+      border: 1px solid #cbd5e1 !important;
+      background: #f8fafc !important;
+      color: #475569 !important;
+      font-size: 0.78rem !important;
+      font-weight: 600 !important;
+      line-height: 1 !important;
+      text-decoration: none !important;
+      cursor: pointer;
       transition: all 0.15s ease;
+      user-select: none;
+      vertical-align: middle;
+      box-sizing: border-box;
     }
-    .btn-preset:hover {
-      background: #f1f5f9;
-      color: #0f172a;
-      border-color: #94a3b8;
+    .ops-preset-pill:hover {
+      background: #ffffff !important;
+      border-color: #94a3b8 !important;
+      color: #0f172a !important;
     }
-    .btn-preset.active {
-      background: #ff6600;
-      color: #ffffff;
-      border-color: #ff6600;
-      font-weight: 600;
+    .ops-preset-pill.active {
+      background: #ff6600 !important;
+      border-color: #ff6600 !important;
+      color: #ffffff !important;
+      font-weight: 700 !important;
+      box-shadow: 0 2px 4px rgba(255, 102, 0, 0.25);
+    }
+    .ops-preset-pill.active span {
+      color: #ffffff !important;
     }
     .ops-map-container {
       background: #edf1ed;
