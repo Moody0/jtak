@@ -4,7 +4,6 @@ using App.Shared.Services;
 using App.ApiModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Modules.Orders.Entities;
 
 namespace App.ApiControllers.V1.Customer;
 
@@ -28,13 +27,12 @@ public class DeliveryCoverageController : SolApiController
     {
         if (request == null) return BadRequest();
         try {
-            var error = await _coverage.ValidateAsync(request.DeliveryLat, request.DeliveryLng, request.DeviceLocation);
+            var error = await _coverage.ValidateAsync(request.DeliveryLat, request.DeliveryLng);
             return error == null ? Ok(new { eligible = true }) : BadRequest(ApiErr.Create(error));
         } catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
     }
     public class CoverageCheck {
         public decimal DeliveryLat { get; set; }
         public decimal DeliveryLng { get; set; }
-        public CustomerDeviceLocation DeviceLocation { get; set; }
     }
 }

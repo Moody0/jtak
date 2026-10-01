@@ -12,9 +12,8 @@ public sealed class HomsCoverageService
 {
     private readonly IGenericSettingService _settings;
     private readonly AppDbContext _db;
-    private readonly TimeProvider _time;
-    public HomsCoverageService(IGenericSettingService settings, AppDbContext db = null, TimeProvider time = null)
-    { _settings = settings; _db = db; _time = time ?? TimeProvider.System; }
+    public HomsCoverageService(IGenericSettingService settings, AppDbContext db = null)
+    { _settings = settings; _db = db; }
 
     public async Task<HomsCoverageSetting> GetSettingAsync()
     {
@@ -41,8 +40,8 @@ public sealed class HomsCoverageService
         return setting;
     }
 
-    public async Task<string> ValidateAsync(decimal lat, decimal lng, CustomerDeviceLocation device)
-        => Validate(await GetSettingAsync(), lat, lng, device, _time.GetUtcNow());
+    public async Task<string> ValidateAsync(decimal lat, decimal lng)
+        => Validate(await GetSettingAsync(), lat, lng);
 
     public async Task<bool> ContainsDestinationAsync(decimal lat, decimal lng)
     {
@@ -50,24 +49,10 @@ public sealed class HomsCoverageService
         return ValidCoordinates(lat, lng) && Distance(setting, lat, lng) <= (double)setting.RadiusKm * 1000;
     }
 
-    public static string Validate(HomsCoverageSetting setting, decimal lat, decimal lng,
-        CustomerDeviceLocation device, DateTimeOffset now)
+    public static string Validate(HomsCoverageSetting setting, decimal lat, decimal lng)
     {
         if (!ValidCoordinates(lat, lng) || Distance(setting, lat, lng) > (double)setting.RadiusKm * 1000)
             return "عنوان التوصيل خارج منطقة التغطية في حمص. اختر عنواناً داخل منطقة التوصيل.";
-        if (device == null)
-            return "يلزم التحقق من موقعك الحالي قبل الطلب. حدّث التطبيق وفعّل الموقع الدقيق.";
-        var age = now - device.CapturedAt;
-        if (!ValidCoordinates(device.Latitude, device.Longitude) || device.IsMocked ||
-            device.AccuracyMeters <= 0m || device.AccuracyMeters > 100m ||
-            age < TimeSpan.FromSeconds(-30) || age > TimeSpan.FromSeconds(60))
-            return "تعذر التحقق من موقع دقيق وحديث. فعّل الموقع الدقيق وحاول مجدداً.";
-        var distance = Distance(setting, device.Latitude, device.Longitude);
-        var radius = (double)setting.RadiusKm * 1000;
-        if (distance > radius)
-            return "موقعك الحالي خارج منطقة التوصيل في حمص. يمكنك التصفح، لكن لا يمكن إتمام طلب من موقعك الحالي.";
-        if (distance + (double)device.AccuracyMeters > radius)
-            return "دقة الموقع غير كافية للتحقق قرب حدود التغطية. حدّث موقعك وحاول مجدداً.";
         return null;
     }
     public static bool ValidCoordinates(decimal lat, decimal lng) => lat >= -90m && lat <= 90m &&

@@ -74,7 +74,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             _moneyCalculationService = moneyCalculationService;
             _timeProvider = timeProvider ?? TimeProvider.System;
             _driverPricingService = driverPricingService;
-            _coverage = coverage ?? new HomsCoverageService(null, time: _timeProvider);
+            _coverage = coverage ?? new HomsCoverageService(null);
         }
 
         /// <summary>
@@ -245,7 +245,7 @@ namespace App.ApiControllers.V1.Customer.Orders
 
             // Existing orders must be replayable even after operating hours; only a new checkout is gated.
             try {
-                var coverageError = await _coverage.ValidateAsync(m.Lat, m.Lng, m.DeviceLocation);
+                var coverageError = await _coverage.ValidateAsync(m.Lat, m.Lng);
                 if (coverageError != null) return BadRequest(ApiErr.Create(coverageError));
             } catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
 

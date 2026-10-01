@@ -16,46 +16,30 @@ namespace Modules.Accounting.Tests;
 
 public class HomsCoverageTests
 {
-    private static readonly DateTimeOffset Now = new(2026,10,1,12,0,0,TimeSpan.Zero);
-    private static CustomerDeviceLocation Fix(decimal lat=34.7333m,decimal lng=36.7167m) =>
-        new() { Latitude=lat,Longitude=lng,AccuracyMeters=10m,CapturedAt=Now };
+    [Fact]
+    public void InAreaDeliveryPassesWithoutCheckingCustomerDeviceLocation() {
+        Assert.Null(HomsCoverageService.Validate(new(),34.7333m,36.7167m));
+    }
 
     [Fact]
-    public void EgyptGpsCannotBeReplacedWithSearchedHomsDestination() {
-        var error=HomsCoverageService.Validate(new(),34.7333m,36.7167m,Fix(30.0145m,31.1759m),Now);
-        Assert.Contains("موقعك الحالي خارج",error);
-        Assert.Null(HomsCoverageService.Validate(new(),34.7333m,36.7167m,Fix(),Now));
+    public void OutOfAreaDeliveryIsStillRejected() {
+        Assert.Contains("عنوان التوصيل خارج",HomsCoverageService.Validate(new(),30.0145m,31.1759m));
     }
-    [Fact]
-    public void DestinationAndDeviceAreSeparateCoverageRequirements() {
-        Assert.Contains("عنوان التوصيل خارج",HomsCoverageService.Validate(new(),30.0145m,31.1759m,Fix(),Now));
-        Assert.Contains("حدّث التطبيق",HomsCoverageService.Validate(new(),34.7333m,36.7167m,null,Now));
-    }
-    [Theory]
-    [InlineData(61,10,false)]
-    [InlineData(-31,10,false)]
-    [InlineData(0,101,false)]
-    [InlineData(0,0,false)]
-    [InlineData(0,10,true)]
-    public void OldInaccurateOrReportedMockFixCannotPass(int age,int accuracy,bool mocked) {
-        var fix=Fix();fix.CapturedAt=Now.AddSeconds(-age);fix.AccuracyMeters=accuracy;fix.IsMocked=mocked;
-        Assert.NotNull(HomsCoverageService.Validate(new(),34.7333m,36.7167m,fix,Now));
-    }
+
     [Theory]
     [InlineData(0,0)]
     [InlineData(91,36)]
     [InlineData(34,181)]
-    public void InvalidDeviceCoordinatesAreRejected(int lat,int lng) =>
-        Assert.NotNull(HomsCoverageService.Validate(new(),34.7333m,36.7167m,Fix(lat,lng),Now));
+    public void InvalidDeliveryCoordinatesAreRejected(int lat,int lng) =>
+        Assert.NotNull(HomsCoverageService.Validate(new(),lat,lng));
 
     [Fact]
-    public void RadiusBoundaryAndLocationAccuracyAreHandledConservatively() {
+    public void DeliveryRadiusBoundaryIsHandledConservatively() {
         const decimal center=34.7333m, longitude=36.7167m;
         var latAt10Km=center+(decimal)(10000d/6371000d*180d/Math.PI);
         var config=new HomsCoverageSetting {RadiusKm=10m};
-        Assert.Null(HomsCoverageService.Validate(config,latAt10Km-0.00001m,longitude,Fix(),Now));
-        Assert.Contains("عنوان التوصيل خارج",HomsCoverageService.Validate(config,latAt10Km+0.00001m,longitude,Fix(),Now));
-        Assert.Contains("دقة الموقع",HomsCoverageService.Validate(config,center,longitude,Fix(latAt10Km-0.00001m,longitude),Now));
+        Assert.Null(HomsCoverageService.Validate(config,latAt10Km-0.00001m,longitude));
+        Assert.Contains("عنوان التوصيل خارج",HomsCoverageService.Validate(config,latAt10Km+0.00001m,longitude));
     }
 
     [Fact]

@@ -82,7 +82,7 @@ namespace App.ApiControllers.V1.Customer
                 return replay.UserId == user.Id ? Ok(ToDto(replay)) : Conflict();
 
             try {
-                var coverageError = await _coverage.ValidateAsync(model.DeliveryLat, model.DeliveryLng, model.DeviceLocation);
+                var coverageError = await _coverage.ValidateAsync(model.DeliveryLat, model.DeliveryLng);
                 if (coverageError != null) return BadRequest(ApiErr.Create(coverageError));
             } catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
 
@@ -316,7 +316,6 @@ namespace App.ApiControllers.V1.Customer
 
     public class CreateErrandRequestDto
     {
-        public Modules.Orders.Entities.CustomerDeviceLocation DeviceLocation { get; set; }
         public Guid RequestKey { get; set; }
         public string Items { get; set; }
         public string PickupPlace { get; set; }
