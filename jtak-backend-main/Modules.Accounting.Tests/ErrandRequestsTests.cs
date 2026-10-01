@@ -60,6 +60,7 @@ namespace Modules.Accounting.Tests
 
             var request = new CreateErrandRequestDto
             {
+                DeviceLocation = new Modules.Orders.Entities.CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = DateTimeOffset.UtcNow },
                 RequestKey = Guid.NewGuid(),
                 Items = "دواء من الصيدلية",
                 PickupPlace = "صيدلية في الوعر",
@@ -77,6 +78,18 @@ namespace Modules.Accounting.Tests
             Assert.Contains("https://www.google.com/maps?q=34.7333,36.7167", saved.Message);
 
             saved = null;
+            // A replay returns the owner's already-created request even if its
+            // device fix has expired; new requests must pass coverage again.
+            request.DeviceLocation = null;
+            Assert.IsType<OkObjectResult>((await controller.Create(request)).Result);
+            request.RequestKey = Guid.NewGuid();
+            request.DeviceLocation = new Modules.Orders.Entities.CustomerDeviceLocation {
+                Latitude = 30.0145m, Longitude = 31.1759m, AccuracyMeters = 10m, CapturedAt = DateTimeOffset.UtcNow
+            };
+            var outsideDevice = Assert.IsType<BadRequestObjectResult>((await controller.Create(request)).Result);
+            Assert.Contains("موقعك الحالي خارج", Assert.IsType<ApiErr>(outsideDevice.Value).Errors.First());
+            request.DeviceLocation.Latitude = 34.7333m;
+            request.DeviceLocation.Longitude = 36.7167m;
             request.DeliveryLat = 33.5138m;
             request.DeliveryLng = 36.2765m;
             request.DeliveryAddress = "حمص، محافظة حمص";

@@ -34,6 +34,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IMapper _mapper;
         private readonly IAdminAuditService _auditService;
         private readonly IDriverPricingService _driverPricingService;
+        private readonly HomsCoverageService _coverage;
 
         public SettingsController(
             IProductService service,
@@ -44,7 +45,7 @@ namespace App.ApiControllers.V1.Admin
             IMapper mapper,
             ILogger<SettingsController> logger,
             IAdminAuditService auditService = null,
-            IDriverPricingService driverPricingService = null)
+            IDriverPricingService driverPricingService = null, HomsCoverageService coverage = null)
         {
             _service = service;
             _categoryService = categoryService;
@@ -55,6 +56,32 @@ namespace App.ApiControllers.V1.Admin
             _mapper = mapper;
             _auditService = auditService;
             _driverPricingService = driverPricingService;
+            _coverage = coverage ?? new HomsCoverageService(genericSetting);
+        }
+
+        [HttpGet("DeliveryCoverage")]
+        public async Task<IActionResult> GetDeliveryCoverage()
+        {
+            try { return Ok(await _coverage.GetSettingAsync()); }
+            catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
+        }
+
+        [HttpPut("DeliveryCoverage")]
+        public async Task<IActionResult> SetDeliveryCoverage([FromBody] HomsCoverageSetting model)
+        {
+            if (model == null || !model.IsValid) return BadRequest(ApiErr.Create("أدخل نصف قطر بين 0.1 و100 كم، حتى منزلتين عشريتين."));
+            try {
+                HomsCoverageSetting before = null;
+                try { before = await _coverage.GetSettingAsync(); }
+                catch (InvalidOperationException) { /* Authorized admins can repair corrupt settings. */ }
+                var after = await _coverage.SaveAsync(model.RadiusKm);
+                if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+                    Module = "Settings", Action = "UpdateDeliveryCoverage", EntityType = "HomsCoverageSetting",
+                    EntityId = HomsCoverageSetting.Key, Description = $"تحديث نصف قطر التوصيل في حمص إلى {after.RadiusKm} كم",
+                    Result = "Success", BeforeState = before, AfterState = after
+                });
+                return Ok(after);
+            } catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
         }
 
         /// <summary>

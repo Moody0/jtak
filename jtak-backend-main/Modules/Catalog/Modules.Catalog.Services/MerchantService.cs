@@ -45,16 +45,18 @@ namespace Modules.Catalog.Services
         private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepo;
         private readonly ICatalogUnitOfWork _uow;
         private readonly IGenericSettingService _genericSetting;
+        private readonly HomsCoverageService _coverage;
         public MerchantService(ITrackableRepository<Merchant, CatalogDbContext> r,
             ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepo,
             ICatalogUnitOfWork uow,
             IGenericSettingService genericSetting,
-            IMemoryCache cache) : base(r)
+            IMemoryCache cache, HomsCoverageService coverage = null) : base(r)
         {
             _merchantProductRepo = merchantProductRepo;
             _uow = uow;
             _genericSetting = genericSetting;
             _cache = cache;
+            _coverage = coverage ?? new HomsCoverageService(genericSetting);
         }
 
         /// <summary>
@@ -89,7 +91,7 @@ namespace Modules.Catalog.Services
 
         public async Task<int[]> GetValidMerchants(decimal lat, decimal lng)
         {
-            if (!HomsDeliveryArea.Contains(lat, lng))
+            if (!await _coverage.ContainsDestinationAsync(lat, lng))
                 return Array.Empty<int>();
 
             return await Queryable().AsNoTracking()

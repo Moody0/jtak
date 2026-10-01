@@ -45,6 +45,7 @@ namespace App.ApiControllers.V1.Customer.Orders
         private readonly IOrderMoneyCalculationService _moneyCalculationService;
         private readonly IDriverPricingService _driverPricingService;
         private readonly TimeProvider _timeProvider;
+        private readonly HomsCoverageService _coverage;
 
         public CartController(IOrdersUnitOfWork unitOfWork,
             INotificationService notificationService,
@@ -58,7 +59,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             IMapper mapper,
             IOrderMoneyCalculationService moneyCalculationService = null,
             TimeProvider timeProvider = null,
-            IDriverPricingService driverPricingService = null)
+            IDriverPricingService driverPricingService = null, HomsCoverageService coverage = null)
         {
             _uow = unitOfWork;
             _userManager = userManager;
@@ -73,6 +74,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             _moneyCalculationService = moneyCalculationService;
             _timeProvider = timeProvider ?? TimeProvider.System;
             _driverPricingService = driverPricingService;
+            _coverage = coverage ?? new HomsCoverageService(null, time: _timeProvider);
         }
 
         /// <summary>
@@ -231,8 +233,10 @@ namespace App.ApiControllers.V1.Customer.Orders
             }
 
             // Existing orders must be replayable even after operating hours; only a new checkout is gated.
-            if (!HomsDeliveryArea.Contains(m.Lat, m.Lng))
-                return BadRequest(ApiErr.Create("عنوان التوصيل خارج منطقة التغطية في حمص. يرجى اختيار موقع على الخريطة ضمن منطقة التوصيل لإتمام الطلب."));
+            try {
+                var coverageError = await _coverage.ValidateAsync(m.Lat, m.Lng, m.DeviceLocation);
+                if (coverageError != null) return BadRequest(ApiErr.Create(coverageError));
+            } catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
 
             // Normalize PhoneNumber
             m.Phonenumber = m.Phonenumber?.Trim().Replace(" ", "");

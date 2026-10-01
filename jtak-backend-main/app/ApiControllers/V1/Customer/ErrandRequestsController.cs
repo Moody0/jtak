@@ -33,6 +33,7 @@ namespace App.ApiControllers.V1.Customer
         private readonly IEmailService _emailService;
         private readonly ILogger<ErrandRequestsController> _logger;
         private readonly AppDbContext _db;
+        private readonly HomsCoverageService _coverage;
 
         public ErrandRequestsController(
             ISupportMessageService supportService,
@@ -40,7 +41,7 @@ namespace App.ApiControllers.V1.Customer
             UserManager<AppUser> userManager,
             IEmailService emailService,
             ILogger<ErrandRequestsController> logger,
-            AppDbContext db = null)
+            AppDbContext db = null, HomsCoverageService coverage = null)
         {
             _supportService = supportService;
             _uow = uow;
@@ -48,6 +49,7 @@ namespace App.ApiControllers.V1.Customer
             _emailService = emailService;
             _logger = logger;
             _db = db;
+            _coverage = coverage ?? new HomsCoverageService(null);
         }
 
         [HttpPost]
@@ -71,9 +73,6 @@ namespace App.ApiControllers.V1.Customer
             if (model.ItemDetails != null && model.ItemDetails.Any(x => x == null || string.IsNullOrWhiteSpace(x.Name) || x.Name.Trim().Length > 200 || x.Quantity < 1 || x.Quantity > 999 || (x.Variant?.Length ?? 0) > 300 || (x.ProductUrl?.Length ?? 0) > 1000 || !SafeProductUrl(x.ProductUrl)))
                 return BadRequest(ApiErr.Create("تحقق من أسماء المنتجات وكمياتها وروابطها."));
 
-            if (!HomsDeliveryArea.Contains(model.DeliveryLat, model.DeliveryLng))
-                return BadRequest(ApiErr.Create("عنوان التوصيل خارج منطقة التغطية في حمص. يرجى اختيار موقع على الخريطة ضمن منطقة التوصيل."));
-
             var user = await _userManager.GetUserAsync(User);
             if (user == null) return Unauthorized();
 
@@ -81,6 +80,11 @@ namespace App.ApiControllers.V1.Customer
                 .FirstOrDefaultAsync(x => x.ErrandRequestKey == model.RequestKey);
             if (replay != null)
                 return replay.UserId == user.Id ? Ok(ToDto(replay)) : Conflict();
+
+            try {
+                var coverageError = await _coverage.ValidateAsync(model.DeliveryLat, model.DeliveryLng, model.DeviceLocation);
+                if (coverageError != null) return BadRequest(ApiErr.Create(coverageError));
+            } catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
 
             var phone = string.IsNullOrWhiteSpace(model.PhoneNumber)
                 ? user.PhoneNumber
@@ -312,6 +316,7 @@ namespace App.ApiControllers.V1.Customer
 
     public class CreateErrandRequestDto
     {
+        public Modules.Orders.Entities.CustomerDeviceLocation DeviceLocation { get; set; }
         public Guid RequestKey { get; set; }
         public string Items { get; set; }
         public string PickupPlace { get; set; }

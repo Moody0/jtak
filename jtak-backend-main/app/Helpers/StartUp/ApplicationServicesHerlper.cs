@@ -53,6 +53,7 @@ namespace App.Helpers.StartUp
             services.AddScoped<ISmsLogService, SmsLogService>();
             services.AddScoped<IFaqService, FaqService>();
             services.AddScoped<IGenericSettingService, GenericSettingService>();
+            services.AddScoped<HomsCoverageService>();
             services.AddScoped<ISessionHelper, SessionHelper>();
             services.AddScoped<ITestimonialService, TestimonialService>();
             services.AddScoped<IProductService, ProductService>();

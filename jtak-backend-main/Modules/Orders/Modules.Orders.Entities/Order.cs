@@ -492,6 +492,7 @@ namespace Modules.Orders.Entities
 
     public class CartSubmit
     {
+        public CustomerDeviceLocation DeviceLocation { get; set; }
         public CartItem[] CartItems { get; set; }
 
         [Required(ErrorMessageResourceType = typeof(_Errors), ErrorMessageResourceName = "FieldIsRequired")]

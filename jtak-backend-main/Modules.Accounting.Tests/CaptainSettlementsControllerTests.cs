@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using Modules.Accounting.Data;
 using Modules.Orders.Entities;
 using Moq;
+using Modules.Accounting.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -161,7 +163,8 @@ namespace Modules.Accounting.Tests
 
             await ordersDb.SaveChangesAsync();
 
-            var controller = new CaptainSettlementsController(ordersDb, accountingDb, userManager.Object);
+            var controller = new CaptainSettlementsController(ordersDb, accountingDb, userManager.Object,
+                new LedgerService(accountingDb, NullLogger<LedgerService>.Instance));
 
             var actionResult = await controller.GetSummary(settlementStatus: "all");
             var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -241,7 +244,8 @@ namespace Modules.Accounting.Tests
             ordersDb.Set<Order>().Add(order);
             await ordersDb.SaveChangesAsync();
 
-            var controller = new CaptainSettlementsController(ordersDb, accountingDb, userManager.Object);
+            var controller = new CaptainSettlementsController(ordersDb, accountingDb, userManager.Object,
+                new LedgerService(accountingDb, NullLogger<LedgerService>.Instance));
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext

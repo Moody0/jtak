@@ -32,6 +32,26 @@ namespace Modules.Accounting.Tests
 {
     public class SafeCheckoutAndOrderCreationTests
     {
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task NewCheckoutWithHomsPinRejectsEgyptOrMissingDeviceLocationBeforeCreatingAnything(bool egypt)
+        {
+            var (controller, db, catalog, user) = CreateTestController();
+            using (db) using (catalog) {
+                var model = new CartSubmit {
+                    IdempotencyKey = Guid.NewGuid().ToString(), Address = "Homs searched address", Lat = 34.7333m, Lng = 36.7167m,
+                    PaymentMethod = Modules.Orders.Entities.PaymentMethod.PayOnDelivery, Phonenumber = user.PhoneNumber,
+                    DeviceLocation = egypt ? new CustomerDeviceLocation { Latitude = 30.0145m, Longitude = 31.1759m,
+                        AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026,9,22,12,0,0,TimeSpan.Zero) } : null,
+                    CartItems = new[] { new CartItem { MerchantId=10, ProductId=101, Quantity=1 } }
+                };
+                var failure = Assert.IsType<BadRequestObjectResult>((await controller.SubmitOrder(model)).Result);
+                Assert.Contains(egypt ? "موقعك الحالي خارج" : "حدّث التطبيق", Assert.IsType<ApiErr>(failure.Value).Errors.First());
+                Assert.Empty(await db.Orders.ToListAsync());
+                Assert.Empty(await db.OrderDetails.ToListAsync());
+            }
+        }
         private OrdersDbContext CreateInMemoryOrdersContext()
         {
             var options = new DbContextOptionsBuilder<OrdersDbContext>()
@@ -258,6 +278,7 @@ namespace Modules.Accounting.Tests
             // 2. SubmitOrder succeeds and creates 2 separate orders
             var submit = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "dual-order-key-1",
                 Phonenumber = customer.PhoneNumber,
                 Lat = 34.7333m, Lng = 36.7167m,
@@ -362,6 +383,7 @@ namespace Modules.Accounting.Tests
 
             var submit = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "driver-pricing-snapshot",
                 Phonenumber = customer.PhoneNumber,
                 Lat = 34.7333m,
@@ -417,6 +439,7 @@ namespace Modules.Accounting.Tests
 
             var submit = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "two-restaurants-rejected",
                 Phonenumber = customer.PhoneNumber,
                 Lat = 34.7333m, Lng = 36.7167m,
@@ -473,6 +496,7 @@ namespace Modules.Accounting.Tests
 
             var submit = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "two-markets-rejected",
                 Phonenumber = customer.PhoneNumber,
                 Lat = 34.7333m, Lng = 36.7167m,
@@ -493,6 +517,7 @@ namespace Modules.Accounting.Tests
 
             var submitRequest = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 // This old address label and the merchant's 10 km radius must not
                 // override a delivery pin in Homs.
                 IdempotencyKey = "key_test_001",
@@ -543,6 +568,7 @@ namespace Modules.Accounting.Tests
 
             var submitRequest = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "key_timeout_retry_999",
                 Phonenumber = testUser.PhoneNumber,
                 Lat = 34.7333m,
@@ -585,6 +611,7 @@ namespace Modules.Accounting.Tests
 
             var submitRequest = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "key_notif_fail_safe",
                 Phonenumber = testUser.PhoneNumber,
                 Lat = 34.7333m,
@@ -631,6 +658,7 @@ namespace Modules.Accounting.Tests
             // The address text says Homs, but the selected map pin is outside its delivery area.
             var outOfRadiusSubmit = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "key_out_of_radius_01",
                 Phonenumber = testUser.PhoneNumber,
                 Lat = 33.8500m,
@@ -700,6 +728,7 @@ namespace Modules.Accounting.Tests
 
             var subMinSubmit = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "key_min_order_fail",
                 Phonenumber = testUser.PhoneNumber,
                 Lat = 34.7333m,
@@ -742,6 +771,7 @@ namespace Modules.Accounting.Tests
 
             var submitRequest = new CartSubmit
             {
+                DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) },
                 IdempotencyKey = "key_batch_exhaust_01",
                 Phonenumber = testUser.PhoneNumber,
                 Lat = 34.7333m,

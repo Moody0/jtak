@@ -180,6 +180,7 @@ namespace Modules.Accounting.Tests
             { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
             var create = new App.ApiControllers.V1.Customer.CreateErrandRequestDto
             {
+                DeviceLocation = new Modules.Orders.Entities.CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m, AccuracyMeters = 10m, CapturedAt = DateTimeOffset.UtcNow },
                 RequestKey = Guid.NewGuid(), Items = "شيبسي وبيبسي", PickupPlace = "محل في حمص",
                 DeliveryAddress = "حمص", DeliveryLat = 34.7333m, DeliveryLng = 36.7167m,
                 PhoneNumber = customer.PhoneNumber
