@@ -1,3 +1,4 @@
+using App.Catalog.Data;
 using App.ApiModels;
 using App.Shared.Services;
 using App.Shared.Data.App;
@@ -35,6 +36,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly IAdminAuditService _auditService;
         private readonly IDriverPricingService _driverPricingService;
         private readonly HomsCoverageService _coverage;
+        private readonly ICatalogUnitOfWork _catalogUnitOfWork;
 
         public SettingsController(
             IProductService service,
@@ -45,7 +47,7 @@ namespace App.ApiControllers.V1.Admin
             IMapper mapper,
             ILogger<SettingsController> logger,
             IAdminAuditService auditService = null,
-            IDriverPricingService driverPricingService = null, HomsCoverageService coverage = null)
+            IDriverPricingService driverPricingService = null, HomsCoverageService coverage = null, ICatalogUnitOfWork catalogUnitOfWork = null)
         {
             _service = service;
             _categoryService = categoryService;
@@ -57,6 +59,67 @@ namespace App.ApiControllers.V1.Admin
             _auditService = auditService;
             _driverPricingService = driverPricingService;
             _coverage = coverage ?? new HomsCoverageService(genericSetting);
+            _catalogUnitOfWork = catalogUnitOfWork;
+        }
+
+        // Use the merchant's existing DeliveryFee as the sole source of truth.
+        [HttpGet("JtakMarketDeliveryFee")]
+        public async Task<IActionResult> GetJtakMarketDeliveryFee()
+        {
+            var id = await _merchantService.GetJtakMarketMerchantId();
+            var merchant = id.HasValue ? await _merchantService.FindAsync(id.Value) : null;
+            if (merchant == null) return BadRequest(ApiErr.Create("تعذر تحديد جيتك ماركت. تحقق من إعدادات المتاجر."));
+            return Ok(new { Amount = merchant.DeliveryFee });
+        }
+
+        [HttpPut("JtakMarketDeliveryFee")]
+        public async Task<IActionResult> SetJtakMarketDeliveryFee([FromBody] JtakMarketDeliveryFeeInput model)
+        {
+            if (model?.Amount == null || model.Amount < 0m || model.Amount > 100000000m ||
+                decimal.Round(model.Amount.Value, 2) != model.Amount.Value)
+                return BadRequest(ApiErr.Create("أدخل أجرة توصيل غير سالبة وصالحة لجيتك ماركت، حتى منزلتين عشريتين."));
+            var id = await _merchantService.GetJtakMarketMerchantId();
+            var merchant = id.HasValue ? await _merchantService.FindAsync(id.Value) : null;
+            if (merchant == null || _catalogUnitOfWork == null)
+                return BadRequest(ApiErr.Create("تعذر تحديد جيتك ماركت أو حفظ الأجرة. تحقق من إعدادات المتاجر."));
+            var before = merchant.DeliveryFee;
+            merchant.DeliveryFee = model.Amount.Value;
+            await _catalogUnitOfWork.SaveChangesAsync();
+            if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+                Module = "Settings", Action = "UpdateJtakMarketDeliveryFee", EntityType = "Merchant",
+                EntityId = merchant.Id.ToString(), Description = "تحديث أجرة التوصيل الثابتة لجيتك ماركت",
+                Result = "Success", BeforeState = new { Amount = before }, AfterState = new { Amount = merchant.DeliveryFee }
+            });
+            return Ok(new { Amount = merchant.DeliveryFee });
+        }
+
+        public class JtakMarketDeliveryFeeInput { public decimal? Amount { get; set; } }
+
+        [HttpGet("JtakMarketCourierPay")]
+        public async Task<IActionResult> GetJtakMarketCourierPay()
+        {
+            try {
+                var setting = await _genericSetting.GetValue<JtakMarketCourierPaySetting>(JtakMarketCourierPaySetting.Key)
+                    ?? new JtakMarketCourierPaySetting();
+                if (!setting.IsValid) return BadRequest(ApiErr.Create("إعدادات أجر مندوب جيتك ماركت غير صالحة."));
+                return Ok(setting);
+            } catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
+        }
+
+        [HttpPut("JtakMarketCourierPay")]
+        public async Task<IActionResult> SetJtakMarketCourierPay([FromBody] JtakMarketCourierPaySetting setting)
+        {
+            if (setting == null || !setting.IsValid)
+                return BadRequest(ApiErr.Create("اختر راتباً شهرياً، أو أجراً ثابتاً موجباً لكل طلب، أو نسبة أكبر من صفر وحتى 100%."));
+            var before = await _genericSetting.GetValue<JtakMarketCourierPaySetting>(JtakMarketCourierPaySetting.Key)
+                ?? new JtakMarketCourierPaySetting();
+            await _genericSetting.SetValue(JtakMarketCourierPaySetting.Key, setting);
+            if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+                Module = "Settings", Action = "UpdateJtakMarketCourierPay", EntityType = "JtakMarketCourierPaySetting",
+                EntityId = JtakMarketCourierPaySetting.Key, Description = "تحديث نظام أجر مندوب جيتك ماركت",
+                Result = "Success", BeforeState = before, AfterState = setting
+            });
+            return Ok(setting);
         }
 
         [HttpGet("DeliveryCoverage")]

@@ -764,6 +764,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 CaptainCompensationType.SalariedEmployee => "موظف براتب شهري",
                 CaptainCompensationType.PerKilometer => $"{rate:N0} ل.س / كم",
                 CaptainCompensationType.Percentage => $"{rate:N0}% من التوصيل",
+                CaptainCompensationType.FixedPerOrder => $"{rate:N2} ل.س لكل طلب مكتمل",
                 _ => "غير محدد"
             };
         }

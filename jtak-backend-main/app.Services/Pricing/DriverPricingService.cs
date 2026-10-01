@@ -29,6 +29,21 @@ namespace App.Shared.Services.Pricing
             return true;
         }
 
+        public async Task<JtakMarketCourierPaySetting> GetJtakMarketCourierPayAsync()
+        {
+            var setting = await _genericSetting.GetValue<JtakMarketCourierPaySetting>(JtakMarketCourierPaySetting.Key);
+            if (setting != null && !setting.IsValid)
+                throw new InvalidOperationException("إعدادات أجر مندوب جيتك ماركت غير صالحة. تواصل مع الإدارة.");
+            return setting ?? new JtakMarketCourierPaySetting();
+        }
+
+        public async Task<bool> SaveJtakMarketCourierPayAsync(JtakMarketCourierPaySetting setting)
+        {
+            if (setting == null || !setting.IsValid) return false;
+            await _genericSetting.SetValue(JtakMarketCourierPaySetting.Key, setting);
+            return true;
+        }
+
         public async Task<decimal> CalculateCaptainEarningAsync(decimal customerLat, decimal customerLng, decimal merchantLat, decimal merchantLng, decimal defaultFee = 0m)
         {
             var setting = await GetSettingAsync();
@@ -82,33 +97,19 @@ namespace App.Shared.Services.Pricing
         {
             setting ??= new DriverPricingSetting();
 
-            decimal distanceKm = 0m;
-            if (customerLat != 0m && customerLng != 0m && merchantLat != 0m && merchantLng != 0m)
-            {
-                double meters = GeoLocationHelper.CalculateDistanceInMeters(merchantLat, merchantLng, customerLat, customerLng);
-                distanceKm = Math.Round((decimal)(meters / 1000.0), 2);
-            }
+            // Physical stores require real coordinates, never an implicit flat fee.
+            if (!ValidCoordinates(customerLat, customerLng))
+                throw new InvalidOperationException("يرجى تحديد عنوان توصيل صالح على الخريطة لحساب أجرة التوصيل.");
+            if (!ValidCoordinates(merchantLat, merchantLng))
+                throw new InvalidOperationException("موقع المتجر غير محدد بشكل صحيح. تواصل مع الإدارة لتصحيحه قبل الطلب.");
+            double meters = GeoLocationHelper.CalculateDistanceInMeters(merchantLat, merchantLng, customerLat, customerLng);
+            decimal distanceKm = Math.Round((decimal)(meters / 1000.0), 2, MidpointRounding.AwayFromZero);
 
             decimal rate = setting.CustomerRatePerKm > 0m ? setting.CustomerRatePerKm : 45m;
             decimal minFee = setting.MinDeliveryFee >= 0m ? setting.MinDeliveryFee : 50m;
 
-            decimal calculated;
-            if (distanceKm > 0m && distanceKm <= 25m)
-            {
-                calculated = Math.Round(distanceKm * rate, MidpointRounding.AwayFromZero);
-            }
-            else if (distanceKm > 25m)
-            {
-                // Safety guard for cross-city / cross-border coordinates (e.g. test GPS in Egypt at 620km):
-                // Never calculate absurd inter-country fees like 27,000 SYP for intra-city bike delivery.
-                calculated = fallbackFee > 0m
-                    ? fallbackFee
-                    : Math.Round(20m * rate, MidpointRounding.AwayFromZero);
-            }
-            else
-            {
-                calculated = fallbackFee;
-            }
+            // Service-area eligibility is validated separately at checkout.
+            decimal calculated = Math.Round(distanceKm * rate, MidpointRounding.AwayFromZero);
 
             decimal originalFee = Math.Max(minFee, calculated);
             decimal actualFee = setting.IsFreeDeliveryEnabled ? 0m : originalFee;
@@ -122,6 +123,9 @@ namespace App.Shared.Services.Pricing
                 IsFreeDelivery = setting.IsFreeDeliveryEnabled
             };
         }
+
+        private static bool ValidCoordinates(decimal lat, decimal lng) =>
+            lat >= -90m && lat <= 90m && lng >= -180m && lng <= 180m && !(lat == 0m && lng == 0m);
 
         public decimal CalculateCaptainOrderEarning(
             CaptainCompensationType compensationType,
@@ -154,6 +158,10 @@ namespace App.Shared.Services.Pricing
                     earning = Math.Round(Math.Max(0m, originalDeliveryFee) * (Math.Max(0m, captainRate) / 100m), 0, MidpointRounding.AwayFromZero);
                     break;
 
+                case CaptainCompensationType.FixedPerOrder:
+                    earning = Math.Max(0m, captainRate);
+                    break;
+
                 default:
                     earning = 0m;
                     break;
@@ -180,8 +188,13 @@ namespace App.Shared.Services.Pricing
                 originalDeliveryFee = order.DeliveryFee;
             }
 
-            var compType = courier.CaptainCompensationType;
-            var rate = courier.CaptainRate;
+            // Virtual-market policy is snapshotted at checkout. Its monthly wage
+            // is agreed and settled separately, never charged per order.
+            var marketPay = money?.JtakMarketCourierPay;
+            if (marketPay != null && !marketPay.IsValid)
+                throw new InvalidOperationException("سياسة أجر مندوب جيتك ماركت المسجلة مع الطلب غير صالحة.");
+            var compType = marketPay?.Mode ?? courier.CaptainCompensationType;
+            var rate = marketPay?.Rate ?? courier.CaptainRate;
             var earning = CalculateCaptainOrderEarningStatic(compType, rate, distance, originalDeliveryFee);
 
             order.DistanceInKm = distance;

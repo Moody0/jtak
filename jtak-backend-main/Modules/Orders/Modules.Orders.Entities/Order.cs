@@ -173,6 +173,7 @@ namespace Modules.Orders.Entities
 
     public class OrderDto
     {
+        public decimal? CustomerMinDeliveryFee { get; set; }
         [Display(Name = "Id", ResourceType = typeof(_Entities))]
         public int Id { get; set; }
 

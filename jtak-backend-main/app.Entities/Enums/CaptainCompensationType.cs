@@ -23,6 +23,9 @@ namespace App.Shared.Entities.Enums
         /// 2: Percentage of Delivery Fee (نسبة من أجرة التوصيل) - earns configured % of original delivery fee (e.g. 60%).
         /// </summary>
         [Display(Name = "نسبة من أجرة التوصيل")]
-        Percentage = 2
+        Percentage = 2,
+
+        [Display(Name = "مبلغ ثابت لكل طلب مكتمل")]
+        FixedPerOrder = 3
     }
 }

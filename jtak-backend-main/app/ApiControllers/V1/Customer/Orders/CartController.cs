@@ -94,11 +94,20 @@ namespace App.ApiControllers.V1.Customer.Orders
             var driverPricing = _driverPricingService == null
                 ? null
                 : await _driverPricingService.GetSettingAsync();
-            var deliveryQuote = CalculateCustomerDeliveryFeeForDetails(
-                driverPricing, orderDetails, lat, lng, merchantValidation.Merchants);
+            var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
+            CustomerDeliveryFeeQuote deliveryQuote;
+            JtakMarketCourierPaySetting marketPay;
+            try
+            {
+                marketPay = virtualMarketId.HasValue && orderDetails.Any(x => x.MerchantId == virtualMarketId.Value)
+                    ? await GetJtakMarketCourierPayAsync() : new JtakMarketCourierPaySetting();
+                deliveryQuote = CalculateCustomerDeliveryFeeForDetails(
+                    driverPricing, orderDetails, lat, lng, merchantValidation.Merchants, virtualMarketId);
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
             var deliveryFee = deliveryQuote.CustomerDeliveryFee;
             var captainEarning = CalculateCaptainEarningForDetails(
-                driverPricing, orderDetails, lat, lng, merchantValidation.Merchants);
+                driverPricing, orderDetails, lat, lng, merchantValidation.Merchants, virtualMarketId, marketPay);
             var dtos = orderDetails.Select(x => x.ToDto()).ToArray();
             var money = CalculateCanonicalMoney(dtos, deliveryFee, Modules.Orders.Entities.PaymentMethod.PayOnDelivery,
                 captainEarning: captainEarning,
@@ -109,11 +118,13 @@ namespace App.ApiControllers.V1.Customer.Orders
                 money.DistanceInKm = deliveryQuote.DistanceInKm;
                 money.CustomerRatePerKm = deliveryQuote.CustomerRatePerKm;
                 money.IsFreeDeliveryPromo = deliveryQuote.IsFreeDelivery;
+                money.JtakMarketCourierPay = deliveryQuote.IsVirtualMarket ? marketPay : null;
             }
             var order = new OrderDto
             {
                 OrderDetails = dtos,
                 DeliveryFee = deliveryFee,
+                CustomerMinDeliveryFee = driverPricing?.MinDeliveryFee ?? 50m,
                 Money = money
             };
             return order;
@@ -300,11 +311,20 @@ namespace App.ApiControllers.V1.Customer.Orders
             var driverPricing = _driverPricingService == null
                 ? null
                 : await _driverPricingService.GetSettingAsync();
-            var deliveryQuote = CalculateCustomerDeliveryFeeForDetails(
-                driverPricing, orderDetails, m.Lat, m.Lng, merchantValidation.Merchants);
+            var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
+            CustomerDeliveryFeeQuote deliveryQuote;
+            JtakMarketCourierPaySetting marketPay;
+            try
+            {
+                marketPay = virtualMarketId.HasValue && orderDetails.Any(x => x.MerchantId == virtualMarketId.Value)
+                    ? await GetJtakMarketCourierPayAsync() : new JtakMarketCourierPaySetting();
+                deliveryQuote = CalculateCustomerDeliveryFeeForDetails(
+                    driverPricing, orderDetails, m.Lat, m.Lng, merchantValidation.Merchants, virtualMarketId);
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }
             var deliveryFee = deliveryQuote.CustomerDeliveryFee;
             var captainEarning = CalculateCaptainEarningForDetails(
-                driverPricing, orderDetails, m.Lat, m.Lng, merchantValidation.Merchants);
+                driverPricing, orderDetails, m.Lat, m.Lng, merchantValidation.Merchants, virtualMarketId, marketPay);
             var detailDtos = orderDetails.Select(x => x.ToDto()).ToArray();
             var money = CalculateCanonicalMoney(detailDtos, deliveryFee, m.PaymentMethod,
                 captainEarning: captainEarning,
@@ -315,6 +335,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                 money.DistanceInKm = deliveryQuote.DistanceInKm;
                 money.CustomerRatePerKm = deliveryQuote.CustomerRatePerKm;
                 money.IsFreeDeliveryPromo = deliveryQuote.IsFreeDelivery;
+                money.JtakMarketCourierPay = deliveryQuote.IsVirtualMarket ? marketPay : null;
             }
 
             // 6. Order Creation: Dual-Merchant Checkout (1 Restaurant + 1 Market)
@@ -327,10 +348,10 @@ namespace App.ApiControllers.V1.Customer.Orders
                 var marketDetails = orderDetails.Where(x => x.MerchantId == marketMerchant.Id).ToList();
 
                 var restDeliveryQuote = CalculateCustomerDeliveryFeeForDetails(
-                    driverPricing, restDetails, m.Lat, m.Lng, new[] { restMerchant });
+                    driverPricing, restDetails, m.Lat, m.Lng, new[] { restMerchant }, virtualMarketId);
                 var restDeliveryFee = restDeliveryQuote.CustomerDeliveryFee;
                 var restCaptainEarning = CalculateCaptainEarningForDetails(
-                    driverPricing, restDetails, m.Lat, m.Lng, new[] { restMerchant });
+                    driverPricing, restDetails, m.Lat, m.Lng, new[] { restMerchant }, virtualMarketId, marketPay);
                 var restDetailDtos = restDetails.Select(x => x.ToDto()).ToArray();
                 var restMoney = CalculateCanonicalMoney(restDetailDtos, restDeliveryFee, m.PaymentMethod,
                     captainEarning: restCaptainEarning,
@@ -341,13 +362,14 @@ namespace App.ApiControllers.V1.Customer.Orders
                     restMoney.DistanceInKm = restDeliveryQuote.DistanceInKm;
                     restMoney.CustomerRatePerKm = restDeliveryQuote.CustomerRatePerKm;
                     restMoney.IsFreeDeliveryPromo = restDeliveryQuote.IsFreeDelivery;
+                    restMoney.JtakMarketCourierPay = restDeliveryQuote.IsVirtualMarket ? marketPay : null;
                 }
 
                 var marketDeliveryQuote = CalculateCustomerDeliveryFeeForDetails(
-                    driverPricing, marketDetails, m.Lat, m.Lng, new[] { marketMerchant });
+                    driverPricing, marketDetails, m.Lat, m.Lng, new[] { marketMerchant }, virtualMarketId);
                 var marketDeliveryFee = marketDeliveryQuote.CustomerDeliveryFee;
                 var marketCaptainEarning = CalculateCaptainEarningForDetails(
-                    driverPricing, marketDetails, m.Lat, m.Lng, new[] { marketMerchant });
+                    driverPricing, marketDetails, m.Lat, m.Lng, new[] { marketMerchant }, virtualMarketId, marketPay);
                 var marketDetailDtos = marketDetails.Select(x => x.ToDto()).ToArray();
                 var marketMoney = CalculateCanonicalMoney(marketDetailDtos, marketDeliveryFee, m.PaymentMethod,
                     captainEarning: marketCaptainEarning,
@@ -358,6 +380,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                     marketMoney.DistanceInKm = marketDeliveryQuote.DistanceInKm;
                     marketMoney.CustomerRatePerKm = marketDeliveryQuote.CustomerRatePerKm;
                     marketMoney.IsFreeDeliveryPromo = marketDeliveryQuote.IsFreeDelivery;
+                    marketMoney.JtakMarketCourierPay = marketDeliveryQuote.IsVirtualMarket ? marketPay : null;
                 }
 
                 var cartRest = new Order
@@ -1006,7 +1029,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             IEnumerable<OrderDetail> details,
             decimal customerLat,
             decimal customerLng,
-            IEnumerable<Modules.Catalog.Entities.Merchant> merchants)
+            IEnumerable<Modules.Catalog.Entities.Merchant> merchants, int? virtualMarketId = null, JtakMarketCourierPaySetting marketPay = null)
         {
             var merchantLookup = (merchants ?? Enumerable.Empty<Modules.Catalog.Entities.Merchant>())
                 .GroupBy(x => x.Id)
@@ -1017,6 +1040,10 @@ namespace App.ApiControllers.V1.Customer.Orders
                 {
                     merchantLookup.TryGetValue(group.Key, out var merchant);
                     var fallbackFee = merchant?.DeliveryFee ?? 0m;
+                    if (merchant != null && merchant.Id == virtualMarketId) {
+                        marketPay ??= new JtakMarketCourierPaySetting();
+                        return DriverPricingService.CalculateCaptainOrderEarningStatic(marketPay.Mode, marketPay.Rate, 0m, fallbackFee);
+                    }
                     if (_driverPricingService == null)
                         return fallbackFee;
 
@@ -1024,10 +1051,16 @@ namespace App.ApiControllers.V1.Customer.Orders
                         setting,
                         customerLat,
                         customerLng,
-                        merchant?.Lat ?? 0m,
-                        merchant?.Lng ?? 0m,
+                        merchant?.Id == virtualMarketId ? 0m : merchant?.Lat ?? 0m,
+                        merchant?.Id == virtualMarketId ? 0m : merchant?.Lng ?? 0m,
                         fallbackFee);
                 });
+        }
+
+        private async Task<JtakMarketCourierPaySetting> GetJtakMarketCourierPayAsync()
+        {
+            var task = _driverPricingService?.GetJtakMarketCourierPayAsync();
+            return task == null ? new JtakMarketCourierPaySetting() : await task ?? new JtakMarketCourierPaySetting();
         }
 
         private CustomerDeliveryFeeQuote CalculateCustomerDeliveryFeeForDetails(
@@ -1035,7 +1068,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             IEnumerable<OrderDetail> details,
             decimal customerLat,
             decimal customerLng,
-            IEnumerable<Modules.Catalog.Entities.Merchant> merchants)
+            IEnumerable<Modules.Catalog.Entities.Merchant> merchants, int? virtualMarketId = null)
         {
             var merchantLookup = (merchants ?? Enumerable.Empty<Modules.Catalog.Entities.Merchant>())
                 .GroupBy(x => x.Id)
@@ -1056,12 +1089,15 @@ namespace App.ApiControllers.V1.Customer.Orders
             decimal maxDistance = 0m;
             decimal rate = setting?.CustomerRatePerKm > 0m ? setting.CustomerRatePerKm : 45m;
             bool isFree = setting?.IsFreeDeliveryEnabled == true;
+            bool hasDistancePricing = false;
 
             foreach (var mId in distinctMerchantIds)
             {
                 merchantLookup.TryGetValue(mId, out var merchant);
-                var quote = _driverPricingService?.CalculateCustomerDeliveryFee(
-                    setting, customerLat, customerLng, merchant?.Lat ?? 0m, merchant?.Lng ?? 0m, merchant?.DeliveryFee ?? 0m);
+                var quote = merchant != null && merchant.Id == virtualMarketId
+                    ? CustomerDeliveryFeeQuote.ForVirtualMarket(setting, merchant.DeliveryFee)
+                    : _driverPricingService?.CalculateCustomerDeliveryFee(
+                        setting, customerLat, customerLng, merchant?.Lat ?? 0m, merchant?.Lng ?? 0m, merchant?.DeliveryFee ?? 0m);
 
                 if (quote == null)
                 {
@@ -1076,6 +1112,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                     };
                 }
 
+                hasDistancePricing |= merchant?.Id != virtualMarketId;
                 totalOriginalFee += quote.OriginalDeliveryFee;
                 totalActualFee += quote.CustomerDeliveryFee;
                 if (quote.DistanceInKm > maxDistance)
@@ -1087,10 +1124,11 @@ namespace App.ApiControllers.V1.Customer.Orders
             return new CustomerDeliveryFeeQuote
             {
                 DistanceInKm = maxDistance,
-                CustomerRatePerKm = rate,
+                CustomerRatePerKm = hasDistancePricing ? rate : 0m,
                 OriginalDeliveryFee = totalOriginalFee,
                 CustomerDeliveryFee = totalActualFee,
-                IsFreeDelivery = isFree
+                IsFreeDelivery = isFree,
+                IsVirtualMarket = !hasDistancePricing
             };
         }
 

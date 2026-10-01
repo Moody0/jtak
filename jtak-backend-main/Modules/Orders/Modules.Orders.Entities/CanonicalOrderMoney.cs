@@ -12,6 +12,10 @@ namespace Modules.Orders.Entities
     /// </summary>
     public class CanonicalOrderMoneyDto
     {
+        // Optional for historical/physical-store orders; immutable order policy.
+        // Fields are serialized only by the snapshot options below, not by the
+        // public API's default serializer. Customers do not need internal pay rules.
+        public JtakMarketCourierPaySetting JtakMarketCourierPay;
         public int Version { get; set; } = 1;
 
         /// <summary>
@@ -31,7 +35,8 @@ namespace Modules.Orders.Entities
         public decimal OriginalDeliveryFee { get; set; }
 
         /// <summary>
-        /// Actual delivery distance in kilometers between merchant and customer.
+        /// Straight-line distance in kilometers between a physical store and customer.
+        /// Virtual-market orders have no pickup distance.
         /// </summary>
         public decimal DistanceInKm { get; set; }
 
@@ -164,7 +169,8 @@ namespace Modules.Orders.Entities
     {
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+            IncludeFields = true
         };
 
         public static string Serialize(CanonicalOrderMoneyDto money)

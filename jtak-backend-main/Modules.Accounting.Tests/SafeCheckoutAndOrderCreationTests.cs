@@ -33,6 +33,86 @@ namespace Modules.Accounting.Tests
     public class SafeCheckoutAndOrderCreationTests
     {
         [Theory]
+        [InlineData(0, 0)]
+        [InlineData(33.5138, 36.2765)]
+        public async Task VirtualMarketPreviewUsesItsOwnFeeOnceWithoutUsingAnyShopPin(decimal shopLat, decimal shopLng)
+        {
+            var generic = new Mock<IGenericSettingService>();
+            generic.Setup(x => x.GetValue<DriverPricingSetting>(DriverPricingSetting.Key, null))
+                .ReturnsAsync(new DriverPricingSetting {CustomerRatePerKm = 900m, MinDeliveryFee = 500m});
+            var (controller, orders, catalog, _) = CreateTestController(
+                configureMerchant: m => m.Setup(x => x.GetJtakMarketMerchantId()).ReturnsAsync(10),
+                driverPricingService: new DriverPricingService(generic.Object));
+            using (orders) using (catalog) {
+                var merchant = await catalog.Merchants.FindAsync(10);
+                merchant.MerchantKind = MerchantKind.Grocery; merchant.Title = "JTAK Market";
+                merchant.Lat = shopLat; merchant.Lng = shopLng; merchant.DeliveryFee = 100m;
+                await catalog.SaveChangesAsync();
+                var result = await controller.GetCalc(34.7333m, 36.7167m, new[] {
+                    new CartItem {MerchantId = 10, ProductId = 101, Quantity = 4},
+                    new CartItem {MerchantId = 10, ProductId = 101, Quantity = 1}
+                });
+                Assert.NotNull(result.Value);
+                Assert.Equal(100m, result.Value.DeliveryFee);
+                Assert.Equal(100m, result.Value.Money.OriginalDeliveryFee);
+                Assert.Equal(0m, result.Value.Money.DistanceInKm);
+                Assert.Equal(0m, result.Value.Money.CustomerRatePerKm);
+                Assert.Equal(CaptainCompensationType.SalariedEmployee, result.Value.Money.JtakMarketCourierPay.Mode);
+                Assert.Equal(0m, result.Value.Money.CaptainEarning);
+            }
+        }
+
+        [Fact]
+        public async Task MissingPhysicalStorePinReturnsActionableApiErrorRatherThanFlatFee()
+        {
+            var generic = new Mock<IGenericSettingService>();
+            generic.Setup(x => x.GetValue<DriverPricingSetting>(DriverPricingSetting.Key, null)).ReturnsAsync(new DriverPricingSetting());
+            var (controller, orders, catalog, _) = CreateTestController(driverPricingService: new DriverPricingService(generic.Object));
+            using (orders) using (catalog) {
+                var merchant = await catalog.Merchants.FindAsync(10); merchant.Lat = merchant.Lng = 0m;
+                await catalog.SaveChangesAsync();
+                var result = await controller.GetCalc(34.7333m, 36.7167m, new[] {
+                    new CartItem {MerchantId = 10, ProductId = 101, Quantity = 1}
+                });
+                var failure = Assert.IsType<BadRequestObjectResult>(result.Result);
+                Assert.Contains("موقع المتجر", Assert.IsType<ApiErr>(failure.Value).Errors.First());
+                Assert.Empty(await orders.Orders.ToListAsync());
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task MixedCartCombinesPhysicalDistanceAndVirtualFixedFeeAndPreservesPromotionBasis(bool free)
+        {
+            var setting = new DriverPricingSetting { IsFreeDeliveryEnabled = free, CustomerRatePerKm = 45m, MinDeliveryFee = 50m };
+            var generic = new Mock<IGenericSettingService>();
+            generic.Setup(x => x.GetValue<DriverPricingSetting>(DriverPricingSetting.Key, null)).ReturnsAsync(setting);
+            var pricing = new DriverPricingService(generic.Object);
+            var (controller, orders, catalog, _) = CreateTestController(driverPricingService: pricing,
+                configureMerchant: m => {
+                    m.Setup(x => x.GetJtakMarketMerchantId()).ReturnsAsync(77);
+                    m.Setup(x => x.FindAsync(77)).ReturnsAsync(new Modules.Catalog.Entities.Merchant {
+                        Id = 77, Title = "Renamed virtual market", Active = true, MerchantKind = MerchantKind.Grocery,
+                        Lat = 0m, Lng = 0m, DeliveryFee = 100m
+                    });
+                    m.Setup(x => x.GetMerchantProductPrice(77, 101)).ReturnsAsync(new MerchantProductDto {
+                        MerchantId = 77, MerchantPrice = 430m
+                    });
+                });
+            using (orders) using (catalog) {
+                var result = await controller.GetCalc(34.7333m, 36.7167m, new[] {
+                    new CartItem {MerchantId = 10, ProductId = 101, Quantity = 1},
+                    new CartItem {MerchantId = 77, ProductId = 101, Quantity = 5}
+                });
+                var restaurant = pricing.CalculateCustomerDeliveryFee(setting, 34.7333m, 36.7167m, 33.5138m, 36.2765m);
+                Assert.NotNull(result.Value);
+                Assert.Equal(free ? 0m : restaurant.CustomerDeliveryFee + 100m, result.Value.DeliveryFee);
+                Assert.Equal(restaurant.OriginalDeliveryFee + 100m, result.Value.Money.OriginalDeliveryFee);
+                Assert.Equal(restaurant.DistanceInKm, result.Value.Money.DistanceInKm);
+            }
+        }
+        [Theory]
         [InlineData(true)]
         [InlineData(false)]
         public async Task NewCheckoutWithHomsPinRejectsEgyptOrMissingDeviceLocationBeforeCreatingAnything(bool egypt)

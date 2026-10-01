@@ -63,6 +63,7 @@ namespace Modules.Catalog.Entities
 
     public class MerchantDto
     {
+        public bool IsJtakMarket { get; set; }
         public int Id { get; set; }
 
         [Required]

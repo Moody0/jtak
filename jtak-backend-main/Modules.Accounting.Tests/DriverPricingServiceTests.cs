@@ -284,7 +284,7 @@ namespace Modules.Accounting.Tests
         }
 
         [Fact]
-        public void CalculateCustomerDeliveryFee_MissingCoordinates_UsesFallbackAndMinFee()
+        public void CalculateCustomerDeliveryFee_MissingCoordinates_RejectsInsteadOfUsingFlatFallback()
         {
             var genericSettingMock = new Mock<IGenericSettingService>();
             var service = new DriverPricingService(genericSettingMock.Object);
@@ -296,17 +296,49 @@ namespace Modules.Accounting.Tests
                 MinDeliveryFee = 50m
             };
 
-            var quote = service.CalculateCustomerDeliveryFee(
+            Assert.Throws<InvalidOperationException>(() => service.CalculateCustomerDeliveryFee(
                 setting,
                 customerLat: 0m,
                 customerLng: 0m,
                 merchantLat: 0m,
                 merchantLng: 0m,
-                fallbackFee: 75m);
+                fallbackFee: 75m));
+        }
 
+        [Fact]
+        public void CustomerFee_Beyond25Km_UsesDistanceRateRatherThanFlatFallback()
+        {
+            var service = new DriverPricingService(null);
+            var quote = service.CalculateCustomerDeliveryFee(new DriverPricingSetting(),
+                34.7333m, 36.7167m, 34.4000m, 36.7167m, 100m);
+            Assert.True(quote.DistanceInKm > 25m);
+            Assert.Equal(Math.Round(quote.DistanceInKm * 45m, MidpointRounding.AwayFromZero), quote.CustomerDeliveryFee);
+            Assert.NotEqual(100m, quote.CustomerDeliveryFee);
+        }
+
+        [Fact]
+        public void CustomerFee_IdenticalPins_UsesMinimumRatherThanFlatFallback()
+        {
+            var quote = new DriverPricingService(null).CalculateCustomerDeliveryFee(new DriverPricingSetting(),
+                34.7333m, 36.7167m, 34.7333m, 36.7167m, 100m);
             Assert.Equal(0m, quote.DistanceInKm);
-            Assert.Equal(75m, quote.CustomerDeliveryFee);
-            Assert.Equal(75m, quote.OriginalDeliveryFee);
+            Assert.Equal(50m, quote.CustomerDeliveryFee);
+        }
+
+        [Theory]
+        [InlineData(false, 100, 100)]
+        [InlineData(true, 100, 0)]
+        [InlineData(false, 0, 0)]
+        public void VirtualMarket_UsesOwnFeeWithoutDistanceOrPhysicalStoreMinimum(bool free, decimal fee, decimal expected)
+        {
+            var quote = CustomerDeliveryFeeQuote.ForVirtualMarket(new DriverPricingSetting {
+                CustomerRatePerKm = 500m, MinDeliveryFee = 1000m, IsFreeDeliveryEnabled = free
+            }, fee);
+            Assert.Equal(expected, quote.CustomerDeliveryFee);
+            Assert.Equal(fee, quote.OriginalDeliveryFee);
+            Assert.Equal(0m, quote.DistanceInKm);
+            Assert.Equal(0m, quote.CustomerRatePerKm);
+            Assert.Equal(free, quote.IsFreeDelivery);
         }
     }
 }

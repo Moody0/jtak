@@ -71,6 +71,7 @@ namespace App.ApiControllers.V1.Customer
         [Route("MerchantsByKind/{merchantKind}")]
         public async Task<ActionResult<MerchantDto[]>> MerchantsByKind(MerchantKind merchantKind)
         {
+            var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
             var merchants = await _merchantService.Queryable()
                 .AsNoTracking()
                 .Where(x => x.DeletionDate == null && x.Active && x.MerchantKind == merchantKind)
@@ -84,12 +85,13 @@ namespace App.ApiControllers.V1.Customer
                     Phone1 = x.Phone1,
                     Phone2 = x.Phone2,
                     ShippingCoverageInMeters = x.ShippingCoverageInMeters,
-                    Lat = x.Lat,
-                    Lng = x.Lng,
+                    Lat = x.Id == virtualMarketId ? 0m : x.Lat,
+                    Lng = x.Id == virtualMarketId ? 0m : x.Lng,
                     Active = x.Active,
                     MerchantKind = x.MerchantKind,
                     DeliveryTime = x.DeliveryTime,
                     DeliveryFee = x.DeliveryFee,
+                    IsJtakMarket = x.Id == virtualMarketId,
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
@@ -107,6 +109,7 @@ namespace App.ApiControllers.V1.Customer
         [Route("Merchants")]
         public async Task<ActionResult<MerchantDto[]>> GetMerchants([FromQuery] MerchantKind? kind = null)
         {
+            var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
             var q = _merchantService.Queryable()
                 .AsNoTracking()
                 .Where(x => x.DeletionDate == null && x.Active);
@@ -127,12 +130,13 @@ namespace App.ApiControllers.V1.Customer
                     Phone1 = x.Phone1,
                     Phone2 = x.Phone2,
                     ShippingCoverageInMeters = x.ShippingCoverageInMeters,
-                    Lat = x.Lat,
-                    Lng = x.Lng,
+                    Lat = x.Id == virtualMarketId ? 0m : x.Lat,
+                    Lng = x.Id == virtualMarketId ? 0m : x.Lng,
                     Active = x.Active,
                     MerchantKind = x.MerchantKind,
                     DeliveryTime = x.DeliveryTime,
                     DeliveryFee = x.DeliveryFee,
+                    IsJtakMarket = x.Id == virtualMarketId,
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
@@ -151,6 +155,7 @@ namespace App.ApiControllers.V1.Customer
         [Route("Merchant/{id}")]
         public async Task<ActionResult<MerchantDto>> GetMerchant(int id)
         {
+            var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
             var merchant = await _merchantService.Queryable()
                 .AsNoTracking()
                 .Where(x => x.Id == id && x.DeletionDate == null && x.Active)
@@ -163,12 +168,13 @@ namespace App.ApiControllers.V1.Customer
                     Phone1 = x.Phone1,
                     Phone2 = x.Phone2,
                     ShippingCoverageInMeters = x.ShippingCoverageInMeters,
-                    Lat = x.Lat,
-                    Lng = x.Lng,
+                    Lat = x.Id == virtualMarketId ? 0m : x.Lat,
+                    Lng = x.Id == virtualMarketId ? 0m : x.Lng,
                     Active = x.Active,
                     MerchantKind = x.MerchantKind,
                     DeliveryTime = x.DeliveryTime,
                     DeliveryFee = x.DeliveryFee,
+                    IsJtakMarket = x.Id == virtualMarketId,
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
@@ -197,6 +203,7 @@ namespace App.ApiControllers.V1.Customer
                                                                            [FromQuery] decimal? lat = null,
                                                                            [FromQuery] decimal? lng = null)
         {
+            var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
             var categoryIds = await GetActiveCategoryTreeIds(categoryId);
             if (!categoryIds.Any())
                 return Array.Empty<MerchantDto>();
@@ -237,12 +244,13 @@ namespace App.ApiControllers.V1.Customer
                     Phone1 = x.Phone1,
                     Phone2 = x.Phone2,
                     ShippingCoverageInMeters = x.ShippingCoverageInMeters,
-                    Lat = x.Lat,
-                    Lng = x.Lng,
+                    Lat = x.Id == virtualMarketId ? 0m : x.Lat,
+                    Lng = x.Id == virtualMarketId ? 0m : x.Lng,
                     Active = x.Active,
                     MerchantKind = x.MerchantKind,
                     DeliveryTime = x.DeliveryTime,
                     DeliveryFee = x.DeliveryFee,
+                    IsJtakMarket = x.Id == virtualMarketId,
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
@@ -257,6 +265,7 @@ namespace App.ApiControllers.V1.Customer
         public async Task<ActionResult<MerchantDto[]>> MerchantsWithOffers([FromQuery] decimal? lat = null,
                                                                            [FromQuery] decimal? lng = null)
         {
+            var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
             var offers = _merchantProductRepository.Queryable().AsNoTracking()
                 .Where(x => x.Discount > 0m && x.MerchantPrice > 0m &&
                             x.Product.Active && x.Product.DeletionDate == null &&
@@ -285,12 +294,13 @@ namespace App.ApiControllers.V1.Customer
                     Phone1 = x.Phone1,
                     Phone2 = x.Phone2,
                     ShippingCoverageInMeters = x.ShippingCoverageInMeters,
-                    Lat = x.Lat,
-                    Lng = x.Lng,
+                    Lat = x.Id == virtualMarketId ? 0m : x.Lat,
+                    Lng = x.Id == virtualMarketId ? 0m : x.Lng,
                     Active = x.Active,
                     MerchantKind = x.MerchantKind,
                     DeliveryTime = x.DeliveryTime,
                     DeliveryFee = x.DeliveryFee,
+                    IsJtakMarket = x.Id == virtualMarketId,
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
