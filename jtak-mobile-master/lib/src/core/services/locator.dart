@@ -3,11 +3,14 @@ import 'package:jtek_app/src/core/controllers/app_parameters_provider.dart';
 import 'package:jtek_app/src/core/controllers/user/address_provider.dart';
 import '../controllers/app_notification_provider.dart';
 import '../controllers/catalog/categories_provider.dart';
+import 'delivery_coverage_service.dart';
 import '../controllers/catalog/markets_provider.dart';
 import '../controllers/order/cart_provider.dart';
 import 'authentication_service.dart';
 import '../../utils/providers/sol_api.dart';
 import '../controllers/app/app_state_manager.dart';
+
+import 'contact_settings_service.dart';
 
 GetIt locator = GetIt.instance;
 
@@ -15,6 +18,8 @@ void setupLocator() {
   locator.registerSingleton(AppStateManager());
   locator.registerLazySingleton(() => AuthenticationService());
   locator.registerLazySingleton(() => SolApi());
+  locator.registerLazySingleton(() => DeliveryCoverageService());
+  locator.registerLazySingleton(() => ContactSettingsService());
   locator.registerLazySingleton(() => AppParametersProvider());
   locator.registerLazySingleton(() => AddressProvider());
   locator.registerLazySingleton(() => CartProvider());
@@ -22,3 +27,4 @@ void setupLocator() {
   locator.registerLazySingleton(() => MarketsProvider());
   locator.registerLazySingleton(() => CategoriesProvider());
 }
+

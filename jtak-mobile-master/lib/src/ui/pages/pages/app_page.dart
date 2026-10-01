@@ -7,7 +7,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 
 import '../../../../main_imports.dart';
 import '../../../config/constants/constants.dart';
-import '../../../config/constants/app_constant.dart';
+import '../../../core/services/contact_settings_service.dart';
 import '../../../utils/utilities/lunch_url.dart';
 import '../../../config/themes/colors.dart';
 import '../../../core/controllers/app_pages_provider.dart';
@@ -84,7 +84,7 @@ class _AppPageState extends State<AppPage> {
       'iconBg': const Color(0xFFFEF2F2),
       'question': 'هل يمكنني إلغاء الطلب بعد تأكيده؟',
       'answer':
-          'نعم، يمكنك إلغاء الطلب طالما أنه في حالة "قيد التحضير" من شاشة تفاصيل الطلب، أو التواصل مباشرة مع خدمة العملاء عبر واتساب.',
+          'يمكنك إلغاء الطلب قبل أن يبدأ المتجر بتحضيره. بعد بدء التحضير لا يمكن إلغاء الطلب من التطبيق؛ عند الحاجة، تواصل مع خدمة العملاء عبر واتساب.',
     },
     {
       'category': 'طرق الدفع',
@@ -219,7 +219,7 @@ class _AppPageState extends State<AppPage> {
     if (isHelp) {
       return _buildHelpCenter();
     } else {
-      return _buildTermsPage();
+      return _buildLegalDocumentEmptyState();
     }
   }
 
@@ -631,7 +631,7 @@ class _AppPageState extends State<AppPage> {
             onTap: () {
               HapticFeedback.lightImpact();
               LunchUrl.openWhatsApp(
-                phone: kSupportWhatsAppNumber,
+                phone: ContactSettingsService.instance.whatsAppNumber,
                 message: 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص التطبيق.',
                 context: context,
               );
@@ -665,6 +665,8 @@ class _AppPageState extends State<AppPage> {
   // Hotline Call Card (Orange Theme)
   // ---------------------------------------------------------------------------
   Widget _buildHotlineCard() {
+    final contact = ContactSettingsService.instance;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -703,7 +705,7 @@ class _AppPageState extends State<AppPage> {
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    LunchUrl.makeCall(kSupportPhoneNumber, context: context);
+                    LunchUrl.makeCall(contact.phoneNumber, context: context);
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Row(
@@ -720,7 +722,7 @@ class _AppPageState extends State<AppPage> {
                       Directionality(
                         textDirection: TextDirection.ltr,
                         child: Text(
-                          '\u202A$kSupportPhoneFormatted\u202C',
+                          '\u202A${contact.phoneFormatted}\u202C',
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w800,
@@ -733,7 +735,9 @@ class _AppPageState extends State<AppPage> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'يومياً 9:00 ص - 12:00 منتصف الليل',
+                  contact.workingHoursAr.isNotEmpty
+                      ? contact.workingHoursAr
+                      : 'يومياً 9:00 ص - 12:00 منتصف الليل',
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -744,7 +748,7 @@ class _AppPageState extends State<AppPage> {
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    LunchUrl.makeCall(kSupportPhoneNumber, context: context);
+                    LunchUrl.makeCall(contact.phoneNumber, context: context);
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
@@ -875,7 +879,8 @@ class _AppPageState extends State<AppPage> {
           savedName != 'مستخدم جيتك') {
         nameController.text = savedName;
       }
-      phoneController.text = PhoneHelper.normalizeSyrianLocalPhone(user?.phoneNumber);
+      phoneController.text =
+          PhoneHelper.normalizeSyrianLocalPhone(user?.phoneNumber);
     }
 
     showDialog(
@@ -1065,7 +1070,8 @@ class _AppPageState extends State<AppPage> {
 
                         final body = {
                           'DisplayName': nameController.text.trim(),
-                          'PhoneNumber': PhoneHelper.normalizeSyrianLocalPhone(phoneController.text),
+                          'PhoneNumber': PhoneHelper.normalizeSyrianLocalPhone(
+                              phoneController.text),
                           'Email': senderEmail,
                           'Title': 'رسالة إلى الدعم الفني',
                           'Message': messageController.text.trim(),
@@ -1117,232 +1123,62 @@ class _AppPageState extends State<AppPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // 2. TERMS & CONDITIONS (الشروط والأحكام وسياسة الخصوصية)
+  // 2. LEGAL DOCUMENT EMPTY STATE
   // ---------------------------------------------------------------------------
-  Widget _buildTermsPage() {
-    final sections = [
-      {
-        'number': '٠١',
-        'title': 'مقدمة وقبول الشروط',
-        'icon': PhosphorIconsFill.fileText,
-        'iconColor': kPrimaryOrange,
-        'iconBg': const Color(0xFFFFF3EB),
-        'content':
-            'أهلاً بك في تطبيق جيتك (JTAK). باستخدامك للتطبيق أو إنشاء حساب جديد، فإنك تقر وتوافق على الالتزام بكافة الشروط والأحكام وسياسات الخدمة الموضحة هنا لضمان تجربة آمنة وموثوقة.',
-      },
-      {
-        'number': '٠٢',
-        'title': 'حساب المستخدم والأمان',
-        'icon': PhosphorIconsFill.user,
-        'iconColor': const Color(0xFF3B82F6),
-        'iconBg': const Color(0xFFEFF6FF),
-        'content':
-            'يلتزم المستخدم بتقديم رقم هاتف صحيح وتأكيده عبر رمز التحقق (OTP). يتحمل المستخدم مسؤولية الحفاظ على سرية حسابه وكافة الأنشطة والطلبات التي تتم من خلاله.',
-      },
-      {
-        'number': '٠٣',
-        'title': 'آلية الطلب وتحديد المواقع',
-        'icon': PhosphorIconsFill.motorcycle,
-        'iconColor': kPrimaryOrange,
-        'iconBg': const Color(0xFFFFF3EB),
-        'content':
-            'يلتزم تطبيق جيتك بتوصيل الطلبات من المطاعم والمتاجر المعتمدة إلى موقعك الجغرافي المحدد بدقة. يرجى التأكد من صحة العنوان ورقم التواصل لتفادي أي تأخير في استلام الوجبات.',
-      },
-      {
-        'number': '٠٤',
-        'title': 'سياسة الخصوصية وحماية البيانات',
-        'icon': PhosphorIconsFill.shieldCheck,
-        'iconColor': const Color(0xFF10B981),
-        'iconBg': const Color(0xFFECFDF5),
-        'content':
-            'نحن نحرص على حماية بياناتك الشخصية بأعلى معايير الأمان. يتم استخدام موقعك ورقم هاتفك فقط لمعالجة الطلبات وإتمام التوصيل، ولا يتم بيع أو مشاركة بياناتك مع أي أطراف إعلانية خارجية.',
-      },
-      {
-        'number': '٠٥',
-        'title': 'الإلغاء وحقوق التعويض',
-        'icon': PhosphorIconsFill.arrowCounterClockwise,
-        'iconColor': const Color(0xFFF59E0B),
-        'iconBg': const Color(0xFFFFFBEB),
-        'content':
-            'يحق للعميل إلغاء الطلب طالما أنه لا يزال في مرحلة "قيد التحضير". في حال استلام صنف ناقص أو غير مطابق، يرجى إبلاغ الدعم الفني خلال ٣٠ دقيقة ليتم التعويض فوراً.',
-      },
-    ];
+  Widget _buildLegalDocumentEmptyState() {
+    final isPrivacyPolicy = widget.pageType.toLowerCase() == 'privacypolicy';
+    final icon = isPrivacyPolicy
+        ? PhosphorIconsFill.shieldCheck
+        : PhosphorIconsFill.fileText;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 1. Hero Overview Header Card
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3EB),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Transform.flip(
-                        flipX: true,
-                        child: const Icon(PhosphorIconsFill.fileText,
-                            color: kPrimaryOrange, size: 24),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'اتفاقية الاستخدام والخصوصية',
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: kCharcoalDark,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'حقوقك والتزاماتك عند استخدام منصة جيتك',
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border:
-                      Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Transform.flip(
-                      flipX: true,
-                      child: const Icon(PhosphorIconsFill.shieldCheck,
-                          size: 14, color: Color(0xFF10B981)),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'سارية ومحدثة لعام 2026',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF475569),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // 2. Structured Section Cards
-        ...sections.map((sec) {
-          return Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(18),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+              color: isPrivacyPolicy
+                  ? const Color(0xFFECFDF5)
+                  : const Color(0xFFFFF3EB),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: sec['iconBg'] as Color,
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: Center(
-                        child: Transform.flip(
-                          flipX: true,
-                          child: Icon(
-                            sec['icon'] as IconData,
-                            size: 18,
-                            color: sec['iconColor'] as Color,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        sec['title'] as String,
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          color: kCharcoalDark,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        sec['number'] as String,
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  sec['content'] as String,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 13.2,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF475569),
-                    height: 1.65,
-                  ),
-                ),
-              ],
+            child: Icon(
+              icon,
+              size: 26,
+              color: isPrivacyPolicy ? const Color(0xFF10B981) : kPrimaryOrange,
             ),
-          );
-        }),
-
-        const SizedBox(height: 24),
-      ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'لم تتم إضافة ${widget.pageTitle} بعد',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: kCharcoalDark,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'سيظهر المحتوى هنا عند نشره من الإدارة.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 13,
+              color: const Color(0xFF64748B),
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

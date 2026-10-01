@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 
 using App.Shared.Services.Pricing;
 using Modules.Orders.Entities;
+using App.Shared.Entities.Domain;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -350,6 +351,44 @@ namespace App.ApiControllers.V1.Admin
                     EntityType = "ErrandDriverEarningSetting", EntityId = ErrandDriverEarningSetting.Key,
                     Description = $"تحديث أجر مندوب اطلب ما تحتاجه إلى {setting.Amount:N2} ل.س لكل طلب",
                     Result = "Success", AfterState = setting
+                });
+            }
+            return Ok(true);
+        }
+
+        /// <summary>
+        /// Get unified support phone numbers and social media channels.
+        /// </summary>
+        [HttpGet("Contact")]
+        public async Task<ActionResult<SystemContactSettings>> GetContact()
+        {
+            var setting = await _genericSetting.GetValue<SystemContactSettings>(SystemContactSettings.Key);
+            return Ok(setting ?? new SystemContactSettings());
+        }
+
+        /// <summary>
+        /// Update unified support phone numbers and social media channels across all apps.
+        /// </summary>
+        [HttpPut("Contact")]
+        public async Task<ActionResult<bool>> SetContact([FromBody] SystemContactSettings model)
+        {
+            if (model == null) return BadRequest(ApiErr.Create("بيانات الإعدادات غير صالحة."));
+            model.Normalize();
+            var before = await _genericSetting.GetValue<SystemContactSettings>(SystemContactSettings.Key);
+            await _genericSetting.SetValue(SystemContactSettings.Key, model);
+
+            if (_auditService != null)
+            {
+                await _auditService.LogAsync(new AdminAuditLogEntry
+                {
+                    Module = "Settings",
+                    Action = "UpdateContactSettings",
+                    EntityType = "SystemContactSettings",
+                    EntityId = SystemContactSettings.Key,
+                    Description = $"تحديث أرقام الدعم وروابط التواصل (الهاتف: {model.PhoneNumber}، واتساب: {model.WhatsAppNumber})",
+                    Result = "Success",
+                    BeforeState = before,
+                    AfterState = model
                 });
             }
             return Ok(true);

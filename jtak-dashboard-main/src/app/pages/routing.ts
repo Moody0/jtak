@@ -110,6 +110,11 @@ const Routing: Routes = [
       import('./pages/pages.module').then((m) => m.PagesModule),
   },
   {
+    path: 'settings/contact',
+    loadChildren: () =>
+      import('./contact-settings/contact-settings.module').then((m) => m.ContactSettingsModule),
+  },
+  {
     path: 'crafted/pages/profile',
     loadChildren: () =>
       import('../modules/profile/profile.module').then((m) => m.ProfileModule),

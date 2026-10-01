@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'driver_order_earning_card.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../../config/themes/colors.dart';
+import '../../../core/services/contact_settings_service.dart';
 import '../../../core/controllers/order_provider.dart';
 import '../../../core/enums/order_details_status_enum.dart';
 import '../../../core/models/order_model.dart';
 import '../../../ui/widgets/app_widgets.dart';
 import '../../../utils/custom_widgets/loading.dart';
 import '../../../utils/utilities/global_var.dart';
+import '../../../utils/utilities/phone_helper.dart';
 import 'order_widgets.dart';
 
 class OrderDetailsPage extends StatefulWidget {
@@ -29,112 +32,40 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   @override
   void initState() {
     super.initState();
-    final provider = Provider.of<OrderProvider>(context, listen: false);
-    provider.setOrderObject(widget.order);
-    if (widget.order.id != null) {
-      provider.silentSyncOrder(widget.order.id!);
-    }
-
-    _refreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    // An empty order snapshot triggers loadOrder's synchronous busy-state
+    // notification. Start after mounting, just like the orders dashboard.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final prov = Provider.of<OrderProvider>(context, listen: false);
-      if (widget.order.id != null && !prov.isBusy && !prov.isActionInFlight(widget.order.id!)) {
-        prov.silentSyncOrder(widget.order.id!);
-      }
+      unawaited(_loadInitialOrder());
+      _refreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+        if (!mounted) return;
+        final prov = Provider.of<OrderProvider>(context, listen: false);
+        if (widget.order.id != null &&
+            !prov.isBusy &&
+            !prov.isActionInFlight(widget.order.id!)) {
+          prov.silentSyncOrder(widget.order.id!);
+        }
+      });
     });
+  }
+
+  Future<void> _loadInitialOrder() async {
+    final provider = Provider.of<OrderProvider>(context, listen: false);
+    try {
+      await provider.setOrderObject(widget.order);
+      if (mounted && widget.order.id != null) {
+        await provider.silentSyncOrder(widget.order.id!);
+      }
+    } catch (error) {
+      // API failures are handled by the shared availability/retry gate.
+      debugPrint('Driver order details refresh failed: $error');
+    }
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     super.dispose();
-  }
-
-  void _confirmCancelOrder(BuildContext context, OrderModel order) {
-    final orderProv = Provider.of<OrderProvider>(context, listen: false);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: kRed, size: 26),
-            const SizedBox(width: 8),
-            Text(
-              isArabic ? 'إلغاء مهمة التوصيل' : 'Cancel Delivery Task',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: isDark ? Colors.white : kCharcoalDark,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          isArabic
-              ? 'هل أنت متأكد من رغبتك في إلغاء توصيل الطلب #${order.id}؟ سيتم إخطار الإدارة والتاجر وإلغاء المهمة.'
-              : 'Are you sure you want to cancel delivery for order #${order.id}? Management and merchants will be notified.',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13.5,
-            color: isDark ? const Color(0xFFCBD5E1) : kCharcoalMuted,
-          ),
-        ),
-        actions: [
-          TextButton(
-            child: Text(
-              isArabic ? 'تراجع' : 'Back',
-              style: GoogleFonts.ibmPlexSansArabic(
-                color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onPressed: () => Navigator.pop(ctx),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text(
-              isArabic ? 'تأكيد الإلغاء' : 'Confirm Cancel',
-              style: GoogleFonts.ibmPlexSansArabic(color: Colors.white, fontWeight: FontWeight.w700),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await orderProv.cancelOrder(order.id!);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isArabic ? 'تم إلغاء مهمة التوصيل بنجاح' : 'Delivery canceled successfully',
-                        style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
-                      ),
-                      backgroundColor: kRed,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(e.toString().replaceAll('Exception: ', '').trim()),
-                      backgroundColor: kRed,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -152,7 +83,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       appBar: AppBar(
         title: Text(
           isArabic ? 'تفاصيل الطلب #${order.id}' : 'Order #${order.id}',
-          style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w800, fontSize: 17),
+          style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: FontWeight.w800, fontSize: 17),
         ),
         centerTitle: true,
         actions: [
@@ -167,7 +99,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomActionBar(context, order, provider, isArabic),
       body: FullScreenLoading(
         inAsyncCall: provider.isBusy && provider.orderIsEmpty(),
         child: SafeArea(
@@ -184,6 +115,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 // 2. Financial & COD Amount Card
                 _buildPaymentCard(order, isDark, isArabic),
 
+                const SizedBox(height: 12),
+                DriverOrderEarningCard(
+                    earning: order.captainEarning,
+                    compensationType: order.captainCompensationType,
+                    rate: order.captainRate,
+                    distanceInKm: order.distanceInKm,
+                    originalDeliveryFee: order.originalDeliveryFee,
+                    delivered: order.isDelivered,
+                    canceled: order.isCanceled),
+
                 const SizedBox(height: 16),
 
                 // 3. Multi-Merchant Pickup Progress Header (if multiple)
@@ -191,9 +132,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   _buildMultiMerchantProgress(order, isDark, isArabic),
 
                 // 4. Merchant Pickup Stops
-                if (order.orderDetails != null && order.orderDetails!.isNotEmpty) ...[
+                if (order.orderDetails != null &&
+                    order.orderDetails!.isNotEmpty) ...[
                   Text(
-                    isArabic ? 'نقاط الاستلام (المتاجر)' : 'Pickup Stops (Stores)',
+                    isArabic
+                        ? 'نقاط الاستلام (المتاجر)'
+                        : 'Pickup Stops (Stores)',
                     style: GoogleFonts.ibmPlexSansArabic(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
@@ -201,18 +145,21 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  ...order.orderDetails!.map((merchant) => MerchentOrderDetailsCard(
-                        item: merchant,
-                        orderId: order.id!,
-                        showPickupAction: true,
-                      )),
+                  ...order.orderDetails!
+                      .map((merchant) => MerchentOrderDetailsCard(
+                            item: merchant,
+                            orderId: order.id!,
+                            showPickupAction: true,
+                          )),
                 ],
 
                 const SizedBox(height: 16),
 
                 // 5. Customer Destination Card
                 Text(
-                  isArabic ? 'وجهة التسليم (العميل)' : 'Dropoff Destination (Customer)',
+                  isArabic
+                      ? 'وجهة التسليم (العميل)'
+                      : 'Dropoff Destination (Customer)',
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -222,37 +169,115 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 const SizedBox(height: 10),
                 CustomerOrderDetailsCard(order: order),
 
+                if (!order.isDelivered && !order.isCanceled) ...[
+                  const SizedBox(height: 12),
+                  _buildSupportCard(order, isDark, isArabic),
+                ],
+
                 const SizedBox(height: 20),
 
-                // 6. Cancel Delivery Action (If non-terminal)
-                if (!order.isTerminal) ...[
-                  Center(
-                    child: OutlinedButton.icon(
-                      onPressed: provider.isActionInFlight(order.id)
-                          ? null
-                          : () => _confirmCancelOrder(context, order),
-                      icon: const AppIcon(PhosphorIcons.xCircleBold, size: 16, color: kRed),
-                      label: Text(
-                        isArabic ? 'إلغاء مهمة التوصيل لهذا الطلب' : 'Cancel Delivery for Order',
-                        style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: kRed,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: kRed.withValues(alpha: 0.5)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                // Keep workflow actions in the page content so they scroll
+                // with the order details instead of staying pinned to the
+                // bottom of the screen.
+                _buildOrderAction(context, order, provider, isArabic),
+
+                const SizedBox(height: 20),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSupportCard(OrderModel order, bool isDark, bool isArabic) {
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textColor = isDark ? Colors.white : kCharcoalDark;
+    final message = isArabic
+        ? 'مرحباً، أحتاج إلى مساعدة بخصوص الطلب رقم #${order.id}.'
+        : 'Hello, I need help with order #${order.id}.';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : kCardBorderColor,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const AppIcon(PhosphorIcons.headsetBold,
+                  size: 20, color: kPrimaryOrange),
+              const SizedBox(width: 8),
+              Text(
+                isArabic ? 'تحتاج إلى مساعدة؟' : 'Need help?',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isArabic ? 'تواصل مع الدعم' : 'Contact support',
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 13,
+              color: isDark ? const Color(0xFF94A3B8) : kCharcoalMuted,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => PhoneHelper.launchCall(
+                      context,
+                      ContactSettingsService
+                          .instance.phoneInternational),
+                  icon: const AppIcon(PhosphorIcons.phoneCallBold,
+                      size: 16, color: kGreen),
+                  label: Text(isArabic ? 'اتصال' : 'Call'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kGreen,
+                    side: BorderSide(color: kGreen.withValues(alpha: 0.45)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => PhoneHelper.launchWhatsApp(
+                    context,
+                    ContactSettingsService
+                        .instance.whatsAppNumber,
+                    message: message,
+                  ),
+                  icon: const AppIcon(PhosphorIcons.chatCircleDotsBold,
+                      size: 16, color: Color(0xFF25A55B)),
+                  label: const Text('WhatsApp'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF25A55B),
+                    side: BorderSide(
+                        color: const Color(0xFF25A55B).withValues(alpha: 0.45)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -262,14 +287,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   // ---------------------------------------------------------------------------
   Widget _buildStatusBanner(OrderModel order, bool isDark, bool isArabic) {
     final status = order.deliveryStatus;
-    final timeFormatted = GlobalVar.dateForamt(order.purchaseDate, 'yyyy-MM-dd HH:mm') ?? '';
+    final timeFormatted =
+        GlobalVar.dateForamt(order.purchaseDate, 'yyyy-MM-dd HH:mm') ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : kCardBorderColor),
+        border: Border.all(
+            color: isDark ? const Color(0xFF334155) : kCardBorderColor),
         boxShadow: const [
           BoxShadow(
             color: Color(0x06000000),
@@ -303,14 +330,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 },
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF0F172A) : kSurfaceWarm,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const AppIcon(PhosphorIcons.hashBold, size: 14, color: kPrimaryOrange),
+                      const AppIcon(PhosphorIcons.hashBold,
+                          size: 14, color: kPrimaryOrange),
                       const SizedBox(width: 4),
                       Text(
                         '${order.id}',
@@ -321,7 +350,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.copy_rounded, size: 12, color: kPrimaryOrange),
+                      const Icon(Icons.copy_rounded,
+                          size: 12, color: kPrimaryOrange),
                     ],
                   ),
                 ),
@@ -359,7 +389,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: _nextStepTextColor(order, isDark).withValues(alpha: 0.8),
+                          color: _nextStepTextColor(order, isDark)
+                              .withValues(alpha: 0.8),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -386,7 +417,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 color: isDark ? kDarkRedBg : kRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: isDark ? kDarkRedBorder : kRed.withValues(alpha: 0.3)),
+                    color:
+                        isDark ? kDarkRedBorder : kRed.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -438,7 +470,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   // ---------------------------------------------------------------------------
   Widget _buildPaymentCard(OrderModel order, bool isDark, bool isArabic) {
     final isCod = order.isCod;
-    final priceFormatted = GlobalVar.priceForamt(order.price);
+    final priceFormatted = GlobalVar.priceForamt(order.payableTotal);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -462,7 +494,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             decoration: BoxDecoration(
               color: isCod
                   ? (isDark ? const Color(0xFF451A03) : const Color(0xFFFEF3C7))
-                  : (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5)),
+                  : (isDark
+                      ? const Color(0xFF064E3B)
+                      : const Color(0xFFD1FAE5)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -482,21 +516,31 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               children: [
                 Text(
                   isCod
-                      ? (isArabic ? 'المطلوب تحصيله من العميل (نقداً):' : 'Collect from customer (Cash):')
-                      : (isArabic ? 'الطلب مدفوع إلكترونياً (مسبقاً)' : 'Order is Prepaid (Card)'),
+                      ? (isArabic
+                          ? 'المطلوب تحصيله من العميل (نقداً):'
+                          : 'Collect from customer (Cash):')
+                      : (isArabic
+                          ? 'الطلب مدفوع إلكترونياً (مسبقاً)'
+                          : 'Order is Prepaid (Card)'),
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: isCod
-                        ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
-                        : (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46)),
+                        ? (isDark
+                            ? const Color(0xFFFDE68A)
+                            : const Color(0xFF92400E))
+                        : (isDark
+                            ? const Color(0xFFA7F3D0)
+                            : const Color(0xFF065F46)),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   isCod
                       ? '$priceFormatted ${isArabic ? 'ليرة سورية' : 'SYP'}'
-                      : (isArabic ? 'لا تقم بتحصيل أي مبالغ نقدية من العميل' : 'Do not collect any cash'),
+                      : (isArabic
+                          ? 'لا تقم بتحصيل أي مبالغ نقدية من العميل'
+                          : 'Do not collect any cash'),
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: isCod ? 16 : 13,
                     fontWeight: FontWeight.w800,
@@ -505,6 +549,43 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         : (isDark ? kDarkGreenText : const Color(0xFF047857)),
                   ),
                 ),
+                if (isCod && (order.deliveryFee ?? 0) > 0) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    isArabic
+                        ? 'يتضمن رسوم توصيل ${GlobalVar.priceForamt(order.deliveryFee)} ل.س'
+                        : 'Includes ${GlobalVar.priceForamt(order.deliveryFee)} SYP delivery fee',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 11,
+                      color: isDark ? kDarkAmberText : const Color(0xFF92400E),
+                    ),
+                  ),
+                ],
+                if (order.hasPartialFulfillment == true) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF7C2D12)
+                          : const Color(0xFFFFEDD5),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      isArabic
+                          ? 'تنبيه: تم تعديل المبلغ المطلوب بسبب اعتذار المتجر عن بعض الأصناف'
+                          : 'Notice: Cash to collect adjusted due to merchant line rejection',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? const Color(0xFFFED7AA)
+                            : const Color(0xFFC2410C),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -516,7 +597,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   // ---------------------------------------------------------------------------
   // Multi-merchant progress indicator
   // ---------------------------------------------------------------------------
-  Widget _buildMultiMerchantProgress(OrderModel order, bool isDark, bool isArabic) {
+  Widget _buildMultiMerchantProgress(
+      OrderModel order, bool isDark, bool isArabic) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(12),
@@ -542,9 +624,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? kDarkBlueText
-                        : const Color(0xFF1E40AF),
+                    color: isDark ? kDarkBlueText : const Color(0xFF1E40AF),
                   ),
                 ),
                 Text(
@@ -566,9 +646,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Persistent Bottom Primary Action Bar
+  // Order workflow action, displayed inline in the scrollable details.
   // ---------------------------------------------------------------------------
-  Widget _buildBottomActionBar(
+  Widget _buildOrderAction(
     BuildContext context,
     OrderModel order,
     OrderProvider provider,
@@ -584,7 +664,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           left: 16,
           right: 16,
           top: 12,
-          bottom: MediaQuery.of(context).padding.bottom + 12,
+          bottom: 12,
         ),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -599,7 +679,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   color: isDark ? kDarkGreenText : kGreen, size: 20),
               const SizedBox(width: 8),
               Text(
-                isArabic ? 'تم تسليم هذا الطلب بنجاح ✓' : 'Order Delivered Successfully ✓',
+                isArabic
+                    ? 'تم تسليم هذا الطلب بنجاح ✓'
+                    : 'Order Delivered Successfully ✓',
                 style: GoogleFonts.ibmPlexSansArabic(
                   color: isDark ? kDarkGreenText : kGreen,
                   fontWeight: FontWeight.w800,
@@ -619,7 +701,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           left: 16,
           right: 16,
           top: 12,
-          bottom: MediaQuery.of(context).padding.bottom + 12,
+          bottom: 12,
         ),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -656,7 +738,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           left: 16,
           right: 16,
           top: 12,
-          bottom: MediaQuery.of(context).padding.bottom + 12,
+          bottom: 12,
         ),
         child: SizedBox(
           height: 50,
@@ -668,11 +750,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
-                : const AppIcon(PhosphorIcons.shieldCheckBold, size: 20, color: Colors.white),
+                : const AppIcon(PhosphorIcons.shieldCheckBold,
+                    size: 20, color: Colors.white),
             label: Text(
-              isArabic ? 'تأكيد تسليم الطلب للعميل (PoD)' : 'Confirm Delivery to Customer',
+              isArabic ? 'تأكيد التسليم' : 'Confirm Delivery',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -681,7 +765,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: kGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
               elevation: 0,
             ),
           ),
@@ -689,83 +774,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       );
     }
 
-    // 2. Pending Pickups -> Primary Action: Pickup from Next Merchant
+    // Pickup is confirmed inside the relevant merchant card so the driver
+    // only sees one action for each pickup stop.
     final nextMerchant = order.nextPendingMerchant;
-    if (nextMerchant != null && nextMerchant.orderDetailStatus == OrderDetailsStatus.readyForPickup) {
-      return Container(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 12,
-          bottom: MediaQuery.of(context).padding.bottom + 12,
-        ),
-        child: SizedBox(
-          height: 50,
-          child: ElevatedButton.icon(
-            onPressed: isActionInFlight
-                ? null
-                : () async {
-                    try {
-                      await provider.startShipping(order.id!, nextMerchant.merchantId!);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isArabic
-                                  ? 'تم استلام الطلب من ${nextMerchant.merchantTitle ?? "المتجر"} بنجاح ✓'
-                                  : 'Order picked up successfully ✓',
-                              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
-                            ),
-                            backgroundColor: kGreen,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              e.toString().replaceAll('Exception: ', '').trim(),
-                              style: GoogleFonts.ibmPlexSansArabic(),
-                            ),
-                            backgroundColor: kRed,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    }
-                  },
-            icon: isActionInFlight
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const AppIcon(PhosphorIcons.storefrontBold, size: 20, color: Colors.white),
-            label: Text(
-              isActionInFlight
-                  ? (isArabic ? 'جاري التأكيد...' : 'Confirming...')
-                  : (isArabic
-                      ? 'استلام الطلب من ${nextMerchant.merchantTitle ?? "المتجر"}'
-                      : 'Pickup from ${nextMerchant.merchantTitle ?? "Store"}'),
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimaryOrange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 0,
-            ),
-          ),
-        ),
-      );
+    if (nextMerchant != null &&
+        nextMerchant.orderDetailStatus == OrderDetailsStatus.readyForPickup) {
+      return const SizedBox.shrink();
     }
-
     // Fallback: Merchant still preparing
     return Container(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -773,7 +788,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         left: 16,
         right: 16,
         top: 12,
-        bottom: MediaQuery.of(context).padding.bottom + 12,
+        bottom: 12,
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -789,7 +804,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 size: 18),
             const SizedBox(width: 8),
             Text(
-              isArabic ? 'المتجر يقوم بتجهيز الطلب حالياً...' : 'Merchant is preparing order...',
+              isArabic
+                  ? 'المتجر يقوم بتجهيز الطلب حالياً...'
+                  : 'Merchant is preparing order...',
               style: GoogleFonts.ibmPlexSansArabic(
                 color: isDark ? kDarkAmberText : const Color(0xFFB45309),
                 fontWeight: FontWeight.w700,
@@ -805,7 +822,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   // ---------------------------------------------------------------------------
   // Helper Color & Label Methods
   // ---------------------------------------------------------------------------
-  Widget _buildStatusPill(OrderDetailsStatus status, bool isDark, bool isArabic) {
+  Widget _buildStatusPill(
+      OrderDetailsStatus status, bool isDark, bool isArabic) {
     Color bg;
     Color fg;
     String text;
@@ -865,16 +883,21 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   Color _nextStepBackgroundColor(OrderModel o, bool isDark) {
     if (o.isDelivered) return isDark ? kDarkGreenBg : kGreenLight;
     if (o.isCanceled) return isDark ? kDarkRedBg : kRedLight;
-    if (o.canDeliverToCustomer) return isDark ? const Color(0xFF2A1C12) : const Color(0xFFFFF0E8);
-    if (o.hasPendingPickups) return isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF);
+    if (o.canDeliverToCustomer)
+      return isDark ? const Color(0xFF2A1C12) : const Color(0xFFFFF0E8);
+    if (o.hasPendingPickups)
+      return isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF);
     return isDark ? kDarkAmberBg : kAmberLight;
   }
 
   Color _nextStepBorderColor(OrderModel o, bool isDark) {
-    if (o.isDelivered) return isDark ? kDarkGreenBorder : const Color(0xFFA7F3D0);
+    if (o.isDelivered)
+      return isDark ? kDarkGreenBorder : const Color(0xFFA7F3D0);
     if (o.isCanceled) return isDark ? kDarkRedBorder : const Color(0xFFFECACA);
-    if (o.canDeliverToCustomer) return isDark ? const Color(0xFF7C2D12) : const Color(0xFFFFD4C0);
-    if (o.hasPendingPickups) return isDark ? kDarkBlueBorder : const Color(0xFFBFDBFE);
+    if (o.canDeliverToCustomer)
+      return isDark ? const Color(0xFF7C2D12) : const Color(0xFFFFD4C0);
+    if (o.hasPendingPickups)
+      return isDark ? kDarkBlueBorder : const Color(0xFFBFDBFE);
     return isDark ? kDarkAmberBorder : const Color(0xFFFDE68A);
   }
 
@@ -882,7 +905,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     if (o.isDelivered) return isDark ? kDarkGreenText : const Color(0xFF047857);
     if (o.isCanceled) return isDark ? kDarkRedText : const Color(0xFFB91C1C);
     if (o.canDeliverToCustomer) return kPrimaryOrange;
-    if (o.hasPendingPickups) return isDark ? kDarkBlueText : const Color(0xFF1E40AF);
+    if (o.hasPendingPickups)
+      return isDark ? kDarkBlueText : const Color(0xFF1E40AF);
     return isDark ? kDarkAmberText : const Color(0xFFB45309);
   }
 
@@ -896,7 +920,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   String _nextStepDescription(OrderModel o, bool isArabic) {
     if (o.isDelivered) {
-      return isArabic ? 'تم إتمام وتوثيق تسليم هذا الطلب بنجاح.' : 'Order delivery completed.';
+      return isArabic
+          ? 'تم إتمام وتوثيق تسليم هذا الطلب بنجاح.'
+          : 'Order delivery completed.';
     }
     if (o.isCanceled) {
       return isArabic ? 'تم إلغاء هذا الطلب.' : 'This order has been canceled.';

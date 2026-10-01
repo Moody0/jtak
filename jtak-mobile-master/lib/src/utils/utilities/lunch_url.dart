@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/constants/app_constant.dart';
+import '../../core/services/contact_settings_service.dart';
 
 /// ---------------------------------------------------------------------------
 /// JTAK Centralized External URL, WhatsApp & Call Launcher Helper
@@ -10,11 +11,11 @@ import '../../config/constants/app_constant.dart';
 /// ---------------------------------------------------------------------------
 class LunchUrl {
   /// Opens native phone dialer with specified phone number.
-  /// Defaults to [kSupportPhoneNumber] ('0985615705') if null or empty.
+  /// Defaults to dynamic [ContactSettingsService.instance.phoneNumber] (or [kSupportPhoneNumber]) if null or empty.
   static Future<bool> makeCall(String? phone, {BuildContext? context}) async {
     final rawPhone = (phone != null && phone.trim().isNotEmpty)
         ? phone.trim()
-        : kSupportPhoneNumber;
+        : ContactSettingsService.instance.phoneNumber;
     final cleanPhone = rawPhone.replaceAll(RegExp(r'[^\d+]'), '');
     final uri = Uri.parse('tel:$cleanPhone');
 
@@ -57,7 +58,7 @@ class LunchUrl {
   }) async {
     String target = (phone != null && phone.trim().isNotEmpty)
         ? phone.trim()
-        : kSupportWhatsAppNumber;
+        : ContactSettingsService.instance.whatsAppNumber;
 
     // Sanitize phone to international digits without '+' or spaces
     target = target.replaceAll(RegExp(r'[^\d]'), '');

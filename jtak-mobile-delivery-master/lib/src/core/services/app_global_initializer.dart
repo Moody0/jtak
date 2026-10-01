@@ -5,6 +5,7 @@ import 'package:app_jtak_delivery/src/core/services/firebase_notification_servic
 import 'package:app_jtak_delivery/src/core/services/locator.dart';
 import 'package:provider/provider.dart';
 import '../controllers/app/app_state_manager.dart';
+import 'contact_settings_service.dart';
 
 class AppGlobalInitializer {
   static Future mainInitializer() async {
@@ -12,6 +13,7 @@ class AppGlobalInitializer {
     WidgetsFlutterBinding.ensureInitialized();
     await FireBaseNotificationServices.basicInitialize();
     setupLocator();
+    await ContactSettingsService.instance.init();
     await locator<AppStateManager>().initializAppState();
     await locator<AuthenticationService>().getAuthorizationData();
   }

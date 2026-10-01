@@ -6,8 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../config/constants/app_constant.dart';
 import '../../config/themes/colors.dart';
+import '../../core/services/contact_settings_service.dart';
 import '../../utils/utilities/global_var.dart';
 import '../../utils/utilities/lunch_url.dart';
 
@@ -21,87 +21,110 @@ class SocialMediaWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-      ),
-      child: Column(
-        children: [
-          // Section Title
-          Text(
-            'تابعنا على منصات التواصل',
-            style: GoogleFonts.ibmPlexSansArabic(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-              color: kCharcoalDark,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            'كن أول من يعرف بالعروض والخصومات اليومية',
-            style: GoogleFonts.ibmPlexSansArabic(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF94A3B8),
-            ),
-          ),
-          const SizedBox(height: 14),
+    final contact = ContactSettingsService.instance;
 
-          // Social Channels Strip (Phosphor Icons System)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return AnimatedBuilder(
+      animation: contact,
+      builder: (context, _) {
+        final hasTelegram = contact.telegramUrl.trim().isNotEmpty;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+          ),
+          child: Column(
             children: [
-              // WhatsApp (Live Support)
-              _buildChannelButton(
-                icon: PhosphorIconsFill.whatsappLogo,
-                iconColor: const Color(0xFF10B981),
-                bgColor: const Color(0xFFECFDF5),
-                onTap: () => _whatsappFun(context),
+              // Section Title
+              Text(
+                'تابعنا على منصات التواصل',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: kCharcoalDark,
+                ),
               ),
-              const SizedBox(width: 12),
-
-              // Call Hotline (JTAK Brand Orange)
-              _buildChannelButton(
-                icon: PhosphorIconsFill.phone,
-                iconColor: kPrimaryOrange,
-                bgColor: const Color(0xFFFFF3EB),
-                onTap: _call,
+              const SizedBox(height: 3),
+              Text(
+                'كن أول من يعرف بالعروض والخصومات اليومية',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF94A3B8),
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 14),
 
-              // Instagram (Rose)
-              _buildChannelButton(
-                icon: PhosphorIconsFill.instagramLogo,
-                iconColor: const Color(0xFFE11D48),
-                bgColor: const Color(0xFFFFF1F2),
-                onTap: _instagramFun,
-              ),
-              const SizedBox(width: 12),
+              // Social Channels Strip (Phosphor Icons System)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // WhatsApp (Live Support)
+                    _buildChannelButton(
+                      icon: PhosphorIconsFill.whatsappLogo,
+                      iconColor: const Color(0xFF10B981),
+                      bgColor: const Color(0xFFECFDF5),
+                      onTap: () => _whatsappFun(context),
+                    ),
+                    const SizedBox(width: 12),
 
-              // Facebook (Blue)
-              _buildChannelButton(
-                icon: PhosphorIconsFill.facebookLogo,
-                iconColor: const Color(0xFF2563EB),
-                bgColor: const Color(0xFFEFF6FF),
-                onTap: _facebookFun,
-              ),
-              const SizedBox(width: 12),
+                    // Call Hotline (JTAK Brand Orange)
+                    _buildChannelButton(
+                      icon: PhosphorIconsFill.phone,
+                      iconColor: kPrimaryOrange,
+                      bgColor: const Color(0xFFFFF3EB),
+                      onTap: _call,
+                    ),
+                    const SizedBox(width: 12),
 
-              // YouTube (Red)
-              _buildChannelButton(
-                icon: PhosphorIconsFill.youtubeLogo,
-                iconColor: const Color(0xFFDC2626),
-                bgColor: const Color(0xFFFEF2F2),
-                onTap: _youtubeFun,
+                    // Instagram (Rose)
+                    _buildChannelButton(
+                      icon: PhosphorIconsFill.instagramLogo,
+                      iconColor: const Color(0xFFE11D48),
+                      bgColor: const Color(0xFFFFF1F2),
+                      onTap: _instagramFun,
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Facebook (Blue)
+                    _buildChannelButton(
+                      icon: PhosphorIconsFill.facebookLogo,
+                      iconColor: const Color(0xFF2563EB),
+                      bgColor: const Color(0xFFEFF6FF),
+                      onTap: _facebookFun,
+                    ),
+                    const SizedBox(width: 12),
+
+                    // YouTube (Red)
+                    _buildChannelButton(
+                      icon: PhosphorIconsFill.youtubeLogo,
+                      iconColor: const Color(0xFFDC2626),
+                      bgColor: const Color(0xFFFEF2F2),
+                      onTap: _youtubeFun,
+                    ),
+
+                    if (hasTelegram) ...[
+                      const SizedBox(width: 12),
+                      // Telegram (Cyan)
+                      _buildChannelButton(
+                        icon: PhosphorIconsFill.paperPlaneTilt,
+                        iconColor: const Color(0xFF0284C7),
+                        bgColor: const Color(0xFFF0F9FF),
+                        onTap: _telegramFun,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -144,12 +167,14 @@ class SocialMediaWidget extends StatelessWidget {
   }
 
   void _call() async {
-    await LunchUrl.makeCall(kSupportPhoneNumber);
+    await LunchUrl.makeCall(ContactSettingsService.instance.phoneNumber);
   }
 
   void _facebookFun() async {
+    final fbUrl = ContactSettingsService.instance.facebookUrl;
     final Uri fbApp = Uri.parse('fb://page/103594782320636');
-    final Uri fbWeb = Uri.parse('https://www.facebook.com/app.jtak/');
+    final Uri fbWeb = Uri.parse(
+        fbUrl.trim().isNotEmpty ? fbUrl : 'https://www.facebook.com/app.jtak/');
     try {
       if (!kIsWeb && !Platform.isIOS && await canLaunchUrl(fbApp)) {
         await launchUrl(fbApp, mode: LaunchMode.externalApplication);
@@ -165,7 +190,10 @@ class SocialMediaWidget extends StatelessWidget {
   }
 
   void _instagramFun() async {
-    final Uri igUri = Uri.parse('https://www.instagram.com/JTAKcompany/');
+    final igUrl = ContactSettingsService.instance.instagramUrl;
+    final Uri igUri = Uri.parse(igUrl.trim().isNotEmpty
+        ? igUrl
+        : 'https://www.instagram.com/JTAKcompany/');
     try {
       await launchUrl(igUri, mode: LaunchMode.externalApplication);
     } catch (err) {
@@ -175,18 +203,33 @@ class SocialMediaWidget extends StatelessWidget {
 
   void _whatsappFun(BuildContext context) async {
     await LunchUrl.openWhatsApp(
-      phone: kSupportWhatsAppNumber,
+      phone: ContactSettingsService.instance.whatsAppNumber,
       message: 'مرحباً جيتك، أحتاج مساعدة واستفسار.',
       context: context,
     );
   }
 
   void _youtubeFun() async {
-    final Uri ytUri = Uri.parse('https://www.youtube.com/channel/UCXEnrIm0euKKFEQOROAQPSQ');
+    final ytUrl = ContactSettingsService.instance.youtubeUrl;
+    final Uri ytUri = Uri.parse(ytUrl.trim().isNotEmpty
+        ? ytUrl
+        : 'https://www.youtube.com/channel/UCXEnrIm0euKKFEQOROAQPSQ');
     try {
       await launchUrl(ytUri, mode: LaunchMode.externalApplication);
     } catch (err) {
       GlobalVar.log(err.toString());
+    }
+  }
+
+  void _telegramFun() async {
+    final tgUrl = ContactSettingsService.instance.telegramUrl;
+    if (tgUrl.trim().isNotEmpty) {
+      final Uri tgUri = Uri.parse(tgUrl.trim());
+      try {
+        await launchUrl(tgUri, mode: LaunchMode.externalApplication);
+      } catch (err) {
+        GlobalVar.log(err.toString());
+      }
     }
   }
 }

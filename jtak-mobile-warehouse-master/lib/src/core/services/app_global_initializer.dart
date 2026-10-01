@@ -3,6 +3,7 @@ import 'package:app_jtak_warehouse/src/core/controllers/initial_data_provider.da
 import 'package:app_jtak_warehouse/src/core/services/authentication_service.dart';
 import 'package:app_jtak_warehouse/src/core/services/firebase_notification_services.dart';
 import 'package:app_jtak_warehouse/src/core/services/locator.dart';
+import 'contact_settings_service.dart';
 import 'package:provider/provider.dart';
 import '../controllers/app/app_state_manager.dart';
 
@@ -12,6 +13,7 @@ class AppGlobalInitializer {
     WidgetsFlutterBinding.ensureInitialized();
     await FireBaseNotificationServices.basicInitialize();
     setupLocator();
+    await ContactSettingsService.instance.init();
     await locator<AppStateManager>().initializAppState();
     await locator<AuthenticationService>().getAuthorizationData();
   }

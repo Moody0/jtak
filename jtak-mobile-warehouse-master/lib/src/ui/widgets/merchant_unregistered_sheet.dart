@@ -1,8 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
-import 'package:app_jtak_warehouse/src/config/constants/app_constant.dart';
+import 'package:app_jtak_warehouse/src/core/services/contact_settings_service.dart';
 import 'package:app_jtak_warehouse/src/utils/custom_widgets/syrian_flag.dart';
 import 'package:app_jtak_warehouse/src/utils/utilities/lunch_url.dart';
 
@@ -27,16 +26,15 @@ class MerchantUnregisteredSheet extends StatelessWidget {
   }
 
   void _openWhatsApp(BuildContext context) {
-    final cleanPhone = kSupportWhatsApp.replaceAll('+', '').replaceAll(' ', '');
-    final message = Uri.encodeComponent(
-      'مرحباً إدارة جيتك، أود الاستفسار عن تسجيل وتفعيل حساب التاجر لرقم الهاتف: $phoneNumber',
+    LunchUrl.openWhatsApp(
+      phone: ContactSettingsService.instance.whatsAppNumber,
+      message:
+          'مرحباً إدارة جيتك، أود الاستفسار عن تسجيل وتفعيل حساب التاجر لرقم الهاتف: $phoneNumber',
     );
-    final url = 'https://wa.me/$cleanPhone?text=$message';
-    LunchUrl.canLaunch(url);
   }
 
   void _callSupport(BuildContext context) {
-    LunchUrl.canLaunch('tel:$kSupportPhone');
+    LunchUrl.makeCall(ContactSettingsService.instance.phoneNumber);
   }
 
   @override
@@ -198,7 +196,7 @@ class MerchantUnregisteredSheet extends StatelessWidget {
                   const Icon(PhosphorIconsBold.phoneCall, size: 20, color: Color(0xFF1E293B)),
                   const SizedBox(width: 10),
                   Text(
-                    'اتصال هاتفي: $kSupportPhone',
+                    'اتصال هاتفي: ${ContactSettingsService.instance.phoneFormatted}',
                     style: GoogleFonts.ibmPlexSansArabic(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -210,33 +208,6 @@ class MerchantUnregisteredSheet extends StatelessWidget {
               ),
             ),
           ),
-
-          // Debug test option (only in debug mode)
-          if (kDebugMode) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: TextButton.icon(
-                onPressed: () => Navigator.pop(context, true),
-                icon: const Icon(PhosphorIconsBold.shieldCheck, size: 18, color: Color(0xFFEA580C)),
-                label: Text(
-                  'المتابعة كتاجر تجريبي (وضع التطوير - Debug)',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFFEA580C),
-                  ),
-                ),
-                style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFF7ED),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
 
           const SizedBox(height: 8),
 

@@ -26,19 +26,35 @@ namespace App.ApiControllers.V1.Customer
         private readonly IAppUnitOfWork _uow;
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger<ContactController> _logger;
+        private readonly IGenericSettingService _genericSetting;
 
         public ContactController(
             IEmailService emailService,
             ISupportMessageService supportService,
             IAppUnitOfWork uow,
             UserManager<AppUser> userManager,
-            ILogger<ContactController> logger)
+            ILogger<ContactController> logger,
+            IGenericSettingService genericSetting = null)
         {
             _emailService = emailService;
             _supportService = supportService;
             _uow = uow;
             _userManager = userManager;
             _logger = logger;
+            _genericSetting = genericSetting;
+        }
+
+        /// <summary>
+        /// Get unified support phone numbers and social media channels (public for all mobile apps).
+        /// </summary>
+        [HttpGet("Settings")]
+        [AllowAnonymous]
+        public async Task<ActionResult<SystemContactSettings>> GetContactSettings()
+        {
+            var setting = _genericSetting != null
+                ? await _genericSetting.GetValue<SystemContactSettings>(SystemContactSettings.Key)
+                : null;
+            return Ok(setting ?? new SystemContactSettings());
         }
 
         [HttpPost]

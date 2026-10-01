@@ -30,6 +30,7 @@ export const ApplicationRoutes = Object.freeze({
   Terms: 'pages/TermsAndConditions',
   PaymentTerms: 'pages/PaymentPolicy',
   AuditLogs: 'audit-logs',
+  ContactSettings: 'settings/contact',
 });
 
 export const ApplicationMenu = [
@@ -134,7 +135,12 @@ export const ApplicationMenu = [
     icon: 'fas fa-utensils',
   },
   {
-    path: ApplicationRoutes.AuditLogs,
+    path: ApplicationRoutes.ContactSettings,
+    label: 'MENU.CONTACT_SETTINGS',
+    icon: 'fas fa-headset',
+  },
+  {
+  path: ApplicationRoutes.AuditLogs,
     label: 'MENU.AUDIT_LOGS',
     icon: 'fas fa-shield-alt',
   },
@@ -214,7 +220,7 @@ export const ApplicationMenuGroups = [
     label: 'MENU.GROUPS.SYSTEM',
     description: 'MENU.GROUP_DESCRIPTIONS.SYSTEM',
     icon: 'fas fa-cog',
-    items: [menuItem(ApplicationRoutes.Terms), menuItem(ApplicationRoutes.PrivacyPolicy), menuItem(ApplicationRoutes.PaymentTerms), menuItem(ApplicationRoutes.AuditLogs)],
+    items: [menuItem(ApplicationRoutes.ContactSettings), menuItem(ApplicationRoutes.Terms), menuItem(ApplicationRoutes.PrivacyPolicy), menuItem(ApplicationRoutes.PaymentTerms), menuItem(ApplicationRoutes.AuditLogs)],
   },
 ];
 

@@ -3,6 +3,7 @@ import 'package:jtek_app/src/core/controllers/app_parameters_provider.dart';
 import 'package:jtek_app/src/core/controllers/user/address_provider.dart';
 import 'package:jtek_app/src/core/services/authentication_service.dart';
 import 'locator.dart';
+import 'contact_settings_service.dart';
 import '../controllers/app/app_state_manager.dart';
 import 'firebase_notification_services.dart';
 import '../controllers/catalog/favorite_product_provider.dart';
@@ -18,6 +19,7 @@ class AppGlobalInitializer {
     await FireBaseNotificationServices.basicInitialize();
     print("  -> setupLocator");
     setupLocator();
+    await ContactSettingsService.instance.init();
     print("  -> initializAppState");
     await locator<AppStateManager>().initializAppState();
     print("  -> getAuthorizationData");

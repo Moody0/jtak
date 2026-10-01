@@ -1,4 +1,5 @@
-import 'package:app_jtak_warehouse/src/config/constants/app_constant.dart';
+import 'dart:ui' as ui;
+
 import 'package:app_jtak_warehouse/src/config/constants/constants.dart';
 import 'package:app_jtak_warehouse/src/config/themes/colors.dart';
 import 'package:app_jtak_warehouse/src/core/controllers/payment_provider.dart';
@@ -8,6 +9,7 @@ import 'package:app_jtak_warehouse/src/core/models/bill_model.dart';
 import 'package:app_jtak_warehouse/src/core/models/order_model.dart';
 import 'package:app_jtak_warehouse/src/core/models/payment_model.dart';
 import 'package:app_jtak_warehouse/src/core/services/authentication_service.dart';
+import 'package:app_jtak_warehouse/src/core/services/contact_settings_service.dart';
 import 'package:app_jtak_warehouse/src/core/services/locator.dart';
 import 'package:app_jtak_warehouse/src/ui/pages/order/order_details_page.dart';
 import 'package:app_jtak_warehouse/src/utils/custom_widgets/messages.dart';
@@ -31,15 +33,21 @@ String formatPrice(num? amount) {
   return formatter.format(amount.round());
 }
 
+String _formatInvoiceAmount(num? amount) {
+  if (amount == null) return '0';
+  return NumberFormat('#,##0.##', 'en_US').format(amount);
+}
+
 /// ---------------------------------------------------------------------------
-/// Flipped Icon (Horizontally Mirrored so it faces the opposite direction)
+/// Icon helper for glyphs mirrored to match the warehouse app's RTL treatment.
 /// ---------------------------------------------------------------------------
 class FlippedIcon extends StatelessWidget {
   final IconData icon;
   final Color? color;
   final double? size;
 
-  const FlippedIcon(this.icon, {Key? key, this.color, this.size}) : super(key: key);
+  const FlippedIcon(this.icon, {Key? key, this.color, this.size})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +65,8 @@ class PaymentSingleItem extends StatelessWidget {
   final PaymentModel item;
   final VoidCallback? onReceiptConfirmed;
 
-  const PaymentSingleItem(this.item, {Key? key, this.onReceiptConfirmed}) : super(key: key);
+  const PaymentSingleItem(this.item, {Key? key, this.onReceiptConfirmed})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +74,10 @@ class PaymentSingleItem extends StatelessWidget {
     final title = item.requestNumber != null
         ? 'طلب تسوية ${item.requestNumber}'
         : (item.id != null ? 'دفعة تسوية #${item.id}' : 'دفعة تسوية');
-    final dateString = item.completedAt ?? item.handoverDate ?? item.reviewedAt ?? item.createdDate;
+    final dateString = item.completedAt ??
+        item.handoverDate ??
+        item.reviewedAt ??
+        item.createdDate;
 
     String statusLabel;
     Color statusBg;
@@ -110,12 +122,14 @@ class PaymentSingleItem extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isReceived ? const Color(0xFFE2E8F0) : const Color(0xFFFFD6C2),
+              color: isReceived
+                  ? const Color(0xFFE2E8F0)
+                  : const Color(0xFFFFD6C2),
               width: isReceived ? 1.0 : 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -136,13 +150,19 @@ class PaymentSingleItem extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: isReceived ? const Color(0xFFDCFCE7) : const Color(0xFFFFF0E8),
+                              color: isReceived
+                                  ? const Color(0xFFDCFCE7)
+                                  : const Color(0xFFFFF0E8),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: FlippedIcon(
-                              isReceived ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.clock,
+                              isReceived
+                                  ? PhosphorIconsFill.checkCircle
+                                  : PhosphorIconsRegular.clock,
                               size: 18,
-                              color: isReceived ? const Color(0xFF16A34A) : kPrimaryOrange,
+                              color: isReceived
+                                  ? const Color(0xFF16A34A)
+                                  : kPrimaryOrange,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -162,7 +182,9 @@ class PaymentSingleItem extends StatelessWidget {
                                 ),
                                 if (dateString != null)
                                   Text(
-                                    GlobalVar.dateForamt(dateString, kDateTimeFormat) ?? "",
+                                    GlobalVar.dateForamt(
+                                            dateString, kDateTimeFormat) ??
+                                        "",
                                     style: GoogleFonts.ibmPlexSansArabic(
                                       fontSize: 10.5,
                                       color: const Color(0xFF94A3B8),
@@ -176,7 +198,8 @@ class PaymentSingleItem extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
                         color: statusBg,
                         borderRadius: BorderRadius.circular(8),
@@ -252,14 +275,17 @@ class PaymentSingleItem extends StatelessWidget {
                     if (!isReceived && item.status != 0 && item.status != 2)
                       ElevatedButton.icon(
                         onPressed: () => _confirmReceiptWithDialog(context),
-                        icon: const FlippedIcon(PhosphorIconsBold.check, size: 14),
+                        icon: const FlippedIcon(PhosphorIconsBold.check,
+                            size: 14),
                         label: const Text('تأكيد الاستلام'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimaryOrange,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
                           textStyle: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -269,7 +295,8 @@ class PaymentSingleItem extends StatelessWidget {
                     else if (item.byUser != null && item.byUser!.isNotEmpty)
                       Row(
                         children: [
-                          const FlippedIcon(PhosphorIconsRegular.user, size: 13, color: Color(0xFF94A3B8)),
+                          const FlippedIcon(PhosphorIconsRegular.user,
+                              size: 13, color: Color(0xFF94A3B8)),
                           const SizedBox(width: 4),
                           Text(
                             'المسلّم: ${item.byUser}',
@@ -298,12 +325,13 @@ class PaymentSingleItem extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => PayoutReceiptSheet(
         payment: item,
-        onConfirmReceipt: (!item.isReceived && item.status != 0 && item.status != 2)
-            ? () {
-                Navigator.pop(ctx);
-                _confirmReceiptWithDialog(context);
-              }
-            : null,
+        onConfirmReceipt:
+            (!item.isReceived && item.status != 0 && item.status != 2)
+                ? () {
+                    Navigator.pop(ctx);
+                    _confirmReceiptWithDialog(context);
+                  }
+                : null,
       ),
     );
   }
@@ -311,143 +339,247 @@ class PaymentSingleItem extends StatelessWidget {
   void _confirmReceiptWithDialog(BuildContext context) {
     HapticFeedback.lightImpact();
     final formattedAmount = formatPrice(item.amount);
-    final courierName = item.byUser ?? 'إدارة جيتك';
-    final refNumber = item.requestNumber ?? (item.id != null ? '#${item.id}' : '');
+    final methodKey = (item.method ?? '').trim().toLowerCase();
+    final handoverMethod = switch (methodKey) {
+      'sham_cash' => 'شام كاش',
+      'syriatel_cash' => 'سيريتل كاش',
+      'cash_in_store' => 'تسليم نقدي في المتجر',
+      'al_haram' => 'حوالة الهرم / الفؤاد',
+      'bank_transfer' => 'تحويل بنكي',
+      _ => item.method?.trim().isNotEmpty == true
+          ? item.method!.trim()
+          : (item.byUser ?? 'إدارة جيتك'),
+    };
+    final refNumber =
+        item.requestNumber ?? (item.id != null ? '#${item.id}' : '');
 
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+        contentPadding: const EdgeInsets.fromLTRB(22, 12, 22, 8),
+        titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 4),
+        actionsPadding: const EdgeInsets.fromLTRB(22, 4, 22, 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF0E8),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(15),
               ),
-              child: const FlippedIcon(PhosphorIconsFill.shieldCheck, color: kPrimaryOrange, size: 22),
+              child: const FlippedIcon(
+                PhosphorIconsFill.shieldCheck,
+                color: kPrimaryOrange,
+                size: 23,
+              ),
             ),
-            const SizedBox(width: 10),
-            Text(
-              'تأكيد استلام الدفعة',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'تأكيد استلام الدفعة',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'هل استلمت بالفعل هذا المبلغ من الإدارة / المندوب؟',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF334155),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'هل استلمت هذا المبلغ فعلياً من الإدارة أو المندوب؟',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 14,
+                  height: 1.6,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF334155),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'المبلغ المطلوب تأكيده:',
-                        style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B)),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'المبلغ المطلوب تأكيده',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
                       ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '$formattedAmount ل.س',
+                      textDirection: ui.TextDirection.rtl,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF15803D),
+                      ),
+                    ),
+                    if (refNumber.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      const SizedBox(height: 12),
                       Text(
-                        '$formattedAmount ل.س',
+                        'رقم الطلب / الإيصال',
                         style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF16A34A),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Directionality(
+                        textDirection: ui.TextDirection.ltr,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: SelectableText(
+                                refNumber,
+                                textAlign: TextAlign.left,
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'نسخ رقم الإيصال',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () {
+                                Clipboard.setData(
+                                    ClipboardData(text: refNumber));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('تم نسخ رقم الإيصال')),
+                                );
+                              },
+                              icon: const FlippedIcon(Icons.copy_rounded,
+                                  size: 17),
+                              color: const Color(0xFF64748B),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                  if (refNumber.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'رقم الطلب / الإيصال:',
-                          style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B)),
-                        ),
-                        Text(
-                          refNumber,
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 12),
+                    Text(
+                      'طريقة التسليم',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      handoverMethod,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1E293B),
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'طريقة التسليم:',
-                        style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B)),
-                      ),
-                      Text(
-                        courierName,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const FlippedIcon(Icons.info_outline_rounded,
+                        size: 18, color: Color(0xFFB45309)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'التأكيد يوثّق استلام المبلغ ويحدّث حساب المتجر. لا تؤكد قبل قبضه فعلياً.',
                         style: GoogleFonts.ibmPlexSansArabic(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1E293B),
+                          fontSize: 11,
+                          height: 1.5,
+                          color: const Color(0xFF92400E),
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'ملاحظة: تأكيد الاستلام سيقوم بتحديث الحسابات وتوثيق تسليم المبلغ نهائياً.',
-              style: GoogleFonts.ibmPlexSansArabic(fontSize: 11, color: const Color(0xFF94A3B8), height: 1.4),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: Text(
-              'إلغاء',
-              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogCtx);
-              await _executeReceipt(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimaryOrange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            ),
-            child: Text(
-              'نعم، استلمت المبلغ',
-              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700, color: Colors.white),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF475569),
+                    minimumSize: const Size.fromHeight(48),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Text(
+                    'إلغاء',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(dialogCtx);
+                    await _executeReceipt(context);
+                  },
+                  icon: const FlippedIcon(Icons.check_circle_outline_rounded,
+                      size: 19),
+                  label: Text(
+                    'نعم، استلمت المبلغ',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: kPrimaryOrange,
+                    minimumSize: const Size.fromHeight(48),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -457,17 +589,20 @@ class PaymentSingleItem extends StatelessWidget {
   Future<void> _executeReceipt(BuildContext context) async {
     HapticFeedback.mediumImpact();
     try {
-      final paymentProvider = Provider.of<PaymentProvider>(context, listen: false);
+      final paymentProvider =
+          Provider.of<PaymentProvider>(context, listen: false);
       bool success = false;
       if (item.isSettlementRequest && item.requestId != null) {
-        success = await paymentProvider.confirmSettlementReceipt(item.requestId!);
+        success =
+            await paymentProvider.confirmSettlementReceipt(item.requestId!);
       } else if (item.id != null) {
         success = await paymentProvider.recivePayment(item.id!);
       }
 
       if (success && context.mounted) {
         try {
-          await Provider.of<TransactionsProvider>(context, listen: false).loadBalances();
+          await Provider.of<TransactionsProvider>(context, listen: false)
+              .loadBalances();
         } catch (_) {}
 
         onReceiptConfirmed?.call();
@@ -476,14 +611,17 @@ class PaymentSingleItem extends StatelessWidget {
           SnackBar(
             backgroundColor: const Color(0xFF16A34A),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             content: Row(
               children: [
-                const FlippedIcon(PhosphorIconsFill.checkCircle, color: Colors.white, size: 20),
+                const FlippedIcon(PhosphorIconsFill.checkCircle,
+                    color: Colors.white, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'تم تأكيد استلام الدفعة وتحديث الرصيد بنجاح!',
-                  style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
+                  style: GoogleFonts.ibmPlexSansArabic(
+                      fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -532,7 +670,7 @@ class BillSingleItem extends StatelessWidget {
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -550,7 +688,8 @@ class BillSingleItem extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF0E8),
                             borderRadius: BorderRadius.circular(8),
@@ -576,21 +715,30 @@ class BillSingleItem extends StatelessWidget {
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isCash ? const Color(0xFFF8FAFC) : const Color(0xFFEFF6FF),
+                        color: isCash
+                            ? const Color(0xFFF8FAFC)
+                            : const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isCash ? const Color(0xFFCBD5E1) : const Color(0xFFBFDBFE),
+                          color: isCash
+                              ? const Color(0xFFCBD5E1)
+                              : const Color(0xFFBFDBFE),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           FlippedIcon(
-                            isCash ? PhosphorIconsRegular.money : PhosphorIconsRegular.creditCard,
+                            isCash
+                                ? PhosphorIconsRegular.money
+                                : PhosphorIconsRegular.creditCard,
                             size: 12,
-                            color: isCash ? const Color(0xFF475569) : const Color(0xFF2563EB),
+                            color: isCash
+                                ? const Color(0xFF475569)
+                                : const Color(0xFF2563EB),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -598,7 +746,9 @@ class BillSingleItem extends StatelessWidget {
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isCash ? const Color(0xFF475569) : const Color(0xFF1D4ED8),
+                              color: isCash
+                                  ? const Color(0xFF475569)
+                                  : const Color(0xFF1D4ED8),
                             ),
                           ),
                         ],
@@ -697,7 +847,8 @@ class BillSingleItem extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 2),
-                        const FlippedIcon(PhosphorIconsBold.caretLeft, size: 12, color: kPrimaryOrange),
+                        const FlippedIcon(PhosphorIconsBold.caretLeft,
+                            size: 12, color: kPrimaryOrange),
                       ],
                     ),
                   ],
@@ -710,17 +861,23 @@ class BillSingleItem extends StatelessWidget {
     );
   }
 
-  void _showBillDetailsSheet(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showBillDetailsSheet(BuildContext context) async {
+    final order = await showModalBottomSheet<OrderModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => InvoiceDetailsSheet(bill: item),
     );
+    if (order == null || !context.mounted) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => OrderDetailsPage(order)),
+    );
   }
 
   String _getPaymentMethodLabel(PaymentMethod? method) {
-    if (method == PaymentMethod.creditCardPayment) return 'إلكتروني / سيريتل كاش';
+    if (method == PaymentMethod.creditCardPayment)
+      return 'إلكتروني / سيريتل كاش';
     if (method == PaymentMethod.payOnDelivery) return 'نقداً عند الاستلام';
     return 'غير محدد';
   }
@@ -745,7 +902,7 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
     final b = widget.bill;
     final total = b.totalAmount ?? 0;
     final net = b.merchantAmount ?? 0;
-    final commission = total - net;
+    final commission = b.jTakAmount ?? (total - net);
     final isCash = b.paymentMethod == PaymentMethod.payOnDelivery;
 
     return Container(
@@ -788,7 +945,8 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
                       color: const Color(0xFFFFF0E8),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const FlippedIcon(PhosphorIconsFill.receipt, color: kPrimaryOrange, size: 20),
+                    child: const FlippedIcon(PhosphorIconsFill.receipt,
+                        color: kPrimaryOrange, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -802,7 +960,8 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
                 ],
               ),
               IconButton(
-                icon: const FlippedIcon(PhosphorIconsRegular.x, size: 20, color: Color(0xFF64748B)),
+                icon: const FlippedIcon(PhosphorIconsRegular.x,
+                    size: 20, color: Color(0xFF64748B)),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -822,31 +981,47 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
               children: [
                 Row(
                   children: [
-                    Text('فاتورة رقم: ', style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B))),
+                    Text('فاتورة رقم: ',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12, color: const Color(0xFF64748B))),
                     Text(
                       '#${b.id ?? ""}',
-                      style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+                      style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E293B)),
                     ),
                     const SizedBox(width: 12),
-                    Text('طلب رقم: ', style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B))),
+                    Text('طلب رقم: ',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12, color: const Color(0xFF64748B))),
                     Text(
                       '#${b.orderId ?? ""}',
-                      style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, fontWeight: FontWeight.w700, color: kPrimaryOrange),
+                      style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: kPrimaryOrange),
                     ),
                   ],
                 ),
                 InkWell(
                   onTap: () {
-                    Clipboard.setData(ClipboardData(text: 'فاتورة #${b.id} لطلب #${b.orderId}'));
+                    Clipboard.setData(ClipboardData(
+                        text: 'فاتورة #${b.id} لطلب #${b.orderId}'));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم نسخ بيانات الفاتورة!'), duration: Duration(seconds: 1)),
+                      const SnackBar(
+                          content: Text('تم نسخ بيانات الفاتورة!'),
+                          duration: Duration(seconds: 1)),
                     );
                   },
                   child: Row(
                     children: [
-                      const FlippedIcon(PhosphorIconsRegular.copy, size: 14, color: Color(0xFF64748B)),
+                      const FlippedIcon(PhosphorIconsRegular.copy,
+                          size: 14, color: Color(0xFF64748B)),
                       const SizedBox(width: 4),
-                      Text('نسخ', style: GoogleFonts.ibmPlexSansArabic(fontSize: 11, color: const Color(0xFF64748B))),
+                      Text('نسخ',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 11, color: const Color(0xFF64748B))),
                     ],
                   ),
                 ),
@@ -858,7 +1033,10 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
           // Breakdown Card
           Text(
             'تفصيل المبالغ المالية',
-            style: GoogleFonts.ibmPlexSansArabic(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+            style: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1E293B)),
           ),
           const SizedBox(height: 8),
           Container(
@@ -870,17 +1048,22 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
             ),
             child: Column(
               children: [
-                _buildModalRow('إجمالي قيمة الطلب للزبون', '${formatPrice(total)} ل.س', const Color(0xFF0F172A)),
+                _buildModalRow(
+                    'إجمالي قيمة الطلب للزبون',
+                    '${_formatInvoiceAmount(total)} ل.س',
+                    const Color(0xFF0F172A)),
                 const Divider(height: 16, color: Color(0xFFF1F5F9)),
                 _buildModalRow(
                   'عمولة ورسوم الخدمة',
-                  commission > 0 ? '-${formatPrice(commission)} ل.س' : '0 ل.س',
+                  commission > 0
+                      ? '-${_formatInvoiceAmount(commission)} ل.س'
+                      : '0 ل.س',
                   const Color(0xFFEF4444),
                 ),
                 const Divider(height: 16, color: Color(0xFFF1F5F9)),
                 _buildModalRow(
                   'صافي مستحقات المتجر',
-                  '+${formatPrice(net)} ل.س',
+                  '+${_formatInvoiceAmount(net)} ل.س',
                   const Color(0xFF16A34A),
                   isBold: true,
                   fontSize: 15,
@@ -903,10 +1086,15 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('طريقة الدفع:', style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B))),
+                    Text('طريقة الدفع:',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12, color: const Color(0xFF64748B))),
                     Text(
                       isCash ? 'نقداً عند الاستلام' : 'إلكتروني / سيريتل كاش',
-                      style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                      style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E293B)),
                     ),
                   ],
                 ),
@@ -915,10 +1103,14 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('تاريخ الإنشاء:', style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text('تاريخ الإنشاء:',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 12, color: const Color(0xFF64748B))),
                       Text(
-                        GlobalVar.dateForamt(b.createdDate, kDateTimeFormat) ?? "",
-                        style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF475569)),
+                        GlobalVar.dateForamt(b.createdDate, kDateTimeFormat) ??
+                            "",
+                        style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12, color: const Color(0xFF475569)),
                       ),
                     ],
                   ),
@@ -934,19 +1126,29 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _isLoadingOrder ? null : () => _navigateToOrder(context, b.orderId!),
+                onPressed: _isLoadingOrder
+                    ? null
+                    : () => _navigateToOrder(context, b.orderId!),
                 icon: _isLoadingOrder
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
                     : const FlippedIcon(PhosphorIconsBold.package, size: 18),
                 label: Text(
-                  _isLoadingOrder ? 'جارٍ تحميل الطلب...' : 'عرض تفاصيل الطلب الأصلي #${b.orderId}',
-                  style: GoogleFonts.ibmPlexSansArabic(fontSize: 14, fontWeight: FontWeight.w700),
+                  _isLoadingOrder
+                      ? 'جارٍ تحميل الطلب...'
+                      : 'عرض تفاصيل الطلب الأصلي #${b.orderId}',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 14, fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryOrange,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
@@ -955,11 +1157,14 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
     );
   }
 
-  Widget _buildModalRow(String label, String value, Color valueColor, {bool isBold = false, double fontSize = 13}) {
+  Widget _buildModalRow(String label, String value, Color valueColor,
+      {bool isBold = false, double fontSize = 13}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.ibmPlexSansArabic(fontSize: 12.5, color: const Color(0xFF64748B))),
+        Text(label,
+            style: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 12.5, color: const Color(0xFF64748B))),
         Text(
           value,
           style: GoogleFonts.ibmPlexSansArabic(
@@ -977,13 +1182,9 @@ class _InvoiceDetailsSheetState extends State<InvoiceDetailsSheet> {
     try {
       final api = locator<SolApi>();
       final data = await api.getRequest('/Orders/$orderId');
-      if (data != null && data is Map<String, dynamic> && context.mounted) {
-        final order = OrderModel.fromMap(data);
-        Navigator.pop(context); // Close sheet
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => OrderDetailsPage(order)),
-        );
+      if (data is Map && context.mounted) {
+        final order = OrderModel.fromMap(Map<String, dynamic>.from(data));
+        Navigator.pop(context, order);
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تعذر تحميل تفاصيل الطلب حالياً')),
@@ -1008,7 +1209,9 @@ class PayoutReceiptSheet extends StatelessWidget {
   final PaymentModel payment;
   final VoidCallback? onConfirmReceipt;
 
-  const PayoutReceiptSheet({Key? key, required this.payment, this.onConfirmReceipt}) : super(key: key);
+  const PayoutReceiptSheet(
+      {Key? key, required this.payment, this.onConfirmReceipt})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1052,12 +1255,17 @@ class PayoutReceiptSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isReceived ? const Color(0xFFDCFCE7) : const Color(0xFFFFF0E8),
+                      color: isReceived
+                          ? const Color(0xFFDCFCE7)
+                          : const Color(0xFFFFF0E8),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: FlippedIcon(
-                      isReceived ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.clock,
-                      color: isReceived ? const Color(0xFF16A34A) : kPrimaryOrange,
+                      isReceived
+                          ? PhosphorIconsFill.checkCircle
+                          : PhosphorIconsRegular.clock,
+                      color:
+                          isReceived ? const Color(0xFF16A34A) : kPrimaryOrange,
                       size: 20,
                     ),
                   ),
@@ -1073,7 +1281,8 @@ class PayoutReceiptSheet extends StatelessWidget {
                 ],
               ),
               IconButton(
-                icon: const FlippedIcon(PhosphorIconsRegular.x, size: 20, color: Color(0xFF64748B)),
+                icon: const FlippedIcon(PhosphorIconsRegular.x,
+                    size: 20, color: Color(0xFF64748B)),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -1098,7 +1307,8 @@ class PayoutReceiptSheet extends StatelessWidget {
               children: [
                 Text(
                   'المبلغ المسلّم للمتجر',
-                  style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: Colors.white70),
+                  style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12, color: Colors.white70),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -1127,13 +1337,16 @@ class PayoutReceiptSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    isReceived ? '✓ تم الاستلام والتوثيق' : '⏳ قيد التسليم للمحل',
+                    isReceived
+                        ? '✓ تم الاستلام والتوثيق'
+                        : '⏳ قيد التسليم للمحل',
                     style: GoogleFonts.ibmPlexSansArabic(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1156,30 +1369,46 @@ class PayoutReceiptSheet extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildVoucherRow('رقم طلب / دفعة التسوية:', payment.requestNumber ?? (payment.id != null ? '#${payment.id}' : '')),
+                _buildVoucherRow(
+                    'رقم طلب / دفعة التسوية:',
+                    payment.requestNumber ??
+                        (payment.id != null ? '#${payment.id}' : '')),
                 if (payment.method != null && payment.method!.isNotEmpty) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
                   _buildVoucherRow('طريقة الصرف:', payment.method!),
                 ],
-                if (payment.accountDetails != null && payment.accountDetails!.isNotEmpty) ...[
+                if (payment.accountDetails != null &&
+                    payment.accountDetails!.isNotEmpty) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
                   _buildVoucherRow('تفاصيل الحساب:', payment.accountDetails!),
                 ],
                 if (payment.byUser != null && payment.byUser!.isNotEmpty) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                  _buildVoucherRow('المسلّم / الجهة المسؤولة:', payment.byUser!),
+                  _buildVoucherRow(
+                      'المسلّم / الجهة المسؤولة:', payment.byUser!),
                 ],
                 if (payment.reviewedAt != null) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                  _buildVoucherRow('تاريخ الموافقة والاعتماد:', GlobalVar.dateForamt(payment.reviewedAt, kDateTimeFormat) ?? ""),
+                  _buildVoucherRow(
+                      'تاريخ الموافقة والاعتماد:',
+                      GlobalVar.dateForamt(
+                              payment.reviewedAt, kDateTimeFormat) ??
+                          ""),
                 ],
-                if (payment.completedAt != null || payment.handoverDate != null) ...[
+                if (payment.completedAt != null ||
+                    payment.handoverDate != null) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                  _buildVoucherRow('تاريخ ووقت الاستلام:', GlobalVar.dateForamt(payment.completedAt ?? payment.handoverDate, kDateTimeFormat) ?? ""),
+                  _buildVoucherRow(
+                      'تاريخ ووقت الاستلام:',
+                      GlobalVar.dateForamt(
+                              payment.completedAt ?? payment.handoverDate,
+                              kDateTimeFormat) ??
+                          ""),
                 ],
                 if (payment.newBalance != null) ...[
                   const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                  _buildVoucherRow('الرصيد بعد الدفعة:', '${formatPrice(payment.newBalance)} ل.س'),
+                  _buildVoucherRow('الرصيد بعد الدفعة:',
+                      '${formatPrice(payment.newBalance)} ل.س'),
                 ],
               ],
             ),
@@ -1199,8 +1428,10 @@ class PayoutReceiptSheet extends StatelessWidget {
                   backgroundColor: kPrimaryOrange,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 14, fontWeight: FontWeight.w700),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  textStyle: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               ),
             )
@@ -1210,11 +1441,15 @@ class PayoutReceiptSheet extends StatelessWidget {
               height: 44,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  final ref = payment.requestNumber ?? (payment.id != null ? '#${payment.id}' : '');
-                  final text = 'إيصال تسوية $ref بمبلغ $formattedAmount ل.س (${isReceived ? "تم الاستلام" : "قيد التسليم"})';
+                  final ref = payment.requestNumber ??
+                      (payment.id != null ? '#${payment.id}' : '');
+                  final text =
+                      'إيصال تسوية $ref بمبلغ $formattedAmount ل.س (${isReceived ? "تم الاستلام" : "قيد التسليم"})';
                   Clipboard.setData(ClipboardData(text: text));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('تم نسخ بيانات الإيصال!'), duration: Duration(seconds: 1)),
+                    const SnackBar(
+                        content: Text('تم نسخ بيانات الإيصال!'),
+                        duration: Duration(seconds: 1)),
                   );
                 },
                 icon: const FlippedIcon(PhosphorIconsRegular.copy, size: 16),
@@ -1222,8 +1457,10 @@ class PayoutReceiptSheet extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF475569),
                   side: const BorderSide(color: Color(0xFFCBD5E1)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 13, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  textStyle: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -1234,15 +1471,28 @@ class PayoutReceiptSheet extends StatelessWidget {
 
   Widget _buildVoucherRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B))),
-        Text(
-          value,
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF1E293B),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 12,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.left,
+            softWrap: true,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
+            ),
           ),
         ),
       ],
@@ -1255,7 +1505,8 @@ class PayoutReceiptSheet extends StatelessWidget {
 /// ---------------------------------------------------------------------------
 class SettlementRequestSheet extends StatefulWidget {
   final double availableBalance;
-  const SettlementRequestSheet({Key? key, required this.availableBalance}) : super(key: key);
+  const SettlementRequestSheet({Key? key, required this.availableBalance})
+      : super(key: key);
 
   @override
   State<SettlementRequestSheet> createState() => _SettlementRequestSheetState();
@@ -1317,7 +1568,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
   @override
   void initState() {
     super.initState();
-    final initialAmt = _hasAvailableBalance ? widget.availableBalance.toInt().toString() : '';
+    final initialAmt =
+        _hasAvailableBalance ? widget.availableBalance.toInt().toString() : '';
     _amountController = TextEditingController(text: initialAmt);
     _amountController.addListener(_onAmountChanged);
     _notesController = TextEditingController();
@@ -1372,7 +1624,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
   }
 
   double get _currentEnteredAmount {
-    final cleanText = _amountController.text.trim().replaceAll(',', '').replaceAll(' ', '');
+    final cleanText =
+        _amountController.text.trim().replaceAll(',', '').replaceAll(' ', '');
     return double.tryParse(cleanText) ?? 0.0;
   }
 
@@ -1419,7 +1672,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
     if (amt > widget.availableBalance) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('المبلغ المطلوب (${formatPrice(amt)} ل.س) يتجاوز رصيدك المتاح (${formatPrice(widget.availableBalance)} ل.س)'),
+          content: Text(
+              'المبلغ المطلوب (${formatPrice(amt)} ل.س) يتجاوز رصيدك المتاح (${formatPrice(widget.availableBalance)} ل.س)'),
           backgroundColor: const Color(0xFFDC2626),
         ),
       );
@@ -1450,13 +1704,15 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
       if (name.isEmpty || phone.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('يرجى إدخال اسم المستلم الثلاثي ورقم الهاتف لحوالة الهرم'),
+            content:
+                Text('يرجى إدخال اسم المستلم الثلاثي ورقم الهاتف لحوالة الهرم'),
             backgroundColor: Color(0xFFDC2626),
           ),
         );
         return;
       }
-      accountDetails = 'حوالة الهرم/الفؤاد | المستلم: $name | هاتف: $phone${city.isNotEmpty ? ' | المحافظة/الفرع: $city' : ''}';
+      accountDetails =
+          'حوالة الهرم/الفؤاد | المستلم: $name | هاتف: $phone${city.isNotEmpty ? ' | المحافظة/الفرع: $city' : ''}';
     } else if (methodKey == 'bank_transfer') {
       final bank = _bankNameController.text.trim();
       final holder = _bankHolderController.text.trim();
@@ -1464,13 +1720,15 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
       if (bank.isEmpty || holder.isEmpty || iban.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('يرجى إدخال اسم المصرف، اسم صاحب الحساب، ورقم الحساب/IBAN'),
+            content: Text(
+                'يرجى إدخال اسم المصرف، اسم صاحب الحساب، ورقم الحساب/IBAN'),
             backgroundColor: Color(0xFFDC2626),
           ),
         );
         return;
       }
-      accountDetails = 'حساب بنكي | المصرف: $bank | صاحب الحساب: $holder | رقم الحساب/IBAN: $iban';
+      accountDetails =
+          'حساب بنكي | المصرف: $bank | صاحب الحساب: $holder | رقم الحساب/IBAN: $iban';
     } else if (methodKey == 'cash_in_store') {
       final phone = _cashPhoneController.text.trim();
       final note = _cashNoteController.text.trim();
@@ -1483,14 +1741,16 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
         );
         return;
       }
-      accountDetails = 'تسليم نقدي في المحل | هاتف التنسيق: $phone${note.isNotEmpty ? ' | التوقيت: $note' : ''}';
+      accountDetails =
+          'تسليم نقدي في المحل | هاتف التنسيق: $phone${note.isNotEmpty ? ' | التوقيت: $note' : ''}';
     }
 
     HapticFeedback.lightImpact();
     setState(() => _isSubmitting = true);
 
     try {
-      final transProvider = Provider.of<TransactionsProvider>(context, listen: false);
+      final transProvider =
+          Provider.of<TransactionsProvider>(context, listen: false);
       final extraNotes = _notesController.text.trim();
       await transProvider.submitSettlementRequest(
         amount: amt,
@@ -1516,7 +1776,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
     }
   }
 
-  void _showSuccessDialog(BuildContext context, double amount, String methodTitle) {
+  void _showSuccessDialog(
+      BuildContext context, double amount, String methodTitle) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1537,7 +1798,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: FlippedIcon(PhosphorIconsFill.checkCircle, color: Color(0xFF16A34A), size: 34),
+                  child: FlippedIcon(PhosphorIconsFill.checkCircle,
+                      color: Color(0xFF16A34A), size: 34),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1572,7 +1834,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                     backgroundColor: kPrimaryOrange,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
                     'حسناً',
@@ -1592,7 +1855,7 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
   }
 
   void _callAccountingSupport() {
-    LunchUrl.canLaunch('tel:$kSupportPhone');
+    LunchUrl.makeCall(ContactSettingsService.instance.phoneNumber);
   }
 
   @override
@@ -1608,7 +1871,9 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
         left: 20,
         right: 20,
         top: 14,
-        bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -1640,7 +1905,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                         color: const Color(0xFFFFF0E8),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const FlippedIcon(PhosphorIconsFill.handCoins, color: kPrimaryOrange, size: 20),
+                      child: const FlippedIcon(PhosphorIconsFill.handCoins,
+                          color: kPrimaryOrange, size: 20),
                     ),
                     const SizedBox(width: 10),
                     Text(
@@ -1654,7 +1920,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                   ],
                 ),
                 IconButton(
-                  icon: const FlippedIcon(PhosphorIconsRegular.x, size: 20, color: Color(0xFF64748B)),
+                  icon: const FlippedIcon(PhosphorIconsRegular.x,
+                      size: 20, color: Color(0xFF64748B)),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -1679,7 +1946,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                       children: [
                         Text(
                           'الرصيد المتاح للسحب الآن',
-                          style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF64748B)),
+                          style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 12, color: const Color(0xFF64748B)),
                         ),
                         const SizedBox(height: 2),
                         Row(
@@ -1708,7 +1976,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFFDCFCE7),
                         borderRadius: BorderRadius.circular(8),
@@ -1742,7 +2011,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                         color: const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(PhosphorIconsFill.warningCircle, color: Color(0xFFD97706), size: 22),
+                      child: const FlippedIcon(PhosphorIconsFill.warningCircle,
+                          color: Color(0xFFD97706), size: 22),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1754,10 +2024,13 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                             children: [
                               Text(
                                 'الرصيد المتاح للسحب الآن',
-                                style: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF78350F)),
+                                style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 12,
+                                    color: const Color(0xFF78350F)),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFDE68A),
                                   borderRadius: BorderRadius.circular(6),
@@ -1802,7 +2075,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(PhosphorIconsRegular.info, color: Color(0xFF64748B), size: 18),
+                    const FlippedIcon(PhosphorIconsRegular.info,
+                        color: Color(0xFF64748B), size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1825,7 +2099,10 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
             // Amount Input Field
             Text(
               'المبلغ المطلوب سحبه (ل.س)',
-              style: GoogleFonts.ibmPlexSansArabic(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+              style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B)),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -1833,19 +2110,40 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
               enabled: _hasAvailableBalance && !_isSubmitting,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: GoogleFonts.ibmPlexSansArabic(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+              style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A)),
               decoration: InputDecoration(
-                hintText: _hasAvailableBalance ? 'أدخل المبلغ المطلوب' : 'لا يوجد رصيد متاح',
-                prefixIcon: const FlippedIcon(PhosphorIconsBold.money, color: kPrimaryOrange, size: 20),
+                hintText: _hasAvailableBalance
+                    ? 'أدخل المبلغ المطلوب'
+                    : 'لا يوجد رصيد متاح',
+                prefixIcon: const FlippedIcon(PhosphorIconsBold.money,
+                    color: kPrimaryOrange, size: 20),
                 suffixText: 'ل.س',
-                suffixStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                suffixStyle: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF64748B)),
                 filled: true,
-                fillColor: _hasAvailableBalance ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kPrimaryOrange, width: 1.5)),
-                disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                fillColor: _hasAvailableBalance
+                    ? const Color(0xFFF8FAFC)
+                    : const Color(0xFFF1F5F9),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: kPrimaryOrange, width: 1.5)),
+                disabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
               ),
             ),
             const SizedBox(height: 10),
@@ -1880,7 +2178,10 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
             // Preferred Method Selector
             Text(
               'طريقة استلام المبلغ المفضلة',
-              style: GoogleFonts.ibmPlexSansArabic(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+              style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B)),
             ),
             const SizedBox(height: 8),
             ...List.generate(_methods.length, (index) {
@@ -1892,7 +2193,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                   color: isSelected ? const Color(0xFFFFF0E8) : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isSelected ? kPrimaryOrange : const Color(0xFFE2E8F0),
+                    color:
+                        isSelected ? kPrimaryOrange : const Color(0xFFE2E8F0),
                     width: isSelected ? 1.5 : 1.0,
                   ),
                 ),
@@ -1901,16 +2203,21 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                   borderRadius: BorderRadius.circular(12),
                   child: ListTile(
                     dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                     leading: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFFFECE0) : const Color(0xFFF1F5F9),
+                        color: isSelected
+                            ? const Color(0xFFFFECE0)
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: FlippedIcon(
                         method['icon'] as IconData,
-                        color: isSelected ? kPrimaryOrange : const Color(0xFF64748B),
+                        color: isSelected
+                            ? kPrimaryOrange
+                            : const Color(0xFF64748B),
                         size: 18,
                       ),
                     ),
@@ -1918,8 +2225,11 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                       method['title'] as String,
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                        color: isSelected ? const Color(0xFF9A3412) : const Color(0xFF1E293B),
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w600,
+                        color: isSelected
+                            ? const Color(0xFF9A3412)
+                            : const Color(0xFF1E293B),
                       ),
                     ),
                     subtitle: Text(
@@ -1927,18 +2237,25 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: isSelected ? const Color(0xFFC2410C) : const Color(0xFF64748B),
+                        color: isSelected
+                            ? const Color(0xFFC2410C)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                     trailing: FlippedIcon(
-                      isSelected ? PhosphorIconsFill.checkCircle : PhosphorIconsRegular.circle,
-                      color: isSelected ? kPrimaryOrange : const Color(0xFFCBD5E1),
+                      isSelected
+                          ? PhosphorIconsFill.checkCircle
+                          : PhosphorIconsRegular.circle,
+                      color:
+                          isSelected ? kPrimaryOrange : const Color(0xFFCBD5E1),
                       size: 20,
                     ),
-                    onTap: _isSubmitting ? null : () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _selectedMethod = index);
-                    },
+                    onTap: _isSubmitting
+                        ? null
+                        : () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _selectedMethod = index);
+                          },
                   ),
                 ),
               );
@@ -1960,7 +2277,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                 children: [
                   Row(
                     children: [
-                      const FlippedIcon(PhosphorIconsRegular.identificationCard, color: kPrimaryOrange, size: 18),
+                      const FlippedIcon(PhosphorIconsRegular.identificationCard,
+                          color: kPrimaryOrange, size: 18),
                       const SizedBox(width: 8),
                       Text(
                         'بيانات التحويل المطلوبة',
@@ -1973,17 +2291,19 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                     ],
                   ),
                   const SizedBox(height: 12),
-
-                  if (_methods[_selectedMethod]['key'] == 'syriatel_cash' || _methods[_selectedMethod]['key'] == 'sham_cash') ...[
+                  if (_methods[_selectedMethod]['key'] == 'syriatel_cash' ||
+                      _methods[_selectedMethod]['key'] == 'sham_cash') ...[
                     _buildField(
                       controller: _syriatelPhoneController,
-                      label: 'رقم هاتف حساب ${_methods[_selectedMethod]['title']} *',
+                      label:
+                          'رقم هاتف حساب ${_methods[_selectedMethod]['title']} *',
                       hint: '9xxxxxxxx',
                       icon: PhosphorIconsRegular.phone,
                       keyboardType: TextInputType.phone,
                       inputFormatters: [SyrianPhoneInputFormatter()],
                     ),
-                  ] else if (_methods[_selectedMethod]['key'] == 'al_haram') ...[
+                  ] else if (_methods[_selectedMethod]['key'] ==
+                      'al_haram') ...[
                     _buildField(
                       controller: _alHaramNameController,
                       label: 'اسم المستلم الثلاثي (كما في الهوية) *',
@@ -2006,7 +2326,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                       hint: 'مثال: دمشق - فرع الحلبوني',
                       icon: PhosphorIconsRegular.mapPin,
                     ),
-                  ] else if (_methods[_selectedMethod]['key'] == 'bank_transfer') ...[
+                  ] else if (_methods[_selectedMethod]['key'] ==
+                      'bank_transfer') ...[
                     _buildField(
                       controller: _bankNameController,
                       label: 'اسم المصرف / البنك *',
@@ -2027,7 +2348,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                       hint: 'رقم الحساب المصرفي',
                       icon: PhosphorIconsRegular.creditCard,
                     ),
-                  ] else if (_methods[_selectedMethod]['key'] == 'cash_in_store') ...[
+                  ] else if (_methods[_selectedMethod]['key'] ==
+                      'cash_in_store') ...[
                     _buildField(
                       controller: _cashPhoneController,
                       label: 'رقم هاتف المسؤول في المحل للتنسيق *',
@@ -2044,7 +2366,6 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                       icon: PhosphorIconsRegular.clock,
                     ),
                   ],
-
                   const SizedBox(height: 10),
                   _buildField(
                     controller: _notesController,
@@ -2064,19 +2385,28 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: (!_hasAvailableBalance || _isSubmitting) ? null : () => _submitSettlementRequest(context),
+                onPressed: (!_hasAvailableBalance || _isSubmitting)
+                    ? null
+                    : () => _submitSettlementRequest(context),
                 icon: _isSubmitting
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
-                    : const FlippedIcon(PhosphorIconsFill.checkCircle, size: 20, color: Colors.white),
+                    : const FlippedIcon(PhosphorIconsFill.checkCircle,
+                        size: 20, color: Colors.white),
                 label: Text(
                   _isSubmitting
                       ? 'جارٍ إرسال الطلب...'
-                      : (_hasAvailableBalance ? 'تأكيد وإرسال طلب السحب' : 'لا يوجد رصيد متاح للسحب'),
-                  style: GoogleFonts.ibmPlexSansArabic(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                      : (_hasAvailableBalance
+                          ? 'تأكيد وإرسال طلب السحب'
+                          : 'لا يوجد رصيد متاح للسحب'),
+                  style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryOrange,
@@ -2084,7 +2414,8 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
                   disabledBackgroundColor: const Color(0xFFCBD5E1),
                   disabledForegroundColor: const Color(0xFF64748B),
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
@@ -2096,10 +2427,14 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
               height: 44,
               child: TextButton.icon(
                 onPressed: _callAccountingSupport,
-                icon: const FlippedIcon(PhosphorIconsRegular.phoneCall, size: 16, color: Color(0xFF64748B)),
+                icon: const FlippedIcon(PhosphorIconsRegular.phoneCall,
+                    size: 16, color: Color(0xFF64748B)),
                 label: Text(
                   'للاستفسار تواصل مباشرة مع قسم المحاسبة',
-                  style: GoogleFonts.ibmPlexSansArabic(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                  style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF64748B)),
                 ),
               ),
             ),
@@ -2143,15 +2478,26 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 12, color: const Color(0xFF94A3B8)),
+            hintStyle: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 12, color: const Color(0xFF94A3B8)),
             prefixIcon: FlippedIcon(icon, color: kPrimaryOrange, size: 18),
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimaryOrange, width: 1.5)),
-            disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: kPrimaryOrange, width: 1.5)),
+            disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
           ),
         ),
       ],
@@ -2163,14 +2509,19 @@ class _SettlementRequestSheetState extends State<SettlementRequestSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Harmonized with selected payout method card visual styling
-    final selectedBg = isDark ? const Color(0xFF2C1810) : const Color(0xFFFFF0E8);
-    final unselectedBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final selectedBg =
+        isDark ? const Color(0xFF2C1810) : const Color(0xFFFFF0E8);
+    final unselectedBg =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
 
     const selectedBorder = kPrimaryOrange;
-    final unselectedBorder = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    final unselectedBorder =
+        isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
 
-    final selectedTextColor = isDark ? const Color(0xFFFF8A65) : const Color(0xFF9A3412);
-    final unselectedTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+    final selectedTextColor =
+        isDark ? const Color(0xFFFF8A65) : const Color(0xFF9A3412);
+    final unselectedTextColor =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
 
     return InkWell(
       onTap: _isSubmitting ? null : () => _setPresetPercentage(fraction),
@@ -2267,7 +2618,8 @@ class SettlementPolicySheet extends StatelessWidget {
                       color: const Color(0xFFFFF0E8),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const FlippedIcon(PhosphorIconsFill.info, color: kPrimaryOrange, size: 20),
+                    child: const FlippedIcon(PhosphorIconsFill.info,
+                        color: kPrimaryOrange, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -2281,7 +2633,8 @@ class SettlementPolicySheet extends StatelessWidget {
                 ],
               ),
               IconButton(
-                icon: const FlippedIcon(PhosphorIconsRegular.x, size: 20, color: Color(0xFF64748B)),
+                icon: const FlippedIcon(PhosphorIconsRegular.x,
+                    size: 20, color: Color(0xFF64748B)),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -2291,25 +2644,29 @@ class SettlementPolicySheet extends StatelessWidget {
           _buildPolicyStep(
             icon: PhosphorIconsFill.calendarCheck,
             title: 'دورة التسوية الأسبوعية',
-            desc: 'تتم تسوية الحسابات دورياً بشكل أسبوعي، كما يحق للتاجر طلب تسوية استثنائية عند وصول الرصيد للحد الأدنى.',
+            desc:
+                'تتم تسوية الحسابات دورياً بشكل أسبوعي، كما يحق للتاجر طلب تسوية استثنائية عند وصول الرصيد للحد الأدنى.',
           ),
           const SizedBox(height: 12),
           _buildPolicyStep(
             icon: PhosphorIconsFill.money,
             title: 'التسليم النقدي في المحل',
-            desc: 'يقوم مناديب جيتك بتسليم الدفعات النقدية مباشرة إلى إدارة المحل مع توثيق إيصال استلام داخل التطبيق.',
+            desc:
+                'يقوم مناديب جيتك بتسليم الدفعات النقدية مباشرة إلى إدارة المحل مع توثيق إيصال استلام داخل التطبيق.',
           ),
           const SizedBox(height: 12),
           _buildPolicyStep(
             icon: PhosphorIconsFill.deviceMobileSpeaker,
             title: 'التحويل الإلكتروني والمحافظ',
-            desc: 'يمكن تحويل المستحقات إلى حساب شام كاش أو سيريتل كاش المعتمد للمتجر، أو عبر الحساب البنكي.',
+            desc:
+                'يمكن تحويل المستحقات إلى حساب شام كاش أو سيريتل كاش المعتمد للمتجر، أو عبر الحساب البنكي.',
           ),
           const SizedBox(height: 12),
           _buildPolicyStep(
             icon: PhosphorIconsFill.clockAfternoon,
             title: 'الرصيد المعلق',
-            desc: 'الأموال المعلقة هي مستحقات الطلبات الجارية أو المسلمة اليوم وتصبح متاحة للتسوية فور التدقيق النهائي بنهاية اليوم.',
+            desc:
+                'الأموال المعلقة هي مستحقات الطلبات الجارية أو المسلمة اليوم وتصبح متاحة للتسوية فور التدقيق النهائي بنهاية اليوم.',
           ),
           const SizedBox(height: 20),
 
@@ -2319,20 +2676,27 @@ class SettlementPolicySheet extends StatelessWidget {
             height: 48,
             child: ElevatedButton.icon(
               onPressed: () {
-                final cleanPhone = kSupportWhatsApp.replaceAll('+', '').replaceAll(' ', '');
-                final msg = Uri.encodeComponent('مرحباً إدارة جيتك، لدي استفسار مالي بخصوص تسوية الحسابات.');
-                LunchUrl.canLaunch('https://wa.me/$cleanPhone?text=$msg');
+                LunchUrl.openWhatsApp(
+                  phone: ContactSettingsService.instance.whatsAppNumber,
+                  message:
+                      'مرحباً إدارة جيتك، لدي استفسار مالي بخصوص تسوية الحسابات.',
+                );
                 Navigator.pop(context);
               },
-              icon: const FlippedIcon(PhosphorIconsFill.whatsappLogo, size: 18, color: Colors.white),
+              icon: const FlippedIcon(PhosphorIconsFill.whatsappLogo,
+                  size: 18, color: Colors.white),
               label: Text(
                 'تواصل مع قسم المحاسبة عبر واتساب',
-                style: GoogleFonts.ibmPlexSansArabic(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white),
+                style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryOrange,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
@@ -2341,7 +2705,8 @@ class SettlementPolicySheet extends StatelessWidget {
     );
   }
 
-  Widget _buildPolicyStep({required IconData icon, required String title, required String desc}) {
+  Widget _buildPolicyStep(
+      {required IconData icon, required String title, required String desc}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2360,12 +2725,18 @@ class SettlementPolicySheet extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.ibmPlexSansArabic(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+                style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1E293B)),
               ),
               const SizedBox(height: 2),
               Text(
                 desc,
-                style: GoogleFonts.ibmPlexSansArabic(fontSize: 11.5, color: const Color(0xFF64748B), height: 1.45),
+                style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 11.5,
+                    color: const Color(0xFF64748B),
+                    height: 1.45),
               ),
             ],
           ),

@@ -1,0 +1,439 @@
+<div class="contact-settings-page">
+  <!-- Page Header -->
+  <div class="card card-custom mb-5 border-0 shadow-none">
+    <div class="card-body p-5 d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div>
+        <h2 class="fs-3 fw-bold text-dark mb-1">
+          <i class="fas fa-headset text-primary me-2"></i>
+          {{ 'CONTACT_SETTINGS_PAGE.TITLE' | translate }}
+        </h2>
+        <p class="text-muted fs-7 mb-0">
+          {{ 'CONTACT_SETTINGS_PAGE.SUBTITLE' | translate }}
+        </p>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-light btn-active-light-primary fw-bold"
+          (click)="loadSettings()"
+          [disabled]="isLoading || isSaving"
+        >
+          <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+          <span class="ms-1">{{ 'COMMON.REFRESH' | translate }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-sm btn-light-secondary fw-bold"
+          (click)="resetDefaults()"
+          [disabled]="isLoading || isSaving"
+        >
+          <i class="fas fa-undo"></i>
+          <span class="ms-1">{{ 'CONTACT_SETTINGS_PAGE.RESET_DEFAULTS' | translate }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-sm btn-primary fw-bold"
+          (click)="save()"
+          [disabled]="isLoading || isSaving || form.invalid"
+        >
+          <i class="fas fa-save" *ngIf="!isSaving"></i>
+          <span class="spinner-border spinner-border-sm me-1" *ngIf="isSaving"></span>
+          <span class="ms-1">{{ 'COMMON.SAVE' | translate }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="text-center py-10">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="text-muted fs-7 mt-3">{{ 'COMMON.LOADING' | translate }}</div>
+  </div>
+
+  <form *ngIf="!isLoading" [formGroup]="form" (ngSubmit)="save()">
+    <div class="row g-5">
+      <!-- Left Column: Form Controls -->
+      <div class="col-lg-8">
+        <!-- 1. Direct Contact Channels -->
+        <div class="card card-custom mb-5 border-0 shadow-none">
+          <div class="card-header border-0 pt-5">
+            <h3 class="card-title align-items-start flex-column">
+              <span class="card-label fw-bold text-dark fs-5">
+                <i class="fas fa-phone-alt text-success me-2"></i>
+                {{ 'CONTACT_SETTINGS_PAGE.DIRECT_CHANNELS_TITLE' | translate }}
+              </span>
+              <span class="text-muted mt-1 fs-7">
+                {{ 'CONTACT_SETTINGS_PAGE.DIRECT_CHANNELS_DESC' | translate }}
+              </span>
+            </h3>
+          </div>
+          <div class="card-body pt-2">
+            <div class="row g-4">
+              <!-- Hotline Phone -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7 required">
+                  {{ 'CONTACT_SETTINGS_PAGE.PHONE_LABEL' | translate }}
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-0">
+                    <i class="fas fa-phone text-muted"></i>
+                  </span>
+                  <input
+                    type="text"
+                    class="form-control form-control-solid"
+                    formControlName="phoneNumber"
+                    (input)="onPhoneNumberChange()"
+                    [placeholder]="'CONTACT_SETTINGS_PAGE.PHONE_PLACEHOLDER' | translate"
+                    dir="ltr"
+                  />
+                </div>
+                <div class="form-text fs-8 text-muted">
+                  {{ 'CONTACT_SETTINGS_PAGE.PHONE_HELP' | translate }}
+                </div>
+              </div>
+
+              <!-- WhatsApp Number -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7 required">
+                  {{ 'CONTACT_SETTINGS_PAGE.WHATSAPP_LABEL' | translate }}
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-0">
+                    <i class="fab fa-whatsapp text-success"></i>
+                  </span>
+                  <input
+                    type="text"
+                    class="form-control form-control-solid"
+                    formControlName="whatsAppNumber"
+                    [placeholder]="'CONTACT_SETTINGS_PAGE.WHATSAPP_PLACEHOLDER' | translate"
+                    dir="ltr"
+                  />
+                </div>
+                <div class="form-text fs-8 text-muted">
+                  {{ 'CONTACT_SETTINGS_PAGE.WHATSAPP_HELP' | translate }}
+                </div>
+              </div>
+
+              <!-- Formatted Display Phone -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  {{ 'CONTACT_SETTINGS_PAGE.FORMATTED_PHONE_LABEL' | translate }}
+                </label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="phoneFormatted"
+                  [placeholder]="'CONTACT_SETTINGS_PAGE.FORMATTED_PHONE_PLACEHOLDER' | translate"
+                  dir="ltr"
+                />
+                <div class="form-text fs-8 text-muted">
+                  {{ 'CONTACT_SETTINGS_PAGE.FORMATTED_PHONE_HELP' | translate }}
+                </div>
+              </div>
+
+              <!-- International Dial Phone -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  {{ 'CONTACT_SETTINGS_PAGE.INTL_PHONE_LABEL' | translate }}
+                </label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="phoneInternational"
+                  placeholder="+963985615705"
+                  dir="ltr"
+                />
+                <div class="form-text fs-8 text-muted">
+                  {{ 'CONTACT_SETTINGS_PAGE.INTL_PHONE_HELP' | translate }}
+                </div>
+              </div>
+
+              <!-- Support Email -->
+              <div class="col-12">
+                <label class="form-label fw-bold fs-7 required">
+                  {{ 'CONTACT_SETTINGS_PAGE.EMAIL_LABEL' | translate }}
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-0">
+                    <i class="fas fa-envelope text-primary"></i>
+                  </span>
+                  <input
+                    type="email"
+                    class="form-control form-control-solid"
+                    formControlName="supportEmail"
+                    placeholder="contact@jtak.app"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Social Media Channels -->
+        <div class="card card-custom mb-5 border-0 shadow-none">
+          <div class="card-header border-0 pt-5">
+            <h3 class="card-title align-items-start flex-column">
+              <span class="card-label fw-bold text-dark fs-5">
+                <i class="fas fa-share-alt text-primary me-2"></i>
+                {{ 'CONTACT_SETTINGS_PAGE.SOCIAL_CHANNELS_TITLE' | translate }}
+              </span>
+              <span class="text-muted mt-1 fs-7">
+                {{ 'CONTACT_SETTINGS_PAGE.SOCIAL_CHANNELS_DESC' | translate }}
+              </span>
+            </h3>
+          </div>
+          <div class="card-body pt-2">
+            <div class="row g-4">
+              <!-- Facebook -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  <i class="fab fa-facebook text-primary me-1"></i>
+                  Facebook
+                </label>
+                <input
+                  type="url"
+                  class="form-control form-control-solid"
+                  formControlName="facebookUrl"
+                  placeholder="https://www.facebook.com/app.jtak/"
+                  dir="ltr"
+                />
+              </div>
+
+              <!-- Instagram -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  <i class="fab fa-instagram text-danger me-1"></i>
+                  Instagram
+                </label>
+                <input
+                  type="url"
+                  class="form-control form-control-solid"
+                  formControlName="instagramUrl"
+                  placeholder="https://www.instagram.com/JTAKcompany/"
+                  dir="ltr"
+                />
+              </div>
+
+              <!-- YouTube -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  <i class="fab fa-youtube text-danger me-1"></i>
+                  YouTube
+                </label>
+                <input
+                  type="url"
+                  class="form-control form-control-solid"
+                  formControlName="youtubeUrl"
+                  placeholder="https://www.youtube.com/channel/..."
+                  dir="ltr"
+                />
+              </div>
+
+              <!-- Telegram -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  <i class="fab fa-telegram text-info me-1"></i>
+                  Telegram
+                </label>
+                <input
+                  type="url"
+                  class="form-control form-control-solid"
+                  formControlName="telegramUrl"
+                  placeholder="https://t.me/..."
+                  dir="ltr"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Working Hours & Location -->
+        <div class="card card-custom mb-5 border-0 shadow-none">
+          <div class="card-header border-0 pt-5">
+            <h3 class="card-title align-items-start flex-column">
+              <span class="card-label fw-bold text-dark fs-5">
+                <i class="fas fa-clock text-warning me-2"></i>
+                {{ 'CONTACT_SETTINGS_PAGE.HOURS_ADDRESS_TITLE' | translate }}
+              </span>
+              <span class="text-muted mt-1 fs-7">
+                {{ 'CONTACT_SETTINGS_PAGE.HOURS_ADDRESS_DESC' | translate }}
+              </span>
+            </h3>
+          </div>
+          <div class="card-body pt-2">
+            <div class="row g-4">
+              <!-- Working Hours AR -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  {{ 'CONTACT_SETTINGS_PAGE.HOURS_AR_LABEL' | translate }}
+                </label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="workingHoursAr"
+                  placeholder="يومياً 9:00 ص - 12:00 منتصف الليل"
+                />
+              </div>
+
+              <!-- Working Hours EN -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  {{ 'CONTACT_SETTINGS_PAGE.HOURS_EN_LABEL' | translate }}
+                </label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="workingHoursEn"
+                  placeholder="Daily 9:00 AM - 12:00 Midnight"
+                  dir="ltr"
+                />
+              </div>
+
+              <!-- Address AR -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  {{ 'CONTACT_SETTINGS_PAGE.ADDRESS_AR_LABEL' | translate }}
+                </label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="addressAr"
+                  placeholder="سوريا - حمص"
+                />
+              </div>
+
+              <!-- Address EN -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold fs-7">
+                  {{ 'CONTACT_SETTINGS_PAGE.ADDRESS_EN_LABEL' | translate }}
+                </label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="addressEn"
+                  placeholder="Syria - Homs"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Live App Preview & Info Card -->
+      <div class="col-lg-4">
+        <!-- Live Apps Preview -->
+        <div class="card card-custom mb-5 border-0 shadow-none sticky-top" style="top: 20px;">
+          <div class="card-header border-0 pt-5">
+            <h3 class="card-title align-items-start flex-column">
+              <span class="card-label fw-bold text-dark fs-6">
+                <i class="fas fa-mobile-alt text-primary me-2"></i>
+                {{ 'CONTACT_SETTINGS_PAGE.PREVIEW_TITLE' | translate }}
+              </span>
+              <span class="text-muted mt-1 fs-8">
+                {{ 'CONTACT_SETTINGS_PAGE.PREVIEW_DESC' | translate }}
+              </span>
+            </h3>
+          </div>
+          <div class="card-body pt-2">
+            <!-- Mobile Preview Mockup -->
+            <div class="preview-device p-4 rounded-3 border bg-light">
+              <div class="text-center mb-4">
+                <div class="badge badge-light-primary mb-2">تطبيق العملاء والكباتن</div>
+                <h5 class="fw-bold fs-6 mb-1">خدمة عملاء جيتك</h5>
+                <p class="text-muted fs-8 mb-0">{{ form.get('workingHoursAr')?.value || 'يومياً' }}</p>
+              </div>
+
+              <!-- Hotline Card Mockup -->
+              <div class="preview-action-card p-3 rounded-2 bg-white mb-3 border d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <div class="preview-icon-circle bg-light-primary text-primary me-3">
+                    <i class="fas fa-phone-alt"></i>
+                  </div>
+                  <div>
+                    <div class="fs-8 text-muted">الخط الساخن</div>
+                    <div class="fw-bold fs-7 text-dark" dir="ltr">
+                      {{ form.get('phoneFormatted')?.value || form.get('phoneNumber')?.value || '0985 615 705' }}
+                    </div>
+                  </div>
+                </div>
+                <span class="badge badge-primary fs-8">اتصال</span>
+              </div>
+
+              <!-- WhatsApp Card Mockup -->
+              <div class="preview-action-card p-3 rounded-2 bg-white mb-4 border d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <div class="preview-icon-circle bg-light-success text-success me-3">
+                    <i class="fab fa-whatsapp fs-5"></i>
+                  </div>
+                  <div>
+                    <div class="fs-8 text-muted">واتساب مباشر</div>
+                    <div class="fw-bold fs-7 text-dark" dir="ltr">
+                      +{{ form.get('whatsAppNumber')?.value || '963985615705' }}
+                    </div>
+                  </div>
+                </div>
+                <span class="badge badge-success fs-8">محادثة</span>
+              </div>
+
+              <!-- Social Media Strip Mockup -->
+              <div class="text-center pt-2 border-top">
+                <div class="fs-8 fw-bold text-muted mb-2">منصات التواصل الرسمية</div>
+                <div class="d-flex justify-content-center gap-2">
+                  <a
+                    *ngIf="form.get('facebookUrl')?.value"
+                    [href]="form.get('facebookUrl')?.value"
+                    target="_blank"
+                    class="social-preview-btn btn btn-icon btn-sm btn-light-primary"
+                  >
+                    <i class="fab fa-facebook-f"></i>
+                  </a>
+                  <a
+                    *ngIf="form.get('instagramUrl')?.value"
+                    [href]="form.get('instagramUrl')?.value"
+                    target="_blank"
+                    class="social-preview-btn btn btn-icon btn-sm btn-light-danger"
+                  >
+                    <i class="fab fa-instagram"></i>
+                  </a>
+                  <a
+                    *ngIf="form.get('youtubeUrl')?.value"
+                    [href]="form.get('youtubeUrl')?.value"
+                    target="_blank"
+                    class="social-preview-btn btn btn-icon btn-sm btn-light-danger"
+                  >
+                    <i class="fab fa-youtube"></i>
+                  </a>
+                  <a
+                    *ngIf="form.get('telegramUrl')?.value"
+                    [href]="form.get('telegramUrl')?.value"
+                    target="_blank"
+                    class="social-preview-btn btn btn-icon btn-sm btn-light-info"
+                  >
+                    <i class="fab fa-telegram-plane"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sync Note -->
+            <div class="alert alert-light-info mt-4 p-3 mb-0" role="alert">
+              <div class="d-flex align-items-start">
+                <i class="fas fa-info-circle text-info fs-5 mt-1 me-2"></i>
+                <div class="fs-8 text-dark">
+                  <strong>مزامنة فورية:</strong>
+                  عند حفظ أي تعديل هنا، يتم تطبيقه تلقائياً ولحظياً على جميع تطبيقات الهواتف الذكية (تطبيق العميل، تطبيق الكابتن، وتطبيق المتجر) دون الحاجة لإعادة إصدار تحديث في متجر التطبيقات.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
