@@ -642,5 +642,110 @@ namespace Modules.Accounting.Tests
             var revenueBalance = await service.GetAccountBalanceAsync(revenueAccount.Id);
             Assert.Equal(10000m, revenueBalance);
         }
+
+        [Fact]
+        public async Task PostCaptainToMerchantPaymentAsync_SuccessfullyDebitsMerchantAndCreditsCaptain()
+        {
+            using var context = CreateInMemoryContext();
+            var service = new LedgerService(context, NullLogger<LedgerService>.Instance);
+
+            var captainId = Guid.NewGuid();
+            var merchantId = 27;
+
+            // 1. Give captain 50,000 float and merchant 30,000 payable
+            var captainFloat = await service.GetOrCreateUserAccountAsync(
+                captainId, AccountType.Asset, SystemAccountCodes.CaptainCashFloatPrefix, "Captain Float");
+            var merchantAcc = await service.GetOrCreateMerchantAccountAsync(
+                merchantId, "Meat Station");
+            var vault = await service.GetOrCreateSystemAccountAsync(
+                SystemAccountCodes.CompanyMainVault, "Company Vault", AccountType.Asset);
+
+            await service.PostTransactionAsync(new PostTransactionRequest
+            {
+                ReferenceType = "Setup", ReferenceId = "1", IdempotencyKey = "Setup-1",
+                Entries = new List<PostLedgerEntryRequest>
+                {
+                    new() { AccountId = captainFloat.Id, Debit = 50000m, Currency = "SYP", Memo = "Initial float" },
+                    new() { AccountId = vault.Id, Credit = 50000m, Currency = "SYP", Memo = "Cash out" }
+                }
+            });
+            await service.PostTransactionAsync(new PostTransactionRequest
+            {
+                ReferenceType = "Setup", ReferenceId = "2", IdempotencyKey = "Setup-2",
+                Entries = new List<PostLedgerEntryRequest>
+                {
+                    new() { AccountId = vault.Id, Debit = 30000m, Currency = "SYP", Memo = "Sales collected" },
+                    new() { AccountId = merchantAcc.Id, Credit = 30000m, Currency = "SYP", Memo = "Payable to merchant" }
+                }
+            });
+
+            Assert.Equal(50000m, await service.GetAccountBalanceAsync(captainFloat.Id));
+            Assert.Equal(30000m, await service.GetAccountBalanceAsync(merchantAcc.Id));
+
+            // 2. Captain hands 40 SYP directly to merchant
+            var result = await service.PostCaptainToMerchantPaymentAsync(
+                captainId, merchantId, 40m, "Payment-2", "Reham", "Meat Station");
+
+            Assert.NotNull(result);
+            Assert.Equal("CaptainToMerchantPayment", result.ReferenceType);
+
+            // 3. Verify balances:
+            // Captain float reduced by 40: 50,000 - 40 = 49,960
+            var floatAfter = await service.GetAccountBalanceAsync(captainFloat.Id);
+            Assert.Equal(49960m, floatAfter);
+
+            // Merchant payable reduced by 40: 30,000 - 40 = 29,960
+            var merchantAfter = await service.GetAccountBalanceAsync(merchantAcc.Id);
+            Assert.Equal(29960m, merchantAfter);
+
+            // Company vault is untouched: 30,000 - 50,000 = -20,000 (unchanged)
+            var vaultAfter = await service.GetAccountBalanceAsync(vault.Id);
+            Assert.Equal(-20000m, vaultAfter);
+        }
+
+        [Fact]
+        public async Task PostCaptainToMerchantPaymentAsync_IdempotentOnDuplicateCall()
+        {
+            using var context = CreateInMemoryContext();
+            var service = new LedgerService(context, NullLogger<LedgerService>.Instance);
+
+            var captainId = Guid.NewGuid();
+            var merchantId = 27;
+
+            var captainFloat = await service.GetOrCreateUserAccountAsync(
+                captainId, AccountType.Asset, SystemAccountCodes.CaptainCashFloatPrefix, "Captain Float");
+            var vault = await service.GetOrCreateSystemAccountAsync(
+                SystemAccountCodes.CompanyMainVault, "Company Vault", AccountType.Asset);
+
+            await service.PostTransactionAsync(new PostTransactionRequest
+            {
+                ReferenceType = "Setup", ReferenceId = "1", IdempotencyKey = "Setup-Float",
+                Entries = new List<PostLedgerEntryRequest>
+                {
+                    new() { AccountId = captainFloat.Id, Debit = 1000m, Currency = "SYP", Memo = "Float" },
+                    new() { AccountId = vault.Id, Credit = 1000m, Currency = "SYP", Memo = "Vault" }
+                }
+            });
+
+            var first = await service.PostCaptainToMerchantPaymentAsync(captainId, merchantId, 40m, "Payment-2");
+            var second = await service.PostCaptainToMerchantPaymentAsync(captainId, merchantId, 40m, "Payment-2");
+
+            Assert.Equal(first.TransactionNumber, second.TransactionNumber);
+            Assert.Equal(960m, await service.GetAccountBalanceAsync(captainFloat.Id));
+        }
+
+        [Fact]
+        public async Task PostCaptainToMerchantPaymentAsync_InsufficientCaptainFloat_ThrowsException()
+        {
+            using var context = CreateInMemoryContext();
+            var service = new LedgerService(context, NullLogger<LedgerService>.Instance);
+
+            var captainId = Guid.NewGuid();
+            var merchantId = 27;
+
+            // Captain float is 0
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.PostCaptainToMerchantPaymentAsync(captainId, merchantId, 40m, "Payment-Fail"));
+        }
     }
 }

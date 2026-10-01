@@ -618,6 +618,58 @@ namespace Modules.Accounting.Services
             });
         }
 
+        public async Task<JournalTransactionDto> PostCaptainToMerchantPaymentAsync(
+            Guid captainUserId,
+            int merchantId,
+            decimal amount,
+            string referenceId,
+            string captainName = null,
+            string merchantName = null,
+            string currency = "SYP")
+        {
+            if (captainUserId == Guid.Empty) throw new ArgumentException("CaptainUserId is required.", nameof(captainUserId));
+            if (merchantId <= 0) throw new ArgumentException("MerchantId must be greater than zero.", nameof(merchantId));
+            if (amount <= 0m) throw new ArgumentException("Amount must be greater than zero.", nameof(amount));
+            if (string.IsNullOrWhiteSpace(referenceId)) throw new ArgumentException("ReferenceId is required.", nameof(referenceId));
+
+            currency = (currency ?? "SYP").ToUpperInvariant();
+            var idempotencyKey = $"CaptainToMerchantPayment-{referenceId.Trim()}";
+            var existing = await _context.JournalTransactions
+                .Include(t => t.Entries)
+                .ThenInclude(e => e.Account)
+                .FirstOrDefaultAsync(t => t.IdempotencyKey == idempotencyKey);
+            if (existing != null) return MapToDto(existing);
+
+            var captainFloat = await GetOrCreateUserAccountAsync(
+                captainUserId,
+                AccountType.Asset,
+                SystemAccountCodes.CaptainCashFloatPrefix,
+                string.IsNullOrWhiteSpace(captainName) ? $"Cash Float {captainUserId}" : $"Cash Float - {captainName}",
+                currency);
+
+            var merchantAccount = await GetOrCreateMerchantAccountAsync(
+                merchantId,
+                merchantName,
+                currency);
+
+            var floatBalance = await GetAccountBalanceAsync(captainFloat.Id);
+            if (floatBalance + 0.001m < amount)
+                throw new InvalidOperationException($"عُهدة المندوب النقدية ({floatBalance:N2} {currency}) أقل من مبلغ الدفعة ({amount:N2} {currency}).");
+
+            return await PostTransactionAsync(new PostTransactionRequest
+            {
+                ReferenceType = "CaptainToMerchantPayment",
+                ReferenceId = referenceId.Trim(),
+                IdempotencyKey = idempotencyKey,
+                Description = $"تسليم دفعة نقدية بقيمة {amount:N0} {currency} من الكابتن {(captainName ?? captainUserId.ToString())} إلى المتجر {(merchantName ?? merchantId.ToString())}",
+                Entries = new List<PostLedgerEntryRequest>
+                {
+                    new() { AccountId = merchantAccount.Id, Debit = amount, Currency = currency, Memo = $"تسديد نقدي للمتجر من عهدة الكابتن - {referenceId.Trim()}" },
+                    new() { AccountId = captainFloat.Id, Credit = amount, Currency = currency, Memo = $"تسليم دفعة نقدية للمتجر - {referenceId.Trim()}" }
+                }
+            });
+        }
+
         public async Task<JournalTransactionDto> PostOrderCancellationReversalAsync(int orderId, string reason)
         {
             var originalIdempotencyKey = $"OrderDelivered-{orderId}";

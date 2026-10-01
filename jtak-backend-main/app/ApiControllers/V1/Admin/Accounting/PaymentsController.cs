@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using OpenIddict.Validation.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
@@ -151,11 +152,35 @@ namespace App.ApiControllers.V1.Admin
                 _service.Insert(payment);
                 await _auow.SaveChangesAsync();
 
-                await _ledgerService.PostCaptainCashHandoverAsync(dto.ByUserId, dto.Amount, $"Payment-{payment.Id}", byUser);
+                var mids = await _merchantService.GetMerchantIds(dto.ToUserId);
+                var merchantId = mids != null && mids.Length > 0 ? mids[0] : 0;
+
+                if (merchantId > 0)
+                {
+                    await _ledgerService.PostCaptainToMerchantPaymentAsync(
+                        dto.ByUserId,
+                        merchantId,
+                        dto.Amount,
+                        $"Payment-{payment.Id}",
+                        byUser,
+                        toUser);
+                }
+                else
+                {
+                    await _ledgerService.PostCaptainCashHandoverAsync(
+                        dto.ByUserId,
+                        dto.Amount,
+                        $"Payment-{payment.Id}",
+                        byUser);
+                }
 
                 // Keep the legacy balance as a compatibility mirror while the
                 // ledger remains the source of truth for current app screens.
                 await _balanceService.UpdateAppBalance(new BalanceDto { Amount = newBalance, PendingAmount = dBalance.PendingAmount, Id = dto.ByUserId, Name = byUser });
+                if (merchantId > 0)
+                {
+                    await _balanceService.DecreaseAppBalance(dto.ToUserId, dto.Amount, toUser);
+                }
                 await _auow.SaveChangesAsync();
                 if (transaction != null) await transaction.CommitAsync();
 
@@ -179,6 +204,53 @@ namespace App.ApiControllers.V1.Admin
                 throw;
             }
             return true;
+        }
+
+        [HttpPost]
+        [Route("{id}/ReconcileToMerchant")]
+        public async Task<ActionResult<bool>> ReconcileToMerchant(int id)
+        {
+            var payment = await _auow.Context.Set<Payment>().FirstOrDefaultAsync(x => x.Id == id);
+            if (payment == null) return NotFound(ApiErr.Create("الدفعة غير موجودة."));
+
+            var mids = await _merchantService.GetMerchantIds(payment.ToUserId);
+            var merchantId = mids != null && mids.Length > 0 ? mids[0] : 0;
+            if (merchantId <= 0)
+                return BadRequest(ApiErr.Create("المستلم ليس متجراً صالحاً للتسوية."));
+
+            var merchantName = await _userManager.Users.Where(x => x.Id == payment.ToUserId).Select(x => x.FullName).FirstOrDefaultAsync() ?? payment.ToUser;
+
+            var idempotencyKey = $"Fix-Payment-{payment.Id}-ReallocateToMerchant";
+            var existingTxn = await _auow.Context.Set<JournalTransaction>().FirstOrDefaultAsync(x => x.IdempotencyKey == idempotencyKey);
+            if (existingTxn == null)
+            {
+                var vendorPayable = await _ledgerService.GetOrCreateMerchantAccountAsync(merchantId, "SYP");
+                var vault = await _ledgerService.GetOrCreateSystemAccountAsync(SystemAccountCodes.CompanyMainVault, "Company Cash Vault", AccountType.Asset, "SYP");
+
+                await _ledgerService.PostTransactionAsync(new PostTransactionRequest
+                {
+                    ReferenceType = "PaymentAdjustment",
+                    ReferenceId = payment.Id.ToString(),
+                    IdempotencyKey = idempotencyKey,
+                    Description = $"تصحيح ترحيل الدفعة #{payment.Id}: تحويل خصم {payment.Amount:N0} ل.س من خزينة الشركة إلى ذمم متجر {merchantName}",
+                    Entries = new List<PostLedgerEntryRequest>
+                    {
+                        new() { AccountId = vendorPayable.Id, Debit = payment.Amount, Currency = "SYP", Memo = $"تسديد نقدي للمتجر من عهدة الكابتن - تصحيح دفعة #{payment.Id}" },
+                        new() { AccountId = vault.Id, Credit = payment.Amount, Currency = "SYP", Memo = $"تعديل ترحيل الخزينة للدفعة #{payment.Id} إلى المتجر" }
+                    }
+                });
+
+                var mBalance = await _balanceService.GetBalance(payment.ToUserId);
+                if (mBalance != null && mBalance.Amount > 0)
+                {
+                    await _balanceService.DecreaseAppBalance(payment.ToUserId, payment.Amount, merchantName);
+                }
+
+                payment.NewBalance = Math.Max(0m, (mBalance?.Amount ?? payment.Amount) - payment.Amount);
+                await _auow.SaveChangesAsync();
+            }
+
+            return Ok(true);
         }
     }
 }

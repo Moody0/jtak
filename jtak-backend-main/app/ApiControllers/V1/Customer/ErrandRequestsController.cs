@@ -316,6 +316,7 @@ namespace App.ApiControllers.V1.Customer
 
     public class CreateErrandRequestDto
     {
+        public Modules.Orders.Entities.CustomerDeviceLocation DeviceLocation { get; set; }
         public Guid RequestKey { get; set; }
         public string Items { get; set; }
         public string PickupPlace { get; set; }

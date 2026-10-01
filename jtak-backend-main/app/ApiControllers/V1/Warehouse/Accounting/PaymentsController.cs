@@ -124,18 +124,38 @@ namespace App.ApiControllers.V1.Warehouse
             //var oldDeliveryBalance = deliveryBalance?.Amount ?? 0;
             //var newDeliveryBalance = oldDeliveryBalance - payment.Amount;
             var dUser = await _userManager.Users.Where(x => x.Id == payment.ByUserId).Select(x => x.FullName).FirstOrDefaultAsync();
-
-            await _ledgerService.PostCaptainCashHandoverAsync(payment.ByUserId, payment.Amount, $"Payment-{payment.Id}", dUser);
-
-            var oldMerchantBalance = (await _balanceService.GetBalance(payment.ToUserId))?.Amount ?? 0;
             var mUser = await _userManager.Users.Where(x => x.Id == payment.ToUserId).Select(x => x.FullName).FirstOrDefaultAsync();
 
+            var mids = await _merchantService.GetMerchantIds(payment.ToUserId);
+            var merchantId = mids != null && mids.Length > 0 ? mids[0] : 0;
+
+            if (merchantId > 0)
+            {
+                await _ledgerService.PostCaptainToMerchantPaymentAsync(
+                    payment.ByUserId,
+                    merchantId,
+                    payment.Amount,
+                    $"Payment-{payment.Id}",
+                    dUser,
+                    mUser);
+            }
+            else
+            {
+                await _ledgerService.PostCaptainCashHandoverAsync(
+                    payment.ByUserId,
+                    payment.Amount,
+                    $"Payment-{payment.Id}",
+                    dUser);
+            }
+
+            var oldMerchantBalance = (await _balanceService.GetBalance(payment.ToUserId))?.Amount ?? 0;
+
             payment.HandoverDate = DateTime.UtcNow;
-            payment.NewBalance = oldMerchantBalance + payment.Amount;
+            payment.NewBalance = Math.Max(0m, oldMerchantBalance - payment.Amount);
 
             // Update delivery and warehouse user balances
-            await _balanceService.DecreaseAppBalance(payment.ByUserId, payment.Amount, dUser); // VERIFIED
-            await _balanceService.IncreaseAppBalance(payment.ToUserId, payment.Amount, mUser); // VERIFIED
+            await _balanceService.DecreaseAppBalance(payment.ByUserId, payment.Amount, dUser);
+            await _balanceService.DecreaseAppBalance(payment.ToUserId, payment.Amount, mUser);
 
             await _auow.SaveChangesAsync();
             if (transaction != null) await transaction.CommitAsync();

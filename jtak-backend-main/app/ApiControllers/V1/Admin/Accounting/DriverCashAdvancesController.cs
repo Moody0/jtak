@@ -81,11 +81,16 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 .Where(u => recentDriverIds.Contains(u.Id))
                 .Select(u => new { u.Id, u.FullName, u.FirstName, u.LastName })
                 .ToDictionaryAsync(u => u.Id, u => u.FullName ?? (u.FirstName + " " + u.LastName));
+            const string reasonPrefix = "عهدة تشغيلية للمندوب. السبب:";
             var advances = recentTransactions.Select(t =>
             {
                 var entry = t.Entries.FirstOrDefault(e =>
                     e.Account.AccountCode.StartsWith(SystemAccountCodes.CaptainCashFloatPrefix) && e.Debit > 0);
                 var driverId = entry?.Account.OwnerUserId;
+                var memo = entry?.Memo;
+                var reason = !string.IsNullOrWhiteSpace(memo) && memo.StartsWith(reasonPrefix, StringComparison.Ordinal)
+                    ? memo.Substring(reasonPrefix.Length).Trim()
+                    : memo ?? t.Description;
                 return new
                 {
                     transactionNumber = t.TransactionNumber,
@@ -94,7 +99,8 @@ namespace App.ApiControllers.V1.Admin.Accounting
                     driverName = driverId.HasValue && recentDriverNames.TryGetValue(driverId.Value, out var name) ? name : "مندوب محذوف",
                     amount = entry?.Debit ?? 0m,
                     reference = t.ReferenceId,
-                    description = t.Description
+                    description = t.Description,
+                    reason
                 };
             }).ToArray();
 
