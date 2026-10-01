@@ -38,10 +38,22 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   @Input() item: User;
   isLoading$: Observable<boolean>;
   formGroup: UntypedFormGroup;
-  // Admin accounts are managed through the dedicated admin access workflow.
-  userRoles = Object.entries(AppUserRoleMap).filter(
-    ([roleId]) => roleId !== '0'
-  );
+
+  // Modern structured role definitions with Arabic labels and icons
+  readonly availableRoles = [
+    { value: 1, label: 'عميل (Customer)', icon: 'fas fa-user', desc: 'مستخدم عادي يطلب من التطبيق' },
+    { value: 2, label: 'تاجر (Merchant)', icon: 'fas fa-store', desc: 'مالك أو مدير متجر مسجّل' },
+    { value: 3, label: 'مندوب توصيل / كابتن (Delivery)', icon: 'fas fa-motorcycle', desc: 'سائق يقوم بتوصيل الطلبات' },
+  ];
+
+  // Backward compatible userRoles array
+  userRoles = [
+    ['1', 'عميل (Customer)'],
+    ['2', 'تاجر (Merchant)'],
+    ['3', 'مندوب توصيل / كابتن (Delivery)'],
+  ];
+
+  showPassword = false;
 
   constructor(
     private service: UsersService,
@@ -53,12 +65,20 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
 
   Number = Number;
 
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
+  }
+
   get captainCompensationType(): number {
     return Number(this.formGroup?.get('captainCompensationType')?.value ?? 0);
   }
 
   get isDeliveryRole(): boolean {
     return Number(this.formGroup?.get('role')?.value) === 3;
+  }
+
+  get isMerchantRole(): boolean {
+    return Number(this.formGroup?.get('role')?.value) === 2;
   }
 
   getUserAvatar(): string | null {
@@ -68,14 +88,35 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   getUserInitials(): string {
     const first = (this.formGroup?.get('firstName')?.value || '').trim()[0] || '';
     const last = (this.formGroup?.get('lastName')?.value || '').trim()[0] || '';
-    return (first + last).toUpperCase() || 'U';
+    const initials = (first + last).toUpperCase();
+    return initials;
+  }
+
+  getRoleDefaultIcon(): string {
+    const role = Number(this.formGroup?.get('role')?.value ?? 1);
+    switch (role) {
+      case 0:
+        return 'fas fa-user-shield';
+      case 2:
+        return 'fas fa-store';
+      case 3:
+        return 'fas fa-motorcycle';
+      default:
+        return 'fas fa-user';
+    }
+  }
+
+  isNameEntered(): boolean {
+    const first = (this.formGroup?.get('firstName')?.value || '').trim();
+    const last = (this.formGroup?.get('lastName')?.value || '').trim();
+    return Boolean(first || last);
   }
 
   getUserDisplayName(): string {
     const first = (this.formGroup?.get('firstName')?.value || '').trim();
     const last = (this.formGroup?.get('lastName')?.value || '').trim();
     const full = `${first} ${last}`.trim();
-    return full || (this.item?.id ? 'اسم المستخدم' : 'مستخدم جديد');
+    return full || (this.item?.id ? (this.item.fullName || 'اسم المستخدم') : 'مستخدم جديد');
   }
 
   getRoleBadgeInfo(): { label: string; icon: string; badgeClass: string } {
@@ -89,6 +130,21 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
         return { label: 'مندوب توصيل', icon: 'fas fa-motorcycle', badgeClass: 'role-delivery' };
       default:
         return { label: 'عميل', icon: 'fas fa-user', badgeClass: 'role-customer' };
+    }
+  }
+
+  getCompensationLabel(): string {
+    const type = Number(this.formGroup?.get('captainCompensationType')?.value ?? 0);
+    const rate = this.formGroup?.get('captainRate')?.value ?? 0;
+    switch (type) {
+      case 0:
+        return 'موظف براتب شهري';
+      case 1:
+        return `${rate} ل.س / كم`;
+      case 2:
+        return `نسبة ${rate}%`;
+      default:
+        return 'موظف براتب شهري';
     }
   }
 

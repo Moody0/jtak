@@ -1,80 +1,620 @@
-<div class="card card-custom gutter-b">
-  <div class="card-header">
-    <div class="card-title">
-      <div>
-        <h3 class="card-label fw-bolder">{{ 'REVIEWS_PAGE.TITLE' | translate }}</h3>
-        <span class="card-subtitle text-muted">{{ 'REVIEWS_PAGE.SUBTITLE' | translate }}</span>
+<div class="reviews-workspace">
+
+  <!-- 1. Header & Live Utility Bar -->
+  <header class="reviews-header">
+    <div class="header-main-info">
+      <div class="header-icon-box">
+        <i class="fas fa-star"></i>
+      </div>
+      <div class="header-text-group">
+        <div class="header-title-line">
+          <h2>تقييمات طلبات العملاء</h2>
+          <span class="badge badge-subtle-primary">Customer Feedback & Reviews</span>
+        </div>
+        <p class="header-desc">
+          متابعة تجربة ورضا العملاء، تحليل درجات التقييم، وفحص الملاحظات والشكاوى التشغيلية المرفقة بالصور.
+        </p>
       </div>
     </div>
-  </div>
-  <div class="card-body">
-    <!-- begin: Filtration form -->
-    <div class="form form-label-right">
-      <div class="form-group row">
-        <div class="col-lg-3" [formGroup]="searchGroup">
-          <input
-            type="text"
-            class="form-control"
-            name="searchText"
-            [placeholder]="'REVIEWS_PAGE.SEARCH_PLACEHOLDER' | translate"
-            formControlName="searchTerm"
-          />
+
+    <div class="header-actions">
+      <div class="reviews-count-badge" title="إجمالي التقييمات المسجلة">
+        <i class="fas fa-comments"></i>
+        <span>إجمالي التقييمات: <strong>{{ kpiTotal | number }}</strong></span>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-header-refresh"
+        (click)="refresh()"
+        [disabled]="isLoading"
+        title="تحديث بيانات التقييمات"
+      >
+        <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+        <span>تحديث البيانات</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. Four Operational KPI Summary Cards -->
+  <section class="reviews-kpis-grid">
+    <!-- Card 1: Total Reviews -->
+    <div class="kpi-metric-card">
+      <div class="kpi-icon-box kpi-icon-blue">
+        <i class="fas fa-comments"></i>
+      </div>
+      <div class="kpi-metric-body">
+        <span class="kpi-label">إجمالي التقييمات</span>
+        <strong class="kpi-value text-blue">{{ kpiTotal | number }}</strong>
+        <small class="kpi-sub">تقييم مسجل في النظام</small>
+      </div>
+    </div>
+
+    <!-- Card 2: Average Rating Score -->
+    <div class="kpi-metric-card">
+      <div class="kpi-icon-box kpi-icon-amber">
+        <i class="fas fa-star"></i>
+      </div>
+      <div class="kpi-metric-body">
+        <span class="kpi-label">متوسط التقييم العام</span>
+        <strong class="kpi-value text-amber">
+          {{ kpiAvgRating > 0 ? (kpiAvgRating | number:'1.1-1') : '5.0' }} <small>/ 5.0</small>
+        </strong>
+        <div class="kpi-stars-row">
+          <i
+            *ngFor="let s of ratingStars"
+            class="fas fa-star"
+            [class.star-filled]="s <= (kpiAvgRating || 5)"
+            [class.star-empty]="s > (kpiAvgRating || 5)"
+          ></i>
         </div>
       </div>
     </div>
-    <!-- end: Filtration form -->
+
+    <!-- Card 3: Five Star Reviews -->
+    <div class="kpi-metric-card">
+      <div class="kpi-icon-box kpi-icon-green">
+        <i class="fas fa-smile"></i>
+      </div>
+      <div class="kpi-metric-body">
+        <span class="kpi-label">تقييمات ممتازة (5 نجوم)</span>
+        <strong class="kpi-value text-green">
+          {{ kpiFiveStarCount | number }}
+          <span class="kpi-pct-pill" *ngIf="kpiTotal > 0">{{ kpiFiveStarPct }}%</span>
+        </strong>
+        <small class="kpi-sub">أعلى درجات الرضا التشغيلي</small>
+      </div>
+    </div>
+
+    <!-- Card 4: Critical / Low Ratings -->
+    <div class="kpi-metric-card">
+      <div class="kpi-icon-box kpi-icon-rose">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <div class="kpi-metric-body">
+        <span class="kpi-label">تحتاج متابعة (1 - 2 نجوم)</span>
+        <strong class="kpi-value text-rose">{{ kpiCriticalCount | number }}</strong>
+        <small class="kpi-sub">شكاوى وملاحظات سلبية للخدمة</small>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Toolbar: Search & Rating Filter Tabs -->
+  <section class="reviews-controls-card">
+    <div class="controls-layout">
+
+      <!-- Live Search Input -->
+      <div class="search-input-wrapper" [formGroup]="searchGroup">
+        <i class="fas fa-search search-icon"></i>
+        <input
+          type="text"
+          class="form-control search-field"
+          formControlName="searchTerm"
+          placeholder="بحث بالعميل، المتجر، رقم الطلب، أو نص التعليق..."
+        />
+        <button
+          type="button"
+          class="btn-clear-search"
+          *ngIf="searchGroup.get('searchTerm')?.value"
+          (click)="clearSearch()"
+          title="مسح البحث"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Rating Filter Pills -->
+      <div class="rating-filter-pills">
+        <button
+          type="button"
+          class="filter-pill-btn"
+          [class.active]="selectedRatingFilter === 'all'"
+          (click)="filterByRating('all')"
+        >
+          <span>الكل</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-pill-btn pill-star-5"
+          [class.active]="selectedRatingFilter === '5'"
+          (click)="filterByRating('5')"
+        >
+          <i class="fas fa-star text-warning"></i>
+          <span>5 نجوم</span>
+          <span class="pill-badge" *ngIf="kpiFiveStarCount > 0">{{ kpiFiveStarCount }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-pill-btn pill-star-4"
+          [class.active]="selectedRatingFilter === '4'"
+          (click)="filterByRating('4')"
+        >
+          <i class="fas fa-star text-warning"></i>
+          <span>4 نجوم</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-pill-btn pill-star-3"
+          [class.active]="selectedRatingFilter === '3'"
+          (click)="filterByRating('3')"
+        >
+          <i class="fas fa-star text-warning"></i>
+          <span>3 نجوم</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-pill-btn pill-star-critical"
+          [class.active]="selectedRatingFilter === 'critical'"
+          (click)="filterByRating('critical')"
+        >
+          <i class="fas fa-exclamation-circle text-danger"></i>
+          <span>حرجة (1-2)</span>
+          <span class="pill-badge pill-badge-critical" *ngIf="kpiCriticalCount > 0">{{ kpiCriticalCount }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-pill-btn"
+          [class.active]="selectedRatingFilter === 'with_photo'"
+          (click)="filterByRating('with_photo')"
+        >
+          <i class="fas fa-camera text-primary"></i>
+          <span>مرفق صور</span>
+          <span class="pill-badge" *ngIf="kpiWithPhotoCount > 0">{{ kpiWithPhotoCount }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-pill-btn"
+          [class.active]="selectedRatingFilter === 'with_text'"
+          (click)="filterByRating('with_text')"
+        >
+          <i class="fas fa-comment-alt text-secondary"></i>
+          <span>مع تعليق مكتوب</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Bulk Actions Strip (when items selected) -->
     <ng-container *ngIf="productReviewsService.items$ | async as items">
       <div class="bulk-action-bar" *ngIf="selection.count > 0">
-        <div class="bulk-selection-count"><strong>{{ selection.count }}</strong> {{ 'COMMON.SELECTED' | translate }}</div>
+        <div class="bulk-selection-count">
+          <i class="fas fa-check-circle text-primary"></i>
+          <span>تم تحديد <strong>{{ selection.count }}</strong> تقييم</span>
+        </div>
         <div class="bulk-action-buttons">
-          <button type="button" class="btn btn-sm btn-light" (click)="selection.exportSelected(items, 'reviews')"><i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}</button>
-          <button type="button" class="btn btn-sm btn-link" (click)="selection.clear()">{{ 'COMMON.CLEAR' | translate }}</button>
+          <button
+            type="button"
+            class="btn btn-sm btn-light"
+            (click)="exportSelection(items)"
+          >
+            <i class="fas fa-file-excel me-1 text-success"></i>
+            <span>تصدير المحدد إلى Excel</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-link text-muted"
+            (click)="selection.clear()"
+          >
+            <span>إلغاء التحديد</span>
+          </button>
         </div>
       </div>
     </ng-container>
+  </section>
 
-    <div class="table-responsive angular-bootstrap-table mt-10" *ngIf="productReviewsService.items$ | async as items">
-      <table
-        class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"
-      >
-        <thead>
-          <tr class="fw-bolder text-muted bg-light text-uppercase fs-7">
-            <th scope="col" class="table-select-cell"><input type="checkbox" class="form-check-input" aria-label="Select all reviews on this page" [checked]="selection.allSelected(items)" [indeterminate]="selection.partiallySelected(items)" (change)="selection.toggleAll(items, $any($event.target).checked)" /></th>
-            <th scope="col">{{ 'REVIEWS_PAGE.COL_ID' | translate }}</th>
-            <th scope="col">{{ 'REVIEWS_PAGE.COL_PRODUCT' | translate }}</th>
-            <th scope="col">{{ 'REVIEWS_PAGE.COL_DATE' | translate }}</th>
-            <th scope="col">{{ 'REVIEWS_PAGE.COL_RATE' | translate }}</th>
-            <th scope="col">{{ 'REVIEWS_PAGE.COL_COMMENT' | translate }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let i of items" [class.table-row-selected]="selection.isSelected(i)">
-            <td class="table-select-cell"><input type="checkbox" class="form-check-input" [checked]="selection.isSelected(i)" [attr.aria-label]="'Select review ' + i.id" (change)="selection.toggle(i, $any($event.target).checked)" /></td>
-            <td><span class="badge badge-light-secondary font-monospace">#{{ i.id }}</span></td>
-            <td>
-              <span class="fw-bolder text-dark">{{ i.merchantTitle }}</span>
-              <small class="d-block text-muted">{{ 'REVIEWS_PAGE.ORDER_NUMBER' | translate }} #{{ i.orderId }}</small>
-              <small class="d-block text-muted" *ngIf="i.reviewerName">{{ i.reviewerName }}</small>
-            </td>
-            <td>{{ i.createdDate | date:'d/M/yy, h:mm a' }}</td>
-            <td>
-              <span class="badge badge-light-warning fw-bolder fs-7">
-                <i class="fas fa-star text-warning me-1"></i>{{ i.rate }}
-              </span>
-            </td>
-            <td class="text-muted text-wrap" style="max-width: 320px;">
-              {{ i.textReview || '-' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <!-- 4. High-Density Reviews Table -->
+  <section class="reviews-table-container">
+    <ng-container *ngIf="productReviewsService.items$ | async as rawItems">
+      <div class="table-responsive" *ngIf="getDisplayedItems(rawItems) as items">
+
+        <table class="table reviews-table align-middle">
+          <thead>
+            <tr>
+              <th scope="col" class="th-checkbox">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  aria-label="تحديد الكل"
+                  [checked]="selection.allSelected(items)"
+                  [indeterminate]="selection.partiallySelected(items)"
+                  (change)="selection.toggleAll(items, $any($event.target).checked)"
+                />
+              </th>
+              <th scope="col" class="th-id">المعرف والطلب</th>
+              <th scope="col" class="th-rate">درجة التقييم</th>
+              <th scope="col" class="th-merchant">المتجر / المطعم</th>
+              <th scope="col" class="th-customer">العميل المقيّم</th>
+              <th scope="col" class="th-comment">الملاحظات والمرفقات</th>
+              <th scope="col" class="th-date">تاريخ التقييم</th>
+              <th scope="col" class="th-actions text-center">الإجراءات</th>
+            </tr>
+          </thead>
+
+          <tbody *ngIf="items.length > 0">
+            <tr
+              *ngFor="let item of items"
+              [class.table-row-selected]="selection.isSelected(item)"
+              (click)="openReviewDetails(item, reviewDetailsModal)"
+              class="clickable-row"
+            >
+              <!-- Checkbox -->
+              <td class="td-checkbox" (click)="$event.stopPropagation()">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  [checked]="selection.isSelected(item)"
+                  [attr.aria-label]="'Select review ' + item.id"
+                  (change)="selection.toggle(item, $any($event.target).checked)"
+                />
+              </td>
+
+              <!-- ID & Order Number -->
+              <td class="td-id">
+                <div class="d-flex flex-column gap-1">
+                  <span class="review-id-pill font-monospace">#{{ item.id }}</span>
+                  <span
+                    class="order-link-pill"
+                    *ngIf="item.orderId"
+                    (click)="$event.stopPropagation(); copyText(item.orderId, 'رقم الطلب')"
+                    title="انقر لنسخ رقم الطلب"
+                  >
+                    <i class="fas fa-shopping-bag text-primary"></i>
+                    <span>طلب #{{ item.orderId }}</span>
+                  </span>
+                </div>
+              </td>
+
+              <!-- Rating Score & Visual Stars -->
+              <td class="td-rate">
+                <div class="rating-cell-content">
+                  <div class="d-flex align-items-center gap-1 mb-1">
+                    <span
+                      class="rating-badge-pill"
+                      [ngClass]="getRatingBadge(item.rate).badgeClass"
+                    >
+                      <i [class]="getRatingBadge(item.rate).icon"></i>
+                      <span>{{ item.rate }} {{ getRatingBadge(item.rate).label }}</span>
+                    </span>
+                  </div>
+                  <div class="star-rating-display">
+                    <i
+                      *ngFor="let s of ratingStars"
+                      class="fas fa-star"
+                      [class.star-filled]="s <= Number(item.rate || 0)"
+                      [class.star-empty]="s > Number(item.rate || 0)"
+                    ></i>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Merchant Store & Product -->
+              <td class="td-merchant">
+                <div class="merchant-cell-content">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="merchant-icon-circle">
+                      <i class="fas fa-store"></i>
+                    </span>
+                    <span class="merchant-title-text" [title]="item.merchantTitle || 'متجر مسجل'">
+                      {{ item.merchantTitle || 'متجر مسجل' }}
+                    </span>
+                  </div>
+                  <span class="product-title-sub" *ngIf="item.productTitle">
+                    <i class="fas fa-box-open text-muted"></i>
+                    <span>{{ item.productTitle }}</span>
+                  </span>
+                </div>
+              </td>
+
+              <!-- Reviewer / Customer -->
+              <td class="td-customer">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="reviewer-avatar">
+                    <span>{{ getReviewerInitials(item.reviewerName) }}</span>
+                  </div>
+                  <div class="d-flex flex-column">
+                    <span class="reviewer-name-text">
+                      {{ item.reviewerName || 'عميل مسجل' }}
+                    </span>
+                    <span class="reviewer-id-sub font-monospace" *ngIf="item.reviewerId">
+                      ID: {{ item.reviewerId }}
+                    </span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Review Text & Photo Thumbnail -->
+              <td class="td-comment">
+                <div class="comment-cell-content">
+                  <!-- Text Review snippet -->
+                  <p class="review-text-snippet" *ngIf="item.textReview">
+                    "{{ item.textReview }}"
+                  </p>
+                  <span class="review-empty-text" *ngIf="!item.textReview">
+                    (بدون تعليق نصي)
+                  </span>
+
+                  <!-- Attached Photo pill button -->
+                  <div class="photo-attachment-wrap" *ngIf="item.imageReview">
+                    <button
+                      type="button"
+                      class="btn-photo-pill"
+                      (click)="openPhotoZoom(item.imageReview, photoZoomModal, $event)"
+                      title="عرض صورة الطلب المرفقة"
+                    >
+                      <i class="fas fa-camera text-primary"></i>
+                      <span>صورة مرفقة</span>
+                    </button>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Submission Date -->
+              <td class="td-date">
+                <div class="date-cell-content">
+                  <span class="date-main">{{ item.createdDate | date:'d/M/yyyy' }}</span>
+                  <span class="time-sub">{{ item.createdDate | date:'h:mm a' }}</span>
+                </div>
+              </td>
+
+              <!-- Actions -->
+              <td class="td-actions text-center" (click)="$event.stopPropagation()">
+                <button
+                  type="button"
+                  class="btn btn-action-view"
+                  (click)="openReviewDetails(item, reviewDetailsModal)"
+                  title="عرض تفاصيل التقييم كاملة"
+                >
+                  <i class="fas fa-eye"></i>
+                  <span>تفاصيل</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Empty State When No Items -->
+        <div class="reviews-empty-state" *ngIf="items.length === 0">
+          <div class="empty-icon-circle">
+            <i class="fas fa-star-half-alt"></i>
+          </div>
+          <h4>لا توجد تقييمات مطابقة</h4>
+          <p>لم يتم العثور على أي تقييمات تطابق معايير البحث أو التصفية المختارة حالياً.</p>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            (click)="selectedRatingFilter = 'all'; clearSearch()"
+          >
+            <i class="fas fa-redo-alt me-1"></i>
+            <span>إعادة ضبط الفلاتر</span>
+          </button>
+        </div>
+
+      </div>
+    </ng-container>
+
+    <!-- Table Paginator -->
+    <div class="reviews-paginator-wrap">
+      <app-paginator
+        class="d-flex justify-content-between align-items-center flex-wrap"
+        [paginator]="paginator"
+        [isLoading]="isLoading"
+        (paginate)="paginate($event)"
+      ></app-paginator>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============================================================================= -->
+<!-- MODAL: Review Details Modal (عرض التفاصيل الكاملة للتقييم)                     -->
+<!-- ============================================================================= -->
+<ng-template #reviewDetailsModal let-modal>
+  <div class="modal-content review-details-dialog" *ngIf="selectedReview">
+
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <div class="jtak-modal-heading">
+        <span class="modal-header-icon-box">
+          <i class="fas fa-star"></i>
+        </span>
+        <div>
+          <span class="modal-header-kicker">سجل تقييم العميل للطلب</span>
+          <h2 class="modal-title">تفاصيل تقييم الطلب #{{ selectedReview.orderId }}</h2>
+          <p class="modal-header-sub">مراجعة كامل ملاحظات العميل، درجة الرضا، والصور المرفقة.</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="إغلاق"
+        (click)="modal.dismiss()"
+      ></button>
     </div>
 
-    <app-paginator
-      class="d-flex justify-content-between align-items-center flex-wrap mt-4"
-      [paginator]="paginator"
-      [isLoading]="isLoading"
-      (paginate)="paginate($event)"
-    ></app-paginator>
+    <!-- Modal Body -->
+    <div class="modal-body">
+      <!-- 4 Summary Info Tiles Grid -->
+      <div class="review-summary-tiles">
+
+        <!-- Tile 1: Rating Score -->
+        <div class="summary-tile tile-rating">
+          <span class="tile-label">درجة التقييم</span>
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <span class="rating-large-num">{{ selectedReview.rate }}</span>
+            <div class="d-flex flex-column gap-1">
+              <span class="rating-badge-pill" [ngClass]="getRatingBadge(selectedReview.rate).badgeClass">
+                <i [class]="getRatingBadge(selectedReview.rate).icon"></i>
+                <span>{{ getRatingBadge(selectedReview.rate).label }}</span>
+              </span>
+              <div class="star-rating-display">
+                <i
+                  *ngFor="let s of ratingStars"
+                  class="fas fa-star"
+                  [class.star-filled]="s <= Number(selectedReview.rate || 0)"
+                  [class.star-empty]="s > Number(selectedReview.rate || 0)"
+                ></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tile 2: Customer / Reviewer -->
+        <div class="summary-tile">
+          <span class="tile-label">العميل المقيّم</span>
+          <div class="d-flex align-items-center gap-2 mt-2">
+            <div class="reviewer-avatar">
+              <span>{{ getReviewerInitials(selectedReview.reviewerName) }}</span>
+            </div>
+            <div class="d-flex flex-column">
+              <strong class="tile-main-text">{{ selectedReview.reviewerName || 'عميل مسجل' }}</strong>
+              <small class="text-muted font-monospace" *ngIf="selectedReview.reviewerId">ID: {{ selectedReview.reviewerId }}</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tile 3: Merchant & Order -->
+        <div class="summary-tile">
+          <span class="tile-label">المتجر ورقم الطلب</span>
+          <div class="d-flex flex-column gap-1 mt-2">
+            <strong class="tile-main-text">
+              <i class="fas fa-store text-success me-1"></i>
+              {{ selectedReview.merchantTitle || 'متجر مسجل' }}
+            </strong>
+            <span class="order-link-pill align-self-start" (click)="copyText(selectedReview.orderId, 'رقم الطلب')">
+              <i class="fas fa-shopping-bag text-primary"></i>
+              <span>طلب #{{ selectedReview.orderId }}</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Tile 4: Submission Date & Time -->
+        <div class="summary-tile">
+          <span class="tile-label">تاريخ ووقت التقييم</span>
+          <div class="d-flex flex-column gap-1 mt-2">
+            <strong class="tile-main-text">
+              <i class="fas fa-calendar-alt text-secondary me-1"></i>
+              {{ selectedReview.createdDate | date:'d MMMM yyyy' }}
+            </strong>
+            <small class="text-muted">
+              <i class="fas fa-clock text-secondary me-1"></i>
+              {{ selectedReview.createdDate | date:'h:mm a' }}
+            </small>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Customer Written Review Section -->
+      <div class="review-feedback-section">
+        <h4 class="section-title">
+          <i class="fas fa-comment-dots text-primary"></i>
+          <span>نص تعليق وملاحظات العميل:</span>
+        </h4>
+        <div class="feedback-speech-bubble" [class.is-empty]="!selectedReview.textReview">
+          <p *ngIf="selectedReview.textReview">"{{ selectedReview.textReview }}"</p>
+          <span *ngIf="!selectedReview.textReview" class="text-muted fst-italic">
+            لم يقم العميل بكتابة أي ملاحظات نصية مع التقييم.
+          </span>
+        </div>
+      </div>
+
+      <!-- Customer Photo Attachment Section (if any) -->
+      <div class="review-photo-section" *ngIf="selectedReview.imageReview">
+        <h4 class="section-title">
+          <i class="fas fa-camera text-primary"></i>
+          <span>الصورة المرفقة من العميل:</span>
+        </h4>
+        <div class="attached-photo-preview-wrap">
+          <div class="photo-card" (click)="openPhotoZoom(selectedReview.imageReview, photoZoomModal)">
+            <img
+              [src]="getPhotoUrl(selectedReview.imageReview)"
+              alt="صورة التقييم"
+              (error)="onImageError($event)"
+            />
+            <div class="photo-overlay">
+              <i class="fas fa-search-plus"></i>
+              <span>تكبير الصورة</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer">
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted fs-8">معرف التقييم: #{{ selectedReview.id }}</span>
+      </div>
+      <div class="d-flex gap-2">
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          (click)="copyText(selectedReview.textReview || ('تقييم ' + selectedReview.rate + ' نجوم للطلب #' + selectedReview.orderId), 'تفاصيل التقييم')"
+        >
+          <i class="fas fa-copy me-1"></i>
+          <span>نسخ الملاحظة</span>
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          (click)="modal.dismiss()"
+        >
+          <span>إغلاق</span>
+        </button>
+      </div>
+    </div>
+
   </div>
-</div>
+</ng-template>
+
+<!-- ============================================================================= -->
+<!-- MODAL: Photo Zoom Lightbox (تكبير الصورة المرفقة)                               -->
+<!-- ============================================================================= -->
+<ng-template #photoZoomModal let-modal>
+  <div class="modal-content photo-zoom-dialog">
+    <div class="modal-header border-0 pb-0">
+      <h5 class="modal-title fs-7 fw-bold text-muted">صورة مرفقة مع التقييم</h5>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="إغلاق"
+        (click)="modal.dismiss()"
+      ></button>
+    </div>
+    <div class="modal-body text-center p-3">
+      <img
+        [src]="activePhotoUrl"
+        alt="صورة الطلب المرفقة"
+        class="img-fluid rounded-3"
+        style="max-height: 80vh; object-fit: contain;"
+      />
+    </div>
+  </div>
+</ng-template>

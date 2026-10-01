@@ -1,4 +1,5 @@
 <app-edit-modal
+  class="user-edit-modal"
   [item]="item"
   [itemName]="item.fullName || ''"
   moduleName="User"
@@ -24,7 +25,7 @@
               </div>
             </div>
 
-            <div class="row g-4">
+            <div class="row g-3">
               <!-- First Name -->
               <div class="col-md-6">
                 <label for="firstName" class="form-label fw-bold mb-2">
@@ -61,23 +62,6 @@
                 </app-input-container>
               </div>
 
-              <!-- Email -->
-              <div class="col-md-6">
-                <label for="email" class="form-label fw-bold mb-2">
-                  {{ 'USERS_PAGE.COL_EMAIL' | translate }}
-                </label>
-                <app-input-container [control]="formGroup.controls.email">
-                  <input
-                    type="email"
-                    class="form-control"
-                    formControlName="email"
-                    id="email"
-                    autocomplete="email"
-                    placeholder="name@example.com"
-                  />
-                </app-input-container>
-              </div>
-
               <!-- Phone with Country Code -->
               <div class="col-md-6">
                 <label class="form-label fw-bold mb-2">
@@ -85,7 +69,7 @@
                   <span class="text-danger">*</span>
                 </label>
                 <div class="d-flex align-items-center gap-2">
-                  <div style="width: 100px; flex-shrink: 0;">
+                  <div style="width: 90px; flex-shrink: 0;">
                     <input
                       type="text"
                       class="form-control text-center fw-bold"
@@ -110,6 +94,25 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Email -->
+              <div class="col-md-6">
+                <label for="email" class="form-label fw-bold mb-2">
+                  {{ 'USERS_PAGE.COL_EMAIL' | translate }}
+                  <span class="text-muted fw-normal ms-1 fs-9">(اختياري)</span>
+                </label>
+                <app-input-container [control]="formGroup.controls.email">
+                  <input
+                    type="email"
+                    class="form-control"
+                    formControlName="email"
+                    id="email"
+                    autocomplete="email"
+                    placeholder="name@example.com"
+                    dir="ltr"
+                  />
+                </app-input-container>
+              </div>
             </div>
           </section>
 
@@ -123,7 +126,7 @@
               </div>
             </div>
 
-            <div class="row g-4">
+            <div class="row g-3">
               <!-- Role Selection -->
               <div class="col-md-6">
                 <label for="role" class="form-label fw-bold mb-2">
@@ -135,146 +138,182 @@
                   formControlName="role"
                   placeholder="اختر دور المستخدم"
                   [clearable]="false"
+                  [searchable]="false"
                 >
-                  <ng-option *ngFor="let role of userRoles" [value]="+role[0]">
-                    {{ role[1] }}
+                  <ng-option *ngFor="let role of availableRoles" [value]="role.value">
+                    <div class="d-flex align-items-center gap-2">
+                      <i [class]="role.icon" class="text-secondary"></i>
+                      <span class="fw-bold">{{ role.label }}</span>
+                    </div>
                   </ng-option>
                 </ng-select>
-                <small class="form-text text-muted d-block mt-2" *ngIf="formGroup.get('role')?.value === 2">
-                  بعد إنشاء حساب التاجر، اربطه بملف متجر من صفحة التجار ليتمكن من إدارة متجره.
-                </small>
               </div>
 
               <!-- Password -->
               <div class="col-md-6">
                 <label for="password" class="form-label fw-bold mb-2">
-                  {{ item?.id ? 'كلمة المرور الجديدة (اختياري)' : 'كلمة المرور' }}
+                  {{ item?.id ? 'كلمة المرور الجديدة' : 'كلمة المرور' }}
                   <span class="text-danger" *ngIf="!item?.id">*</span>
+                  <span class="text-muted fw-normal ms-1 fs-9" *ngIf="item?.id">(اختياري)</span>
                 </label>
                 <app-input-container [control]="formGroup.controls.password">
-                  <input
-                    type="password"
-                    class="form-control"
-                    formControlName="password"
-                    id="password"
-                    autocomplete="new-password"
-                    placeholder="{{ item?.id ? 'اترك الحقل فارغاً للإبقاء على الحالية' : '6 أحرف على الأقل' }}"
-                  />
-                </app-input-container>
-              </div>
-
-              <!-- Driver Cash Custody Limit -->
-              <div class="col-md-6" *ngIf="isDeliveryRole">
-                <label for="maxCashFloat" class="form-label fw-bold mb-2">
-                  الحد الأعلى لعهدة السائق
-                  <span class="text-danger">*</span>
-                </label>
-                <app-input-container [control]="formGroup.controls.maxCashFloat">
                   <div class="input-group">
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      [type]="showPassword ? 'text' : 'password'"
                       class="form-control"
-                      formControlName="maxCashFloat"
-                      id="maxCashFloat"
-                      placeholder="5000"
+                      formControlName="password"
+                      id="password"
+                      autocomplete="new-password"
+                      placeholder="{{ item?.id ? 'اترك الحقل فارغاً للإبقاء على الحالية' : '6 أحرف على الأقل' }}"
+                      dir="ltr"
                     />
-                    <span class="input-group-text">ل.س</span>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-eye-toggle"
+                      (click)="togglePasswordVisibility()"
+                      tabindex="-1"
+                      [title]="showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'"
+                    >
+                      <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    </button>
                   </div>
                 </app-input-container>
-                <small class="text-muted">
-                  أعلى مبلغ نقدي يمكن أن يبقى مع السائق قبل إيقاف إسناد طلبات نقدية جديدة.
-                </small>
               </div>
 
-              <!-- Driver Compensation Model & Rate (Only for Delivery Drivers: role === 3) -->
+              <!-- Merchant Notice (When Role === 2) -->
+              <div class="col-12" *ngIf="isMerchantRole">
+                <div class="merchant-notice-box">
+                  <div class="notice-icon">
+                    <i class="fas fa-store"></i>
+                  </div>
+                  <div class="notice-content">
+                    <strong>تنبيه ربط التاجر بالمتجر:</strong>
+                    <span>بعد إنشاء هذا الحساب، يرجى التوجه لصفحة التجار وربطه بمتجر محدد ليتمكن التاجر من إدارة منتجاته واستقبال طلباته.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Driver Settings Container (When Role === 3 Delivery) -->
               <div class="col-12" *ngIf="isDeliveryRole">
-                <div class="ops-compensation-box p-4 rounded-3">
-                  <div class="d-flex align-items-center gap-2 mb-3">
-                    <i class="fas fa-hand-holding-usd text-warning fs-5"></i>
-                    <h5 class="fw-bolder text-gray-900 mb-0">نظام محاسبة واستحقاق الكابتن</h5>
+                <div class="driver-settings-box">
+                  <div class="driver-settings-header">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="fas fa-motorcycle text-warning"></i>
+                      <span class="fw-bold">إعدادات كابتن التوصيل والعهدة النقدية</span>
+                    </div>
+                    <span class="driver-badge">
+                      حساب كابتن نشط
+                    </span>
                   </div>
 
-                  <div class="row g-3">
-                    <!-- Compensation Model Select -->
-                    <div class="col-md-6">
-                      <label for="captainCompensationType" class="form-label fw-bold mb-1">
-                        طريقة احتساب أجر الكابتن:
-                        <span class="text-danger">*</span>
-                      </label>
-                      <select
-                        class="form-select form-select-solid fw-bold"
-                        id="captainCompensationType"
-                        formControlName="captainCompensationType"
-                        (change)="onCompensationTypeChange($any($event.target).value)"
-                      >
-                        <option [value]="0">1. موظف براتب شهري (0 على الطلب)</option>
-                        <option [value]="1">2. حسب الكيلومتر (سعر لكل 1 كم)</option>
-                        <option [value]="2">3. نسبة من أجرة التوصيل (نسبة مئوية %)</option>
-                      </select>
-                      <small class="text-muted d-block mt-1">
-                        تُثبّت طريقة الحساب والاستحقاق داخل كل طلب عند قبوله.
-                      </small>
-                    </div>
-
-                    <!-- Per Kilometer Rate Input (when type === 1) -->
-                    <div class="col-md-6" *ngIf="captainCompensationType === 1">
-                      <label for="captainRateKm" class="form-label fw-bold mb-1">
-                        سعر الكيلومتر الواحد للكابتن:
-                        <span class="text-danger">*</span>
-                      </label>
-                      <div class="input-group">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          class="form-control fw-bold"
-                          formControlName="captainRate"
-                          id="captainRateKm"
-                          placeholder="25"
-                        />
-                        <span class="input-group-text bg-white fw-bold">ل.س / كم</span>
-                      </div>
-                      <small class="text-muted d-block mt-1">
-                        مثال: إذا المسافة 4 كم والسعر 25 ل.س، يستحق الكابتن 100 ل.س.
-                      </small>
-                    </div>
-
-                    <!-- Percentage Rate Input (when type === 2) -->
-                    <div class="col-md-6" *ngIf="captainCompensationType === 2">
-                      <label for="captainRatePercent" class="form-label fw-bold mb-1">
-                        نسبة الكابتن من أجرة التوصيل:
-                        <span class="text-danger">*</span>
-                      </label>
-                      <div class="input-group">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="1"
-                          class="form-control fw-bold"
-                          formControlName="captainRate"
-                          id="captainRatePercent"
-                          placeholder="60"
-                        />
-                        <span class="input-group-text bg-white fw-bold">%</span>
-                      </div>
-                      <small class="text-muted d-block mt-1">
-                        تحسب من أجرة التوصيل الأصلية (مثلاً 60% من 180 = 108 ل.س) حتى لو كان التوصيل مجانياً للزبون.
-                      </small>
-                    </div>
-
-                    <!-- Salaried Employee Info Card (when type === 0) -->
-                    <div class="col-md-6" *ngIf="captainCompensationType === 0">
-                      <div class="alert alert-light-primary p-3 mb-0 fs-7 border border-primary border-opacity-25 rounded-2">
-                        <div class="d-flex align-items-center gap-2 mb-1">
-                          <i class="fas fa-user-tie text-primary"></i>
-                          <strong class="text-primary">كابتن موظف براتب شهري</strong>
-                        </div>
-                        <span class="text-muted">
-                          لا يأخذ الكابتن أجرة على الطلبات، ويُسلّم كامل المبالغ المستلمة من الزبائن للشركة، ثم تُجرى معه تسوية دورية بالراتب.
+                  <div class="driver-settings-body">
+                    <div class="row g-3">
+                      <!-- Driver Cash Custody Limit -->
+                      <div class="col-md-6">
+                        <label for="maxCashFloat" class="form-label fw-bold mb-1">
+                          الحد الأعلى لعهدة السائق
+                          <span class="text-danger">*</span>
+                        </label>
+                        <app-input-container [control]="formGroup.controls.maxCashFloat">
+                          <div class="input-group">
+                            <input
+                              type="number"
+                              min="0"
+                              step="50000"
+                              class="form-control fw-bold"
+                              formControlName="maxCashFloat"
+                              id="maxCashFloat"
+                              placeholder="5000000"
+                            />
+                            <span class="input-group-text">ل.س</span>
+                          </div>
+                        </app-input-container>
+                        <span class="sub-hint-text">
+                          أعلى مبلغ نقدي يبقى مع السائق قبل إيقاف إسناد طلبات نقدية جديدة.
                         </span>
+                      </div>
+
+                      <!-- Driver Compensation Model -->
+                      <div class="col-md-6">
+                        <label for="captainCompensationType" class="form-label fw-bold mb-1">
+                          طريقة احتساب أجر الكابتن
+                          <span class="text-danger">*</span>
+                        </label>
+                        <select
+                          class="form-select fw-bold"
+                          id="captainCompensationType"
+                          formControlName="captainCompensationType"
+                          (change)="onCompensationTypeChange($any($event.target).value)"
+                        >
+                          <option [value]="0">1. موظف براتب شهري (0 على الطلب)</option>
+                          <option [value]="1">2. حسب الكيلومتر (سعر لكل 1 كم)</option>
+                          <option [value]="2">3. نسبة من أجرة التوصيل (نسبة %)</option>
+                        </select>
+                        <span class="sub-hint-text">
+                          تُثبّت طريقة الحساب والاستحقاق داخل كل طلب عند قبوله.
+                        </span>
+                      </div>
+
+                      <!-- Dynamic Compensation Detail (Per Km) -->
+                      <div class="col-12" *ngIf="captainCompensationType === 1">
+                        <div class="compensation-subfield">
+                          <label for="captainRateKm" class="form-label fw-bold mb-1">
+                            سعر الكيلومتر الواحد للكابتن:
+                            <span class="text-danger">*</span>
+                          </label>
+                          <div class="input-group" style="max-width: 280px;">
+                            <input
+                              type="number"
+                              min="0"
+                              step="5"
+                              class="form-control fw-bold"
+                              formControlName="captainRate"
+                              id="captainRateKm"
+                              placeholder="25"
+                            />
+                            <span class="input-group-text bg-white fw-bold">ل.س / كم</span>
+                          </div>
+                          <span class="sub-hint-text mt-1">
+                            مثال: إذا المسافة 4 كم والسعر 25 ل.س، يستحق الكابتن 100 ل.س.
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Dynamic Compensation Detail (Percentage) -->
+                      <div class="col-12" *ngIf="captainCompensationType === 2">
+                        <div class="compensation-subfield">
+                          <label for="captainRatePercent" class="form-label fw-bold mb-1">
+                            نسبة الكابتن من أجرة التوصيل:
+                            <span class="text-danger">*</span>
+                          </label>
+                          <div class="input-group" style="max-width: 280px;">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              class="form-control fw-bold"
+                              formControlName="captainRate"
+                              id="captainRatePercent"
+                              placeholder="60"
+                            />
+                            <span class="input-group-text bg-white fw-bold">%</span>
+                          </div>
+                          <span class="sub-hint-text mt-1">
+                            تحسب من أجرة التوصيل الأصلية المسجلة على الطلب.
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Dynamic Compensation Detail (Salaried Info) -->
+                      <div class="col-12" *ngIf="captainCompensationType === 0">
+                        <div class="salaried-driver-notice">
+                          <i class="fas fa-info-circle text-primary"></i>
+                          <div>
+                            <strong>كابتن موظف براتب شهري:</strong>
+                            <p class="mb-0">لا يأخذ الكابتن أجرة فردية على الطلبات، ويُسلّم كامل المبالغ المستلمة من الزبائن للشركة، ثم تُجرى معه تسوية دورية بالراتب.</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -292,7 +331,7 @@
                       {{ formGroup.get('isActive')?.value ? 'الحساب نشط ومفعّل' : 'الحساب معطل ومحظور' }}
                     </span>
                     <span class="switch-desc">
-                      {{ formGroup.get('isActive')?.value ? 'يمكن للمستخدم تسجيل الدخول واستخدام الصلاحيات الممنوحة في التطبيق ولوحة التحكم' : 'لن يتمكن هذا المستخدم من تسجيل الدخول إلى حسابه' }}
+                      {{ formGroup.get('isActive')?.value ? 'يمكن للمستخدم تسجيل الدخول واستخدام الصلاحيات الممنوحة في التطبيق ولوحة التحكم' : 'لن يتمكن هذا المستخدم من تسجيل الدخول إلى حسابه في التطبيق أو النظام' }}
                     </span>
                   </div>
                   <div class="form-check form-switch m-0">
@@ -318,9 +357,9 @@
           <div class="preview-phone-header">
             <div class="preview-notch-info">
               <span class="preview-dot-pulse"></span>
-              <span>{{ 'USERS_PAGE.PREVIEW_HEADING' | translate }}</span>
+              <span>معاينة الهوية الرقمية</span>
             </div>
-            <span class="preview-app-title">JTAK</span>
+            <span class="preview-app-title">JTAK ID</span>
           </div>
 
           <!-- Customer Profile Card Mockup -->
@@ -328,12 +367,13 @@
             <div class="customer-profile-card">
               <!-- Avatar Circle -->
               <div class="profile-avatar-circle" [ngClass]="getRoleBadgeInfo().badgeClass">
-                <span *ngIf="!getUserAvatar()">{{ getUserInitials() }}</span>
+                <span *ngIf="getUserInitials()">{{ getUserInitials() }}</span>
+                <i *ngIf="!getUserInitials()" [class]="getRoleDefaultIcon()"></i>
                 <img *ngIf="getUserAvatar()" [src]="getUserAvatar()" (error)="onImageError($event)" alt="Avatar" />
               </div>
 
               <!-- Full Name -->
-              <h4 class="profile-user-name">
+              <h4 class="profile-user-name" [class.is-placeholder]="!isNameEntered()">
                 {{ getUserDisplayName() }}
               </h4>
 
@@ -346,18 +386,48 @@
                 <span>{{ getRoleBadgeInfo().label }}</span>
               </span>
 
-              <!-- Contact List -->
+              <!-- Contact & Operating Specs List -->
               <div class="profile-contact-list">
                 <!-- Phone -->
-                <div class="contact-item" *ngIf="formGroup.get('phoneNumber')?.value">
+                <div class="contact-item">
                   <i class="fas fa-phone-alt"></i>
-                  <span>{{ formGroup.get('countryPhoneCode')?.value }} {{ formGroup.get('phoneNumber')?.value }}</span>
+                  <span *ngIf="formGroup.get('phoneNumber')?.value">
+                    {{ formGroup.get('countryPhoneCode')?.value }} {{ formGroup.get('phoneNumber')?.value }}
+                  </span>
+                  <span *ngIf="!formGroup.get('phoneNumber')?.value" class="item-placeholder">
+                    لم يُحدد رقم الهاتف
+                  </span>
                 </div>
 
                 <!-- Email -->
-                <div class="contact-item" *ngIf="formGroup.get('email')?.value">
+                <div class="contact-item">
                   <i class="fas fa-envelope"></i>
-                  <span class="text-truncate" style="max-width: 220px;">{{ formGroup.get('email')?.value }}</span>
+                  <span *ngIf="formGroup.get('email')?.value" class="text-truncate" style="max-width: 190px;">
+                    {{ formGroup.get('email')?.value }}
+                  </span>
+                  <span *ngIf="!formGroup.get('email')?.value" class="item-placeholder">
+                    البريد الإلكتروني (اختياري)
+                  </span>
+                </div>
+
+                <!-- Role Details / Custody -->
+                <div class="contact-item" *ngIf="isDeliveryRole">
+                  <i class="fas fa-shield-alt text-warning"></i>
+                  <span>العهدة: {{ (formGroup.get('maxCashFloat')?.value || 0) | number }} ل.س</span>
+                </div>
+                <div class="contact-item" *ngIf="isDeliveryRole">
+                  <i class="fas fa-coins text-warning"></i>
+                  <span>{{ getCompensationLabel() }}</span>
+                </div>
+
+                <div class="contact-item" *ngIf="formGroup.get('role')?.value === 2">
+                  <i class="fas fa-store text-success"></i>
+                  <span>حساب إدارة متجر تجاري</span>
+                </div>
+
+                <div class="contact-item" *ngIf="formGroup.get('role')?.value === 1">
+                  <i class="fas fa-shopping-bag text-info"></i>
+                  <span>حساب عميل متسوق بالتطبيق</span>
                 </div>
               </div>
 
@@ -375,7 +445,7 @@
 
           <!-- Bottom Meta Note -->
           <div class="preview-card-meta">
-            {{ 'USERS_PAGE.PREVIEW_SUB' | translate }}
+            {{ item?.id ? 'التعديلات تسري فور حفظ التغييرات' : 'سيتم إنشاء الحساب وإرسال بيانات الدخول' }}
           </div>
         </div>
       </div>
