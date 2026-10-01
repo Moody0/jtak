@@ -541,6 +541,7 @@
                       <label class="form-label fw-semibold text-gray-700">القسم المستهدف <span class="text-danger">*</span></label>
                       <ng-select
                         [items]="categories"
+                        appendTo="body"
                         bindLabel="displayLabel"
                         bindValue="id"
                         [(ngModel)]="tile.productCategoryId"
@@ -573,6 +574,7 @@
                         </label>
                         <ng-select
                           [items]="categories"
+                          appendTo="body"
                           bindLabel="displayLabel"
                           bindValue="id"
                           [(ngModel)]="tile.secondaryProductCategoryId"
@@ -607,6 +609,7 @@
                           <label class="form-label fw-semibold text-gray-700">المتجر أو الماركت المستهدف <span class="text-danger">*</span></label>
                           <ng-select
                             [items]="merchants"
+                            appendTo="body"
                             bindLabel="displayLabel"
                             bindValue="id"
                             [(ngModel)]="tile.merchantId"
@@ -637,6 +640,7 @@
                           <label class="form-label fw-semibold text-gray-700">القسم داخل هذا المتجر <span class="text-danger">*</span></label>
                           <ng-select
                             [items]="getCategoriesForMerchant(tile.merchantId, tile.productCategoryId)"
+                            appendTo="body"
                             bindLabel="displayLabel"
                             bindValue="id"
                             [(ngModel)]="tile.productCategoryId"
@@ -687,6 +691,7 @@
                         <label class="form-label fw-semibold text-gray-700">فلتر المطاعم عند الفتح <span class="text-muted fw-normal">(اختياري)</span></label>
                         <ng-select
                           [items]="restaurantCategories"
+                          appendTo="body"
                           bindLabel="title"
                           bindValue="id"
                           [(ngModel)]="tile.restaurantCategoryId"
@@ -716,6 +721,7 @@
                       <label class="form-label fw-semibold text-gray-700">المتجر المستهدف <span class="text-danger">*</span></label>
                       <ng-select
                         [items]="merchants"
+                        appendTo="body"
                         bindLabel="displayLabel"
                         bindValue="id"
                         [(ngModel)]="tile.merchantId"
