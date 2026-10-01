@@ -8,6 +8,7 @@ on:
     paths:
       - 'jtak-dashboard-main/**'
       - '.github/workflows/deploy-dashboard.yml'
+      - 'tools/deploy-dashboard-helper.cjs'
   workflow_dispatch:
 
 jobs:
@@ -35,6 +36,19 @@ jobs:
         run: |
           npm run build
 
+      - name: 📦 Install FTP Helper Dependencies
+        run: |
+          npm install --no-save basic-ftp
+
+      - name: 🧹 Clean Rogue Server Directories & Check State
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DASHBOARD_DIR: ${{ vars.FTP_DASHBOARD_DIR || 'dash.jtak.app/' }}
+        run: |
+          node tools/deploy-dashboard-helper.cjs clean
+
       - name: 🚀 Deploy via FTP to dash.jtak.app
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -50,3 +64,13 @@ jobs:
             **/web.config
             **/.htaccess
             **/*.map
+
+      - name: ⚙️ Sync Production web.config
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DASHBOARD_DIR: ${{ vars.FTP_DASHBOARD_DIR || 'dash.jtak.app/' }}
+        run: |
+          node tools/deploy-dashboard-helper.cjs sync-config

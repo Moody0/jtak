@@ -112,3 +112,4 @@ tools/__pycache__/
 *.sql
 *.cjs
 !tools/manage-app-offline.cjs
+!tools/deploy-dashboard-helper.cjs
