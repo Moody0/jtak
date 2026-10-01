@@ -1,5 +1,166 @@
-// Edit User Modal Two-Column Architecture & Live ID Profile Preview
+// =============================================================================
+// JTAK Operations - Edit & Create User Modal
+// Modern Minimalist Enterprise UI (Zero Shadows, Alexandria Font, High Density)
+// Strict Color System: Slate Neutral + JTAK Warm Orange (#ea580c)
+// =============================================================================
 
+:host {
+  display: block;
+  font-family: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #0f172a;
+
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+// Modal Window Dialog Override (Desktop Space Utilization)
+::ng-deep .user-edit-modal {
+  .modal-dialog {
+    max-width: 1220px !important;
+    width: 95% !important;
+    margin: 1.5rem auto !important;
+  }
+
+  .modal-content {
+    border-radius: 14px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 16px 24px !important;
+    min-height: 64px;
+
+    .jtak-modal-icon {
+      width: 40px !important;
+      height: 40px !important;
+      border-radius: 10px !important;
+      background: #fff7ed !important;
+      border: 1px solid #ffedd5 !important;
+      color: #ea580c !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-title {
+      font-size: 1.15rem !important;
+      font-weight: 800 !important;
+      color: #0f172a !important;
+    }
+
+    .btn-close {
+      width: 32px !important;
+      height: 32px !important;
+      border-radius: 8px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #64748b !important;
+      opacity: 0.85 !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+
+      &:hover {
+        opacity: 1 !important;
+        background: #f1f5f9 !important;
+        border-color: #cbd5e1 !important;
+        color: #0f172a !important;
+      }
+    }
+  }
+
+  .modal-body {
+    max-height: calc(100vh - 180px);
+    padding: 24px !important;
+    overflow-y: auto;
+    background: #ffffff;
+  }
+
+  .modal-footer {
+    background: #f8fafc !important;
+    border-top: 1px solid #e2e8f0 !important;
+    padding: 14px 24px !important;
+    box-shadow: none !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .jtak-modal-hint {
+      color: #64748b;
+      font-size: 0.76rem;
+      font-weight: 600;
+
+      i {
+        color: #ea580c;
+        margin-inline-end: 4px;
+      }
+    }
+
+    .btn-primary {
+      background-color: #ea580c !important;
+      border-color: #ea580c !important;
+      color: #ffffff !important;
+      font-weight: 750 !important;
+      padding: 8px 24px !important;
+      border-radius: 8px !important;
+      font-size: 0.85rem !important;
+      box-shadow: none !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+
+      i, span {
+        color: #ffffff !important;
+      }
+
+      &:hover:not(:disabled) {
+        background-color: #c2410c !important;
+        border-color: #c2410c !important;
+      }
+
+      &:disabled {
+        opacity: 0.65 !important;
+        background-color: #94a3b8 !important;
+        border-color: #94a3b8 !important;
+        color: #ffffff !important;
+        cursor: not-allowed;
+
+        i, span {
+          color: #ffffff !important;
+        }
+      }
+    }
+
+    .btn-light {
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      color: #334155 !important;
+      font-weight: 700 !important;
+      padding: 8px 18px !important;
+      border-radius: 8px !important;
+      font-size: 0.85rem !important;
+      box-shadow: none !important;
+
+      &:hover {
+        background: #f1f5f9 !important;
+        border-color: #94a3b8 !important;
+        color: #0f172a !important;
+      }
+    }
+  }
+}
+
+// Two-Column Layout
 .user-editor-layout {
   display: flex;
   gap: 24px;
@@ -39,7 +200,7 @@
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: none !important;
 
   .edit-section-heading {
     display: flex;
@@ -61,6 +222,7 @@
       font-size: 0.8rem;
       font-weight: 800;
       flex-shrink: 0;
+      border: 1px solid #ffedd5;
     }
 
     h3 {
@@ -78,6 +240,70 @@
   }
 }
 
+.form-label {
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.form-control,
+.form-select {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  color: #0f172a;
+  background-color: #ffffff;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: #ea580c;
+    box-shadow: none !important;
+    outline: none;
+  }
+}
+
+.input-group-text {
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+// ng-select overrides
+::ng-deep .ng-select {
+  .ng-select-container {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    min-height: 40px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+
+    &:hover {
+      border-color: #94a3b8 !important;
+    }
+  }
+
+  &.ng-select-opened .ng-select-container {
+    border-color: #ea580c !important;
+  }
+
+  .ng-dropdown-panel {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+    z-index: 1070 !important;
+  }
+}
+
+// Driver Compensation Box
+.ops-compensation-box {
+  background: #fffaf5;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+}
+
 // Custom Switch Card
 .custom-switch-card {
   display: flex;
@@ -88,7 +314,8 @@
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  box-shadow: none !important;
 
   &:hover {
     background: #ffffff;
@@ -113,9 +340,10 @@
   }
 
   .form-check-input {
-    width: 42px;
+    width: 44px;
     height: 22px;
     cursor: pointer;
+    box-shadow: none !important;
 
     &:checked {
       background-color: #10b981;
@@ -124,12 +352,12 @@
   }
 }
 
-// User Profile ID Card Preview
+// User Profile ID Card Preview (Phone Mockup)
 .preview-phone-card {
   background: #ffffff;
-  border-radius: 24px;
-  border: 2px solid #e2e8f0;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: none !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -147,7 +375,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     font-weight: 700;
     color: #e2e8f0;
 
@@ -156,15 +384,15 @@
       height: 7px;
       border-radius: 50%;
       background: #22c55e;
-      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+      display: inline-block;
     }
   }
 
   .preview-app-title {
-    font-size: 0.72rem;
+    font-size: 0.76rem;
     font-weight: 800;
     letter-spacing: 0.05em;
-    color: #f97316;
+    color: #ea580c;
   }
 }
 
@@ -181,20 +409,63 @@
 .customer-profile-card {
   width: 100%;
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
   padding: 24px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: none !important;
+
+  .profile-avatar-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &.role-admin {
+      background: #fef2f2;
+      border: 2px solid #fecaca;
+      color: #dc2626;
+    }
+
+    &.role-customer {
+      background: #f0f9ff;
+      border: 2px solid #bae6fd;
+      color: #0284c7;
+    }
+
+    &.role-merchant {
+      background: #ecfdf5;
+      border: 2px solid #a7f3d0;
+      color: #059669;
+    }
+
+    &.role-delivery {
+      background: #fff7ed;
+      border: 2px solid #fed7aa;
+      color: #ea580c;
+    }
+  }
 
   .profile-user-name {
-    font-size: 1.12rem;
+    font-size: 1.05rem;
     font-weight: 800;
     color: #0f172a;
-    margin: 8px 0 12px;
+    margin: 0 0 8px;
   }
 
   .profile-role-badge {
@@ -202,7 +473,7 @@
     align-items: center;
     gap: 6px;
     padding: 3px 10px;
-    border-radius: 12px;
+    border-radius: 8px;
     font-size: 0.74rem;
     font-weight: 750;
     margin-bottom: 12px;
@@ -237,7 +508,7 @@
     flex-direction: column;
     gap: 6px;
     width: 100%;
-    margin-top: 6px;
+    margin-top: 4px;
     padding-top: 12px;
     border-top: 1px solid #f1f5f9;
 
@@ -250,10 +521,11 @@
       background: #f8fafc;
       padding: 6px 10px;
       border-radius: 8px;
+      border: 1px solid #f1f5f9;
 
       i {
         font-size: 0.76rem;
-        color: #f97316;
+        color: #ea580c;
       }
 
       span {
@@ -268,7 +540,7 @@
     margin-top: 12px;
     font-size: 0.74rem;
     font-weight: 750;
-    padding: 3px 10px;
+    padding: 3px 12px;
     border-radius: 20px;
 
     &.active {

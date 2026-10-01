@@ -990,9 +990,9 @@
     </div>
 
     <!-- Screen Modal Header (Hidden when printed) -->
-    <div class="modal-header border-bottom py-3 merchant-statement-screen-header">
+    <div class="modal-header border-bottom py-3 px-4 merchant-statement-screen-header bg-white">
       <div class="d-flex align-items-center gap-3">
-        <div class="ops-avatar bg-light-primary text-primary">
+        <div class="merchant-statement-avatar-box">
           <i class="fas fa-file-invoice-dollar fs-4"></i>
         </div>
         <div>
@@ -1000,9 +1000,9 @@
             كشف الحساب المالي للتاجر — {{ selectedMerchantForStatement?.merchantTitle }}
           </h4>
           <div class="d-flex align-items-center gap-2 mt-1">
-            <span class="badge badge-light-secondary font-monospace">الحساب: 2010-VND-{{ selectedMerchantForStatement?.merchantId }}</span>
-            <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.ownerName">المالك: {{ selectedMerchantForStatement?.ownerName }}</span>
-            <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.phone" dir="ltr">الهاتف: {{ selectedMerchantForStatement?.phone }}</span>
+            <span class="badge badge-light-primary fw-bold font-monospace fs-8">2010-VND-{{ selectedMerchantForStatement?.merchantId }}</span>
+            <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.ownerName"><i class="fas fa-user-tie text-muted me-1"></i>المالك: <strong class="text-dark">{{ selectedMerchantForStatement?.ownerName }}</strong></span>
+            <span class="text-muted fs-8" *ngIf="selectedMerchantForStatement?.phone" dir="ltr"><i class="fas fa-phone-alt text-success me-1"></i>{{ formatPhoneNumber(selectedMerchantForStatement?.phone) }}</span>
           </div>
         </div>
       </div>
@@ -1014,7 +1014,12 @@
       <div class="row g-2 mb-4 merchant-statement-kpi-row">
       <div class="col-md-3 col-sm-6">
         <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--primary">
-          <span class="text-muted fs-8 d-block">رصيد الذمم الإجمالي (الدفتر)</span>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="kpi-card-label">رصيد الذمم الإجمالي (الدفتر)</span>
+            <div class="kpi-card-icon kpi-card-icon--primary">
+              <i class="fas fa-book"></i>
+            </div>
+          </div>
           <strong class="fs-5 text-dark" [ngClass]="(merchantStatementData?.currentBalance || 0) > 0 ? 'text-success' : 'text-dark'">
             {{ (merchantStatementData?.currentBalance || selectedMerchantForStatement?.currentVendorPayableBalance || 0) | number:'1.0-0' }} ل.س
           </strong>
@@ -1022,7 +1027,12 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--warning">
-          <span class="text-muted fs-8 d-block">المبالغ المحجوزة للتسوية</span>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="kpi-card-label">المبالغ المحجوزة للتسوية</span>
+            <div class="kpi-card-icon kpi-card-icon--warning">
+              <i class="fas fa-lock"></i>
+            </div>
+          </div>
           <strong class="fs-5 text-warning">
             {{ (merchantStatementData?.reservedAmount || selectedMerchantForStatement?.reservedSettlementAmount || 0) | number:'1.0-0' }} ل.س
           </strong>
@@ -1030,7 +1040,12 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--success">
-          <span class="text-muted fs-8 d-block">المتاح للتسوية والصرف</span>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="kpi-card-label">المتاح للتسوية والصرف</span>
+            <div class="kpi-card-icon kpi-card-icon--success">
+              <i class="fas fa-check-circle"></i>
+            </div>
+          </div>
           <strong class="fs-5 text-success">
             {{ (merchantStatementData?.availableAmount || selectedMerchantForStatement?.availableSettlementAmount || 0) | number:'1.0-0' }} ل.س
           </strong>
@@ -1038,7 +1053,12 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="p-3 rounded merchant-statement-kpi-card merchant-statement-kpi-card--info">
-          <span class="text-muted fs-8 d-block">معتمد بانتظار استلام التاجر</span>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="kpi-card-label">معتمد بانتظار استلام التاجر</span>
+            <div class="kpi-card-icon kpi-card-icon--info">
+              <i class="fas fa-clock"></i>
+            </div>
+          </div>
           <strong class="fs-5 text-info">
             {{ (merchantStatementData?.approvedAwaitingReceiptAmount || selectedMerchantForStatement?.approvedAwaitingPayoutAmount || 0) | number:'1.0-0' }} ل.س
           </strong>
@@ -1047,20 +1067,22 @@
     </div>
 
     <!-- Modal Internal Tabs -->
-    <ul class="nav nav-tabs nav-line-tabs mb-4 fs-7 fw-bold" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" [class.active]="statementActiveTab === 'statement'" (click)="statementActiveTab = 'statement'" type="button">
-          <i class="fas fa-list-ol me-1"></i> كشف حساب الحركات المالية (Transactions Statement)
-          <span class="badge badge-light-primary ms-1" *ngIf="(merchantStatementData?.items || merchantStatementData?.transactions)">{{ (merchantStatementData?.items || merchantStatementData?.transactions)?.length }}</span>
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" [class.active]="statementActiveTab === 'settlements'" (click)="statementActiveTab = 'settlements'" type="button">
-          <i class="fas fa-history me-1"></i> سجل طلبات التسوية (Settlement Requests History)
-          <span class="badge badge-light-warning ms-1" *ngIf="merchantStatementData?.settlementHistory">{{ merchantStatementData?.settlementHistory?.length }}</span>
-        </button>
-      </li>
-    </ul>
+    <div class="ops-modal-tabs mb-4">
+      <button type="button" class="ops-modal-tab" [class.active]="statementActiveTab === 'statement'" (click)="statementActiveTab = 'statement'">
+        <i class="fas fa-list-ol text-primary"></i>
+        <span>كشف الحركات المالية</span>
+        <span class="ops-modal-tab-badge ops-modal-tab-badge--blue" *ngIf="(merchantStatementData?.items || merchantStatementData?.transactions)">
+          {{ (merchantStatementData?.items || merchantStatementData?.transactions)?.length }}
+        </span>
+      </button>
+      <button type="button" class="ops-modal-tab" [class.active]="statementActiveTab === 'settlements'" (click)="statementActiveTab = 'settlements'">
+        <i class="fas fa-history text-warning"></i>
+        <span>سجل طلبات التسوية</span>
+        <span class="ops-modal-tab-badge ops-modal-tab-badge--orange" *ngIf="merchantStatementData?.settlementHistory">
+          {{ merchantStatementData?.settlementHistory?.length }}
+        </span>
+      </button>
+    </div>
 
     <!-- Spinner if loading -->
     <div *ngIf="isLoadingMerchantStatement" class="text-center py-5">
@@ -1072,53 +1094,71 @@
     <div *ngIf="!isLoadingMerchantStatement && statementActiveTab === 'statement'">
       <!-- Transaction Filter Bar -->
       <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
-        <div class="ops-search-box" style="width: 380px;">
-          <i class="fas fa-search ops-search-icon"></i>
-          <input type="text" class="form-control ops-search-input" [(ngModel)]="statementSearchTerm" (keyup.enter)="onStatementSearch()"
-            placeholder="البحث برقم الحركة (TXN-...) أو رقم الطلب أو البيان..." />
-          <button type="button" class="btn ops-search-clear" *ngIf="statementSearchTerm" (click)="clearStatementSearch()">
-            <i class="fas fa-times"></i>
+        <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 580px;">
+          <div class="ops-search-box flex-grow-1">
+            <i class="fas fa-search ops-search-icon"></i>
+            <input type="text" class="form-control ops-search-input" [(ngModel)]="statementSearchTerm" (keyup.enter)="onStatementSearch()"
+              placeholder="البحث برقم الحركة (TXN-...) أو رقم الطلب أو البيان..." />
+            <button type="button" class="btn ops-search-clear" *ngIf="statementSearchTerm" (click)="clearStatementSearch()">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <button type="button" class="btn btn-sm ops-statement-filter-btn" (click)="onStatementSearch()">
+            <i class="fas fa-filter me-1"></i> تصفية
+          </button>
+          <button type="button" class="btn btn-sm btn-light border text-muted" *ngIf="statementSearchTerm" (click)="clearStatementSearch()">
+            <i class="fas fa-times me-1"></i> مسح
           </button>
         </div>
-        <button type="button" class="btn btn-sm btn-light-primary" (click)="onStatementSearch()">
-          <i class="fas fa-filter me-1"></i> تصفية
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge badge-light-dark fs-8 fw-semibold" *ngIf="(merchantStatementData?.items || merchantStatementData?.transactions)?.length">
+            عدد الحركات: <strong class="text-dark">{{ (merchantStatementData?.items || merchantStatementData?.transactions)?.length }}</strong>
+          </span>
+        </div>
       </div>
 
       <!-- Transactions Statement Table (Authoritative Chronological Running Balance) -->
-      <div class="table-responsive border rounded">
-        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm">
+      <div class="table-responsive border rounded ops-modal-table-wrap">
+        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm align-middle ops-modal-table">
           <thead class="bg-light">
             <tr class="text-muted fs-8 fw-bold">
               <th scope="col" style="min-width: 120px;">التاريخ</th>
               <th scope="col" style="min-width: 140px;">رقم الحركة</th>
               <th scope="col" style="min-width: 110px;">نوع الحركة</th>
               <th scope="col" style="min-width: 160px;">تفاصيل الطلب والعميل</th>
-              <th scope="col" style="min-width: 90px;" class="text-end">إجمالي الطلب</th>
-              <th scope="col" style="min-width: 80px;" class="text-end">عمولة جيتك</th>
-              <th scope="col" style="min-width: 90px;" class="text-end">صافي التاجر</th>
-              <th scope="col" style="min-width: 80px;" class="text-center">طريقة الدفع</th>
-              <th scope="col" style="min-width: 80px;" class="text-center">الحالة</th>
-              <th scope="col" style="min-width: 100px;" class="text-end text-danger">مدين (تسوية/صرف)</th>
-              <th scope="col" style="min-width: 100px;" class="text-end text-success">دائن (استحقاق)</th>
-              <th scope="col" style="min-width: 110px;" class="text-end">الرصيد التراكمي</th>
+              <th scope="col" style="min-width: 95px;" class="text-end">إجمالي الطلب</th>
+              <th scope="col" style="min-width: 85px;" class="text-end">عمولة جيتك</th>
+              <th scope="col" style="min-width: 95px;" class="text-end">صافي التاجر</th>
+              <th scope="col" style="min-width: 90px;" class="text-center">طريقة الدفع</th>
+              <th scope="col" style="min-width: 85px;" class="text-center">الحالة</th>
+              <th scope="col" style="min-width: 110px;" class="text-end text-danger">مدين (تسوية/صرف)</th>
+              <th scope="col" style="min-width: 110px;" class="text-end text-success">دائن (استحقاق)</th>
+              <th scope="col" style="min-width: 120px;" class="text-end">الرصيد التراكمي</th>
               <th scope="col" style="min-width: 220px;">البيان</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngIf="!(merchantStatementData?.items || merchantStatementData?.transactions) || (merchantStatementData?.items || merchantStatementData?.transactions)?.length === 0">
-              <td colspan="13" class="text-center py-4 text-muted">لا توجد حركات مالية مسجلة لهذا الحساب.</td>
+              <td colspan="13" class="text-center py-5">
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                  <div class="statement-empty-icon mb-2">
+                    <i class="fas fa-file-invoice-dollar fs-1 text-muted opacity-40"></i>
+                  </div>
+                  <p class="text-muted fw-bold mb-1">لا توجد حركات مالية مسجلة لهذا الحساب</p>
+                  <span class="text-muted fs-8">سيتم إدراج الحركات المالية والطلبات المكتملة هنا تلقائياً</span>
+                </div>
+              </td>
             </tr>
             <tr *ngFor="let tx of (merchantStatementData?.items || merchantStatementData?.transactions)">
               <!-- 1. Posted Date -->
               <td class="fs-8">
-                <div>{{ tx.postedDate | date:'d MMM y' }}</div>
+                <div class="fw-bold text-dark">{{ tx.postedDate | date:'d MMM y' }}</div>
                 <small class="text-muted">{{ tx.postedDate | date:'shortTime' }}</small>
               </td>
 
               <!-- 2. Txn Number -->
               <td>
-                <code class="fw-bold">{{ tx.transactionNumber }}</code>
+                <span class="ops-txn-code">{{ tx.transactionNumber }}</span>
               </td>
 
               <!-- 3. Type -->
@@ -1133,7 +1173,7 @@
               <!-- 4. Order & Customer -->
               <td>
                 <div *ngIf="tx.orderNumber">
-                  <strong>طلب #{{ tx.orderNumber }}</strong>
+                  <strong class="text-dark">طلب #{{ tx.orderNumber }}</strong>
                   <div class="text-muted fs-8" *ngIf="tx.customerName">{{ tx.customerName }}</div>
                   <small class="text-muted" *ngIf="tx.customerPhone" dir="ltr">{{ tx.customerPhone }}</small>
                 </div>
@@ -1145,25 +1185,25 @@
 
               <!-- 5. Gross Amount -->
               <td class="text-end">
-                <span *ngIf="tx.grossAmount">{{ tx.grossAmount | number:'1.0-0' }}</span>
+                <span *ngIf="tx.grossAmount" class="fw-semibold text-dark">{{ tx.grossAmount | number:'1.0-0' }}</span>
                 <span *ngIf="!tx.grossAmount" class="text-muted">-</span>
               </td>
 
               <!-- 6. JTak Share -->
-              <td class="text-end text-info">
+              <td class="text-end text-info font-weight-bold">
                 <span *ngIf="tx.jTakShare">{{ tx.jTakShare | number:'1.0-0' }}</span>
                 <span *ngIf="!tx.jTakShare" class="text-muted">-</span>
               </td>
 
               <!-- 7. Merchant Net -->
-              <td class="text-end text-primary">
+              <td class="text-end text-primary font-weight-bold">
                 <span *ngIf="tx.merchantNet">{{ tx.merchantNet | number:'1.0-0' }}</span>
                 <span *ngIf="!tx.merchantNet" class="text-muted">-</span>
               </td>
 
               <!-- 8. Payment Method -->
               <td class="text-center fs-8">
-                <span *ngIf="tx.paymentMethod" class="badge badge-light">{{ tx.paymentMethod }}</span>
+                <span *ngIf="tx.paymentMethod" class="badge badge-light-secondary">{{ tx.paymentMethod }}</span>
                 <span *ngIf="!tx.paymentMethod" class="text-muted">-</span>
               </td>
 
@@ -1184,8 +1224,8 @@
               </td>
 
               <!-- 12. Running Balance -->
-              <td class="text-end font-weight-bolder">
-                {{ tx.runningBalance | number:'1.0-0' }} ل.س
+              <td class="text-end font-weight-bolder text-dark">
+                {{ tx.runningBalance | number:'1.0-0' }} <small class="text-muted fs-9">ل.س</small>
               </td>
 
               <!-- 13. Description -->
@@ -1200,8 +1240,8 @@
 
     <!-- Settlement History View -->
     <div *ngIf="!isLoadingMerchantStatement && statementActiveTab === 'settlements'">
-      <div class="table-responsive border rounded">
-        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm align-middle">
+      <div class="table-responsive border rounded ops-modal-table-wrap">
+        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm align-middle ops-modal-table">
           <thead class="bg-light">
             <tr class="text-muted fs-8 fw-bold">
               <th>رقم طلب التسوية</th>
@@ -1218,10 +1258,18 @@
           </thead>
           <tbody>
             <tr *ngIf="!merchantStatementData?.settlementHistory || merchantStatementData?.settlementHistory?.length === 0">
-              <td colspan="10" class="text-center py-4 text-muted">لا توجد طلبات تسوية سابقة لهذا التاجر.</td>
+              <td colspan="10" class="text-center py-5">
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                  <div class="statement-empty-icon mb-2">
+                    <i class="fas fa-history fs-1 text-muted opacity-40"></i>
+                  </div>
+                  <p class="text-muted fw-bold mb-1">لا توجد طلبات تسوية سابقة لهذا التاجر</p>
+                  <span class="text-muted fs-8">ستظهر هنا سجلات طلبات سحب الأرباح والتسويات فور إنشائها</span>
+                </div>
+              </td>
             </tr>
             <tr *ngFor="let s of merchantStatementData?.settlementHistory">
-              <td><strong class="font-monospace">{{ s.requestNumber }}</strong></td>
+              <td><span class="ops-txn-code">{{ s.requestNumber }}</span></td>
               <td class="text-end text-success font-weight-bold">{{ s.amount | number:'1.0-0' }} ل.س</td>
               <td>{{ s.method || 'حوالة / نقدي' }}</td>
               <td>
@@ -1292,11 +1340,11 @@
         وثيقة مالية رسمية صادرة آلياً من النظام المحاسبي لمنصة جيتك (JTAK Express) — تُعتبر معتمدة بعد التوقيع والختم.
       </div>
     </div>
-    <div class="modal-footer border-top py-2 d-flex justify-content-between merchant-statement-modal-actions">
-      <button type="button" class="btn btn-sm btn-light-primary" (click)="printMerchantStatement()">
-        <i class="fas fa-print me-1"></i> طباعة كشف الحساب
+    <div class="modal-footer border-top py-2 px-4 d-flex justify-content-between merchant-statement-modal-actions bg-white">
+      <button type="button" class="btn btn-sm ops-btn-primary" (click)="printMerchantStatement()">
+        <i class="fas fa-print me-2 text-white"></i> <span class="text-white">طباعة كشف الحساب</span>
       </button>
-      <button type="button" class="btn btn-sm btn-secondary" (click)="modal.close()">
+      <button type="button" class="btn btn-sm btn-light border" (click)="modal.close()">
         {{ 'COMMON.CLOSE' | translate }}
       </button>
     </div>

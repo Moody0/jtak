@@ -265,7 +265,12 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     this.merchantStatementData = null;
     this.isLoadingMerchantStatement = true;
 
-    this.modalService.open(content, { size: 'xl', centered: true, scrollable: true });
+    this.modalService.open(content, {
+      size: 'xl',
+      windowClass: 'merchant-statement-modal-window',
+      centered: true,
+      scrollable: true,
+    });
 
     this.loadMerchantStatementData(merchant.merchantId);
   }

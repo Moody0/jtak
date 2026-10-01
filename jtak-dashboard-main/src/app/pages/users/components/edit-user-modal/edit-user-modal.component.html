@@ -84,17 +84,18 @@
                   {{ 'USERS_PAGE.COL_PHONE' | translate }}
                   <span class="text-danger">*</span>
                 </label>
-                <div class="row g-2">
-                  <div class="col-4">
+                <div class="d-flex align-items-center gap-2">
+                  <div style="width: 100px; flex-shrink: 0;">
                     <input
                       type="text"
-                      class="form-control text-center"
+                      class="form-control text-center fw-bold"
                       formControlName="countryPhoneCode"
                       id="countryPhoneCode"
                       placeholder="+963"
+                      dir="ltr"
                     />
                   </div>
-                  <div class="col-8">
+                  <div class="flex-grow-1">
                     <app-input-container [control]="formGroup.controls.phoneNumber">
                       <input
                         type="tel"
@@ -103,6 +104,7 @@
                         id="phoneNumber"
                         autocomplete="tel"
                         placeholder="09xxxxxxxx"
+                        dir="ltr"
                       />
                     </app-input-container>
                   </div>
@@ -188,9 +190,9 @@
 
               <!-- Driver Compensation Model & Rate (Only for Delivery Drivers: role === 3) -->
               <div class="col-12" *ngIf="isDeliveryRole">
-                <div class="p-4 rounded-3 border bg-light-primary border-primary border-dashed">
+                <div class="ops-compensation-box p-4 rounded-3">
                   <div class="d-flex align-items-center gap-2 mb-3">
-                    <i class="fas fa-hand-holding-usd text-primary fs-5"></i>
+                    <i class="fas fa-hand-holding-usd text-warning fs-5"></i>
                     <h5 class="fw-bolder text-gray-900 mb-0">نظام محاسبة واستحقاق الكابتن</h5>
                   </div>
 
@@ -324,6 +326,17 @@
           <!-- Customer Profile Card Mockup -->
           <div class="preview-card-viewport">
             <div class="customer-profile-card">
+              <!-- Avatar Circle -->
+              <div class="profile-avatar-circle" [ngClass]="getRoleBadgeInfo().badgeClass">
+                <span *ngIf="!getUserAvatar()">{{ getUserInitials() }}</span>
+                <img *ngIf="getUserAvatar()" [src]="getUserAvatar()" (error)="onImageError($event)" alt="Avatar" />
+              </div>
+
+              <!-- Full Name -->
+              <h4 class="profile-user-name">
+                {{ getUserDisplayName() }}
+              </h4>
+
               <!-- Role Badge -->
               <span
                 class="profile-role-badge"
@@ -332,11 +345,6 @@
                 <i [class]="getRoleBadgeInfo().icon"></i>
                 <span>{{ getRoleBadgeInfo().label }}</span>
               </span>
-
-              <!-- Full Name -->
-              <h4 class="profile-user-name">
-                {{ (formGroup.get('firstName')?.value || '') + ' ' + (formGroup.get('lastName')?.value || '') || 'اسم المستخدم' }}
-              </h4>
 
               <!-- Contact List -->
               <div class="profile-contact-list">

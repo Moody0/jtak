@@ -121,6 +121,10 @@ export class UsersListComponent
     this.service.patchState({ searchTerm });
   }
 
+  clearSearch(): void {
+    this.searchGroup.get('searchTerm')?.setValue('');
+  }
+
   filterByRole(roleId: number | 'all'): void {
     this.selectedRoleId = roleId;
     this.selection.clear();
@@ -187,6 +191,7 @@ export class UsersListComponent
   edit(item: User | null): void {
     const modalRef = this.modalService.open(EditUserModalComponent, {
       size: 'xl',
+      windowClass: 'user-edit-modal',
       backdrop: 'static',
       keyboard: false,
     });
@@ -201,7 +206,10 @@ export class UsersListComponent
   }
 
   delete(id: string): void {
-    const modalRef = this.modalService.open(DeleteUserModalComponent);
+    const modalRef = this.modalService.open(DeleteUserModalComponent, {
+      centered: true,
+      windowClass: 'user-delete-modal',
+    });
     modalRef.componentInstance.id = id;
     modalRef.result.then(
       () => {

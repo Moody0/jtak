@@ -96,11 +96,21 @@
           [placeholder]="'USERS_PAGE.SEARCH_PLACEHOLDER' | translate"
           formControlName="searchTerm"
         />
+        <button
+          type="button"
+          class="ops-search-clear"
+          *ngIf="searchGroup.get('searchTerm')?.value"
+          (click)="clearSearch()"
+          aria-label="مسح البحث"
+        >
+          <i class="fas fa-times"></i>
+        </button>
       </div>
 
       <!-- Role Dropdown Filter -->
       <div class="ops-filter-dropdown">
         <select
+          class="ops-role-select"
           [ngModel]="selectedRoleId"
           (ngModelChange)="filterByRole($event)"
           aria-label="Filter by Role"

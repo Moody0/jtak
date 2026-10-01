@@ -721,12 +721,163 @@ a.btn-primary,
 // 6. Modal Specific Overhauls (Solid Borders, Zero Shadows, High Density)
 // -----------------------------------------------------------------------------
 
+// Merchant Statement Modal Dialog Window Override (1380px Desktop Space Utilization)
+::ng-deep .merchant-statement-modal-window {
+  .modal-dialog {
+    max-width: 1380px !important;
+    width: 95% !important;
+    margin: 1.5rem auto !important;
+  }
+
+  .modal-content {
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    overflow: hidden;
+  }
+}
+
+// Modal Header Avatar Box
+.merchant-statement-avatar-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #fff7ed;
+  border: 1px solid #ffedd5;
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+// Modal Segmented Tabs
+.ops-modal-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+
+  .ops-modal-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover:not(.active) {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    &.active {
+      background: #ffffff;
+      color: #0f172a;
+      border-color: #cbd5e1;
+      font-weight: 750;
+    }
+
+    .ops-modal-tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 10px;
+      font-size: 0.72rem;
+      font-weight: 750;
+
+      &--blue {
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+      }
+
+      &--orange {
+        background: #fff7ed;
+        color: #ea580c;
+        border: 1px solid #fed7aa;
+      }
+    }
+  }
+}
+
+// Statement Filter Button
+.ops-statement-filter-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155 !important;
+  font-weight: 650;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+
+  i {
+    color: #ea580c !important;
+  }
+
+  &:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    color: #0f172a !important;
+  }
+}
+
 // Merchant Statement Modal KPI Strip
 .merchant-statement-kpi-card {
   padding: 12px 14px;
   border-radius: 10px;
   height: 100%;
   border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  .kpi-card-label {
+    font-size: 0.78rem;
+    font-weight: 650;
+    color: #64748b;
+  }
+
+  .kpi-card-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+
+    &--primary {
+      background: #e2e8f0;
+      color: #334155;
+    }
+    &--warning {
+      background: #fef3c7;
+      color: #d97706;
+    }
+    &--success {
+      background: #d1fae5;
+      color: #059669;
+    }
+    &--info {
+      background: #ede9fe;
+      color: #7c3aed;
+    }
+  }
 
   &--primary {
     background: #f8fafc;
@@ -744,6 +895,67 @@ a.btn-primary,
     background: #f5f3ff;
     border-color: #ddd6fe;
   }
+}
+
+// Statement Tables Wrap & High Density Ledger Styling
+.ops-modal-table-wrap {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px;
+  overflow-x: auto;
+  background: #ffffff;
+}
+
+.ops-modal-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+
+  thead tr th {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    font-size: 0.76rem !important;
+    padding: 8px 10px !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    white-space: nowrap;
+  }
+
+  tbody tr td {
+    padding: 8px 10px !important;
+    font-size: 0.78rem !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none !important;
+  }
+
+  tbody tr:hover td {
+    background-color: #f8fafc;
+  }
+}
+
+.ops-txn-code {
+  display: inline-block;
+  font-family: monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #1e293b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.statement-empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 // Statement Tables

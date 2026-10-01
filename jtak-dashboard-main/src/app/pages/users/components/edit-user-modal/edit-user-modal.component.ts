@@ -71,6 +71,13 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
     return (first + last).toUpperCase() || 'U';
   }
 
+  getUserDisplayName(): string {
+    const first = (this.formGroup?.get('firstName')?.value || '').trim();
+    const last = (this.formGroup?.get('lastName')?.value || '').trim();
+    const full = `${first} ${last}`.trim();
+    return full || (this.item?.id ? 'اسم المستخدم' : 'مستخدم جديد');
+  }
+
   getRoleBadgeInfo(): { label: string; icon: string; badgeClass: string } {
     const role = Number(this.formGroup?.get('role')?.value ?? 1);
     switch (role) {
