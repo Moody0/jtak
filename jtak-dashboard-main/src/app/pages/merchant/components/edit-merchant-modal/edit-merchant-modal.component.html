@@ -202,18 +202,23 @@
 
                   <div
                     class="activity-kind-card"
+                    [class.active]="formGroup.get('merchantKind')?.value === 2"
+                    (click)="setMerchantKind(2)"
+                  >
+                    <span class="activity-icon">💊</span>
+                    <span class="activity-title">صيدلية</span>
+                  </div>
+
+                  <div
+                    class="activity-kind-card"
                     [class.active]="formGroup.get('merchantKind')?.value === 3"
                     (click)="setMerchantKind(3)"
                   >
                     <span class="activity-icon">🏪</span>
                     <span class="activity-title">أخرى</span>
                   </div>
-
-                  <div
-                    class="activity-kind-card"
-                    [class.active]="formGroup.get('merchantKind')?.value === 4"
-                    (click)="setMerchantKind(4)"
-                  >
+                  <div class="activity-kind-card" *ngIf="item?.merchantKind === 4"
+                    (click)="setMerchantKind(4)" [class.active]="formGroup.get('merchantKind')?.value === 4">
                     <span class="activity-icon">🏬</span>
                     <span class="activity-title">مستودع مركزي</span>
                   </div>

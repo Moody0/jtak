@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, TemplateRef } from '@angular/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { Subscription } from 'rxjs';
+import { printDocument } from 'src/app/shared/printing/print-document';
 import {
   CaptainSettlementsOverview,
   CaptainSettlementItem,
@@ -302,7 +303,7 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
   }
 
   printReceipt(): void {
-    window.print();
+    printDocument('#printableReceiptArea');
   }
 
   getCompensationBadgeClass(type: number): string {

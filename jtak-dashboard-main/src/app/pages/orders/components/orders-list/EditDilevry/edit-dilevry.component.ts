@@ -52,7 +52,7 @@ export class EditDilevry implements OnInit, OnDestroy {
   loadForm() {
     this.formGroup = this.fb.group({
       id: [this.item.id],
-      uid: [this.item.deliveryId],
+      uid: [this.item.deliveryId === '00000000-0000-0000-0000-000000000000' ? null : this.item.deliveryId, Validators.required],
     });
   }
 

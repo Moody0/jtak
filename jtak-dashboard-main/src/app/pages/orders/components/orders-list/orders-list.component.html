@@ -324,7 +324,7 @@
                         <span>{{ 'ORDERS_PAGE.MARK_READY' | translate }}</span>
                       </button>
 
-                      <button *ngIf="isDeliveryEditable(o) || canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                      <button *ngIf="isDeliveryEditable(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
                         <i class="fas fa-motorcycle text-primary me-2"></i>
                         <span>{{ hasAssignedDriver(o) ? ('ORDERS_PAGE.ASSIGN_OR_REASSIGN' | translate) : ('ORDERS_PAGE.ASSIGN_CAPTAIN' | translate) }}</span>
                       </button>
@@ -425,7 +425,7 @@
                     <span>جاهز للاستلام</span>
                   </button>
 
-                  <button *ngIf="isDeliveryEditable(o) || canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                  <button *ngIf="isDeliveryEditable(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
                     <i class="fas fa-motorcycle text-primary me-2"></i>
                     <span>{{ hasAssignedDriver(o) ? 'تعيين / إعادة تعيين مندوب' : 'تعيين مندوب توصيل' }}</span>
                   </button>
@@ -523,9 +523,17 @@
                   <i class="fas fa-motorcycle text-primary fs-8"></i>
                   <span class="ops-driver-name">{{ getCleanDriverName(o.deliveryUser) }}</span>
                 </div>
+                <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
+                  <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
+                </button>
               </ng-container>
               <ng-template #unassignedDriverMobile>
-                <span class="ops-unassigned-tag">{{ 'ORDERS_PAGE.UNASSIGNED' | translate }}</span>
+                <button *ngIf="isDeliveryEditable(o); else staticUnassignedMobile" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
+                  <i class="fas fa-user-plus me-1"></i>{{ 'ORDERS_PAGE.ASSIGN_CAPTAIN' | translate }}
+                </button>
+                <ng-template #staticUnassignedMobile>
+                  <span class="ops-unassigned-tag">{{ 'ORDERS_PAGE.UNASSIGNED' | translate }}</span>
+                </ng-template>
               </ng-template>
             </div>
           </div>

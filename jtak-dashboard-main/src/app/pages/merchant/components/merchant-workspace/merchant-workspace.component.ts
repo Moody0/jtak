@@ -595,8 +595,8 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   toggleProduct(item: ProductMerchant, selected: boolean): void {
     if (selected && !item.isSelected && !this.canAddProductToCurrentMerchant(item)) {
       this.toaster.warning(
-        this.merchant?.merchantKind === 1
-          ? 'هذا المنتج مرتبط بمطعم. انسخه كمنتج مستقل قبل إضافته إلى جيتك ماركت.'
+        this.merchant?.merchantKind !== 0
+          ? 'هذا المنتج مرتبط بمطعم. انسخه كمنتج مستقل قبل إضافته إلى هذا المتجر.'
           : 'هذا المنتج مرتبط بجيتك ماركت. انسخه كمنتج مستقل قبل إضافته إلى المطعم.'
       );
       return;
@@ -606,7 +606,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
 
   canAddProductToCurrentMerchant(item: ProductMerchant): boolean {
     if (item.isSelected) return true;
-    if (this.merchant?.merchantKind === 1 && item.hasRestaurantAssignment) return false;
+    if (this.merchant?.merchantKind !== 0 && item.hasRestaurantAssignment) return false;
     if (this.merchant?.merchantKind === 0 && item.hasJtakMarketAssignment) return false;
     return true;
   }
@@ -860,18 +860,12 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
       priceUsd: item.priceUsd ?? null,
       originalPrice: item.originalPrice ?? null,
       discount: item.discount ?? 0,
-      discountPercent: this.getDiscountPercent(item),
+      discountPercent: item.discountPercent ?? this.getDiscountPercent(item),
       profitOutOfMerchantPricePercent: item.profitOutOfMerchantPricePercent ?? this.merchant?.profitOutOfMerchantPricePercent ?? 0,
     });
   }
 
   getDiscountPercent(item: ProductMerchant): number | null {
-    if (item.discountPercent !== undefined && item.discountPercent !== null && item.discountPercent > 0) {
-      return item.discountPercent;
-    }
-    if (item.originalPrice && item.priceUsd && item.originalPrice > item.priceUsd) {
-      return Math.round((1 - item.priceUsd / item.originalPrice) * 100);
-    }
     if (!item.discount || item.discount <= 0 || item.price <= item.finalPrice) {
       return null;
     }
@@ -990,32 +984,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     modalRef.componentInstance.item = product;
     modalRef.result.then((updated: Product | undefined) => {
       if (!updated) return;
-      const existing = this.products.find((item) => item.productId === updated.id);
-      if (existing) {
-        existing.product = updated.title;
-        existing.productDescription = updated.description;
-        existing.productPhotos = updated.photos;
-        existing.productUnit = updated.unit;
-        existing.productActive = updated.active;
-        existing.productIsFeatured = updated.isFeatured;
-        existing.productCategoryId = updated.productCategoryId;
-        existing.productCat1 = updated.productCategory;
-        if (updated.priceUsd !== undefined) existing.priceUsd = updated.priceUsd;
-        if (updated.originalPrice !== undefined) existing.originalPrice = updated.originalPrice;
-        if (updated.discount !== undefined) existing.discount = updated.discount ?? 0;
-        if (updated.discountPercent !== undefined) existing.discountPercent = updated.discountPercent;
-        const newMerchantPrice = (updated as any).merchantPrice ?? updated.price;
-        if (newMerchantPrice !== undefined && newMerchantPrice !== null) {
-          existing.merchantPrice = newMerchantPrice;
-          const markup = Math.round(existing.merchantPrice * (existing.profitOutOfMerchantPricePercent || 0) / 100);
-          existing.profitOutOfMerchantPrice = markup;
-          existing.merchantProfit = existing.merchantPrice;
-          existing.finalPrice = existing.merchantPrice + markup;
-          existing.price = existing.finalPrice + (existing.discount || 0);
-        }
-      } else {
-        this.reloadCatalogPreservingAssignments();
-      }
+      this.reloadCatalogPreservingAssignments();
       this.cdr.detectChanges();
     }, () => {});
   }

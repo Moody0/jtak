@@ -1,0 +1,113 @@
+// Isolate the requested document at every level of the dashboard/modal tree.
+// Named pages keep long financial tables readable while receipts stay portrait.
+@media print {
+  @page financial-report { size: A4 landscape; margin: 8mm; }
+  @page receipt { size: A4 portrait; margin: 10mm; }
+
+  body.printing-document {
+    & > *, [data-print-parent] > * {
+      &:not([data-print-parent]):not([data-print-root]) { display: none !important; }
+    }
+
+    [data-print-parent], [data-print-root] {
+      position: static !important;
+      display: block !important;
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      transform: none !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: white !important;
+      visibility: visible !important;
+      flex: none !important;
+    }
+
+    [data-print-root]:is(#merchant-statement-print-area, #driver-statement-print-area,
+      #historyPrintReport, #printableReceiptArea, #orderReceiptPrintArea, #individualReceiptPrintArea) {
+      &, * { box-sizing: border-box !important; }
+      page: receipt;
+      direction: rtl;
+      &[data-print-root='landscape'] { page: financial-report; }
+
+      .no-print, button, input, select, .ops-modal-tabs { display: none !important; }
+      .table-responsive, .ops-modal-body, .modal-body {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+      }
+      .row {
+        --bs-gutter-x: 0;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+      .merchant-statement-kpi-row > div {
+        flex: 1 1 0 !important;
+        width: auto !important;
+        min-width: 0 !important;
+      }
+      table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        font-size: 8pt !important;
+        line-height: 1.4 !important;
+      }
+      table thead { display: table-header-group !important; }
+      table tbody { display: table-row-group !important; }
+      table tr { break-inside: avoid; page-break-inside: avoid; }
+      table th, table td {
+        min-width: 0 !important;
+        width: auto !important;
+        padding: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        font-size: 8pt !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+        color: #0f172a !important;
+      }
+      table th { font-weight: 700 !important; }
+      table th *, table td * {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        font-size: inherit !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        text-overflow: clip !important;
+        overflow: visible !important;
+      }
+      table .badge, table .ops-txn-code {
+        display: inline !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        color: #0f172a !important;
+      }
+      .merchant-ledger-table { font-size: 7.5pt !important; }
+      .merchant-ledger-table th, .merchant-ledger-table td { font-size: 7.5pt !important; }
+      .print-statement-summary {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 6px 20px;
+        padding: 8px 0;
+        font-size: 9pt;
+      }
+      .receipt-document { border: 0 !important; padding: 0 !important; }
+      .order-details-item { break-inside: avoid; flex-wrap: wrap; }
+      .order-details-product, .order-details-line { overflow-wrap: anywhere; }
+      .receipt-signatures-row, .merchant-statement-print-footer,
+      .driver-statement-print-footer { break-inside: avoid; }
+    }
+  }
+}

@@ -154,6 +154,14 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   }
 
   setMerchantKind(val: number): void {
+    const defaults: Record<number, string> = {
+      0: 'مطعم ومأكولات متنوعة', 1: 'سوبرماركت ومواد غذائية',
+      2: 'صيدلية ومنتجات صحية', 3: 'متجر متنوع', 4: 'مستودع مركزي لتخزين وتجهيز المنتجات'
+    };
+    const desc = String(this.formGroup.get('shortDescription')?.value ?? '').trim();
+    if (!desc || Object.values(defaults).includes(desc)) {
+      this.formGroup.get('shortDescription')?.setValue(defaults[val]);
+    }
     this.formGroup.get('merchantKind')?.setValue(val);
   }
 
@@ -260,6 +268,8 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
     switch (kind) {
       case 1:
         return { label: 'سوبرماركت / بقالية', icon: 'fas fa-shopping-basket', emoji: '🛒' };
+      case 2:
+        return { label: 'صيدلية', icon: 'fas fa-prescription-bottle-alt', emoji: '💊' };
       case 3:
         return { label: 'أخرى', icon: 'fas fa-store', emoji: '🏪' };
       case 4:
@@ -397,6 +407,11 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         this.formGroup.patchValue({
           shortDescription: cleaned || 'مطعم ومأكولات متنوعة',
         });
+      } else if (type === 2) {
+        const defaults = ['متجر متنوع', 'مطعم ومأكولات متنوعة', 'سوبرماركت ومواد غذائية'];
+        if (!currentDesc || defaults.includes(currentDesc)) {
+          this.formGroup.patchValue({ shortDescription: 'صيدلية ومنتجات صحية' });
+        }
       } else if (type === 3 && !currentDesc) {
         this.formGroup.patchValue({ shortDescription: 'متجر متنوع' });
       } else if (type === 4 && !currentDesc) {
@@ -463,6 +478,8 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       if (!desc) {
         desc = 'مطعم ومأكولات متنوعة';
       }
+    } else if (merchantKind === 2 && !desc) {
+      desc = 'صيدلية ومنتجات صحية';
     } else if (merchantKind === 3 && !desc) {
       desc = 'متجر متنوع';
     } else if (merchantKind === 4 && !desc) {

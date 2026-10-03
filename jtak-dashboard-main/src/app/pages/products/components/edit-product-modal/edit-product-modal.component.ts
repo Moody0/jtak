@@ -1,3 +1,4 @@
+import { merchantDiscountQuote } from '../../models/merchant-discount-pricing';
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -153,7 +154,9 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     percentage = Math.max(0, Math.min(99.99, percentage));
 
     let oldPriceUsd: number | null = null;
-    if (storedOriginalUsd > 0) {
+    if (explicitPercent !== null) {
+      oldPriceUsd = storedPriceUsd > 0 ? storedPriceUsd : storedLocalPrice / this.exchangeRate;
+    } else if (storedOriginalUsd > 0) {
       oldPriceUsd = storedOriginalUsd;
     } else if (storedPriceUsd > 0) {
       if (percentage > 0 && percentage < 100) {
@@ -206,64 +209,36 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     this.formGroup?.get('discountPercent')?.markAsDirty();
   }
 
-  get discountPreview(): {
-    oldPriceUsd: number;
-    oldPriceLocal: number;
-    salePriceUsd: number;
-    salePriceLocal: number;
-    percentage: number;
-  } | null {
+  private get pricingQuote() {
     if (!this.formGroup) return null;
+    const baseUsd = this.roundUsd(this.normalizeNumber(this.formGroup.get('priceUsd')?.value, 0) || 0);
+    const requestedPercent = this.normalizeNumber(this.formGroup.get('discountPercent')?.value, 0) || 0;
+    const merchantId = this.normalizeNumber(this.formGroup.get('merchantId')?.value, null);
+    const selected = this.merchantsList.find((merchant) => merchant.id === merchantId);
+    const markup = this.normalizeNumber(selected?.profitOutOfMerchantPricePercent,
+      this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0)) || 0;
+    return merchantDiscountQuote(baseUsd, this.exchangeRate, markup, requestedPercent);
+  }
 
-    const usdPrice = this.normalizeNumber(this.formGroup.get('priceUsd')?.value, 0) || 0;
-    const percentage = this.normalizeNumber(this.formGroup.get('discountPercent')?.value, 0) || 0;
-    if (usdPrice <= 0 || percentage <= 0 || percentage >= 100) return null;
-
-    const profitPercent = this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0) || 0;
-
-    // 1. Calculate base Syrian price from USD
-    const oldBasePriceLocal = Math.round(usdPrice * this.exchangeRate);
-
-    // 2. Calculate Syrian customer price before discount (including platform profit markup)
-    const oldProfitLocal = Math.round(oldBasePriceLocal * profitPercent / 100);
-    const oldPriceLocal = oldBasePriceLocal + oldProfitLocal;
-
-    // 3. Apply discount directly to the Syrian customer price (rounded to nearest integer Syrian Pound)
-    const salePriceLocal = Math.round(oldPriceLocal * (1 - percentage / 100));
-
-    // 4. Derive USD prices by dividing Syrian customer prices by exchange rate
-    const oldPriceUsd = this.exchangeRate > 0 ? this.roundUsd(oldPriceLocal / this.exchangeRate) : this.roundUsd(usdPrice * (1 + profitPercent / 100));
-    const salePriceUsd = this.exchangeRate > 0 ? this.roundUsd(salePriceLocal / this.exchangeRate) : this.roundUsd(oldPriceUsd * (1 - percentage / 100));
-
+  get discountPreview() {
+    const quote = this.pricingQuote;
+    const requested = this.normalizeNumber(this.formGroup?.get('discountPercent')?.value, 0) || 0;
+    if (!quote || requested <= 0) return null;
     return {
-      oldPriceUsd,
-      oldPriceLocal,
-      salePriceUsd,
-      salePriceLocal,
-      percentage,
+      oldPriceUsd: quote.price / this.exchangeRate,
+      oldPriceLocal: quote.price,
+      salePriceUsd: quote.finalPrice / this.exchangeRate,
+      salePriceLocal: quote.finalPrice,
+      percentage: quote.effectivePercent,
+      limited: quote.limited,
+      merchantPrice: quote.merchantPrice,
     };
   }
 
-  get customerPricePreview(): { oldPrice: number; salePrice: number; discountPercent: number } | null {
-    if (!this.formGroup) return null;
-
-    const priceUsd = this.normalizeNumber(this.formGroup.get('priceUsd')?.value, 0) || 0;
-    const discountPercent = this.normalizeNumber(this.formGroup.get('discountPercent')?.value, 0) || 0;
-    if (priceUsd <= 0 || discountPercent < 0 || discountPercent >= 100) return null;
-
-    const profitPercent = this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0) || 0;
-    const oldBasePriceLocal = Math.round(priceUsd * this.exchangeRate);
-    const oldProfitLocal = Math.round(oldBasePriceLocal * profitPercent / 100);
-    const oldPriceLocal = oldBasePriceLocal + oldProfitLocal;
-    const salePriceLocal = discountPercent > 0
-      ? Math.round(oldPriceLocal * (1 - discountPercent / 100))
-      : oldPriceLocal;
-
-    return {
-      oldPrice: oldPriceLocal,
-      salePrice: salePriceLocal,
-      discountPercent,
-    };
+  get customerPricePreview() {
+    const quote = this.pricingQuote;
+    return quote ? { oldPrice: quote.price, salePrice: quote.finalPrice,
+      discountPercent: quote.effectivePercent } : null;
   }
 
   toLocalPrice(priceUsd: number | null | undefined): number {
@@ -337,7 +312,9 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
             if (id > 0 && !mList.some((existing) => existing.id === id)) {
               const rawKind = m.merchantKind ?? m.MerchantKind;
               const merchantKind = rawKind === undefined || rawKind === null ? undefined : Number(rawKind);
-              mList.push({ id, title, merchantKind });
+              mList.push({ id, title, merchantKind,
+                profitOutOfMerchantPricePercent: this.normalizeNumber(m.profitOutOfMerchantPricePercent ?? m.ProfitOutOfMerchantPricePercent, null) ?? undefined,
+              });
             }
           });
         }
@@ -501,38 +478,12 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     let discountAmount = 0;
 
     if (preDiscountPriceUsd !== null && preDiscountPriceUsd > 0) {
-      if (discountPercent > 0) {
-        originalPriceUsd = preDiscountPriceUsd;
-
-        const profitPercent = this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0) || 0;
-        const oldBasePriceLocal = Math.round(preDiscountPriceUsd * this.exchangeRate);
-        const oldProfitLocal = Math.round(oldBasePriceLocal * profitPercent / 100);
-        const oldCustomerPrice = oldBasePriceLocal + oldProfitLocal;
-
-        // Apply discount directly to the Syrian customer price
-        const saleCustomerPrice = Math.round(oldCustomerPrice * (1 - discountPercent / 100));
-        discountAmount = Math.max(0, oldCustomerPrice - saleCustomerPrice);
-
-        // Derive merchant base local price so that (salePriceLocal + profit) == saleCustomerPrice
-        if (profitPercent > 0) {
-          salePriceLocal = Math.round(saleCustomerPrice / (1 + profitPercent / 100));
-          const actualCustomerPrice = salePriceLocal + Math.round(salePriceLocal * profitPercent / 100);
-          if (actualCustomerPrice < saleCustomerPrice && ((salePriceLocal + 1) + Math.round((salePriceLocal + 1) * profitPercent / 100)) === saleCustomerPrice) {
-            salePriceLocal += 1;
-          } else if (actualCustomerPrice > saleCustomerPrice && ((salePriceLocal - 1) + Math.round((salePriceLocal - 1) * profitPercent / 100)) === saleCustomerPrice) {
-            salePriceLocal -= 1;
-          }
-        } else {
-          salePriceLocal = saleCustomerPrice;
-        }
-
-        salePriceUsd = this.exchangeRate > 0 ? this.roundUsd(salePriceLocal / this.exchangeRate) : null;
-      } else {
-        salePriceUsd = preDiscountPriceUsd;
-        originalPriceUsd = null;
-        salePriceLocal = this.toLocalPrice(preDiscountPriceUsd);
-        discountAmount = 0;
-      }
+      const quote = this.pricingQuote;
+      if (!quote) return;
+      salePriceUsd = preDiscountPriceUsd;
+      originalPriceUsd = discountPercent > 0 ? preDiscountPriceUsd : null;
+      salePriceLocal = quote.merchantPrice;
+      discountAmount = quote.discount;
     }
 
     const formValues: Product = {

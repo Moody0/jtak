@@ -71,6 +71,20 @@
   </header>
 
   <!-- 2. System Alerts -->
+  <div class="merchant-kind-shortcuts" *ngIf="!loading">
+    <div>
+      <strong>أقسام المتاجر</strong>
+      <p>أضف بطاقة لنوع المتاجر، ثم عدّل اسمها وصورتها وترتيبها أو أخفها. لن تظهر التغييرات للعملاء إلا بعد الحفظ.</p>
+    </div>
+    <div class="shortcut-actions">
+      <button type="button" class="btn btn-header-secondary" (click)="addMerchantKindTile(2)" [disabled]="saving">
+        <i class="fas fa-prescription-bottle-alt"></i> الصيدليات
+      </button>
+      <button type="button" class="btn btn-header-secondary" (click)="addMerchantKindTile(3)" [disabled]="saving">
+        <i class="fas fa-store"></i> متاجر أخرى
+      </button>
+    </div>
+  </div>
   <!-- Success Alert -->
   <div *ngIf="saveSuccess" class="alert-status-banner alert-success-banner">
     <div class="alert-icon">

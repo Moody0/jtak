@@ -127,7 +127,7 @@ export class MerchantsListComponent
     ).length;
     this.kpiRestaurants = merchants.filter(
       (m) =>
-        (m.merchantKind === 0 || m.merchantKind === 3 || m.merchantKind == null) && !this.isMarket(m)
+        (m.merchantKind === 0 || m.merchantKind == null) && !this.isMarket(m)
     ).length;
     this.cdr.markForCheck();
   }
@@ -363,6 +363,10 @@ export class MerchantsListComponent
           icon: 'fas fa-shopping-basket',
           badgeClass: 'type-grocery',
         };
+      case 2:
+        return { kind: 2, label: 'صيدلية', icon: 'fas fa-prescription-bottle-alt', badgeClass: 'type-pharmacy' };
+      case 4:
+        return { kind: 4, label: 'مستودع مركزي', icon: 'fas fa-warehouse', badgeClass: 'type-store' };
       case 3:
         return {
           kind: 3,

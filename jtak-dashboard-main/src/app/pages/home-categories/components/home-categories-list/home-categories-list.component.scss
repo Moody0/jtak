@@ -15,6 +15,30 @@
   }
 }
 
+.merchant-kind-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+
+  p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .shortcut-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
 .home-categories-workspace {
   display: flex;
   flex-direction: column;

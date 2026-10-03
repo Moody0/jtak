@@ -78,6 +78,7 @@ export interface BatchProductLookup {
 }
 
 export interface BatchMerchantLookup {
+  profitOutOfMerchantPricePercent?: number;
   id: number;
   title: string;
   merchantKind?: number;

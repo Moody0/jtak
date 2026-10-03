@@ -1021,7 +1021,7 @@
             </div>
           </div>
           <strong class="fs-5 text-dark" [ngClass]="(merchantStatementData?.currentBalance || 0) > 0 ? 'text-success' : 'text-dark'">
-            {{ (merchantStatementData?.currentBalance || selectedMerchantForStatement?.currentVendorPayableBalance || 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.currentBalance ?? selectedMerchantForStatement?.currentVendorPayableBalance ?? 0) | number:'1.0-0' }} ل.س
           </strong>
         </div>
       </div>
@@ -1034,7 +1034,7 @@
             </div>
           </div>
           <strong class="fs-5 text-warning">
-            {{ (merchantStatementData?.reservedAmount || selectedMerchantForStatement?.reservedSettlementAmount || 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.reservedAmount ?? selectedMerchantForStatement?.reservedSettlementAmount ?? 0) | number:'1.0-0' }} ل.س
           </strong>
         </div>
       </div>
@@ -1047,7 +1047,7 @@
             </div>
           </div>
           <strong class="fs-5 text-success">
-            {{ (merchantStatementData?.availableAmount || selectedMerchantForStatement?.availableSettlementAmount || 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.availableAmount ?? selectedMerchantForStatement?.availableSettlementAmount ?? 0) | number:'1.0-0' }} ل.س
           </strong>
         </div>
       </div>
@@ -1060,7 +1060,7 @@
             </div>
           </div>
           <strong class="fs-5 text-info">
-            {{ (merchantStatementData?.approvedAwaitingReceiptAmount || selectedMerchantForStatement?.approvedAwaitingPayoutAmount || 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.approvedAwaitingReceiptAmount ?? selectedMerchantForStatement?.approvedAwaitingPayoutAmount ?? 0) | number:'1.0-0' }} ل.س
           </strong>
         </div>
       </div>
@@ -1093,7 +1093,7 @@
     <!-- Statement Transactions View -->
     <div *ngIf="!isLoadingMerchantStatement && statementActiveTab === 'statement'">
       <!-- Transaction Filter Bar -->
-      <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+      <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap no-print">
         <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 580px;">
           <div class="ops-search-box flex-grow-1">
             <i class="fas fa-search ops-search-icon"></i>
@@ -1118,8 +1118,19 @@
       </div>
 
       <!-- Transactions Statement Table (Authoritative Chronological Running Balance) -->
+      <div class="print-statement-summary d-none d-print-flex">
+        <span>عدد الحركات: <strong>{{ (merchantStatementData?.items || merchantStatementData?.transactions)?.length || 0 }}</strong></span>
+        <span>إجمالي المدين (دفعات وخصومات): <strong>{{ statementDebitTotal | number:'1.0-0' }} ل.س</strong></span>
+        <span>إجمالي الدائن (استحقاقات): <strong>{{ statementCreditTotal | number:'1.0-0' }} ل.س</strong></span>
+        <span *ngIf="statementSearchTerm">التصفية: {{ statementSearchTerm }}</span>
+      </div>
       <div class="table-responsive border rounded ops-modal-table-wrap">
-        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm align-middle ops-modal-table">
+        <table class="table table-bordered table-sm gs-3 gy-2 mb-0 font-size-sm align-middle ops-modal-table merchant-ledger-table">
+          <colgroup>
+            <col style="width: 7%"><col style="width: 8%"><col style="width: 7%"><col style="width: 10%">
+            <col style="width: 6%"><col style="width: 6%"><col style="width: 6%"><col style="width: 6%">
+            <col style="width: 6%"><col style="width: 8%"><col style="width: 8%"><col style="width: 8%"><col style="width: 14%">
+          </colgroup>
           <thead class="bg-light">
             <tr class="text-muted fs-8 fw-bold">
               <th scope="col" style="min-width: 120px;">التاريخ</th>
@@ -1209,7 +1220,8 @@
 
               <!-- 9. Financial Status -->
               <td class="text-center">
-                <span class="badge badge-light-info fs-9" *ngIf="tx.financialStatus">{{ tx.financialStatus }}</span>
+                <span class="badge fs-9" *ngIf="tx.financialStatus"
+                  [ngClass]="tx.financialStatus === 'مكتمل — تم الاستلام' ? 'badge-light-success' : tx.financialStatus === 'بانتظار تأكيد التاجر' ? 'badge-light-warning' : 'badge-light-info'">{{ tx.financialStatus }}</span>
                 <span *ngIf="!tx.financialStatus" class="text-muted">-</span>
               </td>
 
@@ -1341,8 +1353,8 @@
       </div>
     </div>
     <div class="modal-footer border-top py-2 px-4 d-flex justify-content-between merchant-statement-modal-actions bg-white">
-      <button type="button" class="btn btn-sm ops-btn-primary" (click)="printMerchantStatement()">
-        <i class="fas fa-print me-2 text-white"></i> <span class="text-white">طباعة كشف الحساب</span>
+      <button type="button" class="btn btn-sm ops-btn-primary" (click)="printMerchantStatement()" [disabled]="isLoadingMerchantStatement || isPrintingMerchantStatement || !merchantStatementData">
+        <i class="fas fa-print me-2 text-white"></i> <span class="text-white">{{ isPrintingMerchantStatement ? 'جاري تجهيز كل الحركات...' : 'طباعة كشف الحساب' }}</span>
       </button>
       <button type="button" class="btn btn-sm btn-light border" (click)="modal.close()">
         {{ 'COMMON.CLOSE' | translate }}
@@ -1849,16 +1861,17 @@
       </div>
       <div class="text-end fs-9">
         <div>تاريخ الطباعة: {{ now | date: 'd MMM y, h:mm a' }}</div>
-        <div>إجمالي الحركات: <strong>{{ (historyPrintItems.length > 0 ? historyPrintItems.length : historyItems.length) }}</strong></div>
+        <div>إجمالي الحركات: <strong>{{ historyPrintItems.length }}</strong></div>
       </div>
     </div>
   </div>
 
   <!-- Print KPI Summary Strip -->
-  <div class="d-flex justify-content-around p-2 mb-3 border rounded bg-light fs-8">
-    <div>إجمالي الدفعات المكتملة: <strong>{{ (historySummary?.totalCompletedAmount || 0) | number: '1.0-0' }} ل.س</strong> ({{ historySummary?.totalCompletedCount || 0 }} حركة)</div>
-    <div>مسددات التجار: <strong>{{ (historySummary?.merchantCompletedAmount || 0) | number: '1.0-0' }} ل.س</strong></div>
-    <div>توريدات المناديب: <strong>{{ (historySummary?.driverCompletedAmount || 0) | number: '1.0-0' }} ل.س</strong></div>
+  <div class="d-flex justify-content-around flex-wrap gap-2 p-2 mb-3 border rounded bg-light fs-8" *ngIf="historyPrintTotals as totals">
+    <div>إجمالي الدفعات المكتملة: <strong>{{ totals.total | number: '1.0-0' }} ل.س</strong> ({{ historyPrintItems.length }} حركة)</div>
+    <div>مسددات التجار: <strong>{{ totals.merchant | number: '1.0-0' }} ل.س</strong></div>
+    <div>توريدات المناديب: <strong>{{ totals.captain | number: '1.0-0' }} ل.س</strong></div>
+    <div *ngIf="totals.earnings">دفعات أجور المناديب: <strong>{{ totals.earnings | number: '1.0-0' }} ل.س</strong></div>
   </div>
 
   <!-- Printable Table -->
@@ -1878,7 +1891,7 @@
       </tr>
     </thead>
     <tbody>
-      <tr *ngFor="let item of (historyPrintItems.length > 0 ? historyPrintItems : historyItems)">
+      <tr *ngFor="let item of historyPrintItems">
         <td class="font-monospace fs-9">{{ item.requestNumber }}</td>
         <td>{{ item.partyTypeLabel }}</td>
         <td><strong>{{ item.partyName }}</strong></td>

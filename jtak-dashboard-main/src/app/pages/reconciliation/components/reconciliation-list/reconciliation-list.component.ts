@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, TemplateRef, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, TemplateRef } from '@angular/core';
+import { printDocument } from 'src/app/shared/printing/print-document';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { interval } from 'rxjs';
@@ -56,6 +57,28 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   selectedMerchantForStatement: MerchantReconciliationItem | null = null;
   merchantStatementData: MerchantStatement | null = null;
   isLoadingMerchantStatement: boolean = false;
+  isPrintingMerchantStatement = false;
+
+  get statementDebitTotal(): number {
+    return (this.merchantStatementData?.items || this.merchantStatementData?.transactions || [])
+      .reduce((total, item) => total + (item.debit || 0), 0);
+  }
+
+  get statementCreditTotal(): number {
+    return (this.merchantStatementData?.items || this.merchantStatementData?.transactions || [])
+      .reduce((total, item) => total + (item.credit || 0), 0);
+  }
+
+  get historyPrintTotals(): { total: number; merchant: number; captain: number; earnings: number } {
+    return this.historyPrintItems.reduce((totals, item) => {
+      const amount = item.amount || 0;
+      totals.total += amount;
+      if (item.partyType === SettlementPartyType.Merchant) totals.merchant += amount;
+      if (item.partyType === SettlementPartyType.Captain) totals.captain += amount;
+      if (item.partyType === SettlementPartyType.CaptainEarnings) totals.earnings += amount;
+      return totals;
+    }, { total: 0, merchant: 0, captain: 0, earnings: 0 });
+  }
   statementSearchTerm: string = '';
   statementActiveTab: 'statement' | 'settlements' = 'statement';
 
@@ -607,11 +630,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   }
 
   printReceipt(): void {
-    document.body.classList.add('print-individual-receipt');
-    window.print();
-    setTimeout(() => {
-      document.body.classList.remove('print-individual-receipt');
-    }, 2000);
+    printDocument('#individualReceiptPrintArea');
   }
 
   printActiveHistory(): void {
@@ -632,13 +651,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         this.historyPrintItems = items || [];
         this.isPrintingHistory = false;
         this.cdr.detectChanges();
-        document.body.classList.add('print-history-report');
-        setTimeout(() => {
-          window.print();
-        }, 150);
-        setTimeout(() => {
-          document.body.classList.remove('print-history-report');
-        }, 3000);
+        printDocument('#historyPrintReport', true);
       },
       error: (err) => {
         console.error('Failed to load print dataset', err);
@@ -811,36 +824,32 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     return (cap.cashFloatBalance || 0) === 0 && (cap.wagesEarnedBalance || 0) === 0 && (cap.expectedNetCashDue || 0) === 0;
   }
 
-  printVoucher(batch: any): void {
-    window.print();
-  }
-
   get printDate(): Date {
     return new Date();
   }
 
-  @HostListener('window:afterprint')
-  onAfterPrint(): void {
-    document.body.classList.remove('print-merchant-statement');
-    document.body.classList.remove('print-individual-receipt');
-    document.body.classList.remove('print-driver-statement');
-    document.body.classList.remove('print-history-report');
-  }
-
   printMerchantStatement(): void {
-    document.body.classList.add('print-merchant-statement');
-    window.print();
-    setTimeout(() => {
-      document.body.classList.remove('print-merchant-statement');
-    }, 2000);
+    if (!this.selectedMerchantForStatement || this.isPrintingMerchantStatement) return;
+    this.isPrintingMerchantStatement = true;
+    this.subs.sink = this.reconciliationService.getCompleteMerchantStatement(
+      this.selectedMerchantForStatement.merchantId, this.statementSearchTerm,
+    ).subscribe({
+      next: statement => {
+        this.merchantStatementData = statement;
+        this.isPrintingMerchantStatement = false;
+        this.cdr.detectChanges();
+        printDocument('#merchant-statement-print-area', true);
+      },
+      error: error => {
+        console.error('Failed to load complete merchant statement for printing', error);
+        this.isPrintingMerchantStatement = false;
+        this.cdr.detectChanges();
+      },
+    });
   }
 
   printDriverStatement(): void {
-    document.body.classList.add('print-driver-statement');
-    window.print();
-    setTimeout(() => {
-      document.body.classList.remove('print-driver-statement');
-    }, 2000);
+    printDocument('#driver-statement-print-area', true);
   }
 
   ngOnDestroy(): void {

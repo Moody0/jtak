@@ -493,10 +493,11 @@ export class OrdersListComponent
   }
 
   edit(item: Order) {
+    if (!this.isDeliveryEditable(item)) return;
     const modalRef = this.modalService.open(EditDilevry, {
       size: 'lg',
     });
-    modalRef.componentInstance.item = item;
+    modalRef.componentInstance.item = { ...item };
     modalRef.result.then(
       () => this.ordersService.fetchPost(),
       () => { }
@@ -577,24 +578,24 @@ export class OrdersListComponent
   }
 
   isDeliveryEditable(order: Order): boolean {
-    if (!order || !order.orderDetails || order.orderDetails.length === 0) return false;
+    if (!order || order.isArchived || order.deletionDate || !order.orderDetails?.length) return false;
     const active = order.orderDetails.filter(d =>
       d.orderDetailStatus !== OrderDetailStatus.MerchantRejected &&
       d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
       d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled);
-    return active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.ReadyForPickup);
+    return active.some(d => d.orderDetailStatus !== OrderDetailStatus.Delivered);
   }
 
   getCleanDriverName(name?: string): string {
     if (!name || name.trim() === '' || name.includes('?')) {
-      return 'Unassigned';
+      return this.translate.currentLang === 'en' ? 'Assigned driver' : 'مندوب التوصيل';
     }
     return name;
   }
 
   hasAssignedDriver(order: Order): boolean {
-    const name = order.deliveryUser;
-    return !!order.deliveryId && !!name && !name.includes('?');
+    const id = order?.deliveryId?.trim();
+    return !!id && id !== '00000000-0000-0000-0000-000000000000';
   }
 
   canLiveTrack(order: Order): boolean {

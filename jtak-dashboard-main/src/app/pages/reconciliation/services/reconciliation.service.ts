@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { EMPTY, Observable } from 'rxjs';
+import { expand, reduce } from 'rxjs/operators';
 import { environment } from 'src/environments/environment';
 import {
   CaptainSettlementSummary,
@@ -39,9 +40,9 @@ export class ReconciliationService {
     return this.http.post<MerchantReconciliationDataTableResult>(`${this.merchantBaseUrl}/DataTable`, params);
   }
 
-  getMerchantStatement(merchantId: number, search?: string, fromDate?: string, toDate?: string): Observable<MerchantStatement> {
+  getMerchantStatement(merchantId: number, search?: string, fromDate?: string, toDate?: string, page = 1, pageSize = 50): Observable<MerchantStatement> {
     let url = `${this.merchantBaseUrl}/${merchantId}/Statement`;
-    const queryParams: string[] = [];
+    const queryParams: string[] = [`page=${page}`, `pageSize=${pageSize}`];
     if (search && search.trim()) {
       const trimmed = search.trim();
       queryParams.push(`searchTerm=${encodeURIComponent(trimmed)}`);
@@ -57,6 +58,22 @@ export class ReconciliationService {
       url += `?${queryParams.join('&')}`;
     }
     return this.http.get<MerchantStatement>(url);
+  }
+
+  getCompleteMerchantStatement(merchantId: number, search?: string): Observable<MerchantStatement> {
+    return this.getMerchantStatement(merchantId, search, undefined, undefined, 1, 1000).pipe(
+      expand(statement => {
+        const page = statement.page || 1;
+        const pageSize = statement.pageSize || 1000;
+        return page * pageSize < (statement.totalRecords || 0)
+          ? this.getMerchantStatement(merchantId, search, undefined, undefined, page + 1, pageSize)
+          : EMPTY;
+      }),
+      reduce((complete, statement) => ({
+        ...statement,
+        items: [...(complete?.items || []), ...(statement.items || statement.transactions || [])],
+      })),
+    );
   }
 
   getCaptains(): Observable<CaptainSettlementSummary[]> {

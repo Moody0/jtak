@@ -31,6 +31,9 @@
               </span>
               <span class="badge badge-light-primary" *ngIf="merchant.merchantKind === 0">مطعم</span>
               <span class="badge badge-light-info" *ngIf="merchant.merchantKind === 1">ماركت</span>
+              <span class="badge badge-light-success" *ngIf="merchant.merchantKind === 2"><i class="fas fa-prescription-bottle-alt me-1"></i>صيدلية</span>
+              <span class="badge badge-light-primary" *ngIf="merchant.merchantKind === 3">أخرى</span>
+              <span class="badge badge-light-primary" *ngIf="merchant.merchantKind === 4">مستودع مركزي</span>
             </div>
             <p class="merchant-subtitle">{{ merchant.shortDescription || merchant.address || ('MERCHANT_WORKSPACE.MERCHANT_INFO' | translate) }}</p>
             <div class="merchant-meta">

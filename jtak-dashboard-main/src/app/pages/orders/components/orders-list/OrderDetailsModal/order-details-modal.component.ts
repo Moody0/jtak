@@ -2,6 +2,7 @@ import { Component, Input } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { Order } from '../../../models/orders.model';
 import { OrderDetailStatus } from '../../../models/order-status.enum';
+import { printDocument } from 'src/app/shared/printing/print-document';
 
 @Component({
   selector: 'app-order-details-modal',
@@ -33,12 +34,6 @@ export class OrderDetailsModalComponent {
   }
 
   printReceipt(): void {
-    document.body.classList.add('print-individual-receipt');
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => {
-        document.body.classList.remove('print-individual-receipt');
-      }, 500);
-    }, 100);
+    printDocument('#orderReceiptPrintArea');
   }
 }

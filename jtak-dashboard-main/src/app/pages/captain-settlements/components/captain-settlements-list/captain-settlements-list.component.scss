@@ -1161,24 +1161,6 @@
 // 7. Print Media Queries
 // -----------------------------------------------------------------------------
 @media print {
-  body * {
-    visibility: hidden;
-  }
-
-  #printableReceiptArea,
-  #printableReceiptArea * {
-    visibility: visible;
-  }
-
-  #printableReceiptArea {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 20px;
-    background: #ffffff !important;
-  }
-
   .settlements-modal-footer,
   .settlements-modal-header .btn-close-modal {
     display: none !important;

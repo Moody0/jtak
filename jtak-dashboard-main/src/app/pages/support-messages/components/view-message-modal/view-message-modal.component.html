@@ -268,7 +268,7 @@
             أجرة التوصيل <strong>{{ message.errandDeliveryFee | number:'1.0-2' }} ل.س</strong> ·
             المجموع <strong class="text-primary">{{ errandTotal | number:'1.0-2' }} ل.س</strong>
             <div class="text-muted fs-8 mt-1">
-              أجر المندوب من الشركة: <strong>{{ (message.errandDriverEarning ?? message.errandDeliveryFee) | number:'1.0-2' }} ل.س</strong> (يُسجل ضمن مستحقاته ولا يُضاف إلى فاتورة العميل).
+              أجر المندوب من الشركة: <strong>{{ (message.errandDriverEarning ?? message.errandDeliveryFee) | number:'1.0-2' }} ل.س</strong> (يحتفظ به المندوب من المبلغ المحصّل عند التسليم، ويُستبعد من عهدته).
             </div>
           </div>
 

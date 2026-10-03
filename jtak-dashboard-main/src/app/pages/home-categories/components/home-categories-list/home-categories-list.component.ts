@@ -165,6 +165,21 @@ export class HomeCategoriesListComponent implements OnInit {
     this.renumber();
   }
 
+  addMerchantKindTile(kind: number): void {
+    const existing = this.config.tiles.find(
+      (tile) => tile.linkType === HomeCategoryLinkType.MerchantKind && tile.merchantKind === kind
+    );
+    if (existing) {
+      this.expandedTiles.add(existing);
+      return;
+    }
+    this.addTile();
+    const tile = this.config.tiles[this.config.tiles.length - 1];
+    tile.linkType = HomeCategoryLinkType.MerchantKind;
+    tile.merchantKind = kind;
+    tile.title = this.merchantKindLabel(kind);
+  }
+
   isTileExpanded(tile: HomeCategoryTile): boolean {
     return this.expandedTiles.has(tile);
   }
