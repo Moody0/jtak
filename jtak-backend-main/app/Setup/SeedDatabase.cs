@@ -17,7 +17,8 @@ namespace App.Setup
             await contentSeeder.SeedMerchants();
             await contentSeeder.SeedCategories();
             await contentSeeder.SeedProducts();
-            await contentSeeder.SeedMerchantProducts();
+            // Merchant catalogs start empty. Product links and prices must be
+            // explicitly saved for that merchant, never inferred during startup.
         }
     }
 }

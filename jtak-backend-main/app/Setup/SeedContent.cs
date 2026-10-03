@@ -174,27 +174,6 @@ namespace App.Setup
             _productService.Insert(prods);
             await cUOW.SaveChangesAsync();
         }
-        public async Task SeedMerchantProducts()
-        {
-            var products = await _productService.Queryable().ToArrayAsync();
-            var merchants = await _merchantService.Queryable().ToArrayAsync();
-            foreach (var merchant in merchants)
-            {
-                var mps = await _merchantService.GetAllMerchantPrices(merchant.Id);
-                if (mps.Count > 0)
-                    continue;
-
-                var cost = R.Next(10, 100);
-                var discount = (int)R.NextDouble() * cost;
-                var newmps = products.Select(p => new MerchantProductAssignDto { ProductId = p.Id, MerchantPrice = cost, Discount = discount }).ToArray();
-                try
-                {
-                    await _merchantService.AssignMerchantProducts(new[] { merchant.Id }, newmps);
-                }
-                catch (Exception) { }
-            }
-        }
-
         public async Task SeedSettings()
         {
             if (_genericSettingService.Queryable().Any()) return;
