@@ -348,13 +348,41 @@ public class CourierDispatchWorkerTests
     {
         using var fixture = new Fixture();
         await fixture.SeedOrderAsync();
-        for (var orderId = 1; orderId <= activeOrders; orderId++)
+        for (var index = 0; index < activeOrders; index++)
         {
+            var orderId = await fixture.SeedOrderAsync();
+            using var scope = fixture.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+            var active = await db.Orders.FindAsync(orderId);
+            active.DeliveryId = fixture.DriverId;
+            active.CourierMatchingCompletedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
             fixture.DriverStatus.PendingOrders.Add(new ShippingOrderDto { OrderId = orderId });
             fixture.DriverStatus.PendingOrders.Add(new ShippingOrderDto { OrderId = orderId });
         }
         await fixture.DispatchAsync();
         Assert.Equal(expectedOffer ? 1 : 0, (await fixture.OffersAsync()).Length);
+    }
+
+    [Fact]
+    public async Task Capacity_IgnoresStaleRouteStopsForTerminalOrders()
+    {
+        using var fixture = new Fixture();
+        await fixture.SeedOrderAsync();
+        for (var index = 0; index < 3; index++)
+        {
+            var id = await fixture.SeedOrderAsync();
+            using var scope = fixture.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+            var terminal = await db.Orders.Include(x => x.OrderDetails).SingleAsync(x => x.Id == id);
+            terminal.DeliveryId = fixture.DriverId;
+            terminal.DeliveredAt = DateTime.UtcNow;
+            terminal.OrderDetails.Single().OrderDetailStatus = OrderDetailStatus.Delivered;
+            await db.SaveChangesAsync();
+            fixture.DriverStatus.PendingOrders.Add(new ShippingOrderDto { OrderId = id });
+        }
+        await fixture.DispatchAsync();
+        Assert.Single(await fixture.OffersAsync());
     }
 
     [Theory]

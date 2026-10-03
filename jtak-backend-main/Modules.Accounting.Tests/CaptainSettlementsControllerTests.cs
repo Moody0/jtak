@@ -10,6 +10,7 @@ using Modules.Accounting.Data;
 using Modules.Orders.Entities;
 using Moq;
 using Modules.Accounting.Services;
+using Modules.Accounting.Entities;
 using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
@@ -243,6 +244,21 @@ namespace Modules.Accounting.Tests
 
             ordersDb.Set<Order>().Add(order);
             await ordersDb.SaveChangesAsync();
+
+            // A real completed delivery has already posted its cash and earning.
+            var ledger = new LedgerService(accountingDb, NullLogger<LedgerService>.Instance);
+            var cashAccount = await ledger.GetOrCreateUserAccountAsync(captain.Id, AccountType.Asset,
+                SystemAccountCodes.CaptainCashFloatPrefix, "Driver cash");
+            var earningAccount = await ledger.GetOrCreateUserAccountAsync(captain.Id, AccountType.Liability,
+                SystemAccountCodes.CaptainEarningsPrefix, "Driver earning");
+            var revenueAccount = await ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.PlatformDeliveryFeeRevenue,
+                "Revenue", AccountType.Revenue);
+            await ledger.PostTransactionAsync(new PostTransactionRequest { IdempotencyKey = "seed-delivery-42", Entries = new()
+            {
+                new() { AccountId = cashAccount.Id, Debit = 2680m },
+                new() { AccountId = earningAccount.Id, Credit = 100m },
+                new() { AccountId = revenueAccount.Id, Credit = 2580m }
+            }});
 
             var controller = new CaptainSettlementsController(ordersDb, accountingDb, userManager.Object,
                 new LedgerService(accountingDb, NullLogger<LedgerService>.Instance));

@@ -33,17 +33,20 @@ namespace App.ApiControllers.V1.Admin
         private readonly UserManager<AppUser> _userManager;
         private readonly IAdminNotificationSummaryService _summaryService;
         private readonly IAdminAuditService _auditService;
+        private readonly IMerchantService _merchants;
 
         public NotificationsController(
             INotificationService service,
             UserManager<AppUser> userManager,
             IAdminNotificationSummaryService summaryService,
-            IAdminAuditService auditService = null)
+            IAdminAuditService auditService = null,
+            IMerchantService merchants = null)
         {
             _userManager = userManager;
             _service = service;
             _summaryService = summaryService;
             _auditService = auditService;
+            _merchants = merchants;
         }
 
         /// <summary>
@@ -124,6 +127,24 @@ namespace App.ApiControllers.V1.Admin
             if (!role.HasValue)
                 return BadRequest(ApiErr.Create("يرجى اختيار تطبيق مستهدف صالح."));
 
+            var destination = string.IsNullOrWhiteSpace(vm.Destination)
+                ? "home" : vm.Destination.Trim().ToLowerInvariant();
+            var allowedDestinations = audience switch
+            {
+                "customers" => new[] { "home", "orders", "merchant", "favorites", "grocery", "restaurants", "errands" },
+                "delivery" => new[] { "home", "orders", "errands", "finance" },
+                _ => new[] { "home", "orders", "products", "finance" }
+            };
+            if (!allowedDestinations.Contains(destination))
+                return BadRequest(ApiErr.Create("الصفحة المختارة غير متاحة في التطبيق المستهدف."));
+            if (destination == "merchant")
+            {
+                var merchant = vm.DestinationId.HasValue && vm.DestinationId.Value > 0 && _merchants != null
+                    ? await _merchants.FindAsync(vm.DestinationId.Value) : null;
+                if (merchant == null || !merchant.Active)
+                    return BadRequest(ApiErr.Create("اختر متجرًا نشطًا ليفتح عند الضغط على الإشعار."));
+            }
+
             if (!_service.IsCampaignPushConfigured())
                 return StatusCode(StatusCodes.Status503ServiceUnavailable,
                     ApiErr.Create("إرسال الإشعارات غير مهيأ على الخادم. يرجى إعداد بيانات Firebase أولاً."));
@@ -134,12 +155,8 @@ namespace App.ApiControllers.V1.Admin
                 "delivery" => "campaign_delivery",
                 _ => "campaign_warehouse"
             };
-            var openOrders = string.Equals(vm.Destination, "orders", StringComparison.OrdinalIgnoreCase);
-            var url = openOrders && audience == "delivery"
-                ? $"{AppDomainHelper.DashboardUrl}/Orders/NewDeliveryOrder/0"
-                : openOrders && audience == "warehouse"
-                    ? $"{AppDomainHelper.DashboardUrl}/Orders/NewMerchantOrder/0"
-                    : null;
+            var url = $"/app/{destination}";
+            if (destination == "merchant") url += $"/{vm.DestinationId.Value}";
             var notification = new Notification
             {
                 Topic = topic,
@@ -168,7 +185,7 @@ namespace App.ApiControllers.V1.Admin
                     EntityId = notification.Id.ToString(),
                     Description = $"إرسال إشعار إلى تطبيق {audience}: {title}",
                     Result = result.AcceptedLanguages > 0 ? "Success" : "Failed",
-                    AfterState = new { Audience = audience, result.RecipientAccounts, result.AcceptedLanguages, result.FailedLanguages, result.FailureCode, result.HistoryRetained }
+                    AfterState = new { Audience = audience, Destination = destination, vm.DestinationId, result.RecipientAccounts, result.AcceptedLanguages, result.FailedLanguages, result.FailureCode, result.HistoryRetained }
                 });
             }
             return result;
@@ -215,6 +232,7 @@ namespace App.ApiControllers.V1.Admin
         public string TextAr { get; set; }
         public string Image { get; set; }
         public string Destination { get; set; }
+        public int? DestinationId { get; set; }
     }
 
     public class CampaignAudiencesDto

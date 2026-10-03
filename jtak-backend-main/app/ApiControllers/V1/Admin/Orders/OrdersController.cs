@@ -222,9 +222,7 @@ namespace App.ApiControllers.V1.Admin
                     continue;
                 }
 
-                bool hasAssignedDriver = order.DeliveryId.HasValue &&
-                                         !string.IsNullOrWhiteSpace(order.DeliveryUser) &&
-                                         !order.DeliveryUser.Contains("?");
+                bool hasAssignedDriver = order.DeliveryId.HasValue && order.DeliveryId != Guid.Empty;
 
                 if (!hasAssignedDriver)
                 {
@@ -315,7 +313,7 @@ namespace App.ApiControllers.V1.Admin
                         case "UNASSIGNED":
                         case "WITHOUT_DRIVER":
                             query = query.Where(o => o.DeliveredAt == null &&
-                                (!o.DeliveryId.HasValue || string.IsNullOrEmpty(o.DeliveryUser) || o.DeliveryUser.Contains("?")) &&
+                                (!o.DeliveryId.HasValue || o.DeliveryId == Guid.Empty) &&
                                 o.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
                                                         d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled &&
                                                         d.OrderDetailStatus != OrderDetailStatus.MerchantRejected) &&
@@ -510,8 +508,15 @@ namespace App.ApiControllers.V1.Admin
             if (string.IsNullOrWhiteSpace(request?.Reason))
                 return BadRequest(ApiErr.Create("سبب الأرشفة إلزامي."));
 
-            var order = await _ouow.Context.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            var order = await _ouow.Context.Orders.Include(o => o.OrderDetails).FirstOrDefaultAsync(o => o.Id == id);
             if (order == null) return NotFound();
+            if (order.DeletionDate != null) return true;
+            if (order.DeliveredAt == null && order.OrderDetails.Any(d =>
+                d.OrderDetailStatus != OrderDetailStatus.Delivered &&
+                d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled))
+                return BadRequest(ApiErr.Create("ألغِ الطلب النشط أولاً قبل أرشفته حتى لا يتوقف إسناده وتجهيزه."));
 
             var beforeState = new
             {
@@ -910,6 +915,8 @@ namespace App.ApiControllers.V1.Admin
             var currentOrder = await _service.FindAsync(id);
             if (currentOrder == null)
                 return NotFound();
+            if (currentOrder.DeletionDate != null || currentOrder.DeliveredAt != null)
+                return BadRequest(ApiErr.Create("لا يمكن قبول طلب مؤرشف أو مكتمل."));
 
             var actionableDetails = currentOrder.OrderDetails
                 .Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
@@ -957,6 +964,19 @@ namespace App.ApiControllers.V1.Admin
                 OccurredAtUtc = DateTime.UtcNow
             });
 
+            // Admin acceptance must open the same durable matching window as merchant acceptance.
+            if ((!currentOrder.DeliveryId.HasValue || currentOrder.DeliveryId == Guid.Empty) &&
+                !currentOrder.CourierMatchingStartedAtUtc.HasValue && currentOrder.OrderDetails
+                    .Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                        x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled && x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled)
+                    .All(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted || x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup ||
+                        (x.OrderDetailStatus == OrderDetailStatus.Pending && merchantIds.Contains(x.MerchantId)))) {
+                var now = DateTime.UtcNow;
+                currentOrder.CourierMatchingStartedAtUtc = now;
+                currentOrder.CourierMatchingDeadlineAtUtc = now.AddMinutes(CourierMatchingPolicy.TimeoutMinutes);
+                currentOrder.CourierMatchingCompletedAtUtc = null;
+                currentOrder.CourierMatchingRound = Math.Max(currentOrder.CourierMatchingRound + 1, 1);
+            }
             await _service.MerchantAccept(id, merchantIds);
 
             if (_trackingHub != null)
@@ -1108,33 +1128,7 @@ namespace App.ApiControllers.V1.Admin
         [Route("Preparing/{id}")]
         public async Task<ActionResult<bool>> Preparing(int id)
         {
-            var currentOrder = await _service.FindAsync(id);
-            if (currentOrder == null) return NotFound();
-
-            var pendingDetails = currentOrder.OrderDetails
-                .Where(x => x.OrderDetailStatus == OrderDetailStatus.Pending)
-                .ToArray();
-
-            if (pendingDetails.Length > 0)
-            {
-                var merchantIds = pendingDetails.Select(x => x.MerchantId).Distinct().ToArray();
-                await _service.MerchantAccept(id, merchantIds);
-            }
-
-            if (_auditService != null)
-            {
-                await _auditService.LogAsync(new AdminAuditLogEntry
-                {
-                    Module = "Orders",
-                    Action = "Preparing",
-                    EntityType = "Order",
-                    EntityId = id.ToString(),
-                    Description = $"بدء تجهيز الطلب #{id}",
-                    Result = "Success"
-                });
-            }
-
-            return true;
+            return await Accept(id);
         }
 
         [HttpPost]
@@ -1715,6 +1709,11 @@ namespace App.ApiControllers.V1.Admin
         {
             var order = await _service.FindAsync(id);
             if (order == null) return NotFound();
+            if (order.DeletionDate != null || order.DeliveredAt != null || !order.OrderDetails.Any(x =>
+                x.OrderDetailStatus == OrderDetailStatus.Pending || x.OrderDetailStatus == OrderDetailStatus.CustomerPending ||
+                x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted || x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup) ||
+                order.OrderDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted || x.OrderDetailStatus == OrderDetailStatus.Delivered))
+                return BadRequest(ApiErr.Create("يمكن إلغاء تعيين المندوب قبل استلام الطلب فقط."));
 
             var prevDriverId = order.DeliveryId;
             var prevDriverName = order.DeliveryUser;
@@ -1732,6 +1731,11 @@ namespace App.ApiControllers.V1.Admin
             order.CaptainCompensationType = null;
             order.CaptainRate = null;
             order.CaptainEarning = 0m;
+            var rematchStarted = DateTime.UtcNow;
+            order.CourierMatchingStartedAtUtc = rematchStarted;
+            order.CourierMatchingDeadlineAtUtc = rematchStarted.AddMinutes(CourierMatchingPolicy.TimeoutMinutes);
+            order.CourierMatchingCompletedAtUtc = null;
+            order.CourierMatchingRound = Math.Max(order.CourierMatchingRound + 1, 1);
             var unassignMoney = OrderMoneySnapshot.Deserialize(order.MoneySnapshotJson);
             if (unassignMoney != null)
             {
@@ -1745,11 +1749,12 @@ namespace App.ApiControllers.V1.Admin
             }
             await _ouow.SaveChangesAsync();
 
-            var onlineDrivers = await _deliveryService.GetOnlineDeliveryIds();
-            if (onlineDrivers.Length > 0)
+            await RunAcceptSideEffectSafely(id, "unassignment notification", async () =>
             {
-                await _notificationService.SendDeliveryNewOrderRecived(onlineDrivers, id, order.OrderDetails.ToArray());
-            }
+                var onlineDrivers = await _deliveryService.GetOnlineDeliveryIds();
+                if (onlineDrivers.Length > 0)
+                    await _notificationService.SendDeliveryNewOrderRecived(onlineDrivers, id, order.OrderDetails.ToArray());
+            });
 
             if (_trackingHub != null)
             {
@@ -1801,6 +1806,12 @@ namespace App.ApiControllers.V1.Admin
             var prevRate = order.CaptainRate;
             var prevEarning = order.CaptainEarning;
             var prevMoneySnapshot = order.MoneySnapshotJson;
+            var prevMatchingCompleted = order.CourierMatchingCompletedAtUtc;
+            var prevLat = order.DeliveryLat;
+            var prevLng = order.DeliveryLng;
+            var prevLocationDate = order.DeliveryLocationUpdatedAt;
+            if (order.DeletionDate != null || order.DeliveredAt != null)
+                return BadRequest(ApiErr.Create("لا يمكن تعيين مندوب لطلب مؤرشف أو مكتمل."));
 
             var activeDetails = order.OrderDetails.Where(x => x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
                                                                x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
@@ -1822,9 +1833,11 @@ namespace App.ApiControllers.V1.Admin
                 }
                 return BadRequest(ApiErr.Create("لا يمكن تعيين مندوب لطلب ملغى أو تم تسليمه بالكامل."));
             }
+            if (activeDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.ShippingStarted || x.OrderDetailStatus == OrderDetailStatus.Delivered))
+                return BadRequest(ApiErr.Create("لا يمكن تغيير المندوب بعد استلام الطلب من المتجر."));
 
             var bestDelivery = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == uid);
-            if (bestDelivery == null || !await _userManager.IsInRoleAsync(bestDelivery, AppRoleName.Delivery.ToString()))
+            if (bestDelivery == null || !bestDelivery.IsActive || !await _userManager.IsInRoleAsync(bestDelivery, AppRoleName.Delivery.ToString()))
             {
                 if (_auditService != null)
                 {
@@ -1880,21 +1893,15 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create(errMsg));
             }
 
-            if (order.DeliveryId.HasValue)
-            {
-                await _deliveryService.RemoveOrder(order.DeliveryId.Value, id);
-            }
-
             order.DeliveryId = bestDelivery.Id;
             order.DeliveryLat = null;
             order.DeliveryLng = null;
             order.DeliveryLocationUpdatedAt = null;
             order.DeliveryUser = await _userManager.Users.Where(x => x.Id == order.DeliveryId).Select(x => x.FullName).FirstOrDefaultAsync();
+            order.CourierMatchingCompletedAtUtc = DateTime.UtcNow;
 
             // Apply Captain Acceptance Snapshot
             DriverPricingService.ApplyCaptainAcceptanceSnapshotStatic(order, bestDelivery);
-
-            await _ouow.SaveChangesAsync();
 
             var customerSO = new ShippingOrderDto
             {
@@ -1931,17 +1938,23 @@ namespace App.ApiControllers.V1.Admin
 
             try
             {
+                await _ouow.SaveChangesAsync();
                 await _deliveryService.AddOrder(bestDelivery.Id, id, merchantsSOs.ToArray(), customerSO);
             }
             catch (Exception ex)
             {
-                await _deliveryService.CompensateOrderStops(bestDelivery.Id, id);
+                try { await _deliveryService.CompensateOrderStops(bestDelivery.Id, id); }
+                catch (Exception cleanupError) { _logger?.LogError(cleanupError, "Failed to clean up incomplete route for Order {OrderId}", id); }
                 order.DeliveryId = prevDriverId;
                 order.DeliveryUser = prevDriverName;
                 order.CaptainCompensationType = prevCompType;
                 order.CaptainRate = prevRate;
                 order.CaptainEarning = prevEarning;
                 order.MoneySnapshotJson = prevMoneySnapshot;
+                order.CourierMatchingCompletedAtUtc = prevMatchingCompleted;
+                order.DeliveryLat = prevLat;
+                order.DeliveryLng = prevLng;
+                order.DeliveryLocationUpdatedAt = prevLocationDate;
                 _service.Update(order);
                 await _ouow.SaveChangesAsync();
                 _logger?.LogError(ex, "Failed to create route while assigning Order {OrderId}; assignment was reverted.", id);
@@ -1949,8 +1962,12 @@ namespace App.ApiControllers.V1.Admin
                     ApiErr.Create("تعذر إنشاء مسار التوصيل وتم التراجع عن تعيين السائق. يرجى المحاولة مجدداً."));
             }
 
+            if (prevDriverId.HasValue && prevDriverId != bestDelivery.Id)
+                await RunAcceptSideEffectSafely(id, "previous driver route cleanup", () => _deliveryService.RemoveOrder(prevDriverId.Value, id));
+
             // Sending Notification will save to DB
-            await _notificationService.SendDeliveryNewOrderRecived(new[] { bestDelivery.Id }, id, order.OrderDetails.ToArray());
+            await RunAcceptSideEffectSafely(id, "assigned driver notification", () =>
+                _notificationService.SendDeliveryNewOrderRecived(new[] { bestDelivery.Id }, id, order.OrderDetails.ToArray()));
 
             if (_auditService != null)
             {

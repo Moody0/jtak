@@ -170,6 +170,8 @@ namespace App.ApiControllers.V1.Admin
         [HttpPut("{id}/status")]
         public async Task<ActionResult<bool>> UpdateStatus(int id, [FromBody] UpdateSupportMessageStatusDto model)
         {
+            if (model == null || !Enum.IsDefined(typeof(SupportMessageStatus), model.Status))
+                return BadRequest(ApiErr.Create("حالة رسالة الدعم غير صالحة."));
             if (await _service.Queryable().AnyAsync(x => x.Id == id && x.ErrandStatus != null))
                 return BadRequest(ApiErr.Create("طلبات الشراء تُدار من خلال مراحل عرض السعر والتنفيذ المخصصة لها."));
             var success = await _service.UpdateStatusAsync(id, model.Status, model.AdminNotes);
