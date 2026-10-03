@@ -230,6 +230,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       salePriceUsd: quote.finalPrice / this.exchangeRate,
       salePriceLocal: quote.finalPrice,
       percentage: quote.effectivePercent,
+      requestedPercentage: requested,
       limited: quote.limited,
       merchantPrice: quote.merchantPrice,
     };
@@ -526,12 +527,23 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     this.toasterService.error(message || 'تعذر حفظ المنتج وربطه بالمتجر، يرجى المحاولة مرة أخرى.');
   }
 
+  private showSaveSuccess(message: string): void {
+    const preview = this.discountPreview;
+    if (preview?.limited) {
+      this.toasterService.warning(
+        `تم حفظ المنتج. الخصم المطلوب ${preview.requestedPercentage}%، والمطبّق فعلياً ${preview.percentage}% لأن سعر العميل لا يمكن أن يقل عن حصة التاجر (${preview.merchantPrice} ل.س).`
+      );
+    } else {
+      this.toasterService.success(message);
+    }
+  }
+
   create(formValues: Product, computedResult?: any): void {
     this.subs.sink = this.service
       .create(formValues)
       .pipe(
         tap((id) => {
-          this.toasterService.success('تمت إضافة المنتج بنجاح');
+          this.showSaveSuccess('تمت إضافة المنتج بنجاح');
           this.modal.close(this.modalResult({ ...formValues, id }, computedResult));
         }),
         catchError((error) => {
@@ -547,7 +559,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       .update(formValues)
       .pipe(
         tap(() => {
-          this.toasterService.success('تم تحديث بيانات المنتج بنجاح');
+          this.showSaveSuccess('تم تحديث بيانات المنتج بنجاح');
           this.modal.close(this.modalResult(formValues, computedResult));
         }),
         catchError((error) => {

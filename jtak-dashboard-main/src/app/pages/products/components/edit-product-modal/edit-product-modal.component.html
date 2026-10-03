@@ -358,7 +358,8 @@
                     </strong>
                     <small class="text-muted">السعر الذي سيدفعه العميل بعد تطبيق الخصم</small>
                     <small class="d-block text-warning" *ngIf="preview.limited">
-                      تم تقليل الخصم لحماية سعر التاجر ({{ preview.merchantPrice | number:'1.0-0' }} ل.س). الخصم من زيادة جيتك فقط.
+                      الخصم المطلوب {{ preview.requestedPercentage | number:'1.0-2' }}%، لكن المطبّق فعلياً {{ preview.percentage | number:'1.0-2' }}%.
+                      سعر العميل لا يمكن أن يقل عن حصة التاجر: {{ preview.merchantPrice | number:'1.0-0' }} ل.س. الخصم من ربح جيتك فقط.
                     </small>
                   </div>
                   <div class="d-flex flex-wrap align-items-center gap-3">

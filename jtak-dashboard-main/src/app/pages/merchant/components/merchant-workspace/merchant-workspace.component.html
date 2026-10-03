@@ -443,7 +443,7 @@
                   <span *ngIf="item.price !== item.finalPrice" class="old-price">{{ item.price | number }}</span>
                   <span class="final-price">{{ item.finalPrice | number }} <small>{{ 'COMMON.CURRENCY_SYP' | translate }}</small></span>
                   <span *ngIf="getDiscountPercent(item) as discountPercent" class="badge badge-light-danger mt-1">
-                    خصم {{ discountPercent }}%
+                    خصم {{ discountPercent | number:'1.0-2' }}%
                   </span>
                 </div>
               </td>

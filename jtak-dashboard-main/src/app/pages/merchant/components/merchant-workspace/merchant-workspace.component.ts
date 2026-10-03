@@ -869,7 +869,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     if (!item.discount || item.discount <= 0 || item.price <= item.finalPrice) {
       return null;
     }
-    return Math.round(((item.price - item.finalPrice) / item.price) * 100);
+    return Math.round(((item.price - item.finalPrice) / item.price) * 10000) / 100;
   }
 
   deleteProduct(item: ProductMerchant): void {
