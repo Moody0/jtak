@@ -302,16 +302,17 @@ export class NgPagination implements OnChanges {
     let leftOffset = Math.floor(this.maxSize / 2);
     let rightOffset = this.maxSize % 2 === 0 ? leftOffset - 1 : leftOffset;
 
-    if (this.page <= leftOffset) {
+    const selectedPage = this.page + 1;
+    if (selectedPage <= leftOffset) {
       // very beginning, no rotation -> [0..maxSize]
       end = this.maxSize;
-    } else if (this.pageCount - this.page < leftOffset) {
+    } else if (this.pageCount - selectedPage < leftOffset) {
       // very end, no rotation -> [len-maxSize..len]
       start = this.pageCount - this.maxSize;
     } else {
       // rotate
-      start = this.page - leftOffset - 1;
-      end = this.page + rightOffset;
+      start = selectedPage - leftOffset - 1;
+      end = selectedPage + rightOffset;
     }
 
     return [start, end];
@@ -321,7 +322,7 @@ export class NgPagination implements OnChanges {
    * Paginates page numbers based on maxSize items per page.
    */
   private _applyPagination(): [number, number] {
-    let page = Math.ceil(this.page / this.maxSize) - 1;
+    let page = Math.floor(this.page / this.maxSize);
     let start = page * this.maxSize;
     let end = start + this.maxSize;
 
@@ -330,7 +331,7 @@ export class NgPagination implements OnChanges {
 
   private _setPageInRange(newPageNo: any) {
     const prevPageNo = this.page;
-    this.page = getValueInRange(newPageNo, this.pageCount, 0);
+    this.page = getValueInRange(newPageNo, Math.max(0, this.pageCount - 1), 0);
 
     if (this.page !== prevPageNo && isNumber(this.collectionSize)) {
       this.pageChange.emit(this.page);

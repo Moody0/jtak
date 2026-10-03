@@ -8,12 +8,12 @@ import { BaseModel } from '../models/base.model';
 import { SortState } from '../models/sort.model';
 import { RequestTypes } from '../models/request-types.enum';
 
-const DEFAULT_STATE: ITableState = {
+const createDefaultState = (): ITableState => ({
   filter: {},
   paginator: new PaginatorState(),
   sorting: new SortState(),
   searchTerm: '',
-};
+});
 
 export abstract class TableService<T> {
   // Private fields
@@ -23,7 +23,10 @@ export abstract class TableService<T> {
   public _isLoading$ = new BehaviorSubject<boolean>(false);
   public _isFirstLoading$ = new BehaviorSubject<boolean>(false);
   public _isRequestLoading$ = new BehaviorSubject<boolean>(false);
-  private _tableState$ = new BehaviorSubject<ITableState>(DEFAULT_STATE);
+  private _tableState$ = new BehaviorSubject<ITableState>(createDefaultState());
+  private listRequest?: Subscription;
+  private _listError$ = new BehaviorSubject<string>('');
+  get listError$() { return this._listError$.asObservable(); }
   private _subscriptions: Subscription[] = [];
 
   // Getters
@@ -103,7 +106,7 @@ export abstract class TableService<T> {
     }
 
     params = params.append('pageSize', this.paginator.pageSize.toString());
-    params = params.append('pageNumber', this.paginator.page.toString());
+    params = params.append('pageNumber', (this.paginator.page + 1).toString());
     params = params.append('sortField', this.sorting.column);
     params = params.append('sortOrder', this.sorting.direction);
 
@@ -112,6 +115,7 @@ export abstract class TableService<T> {
     }
 
     const url = `${this.BASE_URL}/${this.GET_ALL_URL}`;
+    this.listRequest?.unsubscribe();
     this._isLoading$.next(true);
 
     // Prune closed subscriptions to eliminate memory leaks
@@ -122,6 +126,8 @@ export abstract class TableService<T> {
       .pipe(
         take(1),
         tap((res: TableResponseModel<T>) => {
+          if ((res as any)?.error || !Array.isArray(res?.items) || !Number.isFinite(Number(res?.totalRecords))) throw new Error('Invalid table response');
+          this._listError$.next('');
           this._items$.next(res.items);
           this._totalRecords$.next(res.totalRecords);
           this.patchStateWithoutFetch({
@@ -131,6 +137,7 @@ export abstract class TableService<T> {
           });
         }),
         catchError(() => {
+          this._listError$.next('تعذر تحميل البيانات. اضغط تحديث للمحاولة مرة أخرى.');
           this._isLoading$.next(false);
           return of({ items: [], totalRecords: 0 } as TableResponseModel<T>);
         }),
@@ -141,6 +148,7 @@ export abstract class TableService<T> {
       .subscribe(() => {
         this._subscriptions = this._subscriptions.filter(s => !s.closed);
       });
+    this.listRequest = request;
     this._subscriptions.push(request);
   }
 
@@ -161,7 +169,7 @@ export abstract class TableService<T> {
 
     const body: any = {
       pageSize: this.paginator.pageSize,
-      pageNumber: this.paginator.page,
+      pageNumber: this.paginator.page + 1,
       sortField: this.sorting.column,
       sortOrder: this.sorting.direction,
     };
@@ -171,6 +179,7 @@ export abstract class TableService<T> {
     }
 
     const url = `${this.BASE_URL}/${this.GET_ALL_URL}`;
+    this.listRequest?.unsubscribe();
     this._isLoading$.next(true);
 
     // Prune closed subscriptions to eliminate memory leaks
@@ -181,6 +190,8 @@ export abstract class TableService<T> {
       .pipe(
         take(1),
         tap((res: TableResponseModel<T>) => {
+          if ((res as any)?.error || !Array.isArray(res?.items) || !Number.isFinite(Number(res?.totalRecords))) throw new Error('Invalid table response');
+          this._listError$.next('');
           this._items$.next(res.items);
           this._totalRecords$.next(res.totalRecords);
           this.patchStateWithoutFetch({
@@ -190,6 +201,7 @@ export abstract class TableService<T> {
           });
         }),
         catchError(() => {
+          this._listError$.next('تعذر تحميل البيانات. اضغط تحديث للمحاولة مرة أخرى.');
           this._isLoading$.next(false);
           return of({ items: [], totalRecords: 0 } as TableResponseModel<T>);
         }),
@@ -200,6 +212,7 @@ export abstract class TableService<T> {
       .subscribe(() => {
         this._subscriptions = this._subscriptions.filter(s => !s.closed);
       });
+    this.listRequest = request;
     this._subscriptions.push(request);
   }
 
@@ -255,17 +268,11 @@ export abstract class TableService<T> {
   }
 
   public setDefaults() {
-    this.patchStateWithoutFetch({ filter: {} });
-    this.patchStateWithoutFetch({
-      sorting: new SortState(this.DEFAULT_SORT_FIELD || ''),
-    });
-    this.patchStateWithoutFetch({ searchTerm: '' });
-    this.patchStateWithoutFetch({
-      paginator: new PaginatorState(),
-    });
+    this.listRequest?.unsubscribe();
+    this._listError$.next('');
     this._isFirstLoading$.next(true);
     this._isLoading$.next(true);
-    this._tableState$.next(DEFAULT_STATE);
+    this._tableState$.next({ ...createDefaultState(), sorting: new SortState(this.DEFAULT_SORT_FIELD || '') });
   }
 
   // Base Methods
@@ -274,6 +281,10 @@ export abstract class TableService<T> {
     queryParams = null,
     fetchWithPost = true
   ) {
+    if (patch.searchTerm !== undefined || patch.filter !== undefined) {
+      // The widget counts pages from zero; changing the query starts at page one.
+      this.paginator.page = 0;
+    }
     this.patchStateWithoutFetch(patch);
     if (fetchWithPost) {
       this.fetchPost(queryParams);
@@ -283,7 +294,7 @@ export abstract class TableService<T> {
   }
 
   public patchStateWithoutFetch(patch: Partial<ITableState>) {
-    const newState = Object.assign(this._tableState$.value, patch);
+    const newState = { ...this._tableState$.value, ...patch };
     this._tableState$.next(newState);
   }
 

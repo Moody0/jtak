@@ -86,7 +86,7 @@ export class OrdersListComponent
     this.activeTab = tab;
     this.selection.clear();
     const paginator = this.ordersService.paginator;
-    paginator.page = 1;
+    paginator.page = 0;
     const filter = tab === 'ALL' ? {} : { status: tab };
     this.ordersService.patchState({ filter, paginator });
     this.loadSummary();
@@ -237,7 +237,7 @@ export class OrdersListComponent
     this.activeTab = 'ALL';
     this.clearSearch();
     const paginator = this.ordersService.paginator;
-    paginator.page = 1;
+    paginator.page = 0;
     this.ordersService.patchState({ filter: {}, searchTerm: '', paginator });
     this.loadSummary();
   }
@@ -312,7 +312,7 @@ export class OrdersListComponent
   }
 
   canCancel(order: Order): boolean {
-    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    if (!order || order.isArchived || order.deletionDate || order.deliveredAt || !order.orderDetails?.length) return false;
     const details = order.orderDetails;
 
     const allTerminal = details.every(d =>
@@ -325,7 +325,7 @@ export class OrdersListComponent
       d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
       d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
       d.orderDetailStatus !== OrderDetailStatus.MerchantRejected);
-    if (active.length > 0 && active.every(d => d.orderDetailStatus === OrderDetailStatus.Delivered)) {
+    if (active.some(d => d.orderDetailStatus === OrderDetailStatus.Delivered)) {
       return false;
     }
 
@@ -347,11 +347,13 @@ export class OrdersListComponent
   }
 
   canApprove(order: Order): boolean {
-    return order.canAdminApprove === true || this.canAccept(order);
+    return this.canAccept(order);
   }
 
   canAccept(order: Order): boolean {
-    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    if (!this.isDeliveryEditable(order)) return false;
+    if (order.canAdminApprove !== undefined) return order.canAdminApprove;
+    if (order.requiresMerchantDecision) return false;
     return order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.Pending || d.orderDetailStatus === OrderDetailStatus.CustomerPending);
   }
 
@@ -403,13 +405,12 @@ export class OrdersListComponent
   }
 
   canPrepare(order: Order): boolean {
-    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
-    return order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.Pending);
+    return this.canAccept(order);
   }
 
   canMarkReady(order: Order): boolean {
-    if (order.canAdminMarkReady === true) return true;
-    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    if (!this.isDeliveryEditable(order)) return false;
+    if (order.canAdminMarkReady !== undefined) return order.canAdminMarkReady;
     return order.orderDetails.some(d => d.orderDetailStatus === OrderDetailStatus.MerchantAccepted);
   }
 
@@ -438,7 +439,7 @@ export class OrdersListComponent
   }
 
   canConfirmPickup(order: Order): boolean {
-    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    if (!this.isDeliveryEditable(order) || !this.hasAssignedDriver(order)) return false;
     const active = order.orderDetails.filter(d =>
       d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
       d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
@@ -456,7 +457,7 @@ export class OrdersListComponent
   }
 
   canDeliver(order: Order): boolean {
-    if (!order || !order.orderDetails || !order.orderDetails.length) return false;
+    if (!this.isDeliveryEditable(order)) return false;
     const active = order.orderDetails.filter(d =>
       d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
       d.orderDetailStatus !== OrderDetailStatus.DeliveryCanceled &&
@@ -480,6 +481,10 @@ export class OrdersListComponent
     }
     const modalRef = this.modalService.open(CancelOrderModalComponent, { centered: true });
     modalRef.componentInstance.orders = cancelable;
+    modalRef.componentInstance.updated.subscribe(() => {
+      this.selection.clear();
+      this.refreshOrders();
+    });
     modalRef.result.then(
       (res) => {
         if (res) {
@@ -493,7 +498,7 @@ export class OrdersListComponent
   }
 
   edit(item: Order) {
-    if (!this.isDeliveryEditable(item)) return;
+    if (!this.canAssignDriver(item)) return;
     const modalRef = this.modalService.open(EditDilevry, {
       size: 'lg',
     });
@@ -517,6 +522,7 @@ export class OrdersListComponent
     this.loadSummary();
     this.ordersService.fetchPost();
     this.subs.sink = interval(5000).subscribe(() => {
+      if (this.isLoading) return;
       this.loadSummary();
       this.ordersService.fetchPost();
     });
@@ -577,8 +583,17 @@ export class OrdersListComponent
     modalRef.componentInstance.statusLabel = this.getOrderOverallStatus(order).label;
   }
 
+  canAssignDriver(order: Order): boolean {
+    return this.isDeliveryEditable(order) && !order.orderDetails.some(detail =>
+      detail.orderDetailStatus === OrderDetailStatus.ShippingStarted || detail.orderDetailStatus === OrderDetailStatus.Delivered);
+  }
+
+  canArchive(order: Order): boolean {
+    return !order.isArchived && !order.deletionDate && !this.isDeliveryEditable(order);
+  }
+
   isDeliveryEditable(order: Order): boolean {
-    if (!order || order.isArchived || order.deletionDate || !order.orderDetails?.length) return false;
+    if (!order || order.isArchived || order.deletionDate || order.deliveredAt || !order.orderDetails?.length) return false;
     const active = order.orderDetails.filter(d =>
       d.orderDetailStatus !== OrderDetailStatus.MerchantRejected &&
       d.orderDetailStatus !== OrderDetailStatus.CustomerCanceled &&
@@ -599,7 +614,7 @@ export class OrdersListComponent
   }
 
   canLiveTrack(order: Order): boolean {
-    if (!order || !order.orderDetails || order.orderDetails.length === 0) return false;
+    if (!this.isDeliveryEditable(order)) return false;
     const isTerminal = order.orderDetails.every(d =>
       d.orderDetailStatus === OrderDetailStatus.Delivered ||
       d.orderDetailStatus === OrderDetailStatus.CustomerCanceled ||
@@ -669,7 +684,7 @@ export class OrdersListComponent
   }
 
   archiveOrder(order: Order): void {
-    if (!order) return;
+    if (!order || !this.canArchive(order)) return;
     const reason = window.prompt(`أدخل سبب أرشفة / حذف الطلب #${order.id} (إلزامي للتدقيق الإداري):`);
     if (reason === null) return;
     if (!reason.trim()) {

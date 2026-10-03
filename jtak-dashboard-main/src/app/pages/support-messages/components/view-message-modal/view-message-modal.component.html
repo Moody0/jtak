@@ -410,6 +410,7 @@
         <button
           type="button"
           class="modal-status-choice"
+          [disabled]="isSaving || isLoadingMessage"
           [class.is-active]="selectedStatus === SupportMessageStatus.New"
           (click)="setStatus(SupportMessageStatus.New)"
         >
@@ -420,6 +421,7 @@
         <button
           type="button"
           class="modal-status-choice"
+          [disabled]="isSaving || isLoadingMessage"
           [class.is-active]="selectedStatus === SupportMessageStatus.Read"
           (click)="setStatus(SupportMessageStatus.Read)"
         >
@@ -430,6 +432,7 @@
         <button
           type="button"
           class="modal-status-choice"
+          [disabled]="isSaving || isLoadingMessage"
           [class.is-active]="selectedStatus === SupportMessageStatus.Resolved"
           (click)="setStatus(SupportMessageStatus.Resolved)"
         >
@@ -449,6 +452,7 @@
         class="form-control modal-notes-input"
         rows="3"
         [(ngModel)]="adminNotes"
+        [disabled]="isSaving || isLoadingMessage"
         placeholder="اكتب ملاحظات حول التواصل مع العميل أو تفاصيل معالجة الطلب..."
       ></textarea>
     </div>
@@ -464,7 +468,7 @@
     *ngIf="!isErrand"
     type="button"
     class="btn modal-btn-primary"
-    [disabled]="isSaving"
+    [disabled]="isSaving || isLoadingMessage"
     (click)="saveChanges()"
   >
     <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-2"></span>

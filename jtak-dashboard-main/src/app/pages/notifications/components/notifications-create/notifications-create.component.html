@@ -57,12 +57,21 @@
         <button type="button" class="btn btn-sm btn-light-primary" (click)="applyPreset('orders')" [disabled]="isSending || selectedTarget === 'customers'">قالب طلبات</button>
         <button type="button" class="btn btn-sm btn-light-primary" (click)="applyPreset('update')" [disabled]="isSending">قالب تنبيه</button>
       </div>
-      <div class="mb-5" *ngIf="selectedTarget !== 'customers'">
-        <label for="campaign-destination" class="form-label fw-bold">عند الضغط على الإشعار</label>
-        <select id="campaign-destination" class="form-select" formControlName="destination">
-          <option value="orders">فتح الطلبات</option>
-          <option value="home">فتح التطبيق</option>
+      <div class="mb-5">
+        <label for="campaign-destination" class="form-label fw-bold">أي صفحة تفتح عند الضغط على الإشعار؟</label>
+        <select id="campaign-destination" class="form-select" formControlName="destination" (change)="updateDestination()">
+          <option *ngFor="let destination of destinations" [value]="destination.value">{{ destination.label }}</option>
         </select>
+        <div class="form-text">لو لم تحدد صفحة، سيفتح التطبيق على الصفحة الرئيسية.</div>
+        <div *ngIf="formGroup.get('destination')?.value === 'merchant'" class="mt-3">
+          <label for="campaign-merchant" class="form-label fw-bold">المتجر أو المطعم</label>
+          <ng-select labelForId="campaign-merchant" [items]="merchants" bindLabel="title" bindValue="id"
+            formControlName="destinationId" [loading]="merchantsLoading" placeholder="ابحث واختر المتجر"
+            notFoundText="لا توجد متاجر نشطة">
+          </ng-select>
+          <div class="text-danger mt-1" *ngIf="formGroup.get('destinationId')?.touched && formGroup.get('destinationId')?.invalid">اختر المتجر الذي سيفتح للعميل.</div>
+          <button *ngIf="merchantsError" type="button" class="btn btn-sm btn-light-danger mt-2" (click)="loadMerchants()">{{ merchantsError }}</button>
+        </div>
       </div>
       <div class="mb-3">
         <app-file-uploader uploaderTitle="صورة الإشعار (اختياري)" (fileUploaded)="onFileUploaded($event)"></app-file-uploader>
@@ -81,6 +90,7 @@
       <div class="campaign-preview-note mt-3">
         <i class="fas fa-info-circle me-1"></i>
         ستظهر الرسالة باللغة المكتوبة هنا، وسيُحفظ سجلها داخل حسابات الجمهور المختار.
+        <div class="mt-2">عند الضغط: <strong>{{ destinationLabel }}</strong></div>
       </div>
     </div>
   </div>
@@ -89,6 +99,7 @@
 <div class="modal-footer campaign-footer" dir="rtl">
   <div *ngIf="confirming" class="campaign-confirm w-100 mb-3">
     سيُرسل الإشعار إلى <strong>{{ targetLabel }}</strong> الآن. يوجد <strong>{{ targetCount | number }}</strong> حساب نشط؛ وقد تصل الرسالة أيضًا إلى أجهزة العملاء غير المسجلين عند اختيار تطبيق العملاء.
+    <div class="mt-2">الصفحة التي ستفتح: <strong>{{ destinationLabel }}</strong></div>
   </div>
   <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isSending">إلغاء</button>
   <button *ngIf="!confirming" type="button" class="btn btn-primary" (click)="reviewSend()" [disabled]="isSending || statsLoading || !audiences?.pushConfigured">

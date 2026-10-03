@@ -1,3 +1,4 @@
+<div *ngIf="supportService.listError$ | async as listError" class="alert alert-warning" role="alert">{{ listError }} <button type="button" class="btn btn-sm btn-light" (click)="supportService.fetchPost()">تحديث</button></div>
 <div class="support-page-container">
   <div class="support-card">
     <!-- Header: Perfectly Aligned Inline Header -->

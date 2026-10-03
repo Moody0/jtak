@@ -24,6 +24,7 @@
 </div>
 
 <div class="modal-body p-4">
+  <div *ngIf="errorMessage" class="alert alert-warning">{{ errorMessage }} <button type="button" class="btn btn-sm btn-light" (click)="fetchTelemetry()">إعادة المحاولة</button></div>
   <!-- Telemetry Metrics Cards -->
   <div class="row g-3 mb-4">
     <!-- Courier Card -->
@@ -127,6 +128,7 @@
   <!-- Interactive Map Canvas -->
   <div class="rounded-3 border overflow-hidden position-relative shadow-sm" style="height: 380px;">
     <google-map
+      *ngIf="hasGoogleMaps"
       height="100%"
       width="100%"
       [center]="mapCenter"
@@ -173,6 +175,8 @@
         </map-marker>
       </ng-container>
     </google-map>
+    <iframe *ngIf="!hasGoogleMaps && fallbackMapUrl" [src]="fallbackMapUrl"
+      title="موقع الطلب على الخريطة" width="100%" height="100%" style="border: 0" loading="lazy"></iframe>
   </div>
 </div>
 

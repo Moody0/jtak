@@ -1,9 +1,9 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { OrdersService } from '../../../services/orders.service';
 import { Order } from '../../../models/orders.model';
-import { forkJoin } from 'rxjs';
-import { finalize } from 'rxjs/operators';
+import { forkJoin, of } from 'rxjs';
+import { catchError, finalize, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-cancel-order-modal',
@@ -13,6 +13,7 @@ import { finalize } from 'rxjs/operators';
 export class CancelOrderModalComponent implements OnInit {
   @Input() order?: Order;
   @Input() orders?: Order[];
+  @Output() updated = new EventEmitter<void>();
 
   reason: string = '';
   isLoading: boolean = false;
@@ -77,12 +78,21 @@ export class CancelOrderModalComponent implements OnInit {
     this.errorMessage = '';
 
     if (this.isBulk()) {
-      const requests = this.orders!.map(o => this.ordersService.cancel(o.id, trimmedReason));
+      const requests = this.orders!.map(order => this.ordersService.cancel(order.id, trimmedReason).pipe(
+        map(() => ({ order, error: null as string | null })),
+        catchError(error => of({ order, error: this.extractErrorMessage(error) }))
+      ));
       forkJoin(requests)
         .pipe(finalize(() => { this.isLoading = false; }))
         .subscribe({
-          next: () => {
-            this.modal.close(true);
+          next: (results) => {
+            const failures = results.filter(result => result.error !== null);
+            if (results.length > failures.length) this.updated.emit();
+            if (!failures.length) { this.modal.close(true); return; }
+            // Retrying must target only failed orders; successful cancellations stay committed.
+            this.orders = failures.map(result => result.order);
+            this.errorMessage = `تم إلغاء ${results.length - failures.length} من ${results.length} طلبات. ` +
+              failures.map(result => `#${result.order.id}: ${result.error}`).join(' — ');
           },
           error: (err) => {
             this.errorMessage = this.extractErrorMessage(err);

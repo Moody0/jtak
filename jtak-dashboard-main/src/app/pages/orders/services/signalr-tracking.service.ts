@@ -40,6 +40,7 @@ export class SignalrTrackingService implements OnDestroy {
 
   private activeOrderIds = new Set<number>();
   private isRadarJoined = false;
+  private connectionStart: Promise<void> | null = null;
 
   constructor(
     private authService: AuthService,
@@ -47,10 +48,18 @@ export class SignalrTrackingService implements OnDestroy {
   ) {}
 
   public async startConnection(): Promise<void> {
+    if (this.connectionStart) return this.connectionStart;
+    this.connectionStart = this.connect();
+    try { await this.connectionStart; }
+    finally { this.connectionStart = null; }
+  }
+
+  private async connect(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.hubConnection && this.hubConnection.state === signalR.HubConnectionState.Connected) {
       return;
     }
+    if (this.hubConnection && [signalR.HubConnectionState.Connecting, signalR.HubConnectionState.Reconnecting].includes(this.hubConnection.state)) return;
 
     const hubUrl = `${environment.baseUrl}/hubs/tracking`;
 
@@ -137,7 +146,7 @@ export class SignalrTrackingService implements OnDestroy {
     if (!this.hubConnection || this.hubConnection.state !== signalR.HubConnectionState.Connected) {
       await this.startConnection();
     }
-    if (this.hubConnection && this.hubConnection.state === signalR.HubConnectionState.Connected) {
+    if (this.activeOrderIds.has(orderId) && this.hubConnection && this.hubConnection.state === signalR.HubConnectionState.Connected) {
       try {
         await this.hubConnection.invoke('JoinOrderTracking', orderId);
       } catch {}
@@ -158,7 +167,7 @@ export class SignalrTrackingService implements OnDestroy {
     if (!this.hubConnection || this.hubConnection.state !== signalR.HubConnectionState.Connected) {
       await this.startConnection();
     }
-    if (this.hubConnection && this.hubConnection.state === signalR.HubConnectionState.Connected) {
+    if (this.isRadarJoined && this.hubConnection && this.hubConnection.state === signalR.HubConnectionState.Connected) {
       try {
         await this.hubConnection.invoke('JoinCourierRadar');
       } catch {
@@ -183,6 +192,9 @@ export class SignalrTrackingService implements OnDestroy {
   }
 
   public async stopConnection(): Promise<void> {
+    this.activeOrderIds.clear();
+    this.isRadarJoined = false;
+    if (this.connectionStart) await this.connectionStart;
     if (this.hubConnection) {
       try {
         await this.hubConnection.stop();

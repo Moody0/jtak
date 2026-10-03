@@ -2,8 +2,8 @@
   [item]="item"
   [itemName]="item.deliveryUser ? (('ORDERS_PAGE.COL_ORDER_NUM' | translate) + ' #' + item.id + ' - ' + item.deliveryUser) : (('ORDERS_PAGE.COL_ORDER_NUM' | translate) + ' #' + item.id)"
   [moduleName]="'ORDERS_PAGE.MODAL_CAPTAIN_TITLE' | translate"
-  [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid"
+  [isLoading]="isSaving"
+  [saveDisabled]="formGroup.invalid || isSaving || isLoadingDrivers || !!driverLoadError"
   (cancelClicked)="modal.dismiss()"
   (saveClicked)="saved()"
 >
@@ -30,7 +30,7 @@
           <strong class="text-dark ms-1">{{ item.deliveryUser || ('ORDERS_PAGE.UNASSIGNED' | translate) }}</strong>
         </div>
         <button *ngIf="item.deliveryId && item.deliveryId !== '00000000-0000-0000-0000-000000000000'"
-          type="button" class="btn btn-sm btn-light-danger py-1 px-2 fs-8" (click)="unassign()">
+          type="button" class="btn btn-sm btn-light-danger py-1 px-2 fs-8" [disabled]="isSaving" (click)="unassign()">
           <i class="fas fa-user-minus me-1"></i>{{ 'ORDERS_PAGE.MODAL_UNASSIGN_BTN' | translate }}
         </button>
       </div>
@@ -42,6 +42,7 @@
         <i class="fas fa-motorcycle text-primary me-1"></i>{{ 'ORDERS_PAGE.SELECT_CAPTAIN_LABEL' | translate }}
       </label>
       <ng-select
+        [loading]="isLoadingDrivers"
         formControlName="uid"
         [items]="deliviries"
         bindValue="id"
@@ -68,6 +69,7 @@
           </div>
         </ng-template>
       </ng-select>
+      <div *ngIf="driverLoadError" class="text-danger mt-2">{{ driverLoadError }} <button type="button" class="btn btn-sm btn-light" (click)="loadItem()">إعادة المحاولة</button></div>
       <span class="text-muted fs-8 mt-2 d-block">
         <i class="fas fa-info-circle me-1 text-info"></i>
         {{ 'ORDERS_PAGE.CAPTAIN_DISPATCH_NOTE' | translate }}

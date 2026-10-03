@@ -27,6 +27,9 @@ export class EditDilevry implements OnInit, OnDestroy {
   isLoading$: Observable<boolean>;
   formGroup: UntypedFormGroup;
   deliviries: User[] = [];
+  isSaving = false;
+  isLoadingDrivers = false;
+  driverLoadError = '';
 
   constructor(
     private service: UsersService,
@@ -44,8 +47,11 @@ export class EditDilevry implements OnInit, OnDestroy {
   }
 
   loadItem() {
-    this.service.getDeliveries().subscribe((res) => {
-      this.deliviries = res;
+    this.isLoadingDrivers = true;
+    this.driverLoadError = '';
+    this.subs.sink = this.service.getDeliveries().subscribe({
+      next: (res) => { this.deliviries = res || []; this.isLoadingDrivers = false; },
+      error: () => { this.isLoadingDrivers = false; this.driverLoadError = 'تعذر تحميل المندوبين. حاول مرة أخرى.'; }
     });
   }
 
@@ -65,23 +71,29 @@ export class EditDilevry implements OnInit, OnDestroy {
   }
 
   unassign() {
+    if (this.isSaving) return;
     this.formGroup.get('uid')?.setValue('00000000-0000-0000-0000-000000000000');
     this.saved();
   }
 
   saved() {
+    if (this.isSaving || this.formGroup.invalid) return;
     const id = this.formGroup.get('id')?.value;
     const uid = this.formGroup.get('uid')?.value || '00000000-0000-0000-0000-000000000000';
 
+    this.isSaving = true;
     this.subs.sink = this.orderService
       .setDelievry(id, uid)
       .subscribe({
         next: () => {
+          this.isSaving = false;
           this.toasterService.success(uid === '00000000-0000-0000-0000-000000000000' ? 'Order returned to Available Pool' : 'Delivery Captain Updated');
           this.modal.close();
         },
         error: (err: any) => {
-          const errMsg = err?.error?.title || err?.error?.detail || err?.error?.message || err?.message || 'تعذر تعيين مندوب التوصيل.';
+          this.isSaving = false;
+          const errors = err?.error?.errors;
+          const errMsg = (Array.isArray(errors) ? errors.find((value: unknown) => typeof value === 'string') : null) || err?.error?.title || err?.error?.detail || err?.error?.message || 'تعذر تعيين مندوب التوصيل.';
           this.toasterService.error(errMsg);
         }
       });

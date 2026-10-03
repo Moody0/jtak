@@ -2,7 +2,8 @@ import { Component, Input, OnDestroy, OnInit, Output, EventEmitter } from '@angu
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
-import { Subscription, timer } from 'rxjs';
+import { Subject, Subscription, timer } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { SupportMessage, SupportMessageStatus, ErrandStatus, ErrandDriver } from '../../models/support-message.model';
 import { SupportMessagesService } from '../../services/support-messages.service';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
@@ -21,6 +22,7 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
   selectedStatus: SupportMessageStatus;
   adminNotes: string = '';
   isSaving: boolean = false;
+  isLoadingMessage = false;
   itemPrice: number | null = null;
   deliveryFee: number | null = null;
   purchaseCost: number | null = null;
@@ -36,6 +38,7 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
   isRefreshingErrand = false;
   errandDriverEarning: number | null = null;
   acceptDriverSubsidy = false;
+  private destroyed$ = new Subject<void>();
 
   get proposedDriverSubsidy(): number {
     return Math.max(0, Number(this.errandDriverEarning || 0) - Number(this.deliveryFee || 0));
@@ -163,15 +166,28 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
       this.returnReason = this.message.errandReturnReason || '';
       this.loadReceiptPhoto();
       this.scheduleQuoteExpiryRefresh();
+      if (!this.isErrand) {
+        this.isLoadingMessage = true;
+        this.supportService.getMessage(this.message.id).pipe(takeUntil(this.destroyed$)).subscribe({
+          next: message => {
+            this.message = message;
+            this.selectedStatus = message.status;
+            this.adminNotes = message.adminNotes || '';
+            this.isLoadingMessage = false;
+            this.updated.emit();
+          },
+          error: () => { this.isLoadingMessage = false; this.toastr.error('تعذر تحميل تفاصيل الرسالة'); }
+        });
+      }
       if (this.isErrand) {
         this.pollSubscription = timer(10000, 10000).subscribe(() => {
           if (!this.isSaving) this.refreshErrand(true);
         });
-        this.supportService.getErrandDriverEarning().subscribe({
+        this.supportService.getErrandDriverEarning().pipe(takeUntil(this.destroyed$)).subscribe({
           next: (setting) => this.errandDriverEarning = Number(setting?.amount ?? 0),
           error: () => this.errandDriverEarning = null,
         });
-        this.supportService.getErrandDrivers().subscribe({
+        this.supportService.getErrandDrivers().pipe(takeUntil(this.destroyed$)).subscribe({
           next: (drivers) => this.drivers = drivers,
           error: () => this.toastr.error('تعذر تحميل قائمة المندوبين'),
         });
@@ -180,10 +196,13 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
   }
 
   setStatus(status: SupportMessageStatus): void {
+    if (this.isSaving || this.isLoadingMessage) return;
     this.selectedStatus = status;
   }
 
   ngOnDestroy(): void {
+    this.destroyed$.next();
+    this.destroyed$.complete();
     if (this.quoteExpiryTimer) clearTimeout(this.quoteExpiryTimer);
     this.pollSubscription?.unsubscribe();
     this.refreshSubscription?.unsubscribe();
@@ -263,11 +282,12 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
   }
 
   saveChanges(): void {
-    if (!this.message || this.isErrand) return;
+    if (!this.message || this.isErrand || this.isSaving || this.isLoadingMessage) return;
     this.isSaving = true;
 
     this.supportService
       .updateStatus(this.message.id, this.selectedStatus, this.adminNotes)
+      .pipe(takeUntil(this.destroyed$))
       .subscribe({
         next: () => {
           this.isSaving = false;
@@ -335,13 +355,16 @@ export class ViewMessageModalComponent implements OnInit, OnDestroy {
     this.refreshSubscription?.unsubscribe();
     this.isRefreshingErrand = false;
     this.isSaving = true;
-    operation.subscribe({
-      next: () => this.supportService.getMessage(id).subscribe({
+    operation.pipe(takeUntil(this.destroyed$)).subscribe({
+      next: () => this.supportService.getMessage(id).pipe(takeUntil(this.destroyed$)).subscribe({
         next: (message) => {
           this.message = message;
           this.loadReceiptPhoto();
           this.itemPrice = message.errandItemPrice ?? null;
           this.deliveryFee = message.errandDeliveryFee ?? null;
+          this.purchaseCost = message.errandPurchaseCost ?? null;
+          this.receiptReference = message.errandReceiptReference || '';
+          this.driverUserId = message.errandDriverUserId || '';
           this.scheduleQuoteExpiryRefresh();
           this.isSaving = false;
           this.updated.emit();

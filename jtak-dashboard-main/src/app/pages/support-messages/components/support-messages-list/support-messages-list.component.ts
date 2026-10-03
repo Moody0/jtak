@@ -51,6 +51,9 @@ export class SupportMessagesListComponent
   ) {}
 
   ngOnInit(): void {
+    this.supportService.setDefaults();
+    this.paginator = this.supportService.paginator;
+    this.sorting = this.supportService.sorting;
     this.subs.sink = this.supportService.isLoading$.subscribe((val) => {
       this.isLoading = val;
     });
@@ -62,6 +65,7 @@ export class SupportMessagesListComponent
     // New “طلبات” requests enter this queue while it is open. Keep it fresh
     // without asking staff to press the refresh button.
     this.subs.sink = timer(10000, 10000).subscribe(() => {
+      if (this.isLoading) return;
       this.supportService.fetchPost();
       this.loadStats();
     });
@@ -125,7 +129,7 @@ export class SupportMessagesListComponent
       centered: true,
       backdrop: 'static',
     });
-    modalRef.componentInstance.message = message;
+    modalRef.componentInstance.message = { ...message };
     modalRef.componentInstance.updated.subscribe(() => {
       this.loadStats();
       this.supportService.fetchPost();
@@ -150,6 +154,7 @@ export class SupportMessagesListComponent
           message.status = SupportMessageStatus.Resolved;
           this.toastr.success('تم تحديد الاستفسار كمنجز بنجاح', 'تمت المعالجة');
           this.loadStats();
+          this.supportService.fetchPost();
         },
         error: () => {
           this.toastr.error('تعذر تحديث الحالة', 'خطأ');

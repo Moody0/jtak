@@ -5,6 +5,8 @@ import { SubSink } from 'subsink';
 import { ToastrService } from 'ngx-toastr';
 import { CampaignAudiences, CampaignRequest } from '../../models/notification.model';
 import { NotificationsService } from '../../services/notifications.service';
+import { MerchantsService } from '../../../merchant/services/merchants.service';
+import { Merchant } from '../../../merchant/models/merchant.model';
 
 @Component({
   selector: 'app-notifications-create',
@@ -19,6 +21,9 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   isSending = false;
   confirming = false;
   sendError = '';
+  merchants: Merchant[] = [];
+  merchantsLoading = false;
+  merchantsError = '';
 
   readonly targets = [
     { value: 'customers', label: 'تطبيق العملاء', icon: 'fa-shopping-bag', color: 'orange' },
@@ -30,7 +35,8 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
     private notificationsService: NotificationsService,
     private fb: UntypedFormBuilder,
     public modal: NgbActiveModal,
-    private toasterService: ToastrService
+    private toasterService: ToastrService,
+    private merchantsService: MerchantsService
   ) {}
 
   ngOnInit(): void {
@@ -40,6 +46,7 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
       textAr: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(500)]],
       image: [''],
       destination: ['home'],
+      destinationId: [null],
     });
     this.subs.sink = this.formGroup.valueChanges.subscribe(() => {
       this.confirming = false;
@@ -63,7 +70,61 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   }
 
   selectTarget(target: CampaignRequest['target']): void {
-    this.formGroup.patchValue({ target, destination: target === 'customers' ? 'home' : 'orders' });
+    this.formGroup.patchValue({ target, destination: 'home', destinationId: null });
+    this.updateDestination();
+  }
+
+  get destinations(): { value: CampaignRequest['destination']; label: string }[] {
+    const common: { value: CampaignRequest['destination']; label: string }[] = [
+      { value: 'home', label: 'الصفحة الرئيسية' },
+      { value: 'orders', label: 'الطلبات' },
+    ];
+    if (this.selectedTarget === 'customers') return [...common,
+      { value: 'merchant', label: 'متجر أو مطعم محدد' },
+      { value: 'grocery', label: 'السوبرماركت والبقالة' },
+      { value: 'restaurants', label: 'المطاعم' },
+      { value: 'favorites', label: 'المفضلة' },
+      { value: 'errands', label: 'طلبات الشراء' },
+    ];
+    if (this.selectedTarget === 'delivery') return [...common,
+      { value: 'errands', label: 'طلبات الشراء' },
+      { value: 'finance', label: 'المالية والأرباح' },
+    ];
+    return [...common,
+      { value: 'products', label: 'المنتجات' },
+      { value: 'finance', label: 'المالية والأرباح' },
+    ];
+  }
+
+  get destinationLabel(): string {
+    const value = this.formGroup?.get('destination')?.value;
+    const label = this.destinations.find(item => item.value === value)?.label || 'الصفحة الرئيسية';
+    const merchant = this.merchants.find(item => item.id === this.formGroup?.get('destinationId')?.value);
+    return value === 'merchant' && merchant ? merchant.title : label;
+  }
+
+  updateDestination(): void {
+    const control = this.formGroup.get('destinationId');
+    const needsMerchant = this.formGroup.get('destination')?.value === 'merchant';
+    control?.setValidators(needsMerchant ? [Validators.required, Validators.min(1)] : []);
+    if (!needsMerchant) control?.setValue(null, { emitEvent: false });
+    control?.updateValueAndValidity();
+    if (needsMerchant && !this.merchants.length && !this.merchantsLoading) this.loadMerchants();
+  }
+
+  loadMerchants(): void {
+    this.merchantsLoading = true;
+    this.merchantsError = '';
+    this.subs.sink = this.merchantsService.getAllMerchants().subscribe({
+      next: merchants => {
+        this.merchants = merchants.filter(merchant => merchant.active);
+        this.merchantsLoading = false;
+      },
+      error: () => {
+        this.merchantsLoading = false;
+        this.merchantsError = 'تعذر تحميل المتاجر. أعد المحاولة.';
+      },
+    });
   }
 
   get selectedTarget(): CampaignRequest['target'] {

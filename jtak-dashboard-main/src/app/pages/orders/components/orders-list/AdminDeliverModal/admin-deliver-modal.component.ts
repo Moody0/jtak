@@ -24,7 +24,7 @@ export class AdminDeliverModalComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    if (this.order && !this.order.deliveryId) {
+    if (!this.hasAssignedDriver()) {
       this.cashResolutionMode = 'CompanyCash';
     }
   }
@@ -34,7 +34,7 @@ export class AdminDeliverModalComponent implements OnInit {
   }
 
   hasAssignedDriver(): boolean {
-    return !!this.order?.deliveryId;
+    return !!this.order?.deliveryId && this.order.deliveryId !== '00000000-0000-0000-0000-000000000000';
   }
 
   getGrandTotal(): number {
@@ -63,9 +63,14 @@ export class AdminDeliverModalComponent implements OnInit {
   }
 
   submit(): void {
+    if (this.isLoading || !this.order?.id) return;
     this.errorMessage = '';
     const cleanOtp = (this.otp || '').trim();
     const cleanNotes = (this.notes || '').trim();
+    if (cleanOtp && !/^\d{4}$/.test(cleanOtp)) {
+      this.errorMessage = 'رمز استلام الطلب يجب أن يكون 4 أرقام.';
+      return;
+    }
 
     if (!cleanOtp && !cleanNotes) {
       this.errorMessage = 'يجب إدخال رمز التحقق (PIN) للعميل، أو تدوين سبب/ملاحظات التسليم الإداري.';

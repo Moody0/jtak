@@ -29,7 +29,8 @@ export interface CampaignRequest {
     titleAr: string;
     textAr: string;
     image?: string;
-    destination: 'home' | 'orders';
+    destination: 'home' | 'orders' | 'merchant' | 'favorites' | 'grocery' | 'restaurants' | 'errands' | 'finance' | 'products';
+    destinationId?: number | null;
 }
 
 export interface CampaignResult {

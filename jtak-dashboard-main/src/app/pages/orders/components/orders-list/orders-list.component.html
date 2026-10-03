@@ -1,3 +1,4 @@
+<div *ngIf="ordersService.listError$ | async as listError" class="alert alert-warning" role="alert">{{ listError }} <button type="button" class="btn btn-sm btn-light" (click)="refreshOrders()">تحديث</button></div>
 <div class="orders-page-container">
 
 
@@ -142,13 +143,13 @@
                   (change)="selection.toggleAll(items, $any($event.target).checked)" />
               </th>
               <th scope="col">
-                <div class="d-flex align-items-center cursor-pointer" (click)="sort('id')">
+                <div class="d-flex align-items-center cursor-pointer">
                   <span>{{ 'ORDERS_PAGE.COL_ORDER_NUM' | translate }}</span>
                   <app-sort-icon column="id" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
                 </div>
               </th>
               <th scope="col">
-                <div class="d-flex align-items-center cursor-pointer" (click)="sort('purchaseDate')">
+                <div class="d-flex align-items-center cursor-pointer">
                   <span>{{ 'ORDERS_PAGE.COL_CUSTOMER_DEST' | translate }}</span>
                   <app-sort-icon column="purchaseDate" [activeColumn]="sorting.column" [activeDirection]="sorting.direction" (sort)="sort($event)"></app-sort-icon>
                 </div>
@@ -256,12 +257,12 @@
                         <i class="fas fa-motorcycle text-primary"></i>
                         <strong class="ops-driver-name text-truncate">{{ getCleanDriverName(o.deliveryUser) }}</strong>
                       </div>
-                      <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
+                      <button *ngIf="canAssignDriver(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
                         <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
                       </button>
                     </ng-container>
                     <ng-template #unassignedDriver>
-                      <button *ngIf="isDeliveryEditable(o); else staticUnassigned" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
+                      <button *ngIf="canAssignDriver(o); else staticUnassigned" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
                         <i class="fas fa-user-plus me-1"></i>{{ 'ORDERS_PAGE.ASSIGN_CAPTAIN' | translate }}
                       </button>
                       <ng-template #staticUnassigned>
@@ -324,7 +325,7 @@
                         <span>{{ 'ORDERS_PAGE.MARK_READY' | translate }}</span>
                       </button>
 
-                      <button *ngIf="isDeliveryEditable(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                      <button *ngIf="canAssignDriver(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
                         <i class="fas fa-motorcycle text-primary me-2"></i>
                         <span>{{ hasAssignedDriver(o) ? ('ORDERS_PAGE.ASSIGN_OR_REASSIGN' | translate) : ('ORDERS_PAGE.ASSIGN_CAPTAIN' | translate) }}</span>
                       </button>
@@ -359,7 +360,7 @@
                         <span>{{ 'ORDERS_PAGE.RESTORE_ORDER' | translate }}</span>
                       </button>
 
-                      <button *ngIf="!o.isArchived && !o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
+                      <button *ngIf="canArchive(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
                         <i class="fas fa-archive text-danger me-2"></i>
                         <span>{{ 'ORDERS_PAGE.ARCHIVE_ORDER' | translate }}</span>
                       </button>
@@ -425,7 +426,7 @@
                     <span>جاهز للاستلام</span>
                   </button>
 
-                  <button *ngIf="isDeliveryEditable(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                  <button *ngIf="canAssignDriver(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
                     <i class="fas fa-motorcycle text-primary me-2"></i>
                     <span>{{ hasAssignedDriver(o) ? 'تعيين / إعادة تعيين مندوب' : 'تعيين مندوب توصيل' }}</span>
                   </button>
@@ -460,7 +461,7 @@
                     <span>{{ 'ORDERS_PAGE.RESTORE_ORDER' | translate }}</span>
                   </button>
 
-                  <button *ngIf="!o.isArchived && !o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
+                  <button *ngIf="canArchive(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
                     <i class="fas fa-archive text-danger me-2"></i>
                     <span>{{ 'ORDERS_PAGE.ARCHIVE_ORDER' | translate }}</span>
                   </button>
@@ -523,7 +524,7 @@
                   <i class="fas fa-motorcycle text-primary fs-8"></i>
                   <span class="ops-driver-name">{{ getCleanDriverName(o.deliveryUser) }}</span>
                 </div>
-                <button *ngIf="isDeliveryEditable(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
+                <button *ngIf="canAssignDriver(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
                   <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
                 </button>
               </ng-container>
