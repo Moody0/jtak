@@ -188,13 +188,18 @@ namespace App.Shared.Services.Pricing
                 originalDeliveryFee = order.DeliveryFee;
             }
 
-            // Virtual-market policy is snapshotted at checkout. Its monthly wage
-            // is agreed and settled separately, never charged per order.
+            // Individual percentage/fixed-per-order terms take priority over the
+            // market-wide checkout default. In particular, a default monthly
+            // salary policy must not erase a courier's configured percentage.
+            // Keep the market policy for salaried/distance-based couriers, since
+            // virtual-market checkout has no physical pickup distance.
             var marketPay = money?.JtakMarketCourierPay;
-            if (marketPay != null && !marketPay.IsValid)
+            var hasPersonalOrderRate = courier.CaptainCompensationType == CaptainCompensationType.Percentage ||
+                                      courier.CaptainCompensationType == CaptainCompensationType.FixedPerOrder;
+            if (!hasPersonalOrderRate && marketPay != null && !marketPay.IsValid)
                 throw new InvalidOperationException("سياسة أجر مندوب جيتك ماركت المسجلة مع الطلب غير صالحة.");
-            var compType = marketPay?.Mode ?? courier.CaptainCompensationType;
-            var rate = marketPay?.Rate ?? courier.CaptainRate;
+            var compType = hasPersonalOrderRate ? courier.CaptainCompensationType : marketPay?.Mode ?? courier.CaptainCompensationType;
+            var rate = hasPersonalOrderRate ? courier.CaptainRate : marketPay?.Rate ?? courier.CaptainRate;
             var earning = CalculateCaptainOrderEarningStatic(compType, rate, distance, originalDeliveryFee);
 
             order.DistanceInKm = distance;

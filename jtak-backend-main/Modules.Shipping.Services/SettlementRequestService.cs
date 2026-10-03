@@ -276,7 +276,7 @@ namespace Modules.Accounting.Services
             if (amount <= 0m)
                 throw new InvalidOperationException("يرجى إدخال مبلغ صحيح أكبر من الصفر.");
             if (amount > balance.AvailableAmount)
-                throw new InvalidOperationException($"المبلغ المطلوب يتجاوز الرصيد المتاح ({balance.AvailableAmount:N0} ل.س).");
+                throw new InvalidOperationException($"المبلغ المطلوب يتجاوز الرصيد المتاح ({balance.AvailableAmount:N2} ل.س).");
 
             var entity = NewRequest(SettlementPartyType.Merchant, userId, name, phone, amount, currency, request);
             var remaining = amount;

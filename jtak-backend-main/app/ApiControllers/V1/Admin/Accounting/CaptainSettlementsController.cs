@@ -203,6 +203,8 @@ namespace App.ApiControllers.V1.Admin.Accounting
             }
 
             var driverIds = drivers.Select(d => d.Id).ToList();
+            foreach (var driverId in driverIds)
+                await SyncConfirmedOrderSettlementsAsync(driverId);
 
             var query = _ordersDb.Set<Order>()
                 .AsNoTracking()
@@ -321,6 +323,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
             [FromQuery] DateTime? toDate = null,
             [FromQuery] string settlementStatus = "all")
         {
+            await SyncConfirmedOrderSettlementsAsync(captainId);
             var driver = await _userManager.FindByIdAsync(captainId.ToString());
             if (driver == null)
             {
@@ -403,6 +406,15 @@ namespace App.ApiControllers.V1.Admin.Accounting
         public async Task<ActionResult<SettlementBatchReceiptDto>> ConfirmSettlement([FromBody] ConfirmCaptainSettlementRequest request)
         {
             if (request == null || request.CaptainId == Guid.Empty)
+                return BadRequest(ApiErr.Create("يجب تحديد الكابتن لإتمام التسوية"));
+
+            return await new DriverFinancialSafetyService(_accountingDb, _ledgerService, orders: _ordersDb)
+                .WithDriverLockAsync(request.CaptainId, () => ConfirmSettlementCoreAsync(request));
+        }
+
+        private async Task<ActionResult<SettlementBatchReceiptDto>> ConfirmSettlementCoreAsync(ConfirmCaptainSettlementRequest request)
+        {
+            if (request == null || request.CaptainId == Guid.Empty)
             {
                 return BadRequest(ApiErr.Create("يجب تحديد الكابتن لإتمام التسوية"));
             }
@@ -416,6 +428,8 @@ namespace App.ApiControllers.V1.Admin.Accounting
             var adminId = User.GetUserId() ?? Guid.Empty;
             var adminUser = await _userManager.FindByIdAsync(adminId.ToString());
             var adminName = adminUser?.FullName ?? adminUser?.UserName ?? "مسؤول النظام";
+
+            await new CaptainOrderSettlementSyncService(_accountingDb, _ordersDb).SyncAsync(request.CaptainId);
 
             var query = _ordersDb.Set<Order>()
                 .Include(o => o.OrderDetails)
@@ -450,6 +464,11 @@ namespace App.ApiControllers.V1.Admin.Accounting
             var totalCashCollected = orders.Sum(o => CalculateCashCollected(o));
             var totalDeliveryFees = orders.Sum(o => o.DeliveryFee);
             var totalCaptainEarnings = orders.Sum(o => CalculateCaptainEarning(o));
+            var custodyBalance = await _ledgerService.GetUserCashFloatBalanceAsync(request.CaptainId, "SYP");
+            var earningsBalance = await _ledgerService.GetUserEarningsBalanceAsync(request.CaptainId, "SYP");
+            if (totalCashCollected > Math.Max(0m, custodyBalance) + 0.001m ||
+                Math.Min(totalCashCollected, totalCaptainEarnings) > Math.Max(0m, earningsBalance) + 0.001m)
+                return BadRequest(ApiErr.Create("مبالغ الطلبات المحددة لا تطابق الرصيد المتبقي في العهدة أو الأرباح. حدّث البيانات وراجع التوريدات السابقة قبل التسوية."));
             var wagesToOffset = Math.Min(totalCashCollected, totalCaptainEarnings);
             var netDueToCompany = totalCashCollected - wagesToOffset;
 
@@ -734,6 +753,11 @@ namespace App.ApiControllers.V1.Admin.Accounting
 
             return 0m;
         }
+
+        private Task<int> SyncConfirmedOrderSettlementsAsync(Guid captainId) =>
+            new DriverFinancialSafetyService(_accountingDb, _ledgerService, orders: _ordersDb)
+                .WithDriverLockAsync(captainId, () =>
+                    new CaptainOrderSettlementSyncService(_accountingDb, _ordersDb).SyncAsync(captainId));
 
         private static decimal CalculateProductsTotal(Order order)
         {

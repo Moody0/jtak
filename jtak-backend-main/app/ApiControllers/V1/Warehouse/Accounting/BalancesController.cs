@@ -91,7 +91,7 @@ namespace App.ApiControllers.V1.Warehouse
                 return BadRequest(ApiErr.Create("بيانات الطلب غير صالحة"));
             }
 
-            if (model.Amount <= 0)
+            if (!model.UseFullBalance && model.Amount <= 0)
             {
                 return BadRequest(ApiErr.Create("يرجى إدخال مبلغ صحيح أكبر من الصفر"));
             }
@@ -114,9 +114,12 @@ namespace App.ApiControllers.V1.Warehouse
                 return BadRequest(ApiErr.Create("لا يوجد رصيد متاح للسحب حالياً"));
             }
 
-            if (model.Amount > currentBalance)
+            if (!model.UseFullBalance && decimal.Round(model.Amount, 2) != model.Amount)
+                return BadRequest(ApiErr.Create("المبلغ يجب ألا يتجاوز منزلتين عشريتين."));
+
+            if (!model.UseFullBalance && model.Amount > currentBalance)
             {
-                return BadRequest(ApiErr.Create($"المبلغ المطلوب ({model.Amount:N0} ل.س) يتجاوز رصيدك المتاح الحالي ({currentBalance:N0} ل.س)"));
+                return BadRequest(ApiErr.Create($"المبلغ المطلوب ({model.Amount:N2} ل.س) يتجاوز رصيدك المتاح الحالي ({currentBalance:N2} ل.س)"));
             }
 
             var user = _userManager != null ? await _userManager.GetUserAsync(User) : null;
@@ -126,7 +129,7 @@ namespace App.ApiControllers.V1.Warehouse
             try
             {
                 var result = await _settlements.CreateMerchantRequestAsync(uid.Value, merchantName, phone, ownedMerchants,
-                    new CreateSettlementRequestDto { Amount = model.Amount, Method = model.Method, AccountDetails = model.AccountDetails.Trim(), Notes = model.Notes });
+                    new CreateSettlementRequestDto { Amount = model.UseFullBalance ? null : model.Amount, Method = model.Method, AccountDetails = model.AccountDetails.Trim(), Notes = model.Notes });
                 var admins = (await _userManager.GetUsersInRoleAsync(AppRoleName.Admin.ToString())).Where(x => x.IsActive).Select(x => x.Id).ToArray();
                 if (_notifications != null && admins.Length > 0)
                     await _notifications.SendNewSettlementRequest(admins, result.RequestNumber, merchantName, result.Amount, true);
@@ -247,6 +250,8 @@ namespace App.ApiControllers.V1.Warehouse
     {
         [Required(ErrorMessage = "يرجى تحديد المبلغ")]
         public decimal Amount { get; set; }
+
+        public bool UseFullBalance { get; set; }
 
         [Required(ErrorMessage = "يرجى تحديد طريقة التحويل")]
         public string Method { get; set; }
