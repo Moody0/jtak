@@ -169,7 +169,6 @@ namespace App.Services
                 string.IsNullOrEmpty(request.ErrandDeliveryCode) || deliveryCode != request.ErrandDeliveryCode)
                 return ErrandSettlementResult.Bad("تأكد من استلام العميل للمشتريات وتحصيل المبلغ الكامل، ثم أدخل الرمز الذي أعطاك إياه العميل.");
 
-            var key = $"ErrandDelivery-{request.Id}";
             if (request.ErrandStatus == ErrandStatus.Purchased)
             {
                 var fromStatus = request.ErrandStatus;
@@ -178,40 +177,9 @@ namespace App.Services
                 try { await _app.SaveChangesAsync(); }
                 catch (DbUpdateConcurrencyException) { return ErrandSettlementResult.Stale("تغيرت حالة الطلب. حدّث القائمة."); }
             }
-            var floatAccount = await _ledger.GetOrCreateUserAccountAsync(request.ErrandDriverUserId.Value, AccountType.Asset,
-                SystemAccountCodes.CaptainCashFloatPrefix, "Cash Float - Errand Driver");
-            var goods = await _ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.ErrandGoodsInTransit,
-                "Errand Goods In Transit", AccountType.Asset);
-            var earnings = await _ledger.GetOrCreateUserAccountAsync(request.ErrandDriverUserId.Value, AccountType.Liability,
-                SystemAccountCodes.CaptainEarningsPrefix, "Errand Driver Earnings");
-            var marginRevenue = await _ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.ErrandProductMarginRevenue,
-                "Errand Product Margin Revenue", AccountType.Revenue);
-            var entries = new List<PostLedgerEntryRequest>
-            {
-                new() { AccountId = floatAccount.Id, Debit = total, Memo = $"Errand #{request.Id} customer cash collected" },
-                new() { AccountId = goods.Id, Credit = request.ErrandPurchaseCost.Value, Memo = $"Errand #{request.Id} goods delivered" }
-            };
-            var margin = request.ErrandItemPrice.GetValueOrDefault() - request.ErrandPurchaseCost.Value;
-            if (margin > 0) entries.Add(new() { AccountId = marginRevenue.Id, Credit = margin, Memo = $"Errand #{request.Id} contracted shop discount" });
-            if (driverEarning > 0) entries.Add(new() { AccountId = earnings.Id, Credit = driverEarning, Memo = $"Errand #{request.Id} driver delivery earning" });
-            var feeDifference = request.ErrandDeliveryFee.GetValueOrDefault() - driverEarning;
-            if (feeDifference > 0)
-            {
-                var feeRevenue = await _ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.ErrandDeliveryFeeRevenue,
-                    "Errand Delivery Fee Revenue", AccountType.Revenue);
-                entries.Add(new() { AccountId = feeRevenue.Id, Credit = feeDifference, Memo = $"Errand #{request.Id} delivery fee retained by platform" });
-            }
-            else if (feeDifference < 0)
-            {
-                var subsidy = await _ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.DriverEarningSubsidyExpense,
-                    "Driver Earning Subsidy Expense", AccountType.Expense);
-                entries.Add(new() { AccountId = subsidy.Id, Debit = -feeDifference, Memo = $"Errand #{request.Id} driver wage subsidy" });
-            }
-            await _ledger.PostTransactionAsync(new PostTransactionRequest
-            {
-                ReferenceType = "ErrandDelivery", ReferenceId = request.Id.ToString(), IdempotencyKey = key,
-                Description = $"Errand #{request.Id} cash delivery and sales split", Entries = entries
-            });
+            await ErrandDeliveryPosting.PostAsync(_ledger, request.Id, request.ErrandDriverUserId.Value,
+                request.ErrandItemPrice.GetValueOrDefault(), request.ErrandDeliveryFee.GetValueOrDefault(),
+                request.ErrandPurchaseCost.Value, driverEarning);
             var deliveryFromStatus = request.ErrandStatus;
             request.ErrandCashCollected = total;
             request.ErrandDeliveryCodeFailedAttempts = 0;

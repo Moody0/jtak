@@ -146,12 +146,7 @@ namespace App.ApiControllers.V1.Admin
                 var mid = mp?.MerchantId ?? fallbackMp?.MerchantId ?? 0;
                 merchants.TryGetValue(mid, out var merchant);
 
-                var fallbackQuote = fallbackMp == null ? null : new MerchantProductDto
-                {
-                    MerchantPrice = fallbackMp.MerchantPrice,
-                    ProfitOutOfMerchantPricePercent = fallbackMp.ProfitOutOfMerchantPricePercent,
-                    Discount = fallbackMp.Discount
-                };
+                var fallbackQuote = fallbackMp == null ? null : MerchantProductDto.FromStored(fallbackMp, await _merchantService.GetUsdRate());
                 decimal finalPrice = mp?.FinalPrice ?? fallbackQuote?.FinalPrice ?? 0m;
                 decimal price = mp?.Price ?? fallbackQuote?.Price ?? 0m;
                 if (finalPrice <= 0 && fallbackMp != null && fallbackMp.MerchantPrice > 0)

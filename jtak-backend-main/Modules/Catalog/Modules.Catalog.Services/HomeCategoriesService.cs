@@ -49,6 +49,7 @@ namespace Modules.Catalog.Services
         public async Task<HomeCategoriesConfig> GetConfig()
         {
             var config = await _genericSetting.GetValue<HomeCategoriesConfig>(HomeCategoriesConfig.SettingKey);
+            var needsInitialization = config == null;
             if (config == null)
             {
                 config = new HomeCategoriesConfig
@@ -58,13 +59,10 @@ namespace Modules.Catalog.Services
             }
             config.Tiles ??= new List<HomeCategoryTile>();
 
-            // Add the feature to existing customer grids once. Persisting the
-            // marker means an admin can later deactivate or remove the tile.
-            if (!config.ErrandRequestsTileInitialized)
+            // Seed only a new configuration. Saved empty/disabled layouts must
+            // stay exactly as the administrator configured them.
+            if (needsInitialization)
             {
-                if (!config.Tiles.Any())
-                    config.Tiles = await BuildDefaultTiles();
-
                 if (!config.Tiles.Any(x => x.LinkType == HomeCategoryLinkType.ErrandRequests))
                 {
                     foreach (var tile in config.Tiles)
@@ -143,13 +141,6 @@ namespace Modules.Catalog.Services
         {
             var config = await GetConfig();
             var configured = config.Tiles ?? new List<HomeCategoryTile>();
-
-            // Until an administrator curates the grid, fall back to the active
-            // root categories. That keeps Home populated on a fresh install and
-            // gives the dashboard a real starting arrangement to edit, instead
-            // of an empty screen the admin has to build from nothing.
-            if (!configured.Any())
-                configured = await BuildDefaultTiles();
 
             var tiles = configured
                 .Where(x => !activeOnly || x.Active)

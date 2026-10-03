@@ -186,7 +186,7 @@ namespace App.BackgroundTasks
             // No claim can succeed past the persisted deadline. Release the catalog
             // reservation first so a transient catalog DB outage is retried next tick.
             await services.GetRequiredService<IInventoryBatchService>()
-                .ReleaseReservationAsync(order.Id, reason: "No courier accepted within three minutes");
+                .ReleaseReservationAsync(order.Id, reason: "No courier accepted before the matching deadline");
 
             // This conditional update wins only if a driver has not claimed the order.
             var completed = await db.Orders
@@ -210,13 +210,19 @@ namespace App.BackgroundTasks
             await db.SaveChangesAsync(cancellationToken);
 
             var notification = services.GetRequiredService<INotificationService>();
-            await notification.SendOrderCanceledForNoCourier(new[] { order.UserId }, order.Id);
+            // Report the persisted window, including orders created before a policy change.
+            var matchingMinutes = order.CourierMatchingStartedAtUtc.HasValue && order.CourierMatchingDeadlineAtUtc.HasValue
+                ? Math.Max(1, (int)Math.Round((order.CourierMatchingDeadlineAtUtc.Value -
+                    order.CourierMatchingStartedAtUtc.Value).TotalMinutes, MidpointRounding.AwayFromZero))
+                : CourierMatchingPolicy.TimeoutMinutes;
+            await notification.SendOrderCanceledForNoCourier(new[] { order.UserId }, order.Id,
+                matchingMinutes: matchingMinutes);
             var merchantIds = order.OrderDetails.Select(x => x.MerchantId).Distinct().ToArray();
             foreach (var merchantId in merchantIds)
             {
                 var ownerId = await services.GetRequiredService<IMerchantService>().GetOwnerId(merchantId);
                 if (ownerId != Guid.Empty)
-                    await notification.SendOrderCanceledForNoCourier(new[] { ownerId }, order.Id, "warehouse");
+                    await notification.SendOrderCanceledForNoCourier(new[] { ownerId }, order.Id, "warehouse", matchingMinutes);
             }
         }
     }

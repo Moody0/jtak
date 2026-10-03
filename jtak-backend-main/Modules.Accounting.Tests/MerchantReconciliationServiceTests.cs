@@ -42,6 +42,92 @@ namespace Modules.Accounting.Tests
             return new OrdersDbContext(options, null);
         }
 
+        [Theory]
+        [InlineData(40)]
+        [InlineData(1000)]
+        public async Task Statement_CourierPayment_ReflectsMerchantReceiptConfirmationWithoutChangingLedger(decimal amount)
+        {
+            using var accountingDb = CreateInMemoryAccountingContext();
+            using var catalogDb = CreateInMemoryCatalogContext();
+            using var ordersDb = CreateInMemoryOrdersContext();
+            var ledger = new LedgerService(accountingDb, NullLogger<LedgerService>.Instance);
+            var service = new MerchantReconciliationService(accountingDb, catalogDb, ordersDb, ledger, NullLogger<MerchantReconciliationService>.Instance);
+            var captainId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            catalogDb.Merchants.Add(new CatalogMerchant { Id = 27, Title = "محطة اللحوم", OwnerId = ownerId });
+            await catalogDb.SaveChangesAsync();
+            var payable = await ledger.GetOrCreateMerchantAccountAsync(27, "محطة اللحوم");
+            var floatAccount = await ledger.GetOrCreateUserAccountAsync(captainId, AccountType.Asset, SystemAccountCodes.CaptainCashFloatPrefix, "Captain");
+            await ledger.PostTransactionAsync(new PostTransactionRequest
+            {
+                ReferenceType = "OpeningBalance", IdempotencyKey = "opening-receipt-test",
+                Entries = new List<PostLedgerEntryRequest>
+                {
+                    new() { AccountId = floatAccount.Id, Debit = 2000m },
+                    new() { AccountId = payable.Id, Credit = 2000m },
+                }
+            });
+            var payment = new Payment { Id = 2, ToUserId = ownerId, ByUserId = captainId, ByUser = "Reham", Amount = amount };
+            accountingDb.Payments.Add(payment);
+            await accountingDb.SaveChangesAsync();
+            var posting = await ledger.PostCaptainToMerchantPaymentAsync(captainId, 27, amount, "Payment-2", "Reham", "محطة اللحوم");
+
+            var pending = await service.GetMerchantStatementAsync(27, new MerchantStatementRequestDto());
+            var pendingEntry = Assert.Single(pending.Items.Where(x => x.ReferenceType == "CaptainToMerchantPayment"));
+            Assert.Equal("بانتظار تأكيد التاجر", pendingEntry.FinancialStatus);
+            Assert.Equal("دفعة من المندوب", pendingEntry.Type);
+            Assert.Equal("نقداً من المندوب", pendingEntry.PaymentMethod);
+            Assert.Equal("دفعة #2", pendingEntry.SettlementRequestNumber);
+            Assert.Equal(amount, pendingEntry.Debit);
+            Assert.Contains("Reham", pendingEntry.Description);
+            Assert.Equal("مقيد", Assert.Single(pending.Items.Where(x => x.ReferenceType == "OpeningBalance")).FinancialStatus);
+
+            payment.HandoverDate = new DateTime(2026, 10, 3, 14, 30, 0, DateTimeKind.Utc);
+            await accountingDb.SaveChangesAsync();
+            var confirmed = await service.GetMerchantStatementAsync(27, new MerchantStatementRequestDto());
+            var confirmedEntry = Assert.Single(confirmed.Items.Where(x => x.ReferenceType == "CaptainToMerchantPayment"));
+            Assert.Equal("مكتمل — تم الاستلام", confirmedEntry.FinancialStatus);
+            Assert.Contains("أكد التاجر استلام", confirmedEntry.Description);
+            Assert.Contains("2026/10/03 14:30", confirmedEntry.Description);
+            Assert.Equal(pendingEntry.TransactionId, confirmedEntry.TransactionId);
+            Assert.Equal(pendingEntry.Debit, confirmedEntry.Debit);
+            Assert.Equal(pendingEntry.RunningBalance, confirmedEntry.RunningBalance);
+            Assert.Equal(2000m - amount, confirmed.CurrentBalance);
+            Assert.Equal(pending.CurrentBalance, confirmed.CurrentBalance);
+            Assert.Equal(2, await accountingDb.JournalTransactions.CountAsync());
+            var searched = await service.GetMerchantStatementAsync(27, new MerchantStatementRequestDto { SearchTerm = "دفعة #2" });
+            Assert.Single(searched.Items);
+            Assert.Equal("مكتمل — تم الاستلام", searched.Items[0].FinancialStatus);
+        }
+
+        [Fact]
+        public async Task Statement_UnmatchedCourierPayment_DoesNotClaimMerchantConfirmedReceipt()
+        {
+            using var accountingDb = CreateInMemoryAccountingContext();
+            using var catalogDb = CreateInMemoryCatalogContext();
+            using var ordersDb = CreateInMemoryOrdersContext();
+            var ledger = new LedgerService(accountingDb, NullLogger<LedgerService>.Instance);
+            var service = new MerchantReconciliationService(accountingDb, catalogDb, ordersDb, ledger, NullLogger<MerchantReconciliationService>.Instance);
+            catalogDb.Merchants.Add(new CatalogMerchant { Id = 27, Title = "محطة اللحوم" });
+            await catalogDb.SaveChangesAsync();
+            var payable = await ledger.GetOrCreateMerchantAccountAsync(27, "محطة اللحوم");
+            var vault = await ledger.GetOrCreateSystemAccountAsync(SystemAccountCodes.CompanyMainVault, "Vault", AccountType.Asset);
+            await ledger.PostTransactionAsync(new PostTransactionRequest
+            {
+                ReferenceType = "CaptainToMerchantPayment", ReferenceId = "Payment-999", IdempotencyKey = "orphan-payment",
+                Entries = new List<PostLedgerEntryRequest>
+                {
+                    new() { AccountId = payable.Id, Debit = 1000m, Memo = "Original handover memo" },
+                    new() { AccountId = vault.Id, Credit = 1000m },
+                }
+            });
+            var statement = await service.GetMerchantStatementAsync(27, new MerchantStatementRequestDto());
+            var entry = Assert.Single(statement.Items);
+            Assert.Equal("تعذر التحقق من تأكيد الاستلام", entry.FinancialStatus);
+            Assert.Equal("Original handover memo", entry.Description);
+            Assert.Equal(1000m, entry.Debit);
+        }
+
         [Fact]
         public async Task Summary_AggregatesAuthoritativeLedgerBalances_Correctly()
         {

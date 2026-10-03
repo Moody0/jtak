@@ -93,7 +93,7 @@ public class CourierDispatchWorkerTests
                 AccountingLastError = "",
                 PurchaseDate = now,
                 CourierMatchingStartedAtUtc = accepted ? now : null,
-                CourierMatchingDeadlineAtUtc = accepted ? now.AddMinutes(3) : null,
+                CourierMatchingDeadlineAtUtc = accepted ? now.AddMinutes(CourierMatchingPolicy.TimeoutMinutes) : null,
                 CourierMatchingRound = accepted ? 1 : 0,
                 OrderDetails = new List<OrderDetail>
                 {
@@ -182,11 +182,47 @@ public class CourierDispatchWorkerTests
         fixture.Inventory.Verify(x => x.ReleaseReservationAsync(market, null, It.IsAny<string>(), null), Times.Once);
         fixture.Inventory.Verify(x => x.ReleaseReservationAsync(restaurant, It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<int?>()), Times.Never);
         fixture.Notification.Verify(x => x.SendPushNotification(
-            It.Is<Notification>(n => n.EventKey == $"order:{market}:cancelled-no-courier" && n.AudienceApp == "customer"),
+            It.Is<Notification>(n => n.EventKey == $"order:{market}:cancelled-no-courier" && n.AudienceApp == "customer" &&
+                                    n.TextAr.Contains("3 دقائق")),
             It.Is<Guid[]>(ids => ids.Length == 1 && ids[0] == customer), true, false), Times.Once);
         await fixture.DispatchAsync();
         fixture.Notification.Verify(x => x.SendPushNotification(
             It.Is<Notification>(n => n.EventKey == $"order:{market}:cancelled-no-courier"), It.IsAny<Guid[]>(), true, false), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(4, false)]
+    [InlineData(9, false)]
+    [InlineData(11, true)]
+    public async Task NoCourier_StaysAvailableUntilTenMinuteDeadline(int elapsedMinutes, bool shouldCancel)
+    {
+        using var fixture = new Fixture();
+        var id = await fixture.SeedOrderAsync();
+        fixture.Delivery.Setup(x => x.GetOnlineDeliveryIds()).ReturnsAsync(Array.Empty<Guid>());
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+            var order = await db.Orders.SingleAsync(x => x.Id == id);
+            var started = DateTime.UtcNow.AddMinutes(-elapsedMinutes);
+            order.CourierMatchingStartedAtUtc = started;
+            order.CourierMatchingDeadlineAtUtc = started.AddMinutes(10);
+            await db.SaveChangesAsync();
+        }
+
+        await fixture.DispatchAsync();
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var order = await scope.ServiceProvider.GetRequiredService<OrdersDbContext>().Orders
+                .Include(x => x.OrderDetails).SingleAsync(x => x.Id == id);
+            Assert.Equal(shouldCancel, order.CourierMatchingCompletedAtUtc.HasValue);
+            Assert.Equal(shouldCancel ? OrderDetailStatus.DeliveryCanceled : OrderDetailStatus.MerchantAccepted,
+                order.OrderDetails.Single().OrderDetailStatus);
+        }
+        fixture.Inventory.Verify(x => x.ReleaseReservationAsync(id, null, It.IsAny<string>(), null),
+            shouldCancel ? Times.Once() : Times.Never());
+        fixture.Notification.Verify(x => x.SendPushNotification(
+            It.Is<Notification>(n => n.TextAr.Contains("10 دقائق")), It.IsAny<Guid[]>(), true, false),
+            shouldCancel ? Times.Once() : Times.Never());
     }
 
     [Fact]
@@ -244,7 +280,7 @@ public class CourierDispatchWorkerTests
         {
             var order = await scope.ServiceProvider.GetRequiredService<OrdersDbContext>().Orders.SingleAsync();
             Assert.NotNull(order.CourierMatchingStartedAtUtc);
-            Assert.Equal(TimeSpan.FromMinutes(3), order.CourierMatchingDeadlineAtUtc - order.CourierMatchingStartedAtUtc);
+            Assert.Equal(TimeSpan.FromMinutes(10), order.CourierMatchingDeadlineAtUtc - order.CourierMatchingStartedAtUtc);
         }
         await fixture.DispatchAsync();
         Assert.Equal(fixture.DriverId, Assert.Single(await fixture.OffersAsync()).DriverId);

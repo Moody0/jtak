@@ -157,14 +157,11 @@ namespace Modules.Catalog.Services
                                                          .AsNoTracking()
                                                          .Include(x => x.Merchant)
                                                          .Where(x => x.MerchantId == mid && x.Merchant.Active)
-                                                         .Select(x => new MerchantProductDto { MerchantKind = (int)x.Merchant.MerchantKind, ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, OriginalPrice = x.OriginalPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, MaxOrderQuantity = x.MaxOrderQuantity })
+                                                         .Select(x => new MerchantProductDto { MerchantKind = (int)x.Merchant.MerchantKind, ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, OriginalPrice = x.OriginalPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, DiscountPercent = x.DiscountPercent, MaxOrderQuantity = x.MaxOrderQuantity })
                                                          .ToListAsync();
                     foreach (var item in list)
                     {
-                        if (item.PriceUsd.HasValue && item.PriceUsd.Value > 0 && usdRate > 0)
-                        {
-                            item.MerchantPrice = ToLocalPrice(item.PriceUsd.Value, usdRate);
-                        }
+                        item.NormalizePricing(usdRate);
                     }
                     return list.ToDictionary(x => x.ProductId);
                 });
@@ -178,14 +175,11 @@ namespace Modules.Catalog.Services
                                                          .AsNoTracking()
                                                          .Include(x => x.Merchant)
                                                          .Where(x => x.MerchantId == mid)
-                                                         .Select(x => new MerchantProductDto { MerchantKind = (int)x.Merchant.MerchantKind, ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, OriginalPrice = x.OriginalPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, MaxOrderQuantity = x.MaxOrderQuantity })
+                                                         .Select(x => new MerchantProductDto { MerchantKind = (int)x.Merchant.MerchantKind, ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, OriginalPrice = x.OriginalPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, DiscountPercent = x.DiscountPercent, MaxOrderQuantity = x.MaxOrderQuantity })
                                                          .ToListAsync();
                     foreach (var item in list)
                     {
-                        if (item.PriceUsd.HasValue && item.PriceUsd.Value > 0 && usdRate > 0)
-                        {
-                            item.MerchantPrice = ToLocalPrice(item.PriceUsd.Value, usdRate);
-                        }
+                        item.NormalizePricing(usdRate);
                     }
                     return list.ToDictionary(x => x.ProductId);
                 });
@@ -207,16 +201,13 @@ namespace Modules.Catalog.Services
                                                              MerchantPrice = x.MerchantPrice,
                                                              OriginalPrice = x.OriginalPrice,
                                                              PriceUsd = x.PriceUsd,
-                                                             Discount = x.Discount,
+                                                             Discount = x.Discount, DiscountPercent = x.DiscountPercent,
                                                              MaxOrderQuantity = x.MaxOrderQuantity
                                                          })
                                                          .ToListAsync();
                     foreach (var item in list)
                     {
-                        if (item.PriceUsd.HasValue && item.PriceUsd.Value > 0 && usdRate > 0)
-                        {
-                            item.MerchantPrice = ToLocalPrice(item.PriceUsd.Value, usdRate);
-                        }
+                        item.NormalizePricing(usdRate);
                     }
                     return list.OrderBy(x => x.FinalPrice)
                                .ToDictionary(x => x.MerchantId);
@@ -239,14 +230,11 @@ namespace Modules.Catalog.Services
                                                              MerchantPrice = x.MerchantPrice,
                                                              OriginalPrice = x.OriginalPrice,
                                                              PriceUsd = x.PriceUsd,
-                                                             Discount = x.Discount,
+                                                             Discount = x.Discount, DiscountPercent = x.DiscountPercent,
                                                              MaxOrderQuantity = x.MaxOrderQuantity
                                                          })
                                                          .FirstOrDefaultAsync();
-                    if (item != null && item.PriceUsd.HasValue && item.PriceUsd.Value > 0 && usdRate > 0)
-                    {
-                        item.MerchantPrice = ToLocalPrice(item.PriceUsd.Value, usdRate);
-                    }
+                    item?.NormalizePricing(usdRate);
                     return item;
                 });
 
@@ -275,7 +263,7 @@ namespace Modules.Catalog.Services
                 var merchantProducts = await _merchantProductRepo.Queryable().Where(x => x.MerchantId == mid).ToArrayAsync();
 
                 var toBeAdded = products.Where(p => !merchantProducts.Any(mp => mp.ProductId == p.ProductId)).ToArray();
-                var toBeUpdated = products.Where(p => merchantProducts.Any(mp => mp.ProductId == p.ProductId && (mp.AdditionalProfitPercent != 0m || mp.MerchantPrice != p.MerchantPrice || mp.PriceUsd != p.PriceUsd || mp.Discount != p.Discount || mp.OriginalPrice != p.OriginalPrice || mp.MaxOrderQuantity != p.MaxOrderQuantity))).ToArray();
+                var toBeUpdated = products.Where(p => merchantProducts.Any(mp => mp.ProductId == p.ProductId && (mp.AdditionalProfitPercent != 0m || mp.MerchantPrice != p.MerchantPrice || mp.PriceUsd != p.PriceUsd || mp.Discount != p.Discount || (p.DiscountPercent.HasValue && mp.DiscountPercent != p.DiscountPercent) || mp.OriginalPrice != p.OriginalPrice || mp.MaxOrderQuantity != p.MaxOrderQuantity))).ToArray();
                 var toBeRemoved = merchantProducts.Where(mp => !products.Any(p => p.ProductId == mp.ProductId)).ToArray();
 
                 foreach (var item in toBeAdded)
@@ -295,6 +283,7 @@ namespace Modules.Catalog.Services
                                             : item.MerchantPrice,
                         PriceUsd = item.PriceUsd,
                         Discount = item.Discount,
+                        DiscountPercent = item.DiscountPercent,
                         OriginalPrice = item.OriginalPrice,
                         MaxOrderQuantity = item.MaxOrderQuantity,
                         ProfitOutOfMerchantPricePercent = profitOutOfMerchantPricePercent,
@@ -314,6 +303,7 @@ namespace Modules.Catalog.Services
                     mp.MerchantPrice = item?.MerchantPrice ?? 0;
                     ApplyUsdPricing(mp, item?.PriceUsd, usdRate);
                     mp.Discount = item?.Discount ?? 0m;
+                    mp.DiscountPercent = item?.DiscountPercent ?? mp.DiscountPercent;
                     mp.OriginalPrice = item?.OriginalPrice;
                     mp.MaxOrderQuantity = item?.MaxOrderQuantity;
                     _cache.Remove($"ProductPrices_{item.ProductId}");

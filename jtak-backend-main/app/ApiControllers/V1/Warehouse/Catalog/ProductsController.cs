@@ -145,9 +145,13 @@ namespace App.ApiControllers.V1.Warehouse
                         var mp = mps[product.ProductId];
                         product.ProfitOutOfMerchantPricePercent = mp.ProfitOutOfMerchantPricePercent;
                         product.MerchantPrice = mp.MerchantPrice;
-                    product.Discount = mp.Discount;
-                    product.MaxOrderQuantity = mp.MaxOrderQuantity;
-                    product.MerchantKind = mp.MerchantKind;
+                        product.Discount = mp.Discount;
+                        product.DiscountPercent = mp.DiscountPercent;
+                        product.PriceUsd = mp.PriceUsd;
+                        product.OriginalPrice = mp.OriginalPrice;
+                        product.UsdExchangeRate = mp.UsdExchangeRate;
+                        product.MaxOrderQuantity = mp.MaxOrderQuantity;
+                        product.MerchantKind = mp.MerchantKind;
                         product.MerchantId = mid;
                         resultList.Add(product);
                     }

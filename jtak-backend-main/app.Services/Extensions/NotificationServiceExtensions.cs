@@ -105,7 +105,8 @@ namespace App.Shared.Services.Extentions
             await SendActionAsync(service, n, ids);
         }
 
-        public static async Task SendOrderCanceledForNoCourier(this INotificationService service, Guid[] ids, int orderId, string audienceApp = "customer")
+        public static async Task SendOrderCanceledForNoCourier(this INotificationService service, Guid[] ids, int orderId,
+            string audienceApp = "customer", int matchingMinutes = CourierMatchingPolicy.TimeoutMinutes)
         {
             var n = new Notification
             {
@@ -114,9 +115,9 @@ namespace App.Shared.Services.Extentions
                 TitleTr = $"#{orderId} numaralı sipariş iptal edildi",
                 AudienceApp = audienceApp,
                 EventKey = $"order:{orderId}:cancelled-no-courier",
-                TextAr = "تعذر العثور على سائق متاح خلال 3 دقائق، لذلك تم إلغاء الطلب وإعادة المنتجات إلى المخزون.",
-                TextEn = "No courier accepted within 3 minutes. The order was cancelled and reserved items were returned to stock.",
-                TextTr = "3 dakika içinde kurye bulunamadığı için sipariş iptal edildi ve ürünler stoğa iade edildi.",
+                TextAr = $"تعذر العثور على سائق متاح خلال {matchingMinutes} دقائق، لذلك تم إلغاء الطلب وإعادة المنتجات إلى المخزون.",
+                TextEn = $"No courier accepted within {matchingMinutes} minutes. The order was cancelled and reserved items were returned to stock.",
+                TextTr = $"{matchingMinutes} dakika içinde kurye bulunamadığı için sipariş iptal edildi ve ürünler stoğa iade edildi.",
                 Url = $"{AppDomainHelper.DashboardUrl}/Orders/Cancel/{orderId}",
                 NotificationType = NotificationType.Order
             };

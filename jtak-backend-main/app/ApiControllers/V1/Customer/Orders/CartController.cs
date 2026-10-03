@@ -122,6 +122,8 @@ namespace App.ApiControllers.V1.Customer.Orders
             }
             var order = new OrderDto
             {
+                MerchantKind = merchantValidation.Merchants.Count == 1
+                    ? (int)merchantValidation.Merchants[0].MerchantKind : null,
                 OrderDetails = dtos,
                 DeliveryFee = deliveryFee,
                 CustomerMinDeliveryFee = driverPricing?.MinDeliveryFee ?? 50m,
@@ -707,10 +709,13 @@ namespace App.ApiControllers.V1.Customer.Orders
                             ?? CalculateCanonicalMoney(existingDetails, existingOrder.DeliveryFee, existingOrder.PaymentMethod,
                                 existingOrder.CaptainEarning, existingOrder.MoneySnapshotVersion == 2,
                                 existingOrder.MoneySnapshotVersion >= 3);
+                        var existingMerchant = existingDetails.Length > 0
+                            ? await _merchantService.FindAsync(existingDetails[0].MerchantId) : null;
 
                         return Ok(new OrderDto
                         {
                             Id = existingOrder.Id,
+                            MerchantKind = existingMerchant == null ? null : (int)existingMerchant.MerchantKind,
                             UserId = existingOrder.UserId,
                             User = existingOrder.User,
                             Phonenumber = existingOrder.Phonenumber,
@@ -744,6 +749,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             var responseDto = new OrderDto
             {
                 Id = cart.Id,
+                MerchantKind = (int)merchantValidation.Merchants[0].MerchantKind,
                 UserId = cart.UserId,
                 User = cart.User,
                 Phonenumber = cart.Phonenumber,

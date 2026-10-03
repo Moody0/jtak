@@ -195,7 +195,7 @@ namespace App.ApiControllers.V1.Warehouse
             }
 
             // Matching starts only after every active item from this (single) merchant
-            // has been accepted. The three-minute clock is server-owned.
+            // has been accepted. The overall matching clock is server-owned.
             var acceptedOrder = await _service.FindAsync(id);
             var activeDetails = acceptedOrder?.OrderDetails?.Where(x =>
                 x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
@@ -209,7 +209,7 @@ namespace App.ApiControllers.V1.Warehouse
                 var matchingStarted = DateTime.UtcNow;
                 acceptedOrder.CourierMatchingRound = Math.Max(1, acceptedOrder.CourierMatchingRound + 1);
                 acceptedOrder.CourierMatchingStartedAtUtc = matchingStarted;
-                acceptedOrder.CourierMatchingDeadlineAtUtc = matchingStarted.AddMinutes(3);
+                acceptedOrder.CourierMatchingDeadlineAtUtc = matchingStarted.AddMinutes(CourierMatchingPolicy.TimeoutMinutes);
                 acceptedOrder.CourierMatchingCompletedAtUtc = null;
                 await _uow.SaveChangesAsync();
                 if (_trackingHub != null)

@@ -353,6 +353,8 @@ namespace App.ApiControllers.V1.Customer
                     product.ProfitOutOfMerchantPricePercent = mp.ProfitOutOfMerchantPricePercent;
                     product.MerchantPrice = mp.MerchantPrice;
                     product.Discount = mp.Discount;
+                    product.DiscountPercent = mp.DiscountPercent;
+                    product.UsdExchangeRate = mp.UsdExchangeRate;
                     product.PriceUsd = mp.PriceUsd;
                     product.OriginalPrice = mp.OriginalPrice;
                     product.MaxOrderQuantity = mp.MaxOrderQuantity;
@@ -424,25 +426,16 @@ namespace App.ApiControllers.V1.Customer
                 var fallbackMp = item.MerchantProducts?.FirstOrDefault(m => m.MerchantPrice > 0);
                 if (fallbackMp != null)
                 {
-                    var fallbackBase = fallbackMp.MerchantPrice;
-                    model.MerchantId = fallbackMp.MerchantId;
+                    var quote = MerchantProductDto.FromStored(fallbackMp, await _merchantService.GetUsdRate());
                     var fallbackMerchant = await _merchantService.FindAsync(fallbackMp.MerchantId);
+                    model.MerchantId = fallbackMp.MerchantId;
                     model.MerchantKind = (int)(fallbackMerchant?.MerchantKind ?? MerchantKind.Grocery);
-                    model.PriceUsd = fallbackMp.PriceUsd;
-                    model.OriginalPrice = fallbackMp.OriginalPrice;
-                    model.Discount = fallbackMp.Discount;
-                    model.MaxOrderQuantity = fallbackMp.MaxOrderQuantity;
-                    if (fallbackMp.PriceUsd.HasValue && fallbackMp.PriceUsd.Value > 0)
-                    {
-                        var usdRate = await _merchantService.GetUsdRate();
-                        if (usdRate > 0)
-                        {
-                            fallbackBase = Math.Round(fallbackMp.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
-                        }
-                    }
-                    var markup = Math.Round(fallbackBase * fallbackMp.ProfitOutOfMerchantPricePercent / 100m, 0, MidpointRounding.AwayFromZero);
-                    model.FinalPrice = fallbackBase + markup;
-                    model.Price = model.FinalPrice + fallbackMp.Discount;
+                    model.PriceUsd = quote.PriceUsd;
+                    model.OriginalPrice = quote.OriginalPrice;
+                    model.Discount = quote.Discount;
+                    model.MaxOrderQuantity = quote.MaxOrderQuantity;
+                    model.FinalPrice = quote.FinalPrice;
+                    model.Price = quote.Price;
                 }
             }
 
@@ -970,22 +963,7 @@ namespace App.ApiControllers.V1.Customer
                     var fallbackPrice = p.MerchantProducts?.FirstOrDefault(m => m.MerchantId == mid);
                     if (fallbackPrice != null && fallbackPrice.MerchantPrice > 0)
                     {
-                        decimal fallbackBase = fallbackPrice.MerchantPrice;
-                        if (fallbackPrice.PriceUsd.HasValue && fallbackPrice.PriceUsd.Value > 0)
-                        {
-                            var usdRate = await _merchantService.GetUsdRate();
-                            if (usdRate > 0)
-                            {
-                                fallbackBase = Math.Round(fallbackPrice.PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
-                            }
-                        }
-                        var quote = new MerchantProductDto
-                        {
-                            MerchantPrice = fallbackBase,
-                            ProfitOutOfMerchantPricePercent = fallbackPrice.ProfitOutOfMerchantPricePercent,
-                            Discount = fallbackPrice.Discount,
-                            MaxOrderQuantity = fallbackPrice.MaxOrderQuantity
-                        };
+                        var quote = MerchantProductDto.FromStored(fallbackPrice, await _merchantService.GetUsdRate());
                         finalPrice = quote.FinalPrice;
                         price = quote.Price;
                         maxOrderQuantity = quote.MaxOrderQuantity;

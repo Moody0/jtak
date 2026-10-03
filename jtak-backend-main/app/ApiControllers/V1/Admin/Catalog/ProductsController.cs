@@ -172,6 +172,12 @@ namespace App.ApiControllers.V1.Admin
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.Discount)
                     .FirstOrDefault(),
+                DiscountPercent = x.MerchantProducts
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
+                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .ThenBy(mp => mp.MerchantId)
+                    .Select(mp => mp.DiscountPercent)
+                    .FirstOrDefault(),
                 ProfitOutOfMerchantPricePercent = x.MerchantProducts
                     .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
                     .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
@@ -350,14 +356,13 @@ namespace App.ApiControllers.V1.Admin
             var priceUsd = item.PriceUsd;
             var discount = item.Discount > 0 ? item.Discount : 0m;
             var originalPrice = item.OriginalPrice;
+            var merchantProfit = merchantId.HasValue ? await _merchantService.Queryable()
+                .Where(x => x.Id == merchantId.Value).Select(x => x.ProfitOutOfMerchantPricePercent).FirstOrDefaultAsync() : 0m;
             if (item.DiscountPercent.HasValue)
             {
                 if (item.DiscountPercent.Value > 0m)
                 {
-                    var merchantProfit = await _merchantService.Queryable()
-                        .Where(x => x.Id == merchantId.Value)
-                        .Select(x => x.ProfitOutOfMerchantPricePercent)
-                        .FirstOrDefaultAsync();
+
 
                     var pricing = CalculateDiscountPricing(
                         price,
@@ -404,7 +409,9 @@ namespace App.ApiControllers.V1.Admin
                     MerchantPrice = price,
                     PriceUsd = priceUsd,
                     OriginalPrice = originalPrice,
-                    Discount = discount
+                    Discount = discount,
+                    DiscountPercent = item.DiscountPercent,
+                    ProfitOutOfMerchantPricePercent = merchantProfit
                 });
                 await _uow.SaveChangesAsync();
 
@@ -512,6 +519,9 @@ namespace App.ApiControllers.V1.Admin
             var priceUsd = item.PriceUsd;
             var discount = item.Discount > 0 ? item.Discount : 0m;
             var originalPrice = item.OriginalPrice;
+            var merchantProfit = requestedMerchantId.HasValue ? await _merchantService.Queryable()
+                .Where(x => x.Id == requestedMerchantId.Value).Select(x => x.ProfitOutOfMerchantPricePercent).FirstOrDefaultAsync()
+                : targetMpForPrice?.ProfitOutOfMerchantPricePercent ?? 0m;
             if (item.DiscountPercent.HasValue)
             {
                 if (item.DiscountPercent.Value > 0m)
@@ -521,7 +531,7 @@ namespace App.ApiControllers.V1.Admin
                         priceUsd,
                         item.DiscountPercent.Value,
                         await _merchantService.GetUsdRate(),
-                        targetMpForPrice?.ProfitOutOfMerchantPricePercent ?? 0m);
+                        merchantProfit);
                     price = pricing.SalePrice;
                     priceUsd = pricing.SalePriceUsd;
                     discount = pricing.DiscountAmount;
@@ -570,6 +580,8 @@ namespace App.ApiControllers.V1.Admin
                     targetMp.PriceUsd = priceUsd;
                     targetMp.OriginalPrice = originalPrice;
                     targetMp.Discount = discount;
+                    targetMp.ProfitOutOfMerchantPricePercent = merchantProfit;
+                    targetMp.DiscountPercent = item.DiscountPercent ?? targetMp.DiscountPercent;
                     _merchantProductRepo.Update(targetMp);
 
                     // Clean up any extraneous merchant links if product is uniquely assigned
@@ -598,7 +610,9 @@ namespace App.ApiControllers.V1.Admin
                         MerchantPrice = price,
                         PriceUsd = priceUsd,
                         OriginalPrice = originalPrice,
-                        Discount = discount
+                        Discount = discount,
+                        DiscountPercent = item.DiscountPercent,
+                        ProfitOutOfMerchantPricePercent = merchantProfit
                     });
                 }
 
@@ -772,6 +786,7 @@ namespace App.ApiControllers.V1.Admin
                 MerchantPrice = restaurantAssignment?.MerchantPrice ?? 0m,
                 PriceUsd = restaurantAssignment?.PriceUsd,
                 Discount = restaurantAssignment?.Discount ?? 0m,
+                DiscountPercent = restaurantAssignment?.DiscountPercent,
                 ProfitOutOfMerchantPricePercent = targetMerchant?.ProfitOutOfMerchantPricePercent ?? 0m,
                 AdditionalProfitPercent = 0m
             });
@@ -943,65 +958,12 @@ namespace App.ApiControllers.V1.Admin
         {
             var hasUsdPrice = originalPriceUsd.HasValue && originalPriceUsd.Value > 0m;
             if (hasUsdPrice && usdRate <= 0m)
-            {
                 throw new InvalidOperationException("سعر صرف الدولار غير صالح.");
-            }
-
-            decimal oldBasePrice;
-            decimal? savedOriginalPriceUsd = null;
-
-            if (hasUsdPrice)
-            {
-                var oldUsd = originalPriceUsd!.Value;
-                savedOriginalPriceUsd = oldUsd;
-                oldBasePrice = Math.Round(oldUsd * usdRate, 0, MidpointRounding.AwayFromZero);
-            }
-            else
-            {
-                oldBasePrice = Math.Round(originalPriceLocal, 0, MidpointRounding.AwayFromZero);
-            }
-
-            static decimal CustomerPrice(decimal basePrice, decimal merchantProfitPercent)
-            {
-                var merchantProfit = Math.Round(basePrice * merchantProfitPercent / 100m, 0, MidpointRounding.AwayFromZero);
-                return Math.Round(basePrice + merchantProfit, 0, MidpointRounding.AwayFromZero);
-            }
-
-            // 1. Calculate Syrian customer price before discount (including platform/merchant profit markup)
-            var oldCustomerPrice = CustomerPrice(oldBasePrice, profitOutOfMerchantPricePercent);
-
-            // 2. Apply discount directly to the Syrian customer price (rounded to nearest integer Syrian Pound)
-            var saleCustomerPrice = Math.Round(oldCustomerPrice * (1m - discountPercent / 100m), 0, MidpointRounding.AwayFromZero);
-            var discountAmount = Math.Max(0m, oldCustomerPrice - saleCustomerPrice);
-
-            // 3. Derive merchant base Syrian price so that CustomerPrice(saleBasePrice, profitOutOfMerchantPricePercent) == saleCustomerPrice
-            decimal saleBasePrice;
-            if (profitOutOfMerchantPricePercent > 0m)
-            {
-                saleBasePrice = Math.Round(saleCustomerPrice / (1m + profitOutOfMerchantPricePercent / 100m), 0, MidpointRounding.AwayFromZero);
-                var actualCustomerPrice = CustomerPrice(saleBasePrice, profitOutOfMerchantPricePercent);
-                if (actualCustomerPrice < saleCustomerPrice && CustomerPrice(saleBasePrice + 1m, profitOutOfMerchantPricePercent) == saleCustomerPrice)
-                {
-                    saleBasePrice += 1m;
-                }
-                else if (actualCustomerPrice > saleCustomerPrice && CustomerPrice(saleBasePrice - 1m, profitOutOfMerchantPricePercent) == saleCustomerPrice)
-                {
-                    saleBasePrice -= 1m;
-                }
-            }
-            else
-            {
-                saleBasePrice = saleCustomerPrice;
-            }
-
-            // 4. Derive sale USD price from the base Syrian price if product uses USD pricing
-            decimal? salePriceUsd = null;
-            if (hasUsdPrice)
-            {
-                salePriceUsd = Math.Round(saleBasePrice / usdRate, 2, MidpointRounding.AwayFromZero);
-            }
-
-            return (saleBasePrice, salePriceUsd, discountAmount, savedOriginalPriceUsd);
+            var exactBaseLocal = hasUsdPrice ? originalPriceUsd.Value * usdRate : originalPriceLocal;
+            var quote = MerchantProductPricing.Calculate(exactBaseLocal, profitOutOfMerchantPricePercent, discountPercent);
+            // The merchant quote is never reduced. Savings come out of platform markup.
+            return (quote.MerchantPrice, hasUsdPrice ? originalPriceUsd : null, quote.Discount,
+                discountPercent > 0m && hasUsdPrice ? originalPriceUsd : null);
         }
     }
 }

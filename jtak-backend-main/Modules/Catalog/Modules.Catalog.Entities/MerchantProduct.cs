@@ -30,6 +30,9 @@ namespace Modules.Catalog.Entities
         /// </summary>
         public decimal Discount { get; set; }
 
+        /// <summary>Requested customer discount, funded only from platform markup.</summary>
+        public decimal? DiscountPercent { get; set; }
+
         /// <summary>
         /// Original price before discount in USD
         /// </summary>
@@ -76,8 +79,10 @@ namespace Modules.Catalog.Entities
         /// Contracted profit percent
         /// </summary>
         public decimal ProfitOutOfMerchantPricePercent { get; set; }
-        public decimal ProfitOutOfMerchantPrice => Math.Round(MerchantPrice * ProfitOutOfMerchantPricePercent / 100m, 0, MidpointRounding.AwayFromZero);
-        public decimal MerchantProfit => MerchantPrice;
+        public decimal ProfitOutOfMerchantPrice => DiscountPercent.HasValue
+            ? FinalPrice - MerchantProfit
+            : Math.Round(MerchantPrice * ProfitOutOfMerchantPricePercent / 100m, 0, MidpointRounding.AwayFromZero);
+        public decimal MerchantProfit => DiscountPercent.HasValue ? Quote.MerchantPrice : MerchantPrice;
 
         /// <summary>
         /// Normal asking price specified by the merchant
@@ -98,7 +103,46 @@ namespace Modules.Catalog.Entities
         /// Savings amount used to calculate the compare-at price. The merchant
         /// price and additional profit remain the amount charged after discount.
         /// </summary>
-        public decimal Discount { get; set; }
+        private decimal _legacyDiscount;
+        public decimal Discount { get => DiscountPercent.HasValue ? Quote.Discount : _legacyDiscount; set => _legacyDiscount = value; }
+        public decimal? DiscountPercent { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public decimal UsdExchangeRate { get; set; }
+
+        private (decimal MerchantPrice, decimal Price, decimal FinalPrice, decimal Discount) Quote =>
+            MerchantProductPricing.Calculate(PriceUsd > 0m && UsdExchangeRate > 0m
+                ? PriceUsd.Value * UsdExchangeRate : MerchantPrice,
+                ProfitOutOfMerchantPricePercent, DiscountPercent ?? 0m);
+
+        public void NormalizePricing(decimal usdRate)
+        {
+            // Recover the supplier quote from older discounted USD rows without
+            // modifying historical orders or unrelated compare-at promotions.
+            if (!DiscountPercent.HasValue && ProfitOutOfMerchantPricePercent > 0m &&
+                _legacyDiscount > 0m && OriginalPrice > PriceUsd && PriceUsd > 0m)
+            {
+                DiscountPercent = Math.Clamp(Math.Round((1m - PriceUsd.Value / OriginalPrice.Value) * 100m, 2), 0m, 99.99m);
+                PriceUsd = OriginalPrice;
+            }
+            UsdExchangeRate = usdRate;
+            if (PriceUsd > 0m && usdRate > 0m)
+                MerchantPrice = Math.Round(PriceUsd.Value * usdRate, 0, MidpointRounding.AwayFromZero);
+        }
+
+        public static MerchantProductDto FromStored(MerchantProduct row, decimal usdRate)
+        {
+            var quote = new MerchantProductDto
+            {
+                MerchantId = row.MerchantId, ProductId = row.ProductId,
+                MerchantPrice = row.MerchantPrice, PriceUsd = row.PriceUsd,
+                OriginalPrice = row.OriginalPrice, Discount = row.Discount,
+                DiscountPercent = row.DiscountPercent,
+                ProfitOutOfMerchantPricePercent = row.ProfitOutOfMerchantPricePercent,
+                MaxOrderQuantity = row.MaxOrderQuantity
+            };
+            quote.NormalizePricing(usdRate);
+            return quote;
+        }
 
         /// <summary>Restaurant per-order quantity limit; null uses the platform default.</summary>
         public int? MaxOrderQuantity { get; set; }
@@ -106,12 +150,12 @@ namespace Modules.Catalog.Entities
         /// <summary>
         /// Compare-at price before discount
         /// </summary>
-        public decimal Price => Discount + FinalPrice;
+        public decimal Price => DiscountPercent.HasValue ? Quote.Price : Discount + FinalPrice;
 
         /// <summary>
         /// Selling price charged after discount
         /// </summary>
-        public decimal FinalPrice => MerchantPrice + ProfitOutOfMerchantPrice;
+        public decimal FinalPrice => DiscountPercent.HasValue ? Quote.FinalPrice : MerchantPrice + ProfitOutOfMerchantPrice;
     }
     public class MerchantProductAssignDto
     {
@@ -119,6 +163,7 @@ namespace Modules.Catalog.Entities
         public decimal ProfitOutOfMerchantPricePercent { get; set; }
         public decimal MerchantPrice { get; set; }
         public decimal Discount { get; set; }
+        public decimal? DiscountPercent { get; set; }
         public decimal? OriginalPrice { get; set; }
         public decimal? PriceUsd { get; set; }
         public int? MaxOrderQuantity { get; set; }

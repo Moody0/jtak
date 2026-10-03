@@ -33,6 +33,68 @@ namespace Modules.Accounting.Tests
     public class SafeCheckoutAndOrderCreationTests
     {
         [Theory]
+        [InlineData(10, 550, 55)]
+        [InlineData(5, 575, 30)]
+        [InlineData(0, 605, 0)]
+        public async Task MerchantDiscountCartUsesSameFinalPriceAndPreservesSupplierBase(
+            decimal requestedDiscount, decimal expectedFinal, decimal expectedSaving)
+        {
+            var quote = MerchantProductDto.FromStored(new MerchantProduct {
+                MerchantId = 10, ProductId = 101, PriceUsd = 5m, MerchantPrice = 550m,
+                ProfitOutOfMerchantPricePercent = 10m, DiscountPercent = requestedDiscount
+            }, 110m);
+            var (controller, orders, catalog, _) = CreateTestController(
+                configureMerchant: m => m.Setup(x => x.GetMerchantProductPrice(10, 101)).ReturnsAsync(quote));
+            using (orders) using (catalog)
+            {
+                var result = await controller.GetCalc(34.7333m, 36.7167m,
+                    new[] { new CartItem { MerchantId = 10, ProductId = 101, Quantity = 3 } });
+                var cart = Assert.IsType<OrderDto>(result.Value);
+                var detail = Assert.Single(cart.OrderDetails);
+                Assert.Equal(550m, detail.SingleMerchantProfit);
+                Assert.Equal(605m, detail.SinglePrice);
+                Assert.Equal(expectedFinal, detail.SingleFinalPrice);
+                Assert.Equal(expectedSaving, detail.SinglePrice - detail.SingleFinalPrice);
+                Assert.Equal(expectedFinal * 3m, cart.Money.ProductSubtotal);
+                Assert.Equal(cart.Money.ProductSubtotal + cart.DeliveryFee, cart.Money.GrandTotal);
+                Assert.Empty(await orders.Orders.ToArrayAsync());
+            }
+        }
+
+        [Fact]
+        public async Task PharmacyCheckoutPreservesKindAndUsesPhysicalPickupAndStock()
+        {
+            var stock = new Mock<IInventoryBatchService>();
+            var (controller, orders, catalog, customer) = CreateTestController(configureBatch: batch => stock = batch);
+            using (orders) using (catalog)
+            {
+                var merchant = await catalog.Merchants.FindAsync(10);
+                merchant.MerchantKind = MerchantKind.Pharmacy;
+                merchant.Title = "صيدلية الهدى";
+                await catalog.SaveChangesAsync();
+                var items = new[] { new CartItem { MerchantId = 10, ProductId = 101, Quantity = 1 } };
+                var preview = await controller.GetCalc(34.7333m, 36.7167m, items);
+                Assert.NotNull(preview.Value);
+                Assert.Equal((int)MerchantKind.Pharmacy, preview.Value.MerchantKind);
+                var response = await controller.SubmitOrder(new CartSubmit
+                {
+                    IdempotencyKey = "pharmacy-checkout",
+                    Phonenumber = customer.PhoneNumber, Lat = 34.7333m, Lng = 36.7167m,
+                    Address = "Homs", CartItems = items,
+                    PaymentMethod = Modules.Orders.Entities.PaymentMethod.PayOnDelivery,
+                    DeviceLocation = new CustomerDeviceLocation { Latitude = 34.7333m, Longitude = 36.7167m,
+                        AccuracyMeters = 10m, CapturedAt = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero) }
+                });
+                var dto = Assert.IsType<OrderDto>(Assert.IsType<OkObjectResult>(response.Result).Value);
+                Assert.Equal((int)MerchantKind.Pharmacy, dto.MerchantKind);
+                stock.Verify(x => x.ReserveStockFEFOAsync(dto.Id, It.IsAny<int>(), 101, 10, 1, It.IsAny<int>()), Times.Once);
+                var saved = await orders.Orders.Include(x => x.OrderDetails).SingleAsync();
+                Assert.Equal(10, saved.OrderDetails.Single().MerchantId);
+                Assert.False(saved.OrderDetails.Single().IsPlatformOwnedSnapshot);
+            }
+        }
+
+        [Theory]
         [InlineData(0, 0)]
         [InlineData(33.5138, 36.2765)]
         public async Task VirtualMarketPreviewUsesItsOwnFeeOnceWithoutUsingAnyShopPin(decimal shopLat, decimal shopLng)

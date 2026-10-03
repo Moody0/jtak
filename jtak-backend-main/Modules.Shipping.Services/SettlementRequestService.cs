@@ -92,6 +92,9 @@ namespace Modules.Accounting.Services
             // earnings include those corrections; payouts include EOD offsets.
             var paid = entries.Where(x => x.ReferenceType == "CaptainEarningsPayout" || x.ReferenceType == "FleetSettlement" || x.ReferenceType == "CaptainSettlementRequest")
                 .Sum(x => x.Debit - x.Credit);
+            // In an errand delivery the credit accrues the wage and the debit
+            // records cash the driver already retained in the same atomic posting.
+            paid += entries.Where(x => x.ReferenceType == ErrandDeliveryPosting.ReferenceType).Sum(x => x.Debit);
             var requests = await GetMineAsync(captainUserId, SettlementPartyType.CaptainEarnings);
             var active = requests.Where(x => x.Currency == currency &&
                 (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved)).Sum(x => x.Amount);

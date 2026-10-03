@@ -115,13 +115,8 @@ namespace App.ApiControllers.V1.Admin
 
             int total = merchants.Count;
             int active = merchants.Count(m => m.Active);
-            int grocery = merchants.Count(m => m.MerchantKind == MerchantKind.Grocery ||
-                                               m.MerchantKind == MerchantKind.Store ||
-                                               m.MerchantKind == MerchantKind.DarkStore ||
-                                               m.MerchantKind == MerchantKind.Pharmacy ||
-                                               ((m.Title != null && (m.Title.Contains("ماركت") || m.Title.Contains("بقالة") || m.Title.Contains("سوبر") || m.Title.Contains("تموين"))) ||
-                                                (m.ShortDescription != null && (m.ShortDescription.Contains("ماركت") || m.ShortDescription.Contains("بقالة") || m.ShortDescription.Contains("سوبر")))));
-            int restaurants = Math.Max(0, total - grocery);
+            int grocery = merchants.Count(m => m.MerchantKind == MerchantKind.Grocery);
+            int restaurants = merchants.Count(m => m.MerchantKind == MerchantKind.Restaurant);
 
             return Ok(new MerchantSummaryDto
             {
@@ -222,6 +217,8 @@ namespace App.ApiControllers.V1.Admin
         {
             if (item == null || !await IsActiveMerchantAccountAsync(item.OwnerId))
                 return BadRequest(ApiErr.Create("اربط المتجر بحساب تاجر نشط قبل حفظه."));
+            if (!Enum.IsDefined(typeof(MerchantKind), item.MerchantKind))
+                return BadRequest(ApiErr.Create("اختر نوع نشاط صالحًا للمتجر."));
             if (await _service.Queryable().AnyAsync(x => x.OwnerId == item.OwnerId && x.DeletionDate == null))
                 return BadRequest(ApiErr.Create("حساب التاجر مرتبط بمتجر آخر. خصص حساباً مستقلاً لكل متجر."));
 
@@ -281,6 +278,8 @@ namespace App.ApiControllers.V1.Admin
         [Route("{id:int}")]
         public async Task<ActionResult<int>> Edit(int id, MerchantDto item)
         {
+            if (item == null || !Enum.IsDefined(typeof(MerchantKind), item.MerchantKind))
+                return BadRequest(ApiErr.Create("اختر نوع نشاط صالحًا للمتجر."));
             var entity = await _service.FindAsync(id);
             if (entity == null) return NotFound();
             var ownerId = item.OwnerId != Guid.Empty ? item.OwnerId : entity.OwnerId;
@@ -290,6 +289,7 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create("حساب التاجر مرتبط بمتجر آخر. خصص حساباً مستقلاً لكل متجر."));
 
             var merchantActiveChanged = item.Active != entity.Active;
+            var merchantKindChanged = item.MerchantKind != entity.MerchantKind;
 
             var beforeState = new
             {
@@ -331,12 +331,12 @@ namespace App.ApiControllers.V1.Admin
 
             await _service.SetMerchantPercent(entity.Id, item.ProfitOutOfMerchantPricePercent);
 
-            // If active changed: remove merchant products from cach
-            if (merchantActiveChanged)
+            // Cached product prices also carry the merchant kind used by checkout.
+            if (merchantActiveChanged || merchantKindChanged)
             {
                 _cache.Remove($"ActiveMerchantPrices_{id}");
                 _cache.Remove($"AllMerchantPrices_{id}");
-                var mpIds = (await _service.GetActiveMerchantPrices(id)).Select(x=>x.Key).ToArray();
+                var mpIds = (await _service.GetAllMerchantPrices(id)).Select(x=>x.Key).ToArray();
                 foreach (var mpId in mpIds)
                 {
                     _cache.Remove($"ProductPrices_{mpId}");
@@ -497,6 +497,10 @@ namespace App.ApiControllers.V1.Admin
                     product.ProfitOutOfMerchantPricePercent = mp.ProfitOutOfMerchantPricePercent;
                     product.MerchantPrice = mp.MerchantPrice;
                     product.Discount = mp.Discount;
+                    product.DiscountPercent = mp.DiscountPercent;
+                    product.PriceUsd = mp.PriceUsd;
+                    product.OriginalPrice = mp.OriginalPrice;
+                    product.UsdExchangeRate = mp.UsdExchangeRate;
                     product.PriceUsd = mp.PriceUsd;
                     product.OriginalPrice = mp.OriginalPrice;
                     product.MaxOrderQuantity = mp.MaxOrderQuantity;

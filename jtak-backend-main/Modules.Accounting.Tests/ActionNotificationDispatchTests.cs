@@ -71,6 +71,9 @@ public class ActionNotificationDispatchTests
         Assert.Single(n.NotificationMessages);
         Assert.NotNull(n.PushSentAtUtc);
         Assert.Equal(1, n.PushAttemptCount);
+        Assert.Contains("10 دقائق", n.TextAr);
+        Assert.Contains("10 minutes", n.TextEn);
+        Assert.Contains("10 dakika", n.TextTr);
         var push = Assert.Single(f.Messages);
         Assert.EndsWith("_customer_ar", push.Topic);
         Assert.Equal(n.DispatchKey, push.Android.Notification.Tag);

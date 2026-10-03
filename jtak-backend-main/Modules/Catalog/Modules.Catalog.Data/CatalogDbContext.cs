@@ -47,6 +47,7 @@ namespace App.Catalog.Data
 
             builder.Entity<MerchantProduct>().ToTable("Catalog_MerchantProduct");
             builder.Entity<MerchantProduct>().HasKey(c => new { c.MerchantId, c.ProductId });
+            builder.Entity<MerchantProduct>().Property(x => x.DiscountPercent).HasPrecision(5, 2);
             builder.Entity<MerchantProduct>().HasOne(x => x.Merchant).WithMany(x => x.MerchantProducts).HasForeignKey(x => x.MerchantId);
             builder.Entity<MerchantProduct>().HasOne(x => x.Product).WithMany(x => x.MerchantProducts).HasForeignKey(x => x.ProductId);
 

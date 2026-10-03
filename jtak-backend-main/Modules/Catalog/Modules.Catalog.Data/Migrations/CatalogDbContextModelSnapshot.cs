@@ -395,6 +395,10 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<decimal>("Discount")
                         .HasColumnType("decimal(65,30)");
 
+                    b.Property<decimal?>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
                     b.Property<decimal>("MerchantPrice")
                         .HasColumnType("decimal(65,30)");
 

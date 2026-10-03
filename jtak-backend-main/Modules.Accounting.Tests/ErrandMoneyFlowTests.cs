@@ -148,7 +148,7 @@ namespace Modules.Accounting.Tests
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public async Task PurchaseAndDelivery_RecordFullCashFloat_MarginAndDriverEarningOnce(bool driverActions)
+        public async Task PurchaseAndDelivery_RecordNetCashFloat_MarginAndPaidDriverEarningOnce(bool driverActions)
         {
             var accessor = new HttpContextAccessor();
             using var app = new AppDbContext(
@@ -329,7 +329,7 @@ namespace Modules.Accounting.Tests
             Assert.Equal(ErrandStatus.Delivered, deliveredCustomer.ErrandStatus);
             Assert.Equal(1100m, deliveredCustomer.CashCollected);
 
-            Assert.Equal(2300m, await ledger.GetAccountBalanceAsync(floatAccount.Id));
+            Assert.Equal(2150m, await ledger.GetAccountBalanceAsync(floatAccount.Id));
             Assert.Equal(1100m, request.ErrandCashCollected);
             Assert.Equal(ErrandStatus.Delivered, request.ErrandStatus);
             Assert.Equal(1, await accounting.JournalTransactions.CountAsync(x =>
@@ -343,7 +343,7 @@ namespace Modules.Accounting.Tests
             var goods = await accounting.Accounts.FirstAsync(x =>
                 x.AccountCode == SystemAccountCodes.ErrandGoodsInTransit);
             Assert.Equal(200m, await ledger.GetAccountBalanceAsync(margin.Id));
-            Assert.Equal(150m, await ledger.GetAccountBalanceAsync(earning.Id));
+            Assert.Equal(0m, await ledger.GetAccountBalanceAsync(earning.Id));
             var subsidy = await accounting.Accounts.FirstAsync(x =>
                 x.AccountCode == SystemAccountCodes.DriverEarningSubsidyExpense);
             Assert.Equal(50m, await ledger.GetAccountBalanceAsync(subsidy.Id));

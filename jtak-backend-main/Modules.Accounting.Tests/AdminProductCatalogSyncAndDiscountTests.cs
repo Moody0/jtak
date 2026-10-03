@@ -703,86 +703,38 @@ namespace Modules.Accounting.Tests
             Assert.False(targetD.IsFeatured);
         }
 
-        [Fact]
-        public void CalculateDiscountPricing_AppliedDirectlyToSyrianCustomerPrice_UserScenario()
+        [Theory]
+        [InlineData(550, 10, 10, 605, 550, 55)]
+        [InlineData(10000, 10, 5, 11000, 10450, 550)]
+        [InlineData(25000, 15, 20, 28750, 25000, 3750)]
+        [InlineData(500, 0, 10, 500, 500, 0)]
+        [InlineData(1000, 10, 0, 1100, 1100, 0)]
+        public void CalculateDiscountPricing_PreservesSupplierQuoteAndCapsSavings(
+            decimal basePrice, decimal markup, decimal requestedDiscount,
+            decimal expectedBefore, decimal expectedFinal, decimal expectedSaving)
         {
-            // Scenario reported by user:
-            // Base merchant price = 450 SYP
-            // Platform markup = 10% -> 450 + 45 = 495 SYP
-            // Discount = 10%
-            // Old calculation applied discount on USD cents, resulting in 445 SYP (50 SYP discount).
-            // Required fix: Apply 10% discount directly to Syrian customer price (495 * 0.9 = 445.5 -> 446 SYP),
-            // giving a discount amount of 49 SYP and customer price of 446 SYP.
-
-            // 1. Direct SYP pricing (without USD)
-            var (saleBasePriceSyp, _, discountAmountSyp, _) = ProductsController.CalculateDiscountPricing(
-                originalPriceLocal: 450m,
-                originalPriceUsd: null,
-                discountPercent: 10m,
-                usdRate: 1m,
-                profitOutOfMerchantPricePercent: 10m
-            );
-
-            // Customer price before discount = 450 + round(450 * 0.10) = 495 SYP
-            // Discount = 10% of 495 = 49.5 -> rounds to 50 SYP discount or 445.5 -> 446 SYP final price
-            // 495 - 446 = 49 SYP discount amount
-            Assert.Equal(49m, discountAmountSyp);
-
-            // Reconstructed customer price: saleBasePrice + round(saleBasePrice * 10%)
-            var customerPriceSyp = saleBasePriceSyp + Math.Round(saleBasePriceSyp * 0.10m, 0, MidpointRounding.AwayFromZero);
-            Assert.Equal(446m, customerPriceSyp);
-            Assert.Equal(405m, saleBasePriceSyp); // 405 + 41 = 446 SYP
-
-            // 2. USD pricing with Syrian conversion (e.g. $3.33 @ rate 135.135135)
-            const decimal usdRate = 135.135135135135m;
-            var (saleBasePriceFromUsd, salePriceUsd, discountAmountFromUsd, originalUsd) = ProductsController.CalculateDiscountPricing(
-                originalPriceLocal: 450m,
-                originalPriceUsd: 3.33m,
-                discountPercent: 10m,
-                usdRate: usdRate,
-                profitOutOfMerchantPricePercent: 10m
-            );
-
-            Assert.Equal(3.33m, originalUsd);
-            Assert.Equal(49m, discountAmountFromUsd);
-            Assert.Equal(405m, saleBasePriceFromUsd);
-            var customerPriceFromUsd = saleBasePriceFromUsd + Math.Round(saleBasePriceFromUsd * 0.10m, 0, MidpointRounding.AwayFromZero);
-            Assert.Equal(446m, customerPriceFromUsd);
-            Assert.Equal(3.00m, salePriceUsd); // 405 / 135.135135 = 2.997 -> rounds to $3.00
+            var stored = ProductsController.CalculateDiscountPricing(basePrice, null, requestedDiscount, 1m, markup);
+            Assert.Equal(basePrice, stored.SalePrice);
+            Assert.Equal(expectedSaving, stored.DiscountAmount);
+            var response = MerchantProductDto.FromStored(new MerchantProduct {
+                MerchantPrice = stored.SalePrice, Discount = stored.DiscountAmount,
+                DiscountPercent = requestedDiscount, ProfitOutOfMerchantPricePercent = markup
+            }, 1m);
+            Assert.Equal(basePrice, response.MerchantProfit);
+            Assert.Equal(expectedBefore, response.Price);
+            Assert.Equal(expectedFinal, response.FinalPrice);
+            Assert.Equal(expectedSaving, response.Discount);
         }
 
-        [Theory]
-        [InlineData(10000, 10, 10, 11000, 9900, 1100, 9000)]
-        [InlineData(25000, 15, 20, 28750, 23000, 5750, 20000)]
-        [InlineData(500, 0, 10, 500, 450, 50, 450)]
-        [InlineData(1000, 10, 0, 1100, 1100, 0, 1000)]
-        public void CalculateDiscountPricing_DirectSyrianCalculation_VariousRates(
-            decimal basePrice,
-            decimal markupPercent,
-            decimal discountPercent,
-            decimal expectedOldCustomerPrice,
-            decimal expectedSaleCustomerPrice,
-            decimal expectedDiscountAmount,
-            decimal expectedSaleBasePrice)
+        [Fact]
+        public void CalculateDiscountPricing_UsdDoesNotRoundOrReduceSupplierBase()
         {
-            var (saleBasePrice, _, discountAmount, _) = ProductsController.CalculateDiscountPricing(
-                originalPriceLocal: basePrice,
-                originalPriceUsd: null,
-                discountPercent: discountPercent,
-                usdRate: 1m,
-                profitOutOfMerchantPricePercent: markupPercent
-            );
-
-            Assert.Equal(expectedDiscountAmount, discountAmount);
-            Assert.Equal(expectedSaleBasePrice, saleBasePrice);
-
-            var actualOldCustomerPrice = basePrice + Math.Round(basePrice * markupPercent / 100m, 0, MidpointRounding.AwayFromZero);
-            Assert.Equal(expectedOldCustomerPrice, actualOldCustomerPrice);
-
-            var actualSaleCustomerPrice = saleBasePrice + Math.Round(saleBasePrice * markupPercent / 100m, 0, MidpointRounding.AwayFromZero);
-            Assert.Equal(expectedSaleCustomerPrice, actualSaleCustomerPrice);
-            Assert.Equal(expectedOldCustomerPrice - expectedDiscountAmount, actualSaleCustomerPrice);
+            var stored = ProductsController.CalculateDiscountPricing(550m, 5m, 10m, 110m, 10m);
+            Assert.Equal(5m, stored.SalePriceUsd);
+            Assert.Equal(5m, stored.OriginalPriceUsd);
+            Assert.Equal(550m, stored.SalePrice);
+            Assert.Equal(55m, stored.DiscountAmount);
+            Assert.Throws<InvalidOperationException>(() => ProductsController.CalculateDiscountPricing(550m, 5m, 10m, 0m, 10m));
         }
     }
 }
-

@@ -308,6 +308,7 @@ namespace Modules.Accounting.Services
             // Collect referenced order IDs and settlement IDs for batch enrichment
             var orderIdsToFetch = new HashSet<int>();
             var settlementIdsToFetch = new HashSet<string>();
+            var paymentIdsToFetch = new HashSet<int>();
 
             foreach (var e in rawEntries)
             {
@@ -327,6 +328,12 @@ namespace Modules.Accounting.Services
                 {
                     if (!string.IsNullOrWhiteSpace(refId))
                         settlementIdsToFetch.Add(refId);
+                }
+                else if (refType == "CaptainToMerchantPayment" &&
+                         refId.StartsWith("Payment-", StringComparison.OrdinalIgnoreCase) &&
+                         int.TryParse(refId.Substring("Payment-".Length), out var paymentId))
+                {
+                    paymentIdsToFetch.Add(paymentId);
                 }
 
                 processedTransactions.Add(new MerchantStatementTransactionDto
@@ -394,6 +401,16 @@ namespace Modules.Accounting.Services
                 }
             }
 
+            // Courier handovers use Payment-{id}, rather than a SettlementRequest.
+            // Posting the journal and the merchant confirming receipt are distinct events.
+            var paymentsMap = new Dictionary<string, Payment>(StringComparer.OrdinalIgnoreCase);
+            if (paymentIdsToFetch.Count > 0)
+            {
+                paymentsMap = await _accountingDb.Payments.AsNoTracking()
+                    .Where(p => paymentIdsToFetch.Contains(p.Id))
+                    .ToDictionaryAsync(p => $"Payment-{p.Id}", StringComparer.OrdinalIgnoreCase);
+            }
+
             // 7. Enrich Transactions with Human-Readable "البيان" and Order/Customer metadata
             foreach (var item in processedTransactions)
             {
@@ -422,6 +439,31 @@ namespace Modules.Accounting.Services
 
                     // Human-Readable Statement Description
                     item.Description = $"طلب #{order.Id} — {merchant.Title} — العميل: {item.CustomerName} — إجمالي الطلب {item.GrossAmount:N0} ل.س — صافي مستحق التاجر {item.MerchantNet:N0} ل.س";
+                }
+                else if (item.ReferenceType == "CaptainToMerchantPayment")
+                {
+                    item.Type = "دفعة من المندوب";
+                    item.PaymentMethod = "نقداً من المندوب";
+                    if (paymentsMap.TryGetValue(item.ReferenceId, out var payment))
+                    {
+                        item.SettlementRequestNumber = $"دفعة #{payment.Id}";
+                        var sender = string.IsNullOrWhiteSpace(payment.ByUser) ? "المندوب" : payment.ByUser;
+                        if (payment.HandoverDate.HasValue)
+                        {
+                            item.FinancialStatus = "مكتمل — تم الاستلام";
+                            item.Description = $"دفعة #{payment.Id} — أكد التاجر استلام {item.Debit:N0} ل.س من {sender} بتاريخ {payment.HandoverDate.Value:yyyy/MM/dd HH:mm} — تم خصم المبلغ من مستحقات التاجر";
+                        }
+                        else
+                        {
+                            item.FinancialStatus = "بانتظار تأكيد التاجر";
+                            item.Description = $"دفعة #{payment.Id} — مبلغ {item.Debit:N0} ل.س من {sender} — تم قيد الدفعة وبانتظار تأكيد التاجر استلامها";
+                        }
+                    }
+                    else
+                    {
+                        item.FinancialStatus = "تعذر التحقق من تأكيد الاستلام";
+                        // Preserve the original ledger memo for unmatched historical records.
+                    }
                 }
                 else if (item.ReferenceType == "MerchantSettlementRequest" || item.ReferenceType == "SettlementRequest")
                 {
