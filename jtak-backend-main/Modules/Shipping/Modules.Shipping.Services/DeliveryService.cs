@@ -259,22 +259,19 @@ namespace Modules.Shipping.Services
         public async Task RemoveOrder(Guid uid, int oid, int? mid = null)
         {
             var s = await GetDeliveryStatus(uid);
-            if (!s.PendingOrders.Any(x => x.OrderId == oid))
-                return;
-
-            var mOrders = s.PendingOrders.Where(x => x.OrderId == oid && x.MerchantId == mid).ToList();
-            if (mOrders.Any())
-                s.Loc = mOrders.Last().Loc;
-
-            s.PendingOrders.RemoveAll(x => x.OrderId == oid && x.MerchantId == mid);
-            SetDeliveryStatus(uid, s);
-
+            // A merchant ID completes that pickup only. Final delivery/cancel
+            // completes every remaining stop, including skipped legacy pickups.
+            // Always reconcile storage even when the cached route is already empty.
             var completedStops = await Queryable()
-                .Where(x => x.OrderId == oid && x.DriverId == uid && x.MerchantId == mid && !x.CompletedDate.HasValue)
+                .Where(x => x.OrderId == oid && x.DriverId == uid &&
+                            (!mid.HasValue || x.MerchantId == mid) && !x.CompletedDate.HasValue)
                 .ToArrayAsync();
             foreach (var stop in completedStops)
                 stop.CompletedDate = DateTime.UtcNow;
             await _uow.SaveChangesAsync();
+            s.PendingOrders.RemoveAll(x => x.OrderId == oid && (!mid.HasValue || x.MerchantId == mid));
+            // Route completion must not replace the driver's actual GPS fix.
+            SetDeliveryStatus(uid, s);
         }
 
         public async Task<List<ShippingOrderDto>> GetOrderStops(int orderId)

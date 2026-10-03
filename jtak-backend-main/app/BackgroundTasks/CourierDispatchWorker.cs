@@ -115,6 +115,20 @@ namespace App.BackgroundTasks
             var onlineDrivers = await deliveryService.GetOnlineDeliveryIds();
             if (onlineDrivers.Length == 0) return;
 
+            // A leftover route stop is not an active delivery. Count the actual
+            // assigned order lifecycle so delivered/canceled history cannot fill
+            // a driver's capacity indefinitely.
+            var activeDeliveryCounts = await db.Orders.AsNoTracking()
+                .Where(x => x.OrderStatus == OrderStatus.Success && x.DeliveryId.HasValue &&
+                            onlineDrivers.Contains(x.DeliveryId.Value) && x.DeliveredAt == null &&
+                            x.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.Delivered &&
+                                d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
+                                d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
+                                d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled))
+                .GroupBy(x => x.DeliveryId.Value)
+                .Select(x => new { DriverId = x.Key, Count = x.Count() })
+                .ToDictionaryAsync(x => x.DriverId, x => x.Count, cancellationToken);
+
             var alreadyOffered = await db.OrderDispatchOffers.AsNoTracking()
                 .Where(x => x.OrderId == orderId && x.MatchingRound == order.CourierMatchingRound)
                 .Select(x => x.DriverId)
@@ -129,8 +143,7 @@ namespace App.BackgroundTasks
                     status.LastLocationUpdatedAt.Value < now.Subtract(LocationFreshness))
                     continue;
 
-                var activeOrders = status.PendingOrders.Where(x => !x.CompletedDate.HasValue)
-                    .Select(x => x.OrderId).Distinct().Count();
+                var activeOrders = activeDeliveryCounts.TryGetValue(driverId, out var count) ? count : 0;
                 if (activeOrders >= 3) continue;
                 var distance = status.Loc.DistanceInMeters((pickup.Lat, pickup.Lng));
                 candidates.Add((driverId, distance));

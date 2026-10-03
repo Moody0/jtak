@@ -1334,6 +1334,7 @@ namespace App.ApiControllers.V1.Delivery
             }
 
             var order = await _service.DeliveryCancelOrder(id, uid);
+            await _deliveryService.RemoveOrder(uid.Value, id);
 
             // Delivery should return products to each merchant (offline), Without return confirmation
             // Bills are preserved for audit trail (never deleted), but deactivated from dues

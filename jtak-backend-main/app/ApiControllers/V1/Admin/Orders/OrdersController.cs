@@ -460,7 +460,9 @@ namespace App.ApiControllers.V1.Admin
                 order.AdminFlowMessage = order.RequiresMerchantDecision
                     ? "بانتظار قرار التاجر — لا تعيّن مندوباً الآن"
                     : activeDetails.Any(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted)
-                        ? "وافق التاجر ويقوم بالتجهيز — انتظر علامة جاهز للاستلام"
+                        ? (order.DeliveryId.HasValue && order.DeliveryId != Guid.Empty
+                            ? "تم قبول الطلب من التاجر والسائق — يمكن بدء التجهيز"
+                            : "وافق التاجر — بانتظار قبول سائق قبل بدء التجهيز")
                             : activeDetails.Length > 0 && activeDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup)
                             ? "الطلب جاهز — عيّن مندوب توصيل"
                             : order.IsJtakMarketOrder ? "طلب جيتك ماركت" : null;
