@@ -1,4 +1,5 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { UsersService } from '../../services/users.service';
 
@@ -7,7 +8,10 @@ import { UsersService } from '../../services/users.service';
   templateUrl: './delete-user-modal.component.html',
   styles: []
 })
-export class DeleteUserModalComponent implements OnInit {
+export class DeleteUserModalComponent implements OnInit,OnDestroy {
+  isSaving=false;
+  errorMessage='';
+  private request?:Subscription;
   @Input() id: string;
 
   constructor(
@@ -18,11 +22,13 @@ export class DeleteUserModalComponent implements OnInit {
   ngOnInit(): void {}
 
   delete() {
-    if (this.id) {
-      this.service.delete(this.id).subscribe({
+    if (this.id && !this.isSaving) {
+      this.isSaving=true;this.errorMessage='';
+      this.request=this.service.delete(this.id).subscribe({
         next: () => this.modal.close(),
-        error: () => this.modal.dismiss()
+        error: error=>{this.isSaving=false;this.errorMessage=error?.error?.message || error?.error?.errorDescription || (typeof error?.error==='string' ? error.error : 'تعذر أرشفة المستخدم. تحقق من السجل ثم حاول مجدداً.');}
       });
     }
   }
+  ngOnDestroy():void {this.request?.unsubscribe();}
 }

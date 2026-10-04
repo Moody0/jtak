@@ -1,4 +1,5 @@
 <div class="reviews-workspace">
+  <div class="alert alert-danger" *ngIf="productReviewsService.listError$ | async as error">{{ error }}</div>
 
   <!-- 1. Header & Live Utility Bar -->
   <header class="reviews-header">
@@ -12,7 +13,7 @@
           <span class="badge badge-subtle-primary">Customer Feedback & Reviews</span>
         </div>
         <p class="header-desc">
-          متابعة تجربة ورضا العملاء، تحليل درجات التقييم، وفحص الملاحظات والشكاوى التشغيلية المرفقة بالصور.
+          متابعة تجربة ورضا العملاء، تحليل درجات التقييم، وفحص ملاحظات العملاء وشكاوى الخدمة.
         </p>
       </div>
     </div>
@@ -58,14 +59,14 @@
       <div class="kpi-metric-body">
         <span class="kpi-label">متوسط التقييم العام</span>
         <strong class="kpi-value text-amber">
-          {{ kpiAvgRating > 0 ? (kpiAvgRating | number:'1.1-1') : '5.0' }} <small>/ 5.0</small>
+          {{ kpiAvgRating | number:'1.1-1' }} <small>/ 5.0</small>
         </strong>
         <div class="kpi-stars-row">
           <i
             *ngFor="let s of ratingStars"
             class="fas fa-star"
-            [class.star-filled]="s <= (kpiAvgRating || 5)"
-            [class.star-empty]="s > (kpiAvgRating || 5)"
+            [class.star-filled]="s <= kpiAvgRating"
+            [class.star-empty]="s > kpiAvgRating"
           ></i>
         </div>
       </div>
@@ -176,16 +177,6 @@
           <span class="pill-badge pill-badge-critical" *ngIf="kpiCriticalCount > 0">{{ kpiCriticalCount }}</span>
         </button>
 
-        <button
-          type="button"
-          class="filter-pill-btn"
-          [class.active]="selectedRatingFilter === 'with_photo'"
-          (click)="filterByRating('with_photo')"
-        >
-          <i class="fas fa-camera text-primary"></i>
-          <span>مرفق صور</span>
-          <span class="pill-badge" *ngIf="kpiWithPhotoCount > 0">{{ kpiWithPhotoCount }}</span>
-        </button>
 
         <button
           type="button"

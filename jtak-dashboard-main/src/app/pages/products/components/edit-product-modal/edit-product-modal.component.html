@@ -3,8 +3,8 @@
   [item]="item"
   [itemName]="item.title || ''"
   moduleName="Product"
-  [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid"
+  [isLoading]="isSaving || (isLoading$ | async)"
+  [saveDisabled]="isSaving || formGroup.invalid"
   (cancelClicked)="modal.dismiss()"
   (saveClicked)="save()"
 >

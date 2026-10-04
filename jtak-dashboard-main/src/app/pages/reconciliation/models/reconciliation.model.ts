@@ -274,6 +274,7 @@ export interface SettlementHistoryItem {
 }
 
 export interface SettlementHistorySummary {
+  currencyTotals?:{currency:string;amount:number}[];
   totalCompletedCount: number;
   totalCompletedAmount: number;
   merchantCompletedCount: number;

@@ -70,6 +70,7 @@ export class CategoriesListComponent
 
   ngOnInit(): void {
     this.service.setDefaults();
+    this.service.setCategoryLevel('all');
     this.searchForm();
     this.loadHierarchyData();
     this.service.fetchPost();
@@ -80,7 +81,7 @@ export class CategoriesListComponent
 
     this.subs.sink = this.service.totalRecords$.subscribe((total) => {
       this.totalRecords = total || 0;
-      this.kpiTotal = this.totalRecords;
+      // KPI total is loaded from the full hierarchy, independently of filters.
     });
 
     this.sorting = this.service.sorting;
@@ -89,9 +90,11 @@ export class CategoriesListComponent
 
   loadHierarchyData(): void {
     forkJoin({
-      roots: this.service.getAll(true).pipe(catchError(() => of([]))),
-      subs: this.service.getAll(false).pipe(catchError(() => of([]))),
+      roots: this.service.getAll(true, true).pipe(catchError(() => of([]))),
+      subs: this.service.getAll(false, true).pipe(catchError(() => of([]))),
     }).subscribe(({ roots, subs }) => {
+      this.kpiTotal = roots.length + subs.length;
+      this.parentMap.clear();
       this.parentCategories = roots;
       this.kpiRoots = roots.length;
       this.kpiSubs = subs.length;
@@ -147,17 +150,19 @@ export class CategoriesListComponent
     this.selectedLevel = level;
     this.selection.clear();
     this.service.setCategoryLevel(level);
-    this.service.fetchPost();
+    this.applyFilters();
   }
 
   filterByParent(parentId: number | null): void {
     this.selectedParentId = parentId;
     this.selection.clear();
+    this.applyFilters();
   }
 
   filterByStatus(status: 'all' | 'active' | 'inactive'): void {
     this.selectedStatus = status;
     this.selection.clear();
+    this.applyFilters();
   }
 
   clearSearch(): void {
@@ -171,7 +176,7 @@ export class CategoriesListComponent
     this.selectedStatus = 'all';
     this.selection.clear();
     this.service.setCategoryLevel('all');
-    this.service.fetchPost();
+    this.applyFilters();
   }
 
   getDisplayedItems(items: Category[]): Category[] {
@@ -194,6 +199,13 @@ export class CategoriesListComponent
 
       return true;
     });
+  }
+
+  private applyFilters(): void {
+    const filter: any = {};
+    if (this.selectedParentId !== null) filter.parentId = this.selectedParentId;
+    if (this.selectedStatus !== 'all') filter.active = this.selectedStatus === 'active';
+    this.service.patchState({ filter, paginator: Object.assign(this.service.paginator, { page: 0 }) });
   }
 
   paginate(paginator: PaginatorState): void {

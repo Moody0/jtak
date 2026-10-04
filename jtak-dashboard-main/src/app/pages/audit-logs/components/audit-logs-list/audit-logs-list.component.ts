@@ -2,6 +2,8 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
 import { SubSink } from 'subsink';
 import {
   IPaginatorView,
@@ -23,6 +25,9 @@ export class AuditLogsListComponent
   implements OnInit, OnDestroy, ISortView, IPaginatorView, ISearchView
 {
   private subs = new SubSink();
+  private summarySub?: Subscription;
+  private copyTimer?: ReturnType<typeof setTimeout>;
+  summaryError = false;
 
   summary: AdminAuditLogSummary = {
     totalOperations: 0,
@@ -30,8 +35,8 @@ export class AuditLogsListComponent
     thisWeekOperations: 0,
     successCount: 0,
     failureCount: 0,
-    topModule: 'Orders',
-    topAdmin: 'Admin',
+    topModule: '',
+    topAdmin: '',
   };
 
   searchGroup: UntypedFormGroup;
@@ -55,6 +60,11 @@ export class AuditLogsListComponent
     { value: 'Catalog', label: 'الكتالوج والمنتجات' },
     { value: 'Banners', label: 'الإعلانات والبنرات' },
     { value: 'Settings', label: 'إعدادات النظام' },
+    { value: 'Pages', label: 'محتوى صفحات التطبيقات' },
+    { value: 'Notifications', label: 'الإشعارات' },
+    { value: 'Payments', label: 'الدفعات' },
+    { value: 'Reconciliation', label: 'العهد وتسوية الصندوق' },
+    { value: 'ErrandRequests', label: 'طلبات الشراء' },
     { value: 'Auth', label: 'المصادقة والدخول' },
   ];
 
@@ -81,16 +91,18 @@ export class AuditLogsListComponent
   readonly results = [
     { value: '', label: 'كافة الحالات' },
     { value: 'Success', label: 'ناجحة' },
-    { value: 'Failed', label: 'فاشلة' },
+    { value: 'Failed', label: 'غير ناجحة' },
   ];
 
   constructor(
     private fb: UntypedFormBuilder,
     public auditLogsService: AuditLogsService,
-    private modalService: NgbModal
+    private modalService: NgbModal,
+    private toastr: ToastrService
   ) {}
 
   ngOnInit(): void {
+    this.auditLogsService.setDefaults();
     // Keep the last successful totals visible while the page refreshes them.
     this.summary = this.auditLogsService.getCachedSummary() || this.summary;
 
@@ -107,12 +119,14 @@ export class AuditLogsListComponent
   }
 
   loadSummary(): void {
-    this.subs.sink = this.auditLogsService.getSummary().subscribe({
+    this.summarySub?.unsubscribe();
+    this.summaryError = false;
+    this.summarySub = this.auditLogsService.getSummary().subscribe({
       next: (summary) => {
         this.summary = summary;
         this.auditLogsService.cacheSummary(summary);
       },
-      error: () => {},
+      error: () => { this.summaryError = true; },
     });
   }
 
@@ -134,6 +148,10 @@ export class AuditLogsListComponent
   }
 
   applyFilters(): void {
+    if (this.fromDate && this.toDate && this.fromDate > this.toDate) {
+      this.toastr.warning('تاريخ البداية يجب أن يسبق تاريخ النهاية.');
+      return;
+    }
     const filter: any = {};
     if (this.selectedModule) filter.module = this.selectedModule;
     if (this.selectedAction) filter.action = this.selectedAction;
@@ -142,7 +160,7 @@ export class AuditLogsListComponent
     if (this.toDate) filter.toDate = this.toDate;
 
     const paginator = this.auditLogsService.paginator;
-    paginator.page = 1;
+    paginator.page = 0;
 
     this.auditLogsService.patchState({
       filter,
@@ -203,7 +221,7 @@ export class AuditLogsListComponent
     if (this.toDate) filter.toDate = this.toDate;
 
     const paginator = this.auditLogsService.paginator;
-    paginator.page = 1;
+    paginator.page = 0;
     this.auditLogsService.patchState({ filter, searchTerm: '', paginator });
   }
 
@@ -215,7 +233,7 @@ export class AuditLogsListComponent
     this.toDate = '';
     this.searchGroup?.controls.searchTerm.setValue('', { emitEvent: false });
     const paginator = this.auditLogsService.paginator;
-    paginator.page = 1;
+    paginator.page = 0;
     this.auditLogsService.patchState({ filter: {}, searchTerm: '', paginator });
   }
 
@@ -245,6 +263,11 @@ export class AuditLogsListComponent
       Catalog: 'الكتالوج والمنتجات',
       Banners: 'الإعلانات والبنرات',
       Settings: 'إعدادات النظام',
+      Pages: 'محتوى صفحات التطبيقات',
+      Notifications: 'الإشعارات',
+      Payments: 'الدفعات',
+      Reconciliation: 'العهد وتسوية الصندوق',
+      ErrandRequests: 'طلبات الشراء',
       Auth: 'المصادقة والدخول',
       System: 'النظام',
     };
@@ -255,6 +278,16 @@ export class AuditLogsListComponent
     const labels: { [key: string]: string } = {
       Create: 'إنشاء',
       Update: 'تعديل',
+      Edit: 'تعديل',
+      Disable: 'تعطيل مستخدم',
+      Enable: 'تفعيل مستخدم',
+      UpdateSettings: 'تحديث إعدادات النظام',
+      UpdateContactSettings: 'تحديث بيانات التواصل',
+      UpdateDriverPricing: 'تحديث تسعير التوصيل',
+      UpdateErrandDriverEarning: 'تحديث أجر طلبات الشراء',
+      UpdateJtakMarketCourierPay: 'تحديث أجر مندوب جيتك ماركت',
+      UpdateJtakMarketDeliveryFee: 'تحديث أجرة توصيل جيتك ماركت',
+      UpdateDeliveryCoverage: 'تحديث نطاق التوصيل',
       Delete: 'حذف',
       Archive: 'أرشفة',
       Restore: 'استعادة',
@@ -305,7 +338,7 @@ export class AuditLogsListComponent
     this.searchGroup.controls.searchTerm.setValue('');
 
     const paginator = this.auditLogsService.paginator;
-    paginator.page = 1;
+    paginator.page = 0;
 
     this.auditLogsService.patchState({
       filter: {},
@@ -356,14 +389,16 @@ export class AuditLogsListComponent
     modalRef.componentInstance.log = log;
   }
 
-  copyText(text: string, id: string, event?: Event): void {
+  async copyText(text: string, id: string, event?: Event): Promise<void> {
     if (event) {
       event.stopPropagation();
     }
     if (!text) return;
-    navigator.clipboard.writeText(text);
+    try { await navigator.clipboard.writeText(text); }
+    catch { this.toastr.error('تعذر النسخ. انسخ النص يدوياً أو افتح اللوحة عبر HTTPS.'); return; }
     this.copiedId = id;
-    setTimeout(() => {
+    if (this.copyTimer) clearTimeout(this.copyTimer);
+    this.copyTimer = setTimeout(() => {
       if (this.copiedId === id) {
         this.copiedId = null;
       }
@@ -445,5 +480,7 @@ export class AuditLogsListComponent
 
   ngOnDestroy(): void {
     this.subs.unsubscribe();
+    this.summarySub?.unsubscribe();
+    if (this.copyTimer) clearTimeout(this.copyTimer);
   }
 }

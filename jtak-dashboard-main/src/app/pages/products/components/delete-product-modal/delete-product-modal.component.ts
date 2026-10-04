@@ -16,6 +16,7 @@ export class DeleteProductModalComponent implements OnInit {
   @Input() selectedIds: number[] = [];
 
   isLoading$: Observable<boolean>;
+  deleting = false;
 
   constructor(
     private service: ProductsService,
@@ -28,46 +29,19 @@ export class DeleteProductModalComponent implements OnInit {
   }
 
   delete(): void {
-    if (this.isBulk && this.selectedIds?.length) {
-      this.service.deleteSelected(this.selectedIds).pipe(
-        catchError(() => {
-          // If bulk endpoint fails, fallback to parallel individual deletes
-          return forkJoin(
-            this.selectedIds.map((id) =>
-              this.service.delete(id).pipe(
-                map(() => true),
-                catchError(() => of(false))
-              )
-            )
-          ).pipe(
-            map((results) => {
-              const allSuccess = results.every(Boolean);
-              if (!allSuccess) {
-                throw new Error('Some items could not be deleted');
-              }
-              return true;
-            })
-          );
-        })
-      ).subscribe({
-        next: () => this.modal.close(true),
-        error: (err) => {
-          this.toaster.info(
-            'تنبيه: المنتجات المرتبطة بطلبات أو وجبات مخزون سابقة لا يمكن حذفها من قاعدة البيانات منعاً لتلف السجلات، يرجى استخدام خيار "تعطيل" بدلاً من الحذف.'
-          );
-          this.modal.dismiss(err);
-        },
-      });
-    } else if (this.id) {
-      this.service.delete(this.id).subscribe({
-        next: () => this.modal.close(true),
-        error: (err) => {
-          this.toaster.info(
-            'تنبيه: هذا المنتج مرتبط بسجلات طلبات أو مخزون سابقة في النظام. يرجى استخدام خيار "تعطيل" لإخفائه عن العملاء بدلاً من حذفه نهائياً.'
-          );
-          this.modal.dismiss(err);
-        },
-      });
-    }
+    if (this.deleting) return;
+    const ids = this.isBulk ? this.selectedIds : [this.id];
+    if (!ids?.length || ids.some(id => !id)) return;
+    this.deleting = true;
+    const request = this.isBulk ? this.service.deleteSelected(ids) : this.service.delete(this.id);
+    request.subscribe({
+      next: () => this.modal.close(true),
+      error: (error) => {
+        this.deleting = false;
+        const body = error?.error;
+        this.toaster.error(Array.isArray(body?.errors) ? body.errors.join('، ') : 'تعذر حذف المنتج. حاول مرة أخرى.');
+      }
+    });
   }
+
 }

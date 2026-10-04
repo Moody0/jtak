@@ -55,6 +55,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
 
   isLoading$: Observable<boolean>;
   formGroup: UntypedFormGroup;
+  isSaving = false;
 
   // Category & Hierarchy structure
   categoriesList: CategoryOption[] = [];
@@ -250,7 +251,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   loadLookups(): void {
     this.merchantsLoading = true;
     this.merchantsLoadError = false;
-    forkJoin({
+    this.subs.sink = forkJoin({
       roots: this.categoriesService.getAll(true).pipe(catchError(() => of([]))),
       subs: this.categoriesService.getAll(false).pipe(catchError(() => of([]))),
       merchants: this.merchantsService
@@ -332,9 +333,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
 
         const market = this.getMarketMerchant();
         const currentMerchantId = Number(this.formGroup.get('merchantId')?.value || 0);
-        this.merchantOptions = this.merchantsList.filter(
-          (merchant) => merchant.merchantKind === 0 || merchant.id === market?.id || this.isMarketMerchant(merchant)
-        );
+        this.merchantOptions = [...this.merchantsList];
         if (currentMerchantId && !this.merchantOptions.some((merchant) => merchant.id === currentMerchantId)) {
           const current = this.merchantsList.find((merchant) => merchant.id === currentMerchantId);
           if (current) this.merchantOptions.unshift(current);
@@ -458,11 +457,17 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   }
 
   save(): void {
+    if (this.isSaving) return;
+    if (this.formGroup.invalid) { this.formGroup.markAllAsTouched(); return; }
+    if (!String(this.formGroup.get('title')?.value || '').trim()) {
+      this.formGroup.get('title')?.setErrors({ required: true }); return;
+    }
     if (this.formGroup.invalid) {
       this.formGroup.markAllAsTouched();
       return;
     }
 
+    this.isSaving = true;
     const raw = this.formGroup.value;
     const photosArray = raw.photos || [];
     const photosStr = Array.isArray(photosArray) ? photosArray.join(',') : (photosArray || '');
@@ -523,7 +528,8 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   }
 
   private handleSaveError(error: any): void {
-    const message = typeof error?.error === 'string' ? error.error : error?.error?.message;
+    this.isSaving = false;
+    const message = Array.isArray(error?.error?.errors) ? error.error.errors.join('، ') : typeof error?.error === 'string' ? error.error : error?.error?.message;
     this.toasterService.error(message || 'تعذر حفظ المنتج وربطه بالمتجر، يرجى المحاولة مرة أخرى.');
   }
 

@@ -1,6 +1,8 @@
 import { BaseModel } from 'src/app/_metronic/shared/crud-table';
 
 export interface Payment extends BaseModel {
+  requestKey?: string;
+  merchantId?: number;
   id: any;
   referenceNumber?: string;
   paymentType?: string;

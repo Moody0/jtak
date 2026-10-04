@@ -2,7 +2,8 @@ import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, TemplateRef
 import { printDocument } from 'src/app/shared/printing/print-document';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
-import { interval } from 'rxjs';
+import { interval, Subject, forkJoin } from 'rxjs';
+import { takeUntil, finalize } from 'rxjs/operators';
 import {
   CaptainSettlementSummary,
   CaptainShiftDetails,
@@ -36,6 +37,10 @@ import { NotificationSummaryService } from 'src/app/_metronic/layout/core/notifi
 })
 export class ReconciliationListComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
+  private destroy$=new Subject<void>();
+  private closeTimer?:ReturnType<typeof setTimeout>;
+  private pendingReads=new Map<string,Subject<void>>();
+  dataError='';
   private isPollingRequests = false;
   private isPollingCaptains = false;
   private isPollingHistory = false;
@@ -71,6 +76,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
 
   get historyPrintTotals(): { total: number; merchant: number; captain: number; earnings: number } {
     return this.historyPrintItems.reduce((totals, item) => {
+      if(item.currency && item.currency!=='SYP') return totals;
       const amount = item.amount || 0;
       totals.total += amount;
       if (item.partyType === SettlementPartyType.Merchant) totals.merchant += amount;
@@ -164,9 +170,9 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   }
 
   startAutoRefresh(): void {
-    this.subs.sink = interval(5000).subscribe(() => {
+    this.subs.sink = interval(5000).pipe(takeUntil(this.destroy$)).subscribe(() => {
       // Avoid interrupting the user if a modal is open or an action is currently processing
-      if (this.modalService.hasOpenModals() || this.processingRequestId || this.isSettling) {
+      if (this.modalService.hasOpenModals() || this.processingRequestId || this.isSettling || this.isLoadingMerchants || this.isLoadingMerchantSummary || this.isLoading || this.isLoadingHistory || this.isLoadingRequests) {
         return;
       }
       this.pollSettlementRequests();
@@ -183,14 +189,14 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
 
   loadMerchantSummary(): void {
     this.isLoadingMerchantSummary = true;
-    this.reconciliationService.getMerchantSummary().subscribe({
+    this.reconciliationService.getMerchantSummary().pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('merchant-summary')),finalize(()=>this.isPollingMerchants=false)).subscribe({
       next: (summary) => {
         this.merchantSummary = summary;
         this.isLoadingMerchantSummary = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load merchant reconciliation summary', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load merchant reconciliation summary', err);
         this.isLoadingMerchantSummary = false;
         this.cdr.detectChanges();
       },
@@ -204,7 +210,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       pageSize: this.merchantPageSize,
       searchTerm: this.merchantSearchTerm.trim(),
     };
-    this.reconciliationService.getMerchantReconciliationDataTable(req).subscribe({
+    this.reconciliationService.getMerchantReconciliationDataTable(req).pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('merchant-table')),finalize(()=>this.isPollingMerchants=false)).subscribe({
       next: (res) => {
         this.merchantsList = res.items || [];
         this.merchantTotalRecords = res.totalRecords || 0;
@@ -212,7 +218,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load merchants list', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load merchants list', err);
         this.isLoadingMerchants = false;
         this.cdr.detectChanges();
       },
@@ -220,32 +226,14 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   }
 
   pollMerchants(): void {
-    if (this.isPollingMerchants) return;
+    if (this.isPollingMerchants || this.isLoadingMerchantSummary || this.isLoadingMerchants) return;
     this.isPollingMerchants = true;
-    this.reconciliationService.getMerchantSummary().subscribe({
-      next: (s) => {
-        this.merchantSummary = s;
-        const req: MerchantReconciliationDataTableRequest = {
-          page: this.merchantPageNumber,
-          pageSize: this.merchantPageSize,
-          searchTerm: this.merchantSearchTerm.trim(),
-        };
-        this.reconciliationService.getMerchantReconciliationDataTable(req).subscribe({
-          next: (res) => {
-            this.merchantsList = res.items || [];
-            this.merchantTotalRecords = res.totalRecords || 0;
-            this.isPollingMerchants = false;
-            this.cdr.detectChanges();
-          },
-          error: () => {
-            this.isPollingMerchants = false;
-          },
-        });
-      },
-      error: () => {
-        this.isPollingMerchants = false;
-      },
-    });
+    const req:MerchantReconciliationDataTableRequest={page:this.merchantPageNumber,pageSize:this.merchantPageSize,searchTerm:this.merchantSearchTerm.trim()};
+    forkJoin({summary:this.reconciliationService.getMerchantSummary(),table:this.reconciliationService.getMerchantReconciliationDataTable(req)})
+      .pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('merchant-summary')),takeUntil(this.replaceRead('merchant-table')),finalize(()=>this.isPollingMerchants=false)).subscribe({
+        next:result=>{this.merchantSummary=result.summary;this.merchantsList=result.table.items || [];this.merchantTotalRecords=result.table.totalRecords || 0;this.cdr.detectChanges();},
+        error:()=>{this.dataError='تعذر تحديث حسابات التجار. حدّث الصفحة للتحقق من الأرصدة.';this.cdr.detectChanges();}
+      });
   }
 
   onMerchantSearch(): void {
@@ -300,14 +288,14 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
 
   loadMerchantStatementData(merchantId: number, search?: string): void {
     this.isLoadingMerchantStatement = true;
-    this.reconciliationService.getMerchantStatement(merchantId, search).subscribe({
+    this.reconciliationService.getMerchantStatement(merchantId, search).pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('merchant-statement'))).subscribe({
       next: (stmt) => {
         this.merchantStatementData = stmt;
         this.isLoadingMerchantStatement = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load merchant statement', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load merchant statement', err);
         this.isLoadingMerchantStatement = false;
         this.cdr.detectChanges();
       },
@@ -348,7 +336,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   pollSettlementRequests(): void {
     if (this.isPollingRequests) return;
     this.isPollingRequests = true;
-    this.reconciliationService.getSettlementRequests().subscribe({
+    this.reconciliationService.getSettlementRequests().pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('requests')),finalize(()=>this.isPollingRequests=false)).subscribe({
       next: (items) => {
         this.settlementRequests = items || [];
         this.isPollingRequests = false;
@@ -363,7 +351,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   pollCaptains(): void {
     if (this.isPollingCaptains) return;
     this.isPollingCaptains = true;
-    this.reconciliationService.getCaptains().subscribe({
+    this.reconciliationService.getCaptains().pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('captains')),finalize(()=>this.isPollingCaptains=false)).subscribe({
       next: (data) => {
         this.captains = data || [];
         this.applyFilter();
@@ -389,7 +377,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       sortColumn: 'CompletedAt',
       sortDirection: 'DESC',
     };
-    this.reconciliationService.getSettlementHistoryDataTable(req).subscribe({
+    this.reconciliationService.getSettlementHistoryDataTable(req).pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('history')),finalize(()=>this.isPollingHistory=false)).subscribe({
       next: (res) => {
         this.historyItems = res.items || [];
         this.historyTotalRecords = res.totalRecords || 0;
@@ -405,7 +393,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
 
   loadSettlementRequests(): void {
     this.isLoadingRequests = true;
-    this.reconciliationService.getSettlementRequests().subscribe({
+    this.reconciliationService.getSettlementRequests().pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('requests')),finalize(()=>this.isPollingRequests=false)).subscribe({
       next: (items) => {
         this.settlementRequests = items || [];
         this.isLoadingRequests = false;
@@ -427,7 +415,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       : `قبول طلب التاجر ${item.requestNumber}؟ سيبقى المبلغ محجوزاً حتى تأكيد الاستلام.`;
     if (!window.confirm(message)) return;
     this.processingRequestId = item.id;
-    this.reconciliationService.acceptRequest(item.id).subscribe({
+    this.reconciliationService.acceptRequest(item.id).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => this.finishRequestAction(),
       error: (err) => this.failRequestAction(err),
     });
@@ -438,7 +426,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     const reason = window.prompt('اكتب سبب رفض طلب التسوية (سيصل لصاحب الطلب):');
     if (reason === null || !reason.trim()) return;
     this.processingRequestId = item.id;
-    this.reconciliationService.rejectRequest(item.id, reason.trim()).subscribe({
+    this.reconciliationService.rejectRequest(item.id, reason.trim()).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => this.finishRequestAction(),
       error: (err) => this.failRequestAction(err),
     });
@@ -447,7 +435,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   completeMerchantSettlement(item: SettlementRequestItem): void {
     if (!window.confirm(`تأكيد أن التاجر استلم ${item.amount.toLocaleString()} ل.س؟ سيتم خصم المبلغ من خزنة جيتك وإغلاق التسوية.`)) return;
     this.processingRequestId = item.id;
-    this.reconciliationService.completeMerchantRequest(item.id).subscribe({
+    this.reconciliationService.completeMerchantRequest(item.id).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => this.finishRequestAction(),
       error: (err) => this.failRequestAction(err),
     });
@@ -456,7 +444,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   completeDriverEarnings(item: SettlementRequestItem): void {
     if (this.processingRequestId || !window.confirm(`هل دفعت للسائق فعلياً ${item.amount.toLocaleString()} ل.س؟ سيتم خصمها من مستحقاته وخزينة جيتك مرة واحدة، دون تغيير عهدته النقدية.`)) return;
     this.processingRequestId = item.id;
-    this.reconciliationService.completeDriverEarningsRequest(item.id).subscribe({
+    this.reconciliationService.completeDriverEarningsRequest(item.id).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => this.finishRequestAction(),
       error: (err) => this.failRequestAction(err),
     });
@@ -500,7 +488,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
 
   loadCaptains(): void {
     this.isLoading = true;
-    this.reconciliationService.getCaptains().subscribe({
+    this.reconciliationService.getCaptains().pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('captains')),finalize(()=>this.isPollingCaptains=false)).subscribe({
       next: (data) => {
         this.captains = data || [];
         this.applyFilter();
@@ -508,7 +496,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load fleet reconciliation summaries', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load fleet reconciliation summaries', err);
         this.isLoading = false;
         this.cdr.detectChanges();
       },
@@ -527,7 +515,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       sortColumn: 'CompletedAt',
       sortDirection: 'DESC',
     };
-    this.reconciliationService.getSettlementHistoryDataTable(req).subscribe({
+    this.reconciliationService.getSettlementHistoryDataTable(req).pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('history')),finalize(()=>this.isPollingHistory=false)).subscribe({
       next: (res) => {
         this.historyItems = res.items || [];
         this.historyTotalRecords = res.totalRecords || 0;
@@ -536,7 +524,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load settlement history', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load settlement history', err);
         this.isLoadingHistory = false;
         this.cdr.detectChanges();
       },
@@ -596,14 +584,14 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     this.isLoadingReceipt = true;
     this.modalService.open(content, { size: 'lg', centered: true, scrollable: true });
 
-    this.reconciliationService.getSettlementReceipt(targetId).subscribe({
+    this.reconciliationService.getSettlementReceipt(targetId).pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('receipt'))).subscribe({
       next: (receipt) => {
         this.selectedReceipt = receipt;
         this.isLoadingReceipt = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load settlement receipt', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load settlement receipt', err);
         this.isLoadingReceipt = false;
         this.cdr.detectChanges();
       }
@@ -615,14 +603,14 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     this.isLoadingReceipt = true;
     this.modalService.open(content, { size: 'lg', centered: true, scrollable: true });
 
-    this.reconciliationService.getSettlementReceipt(item.id).subscribe({
+    this.reconciliationService.getSettlementReceipt(item.id).pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('receipt'))).subscribe({
       next: (receipt) => {
         this.selectedReceipt = receipt;
         this.isLoadingReceipt = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load settlement receipt', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load settlement receipt', err);
         this.isLoadingReceipt = false;
         this.cdr.detectChanges();
       }
@@ -646,7 +634,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       sortDirection: 'DESC',
     };
 
-    this.reconciliationService.getSettlementHistoryPrintData(req).subscribe({
+    this.reconciliationService.getSettlementHistoryPrintData(req).pipe(takeUntil(this.destroy$)).subscribe({
       next: (items) => {
         this.historyPrintItems = items || [];
         this.isPrintingHistory = false;
@@ -654,7 +642,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         printDocument('#historyPrintReport', true);
       },
       error: (err) => {
-        console.error('Failed to load print dataset', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load print dataset', err);
         this.isPrintingHistory = false;
         this.cdr.detectChanges();
       }
@@ -706,14 +694,17 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     this.settlementSuccess = null;
     this.isSettling = false;
 
-    this.modalService.open(content, { size: 'lg', backdrop: 'static', centered: true });
+    this.modalService.open(content, { size: 'lg', backdrop: 'static', centered: true, beforeDismiss:()=>!this.isSettling });
   }
 
   confirmSettlement(modal: any): void {
-    if (!this.selectedCaptain) return;
+    if (!this.selectedCaptain || this.isSettling) return;
+    if(!Number.isFinite(this.settleCashReceived) || this.settleCashReceived<0 || Math.abs(this.settleCashReceived*100-Math.round(this.settleCashReceived*100))>0.000001){
+      this.settlementError='أدخل مبلغاً غير سالب بحد أقصى منزلتين عشريتين.';return;
+    }
 
     if (this.settleDiscrepancy !== 0 && !this.settleReason.trim()) {
-      this.settlementError = 'Please provide a discrepancy reason for non-zero cash variance.';
+      this.settlementError = 'اكتب سبب الفرق بين المبلغ المستلم والمبلغ المتوقع.';
       return;
     }
 
@@ -729,20 +720,20 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
       shortageTreatment: this.settleDiscrepancy < 0 ? this.shortageTreatment : undefined,
     };
 
-    this.reconciliationService.settleShift(request).subscribe({
+    this.reconciliationService.settleShift(request).pipe(takeUntil(this.destroy$)).subscribe({
       next: (result) => {
         this.settlementSuccess = result;
         this.isSettling = false;
         this.loadCaptains();
         this.loadHistory();
         this.cdr.detectChanges();
-        setTimeout(() => {
+        this.closeTimer = setTimeout(() => {
           modal.close();
         }, 1500);
       },
       error: (err) => {
         this.isSettling = false;
-        this.settlementError = err?.error?.message || err?.message || 'Settlement failed. Check server logs.';
+        this.settlementError = err?.error?.message || 'تعذر إتمام التسوية. حدّث البيانات وتحقق من السجل قبل المحاولة مجدداً.';
         this.cdr.detectChanges();
       },
     });
@@ -755,14 +746,14 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
 
     this.modalService.open(content, { size: 'xl', centered: true });
 
-    this.reconciliationService.getCaptainStatement(captain.captainUserId).subscribe({
+    this.reconciliationService.getCaptainStatement(captain.captainUserId).pipe(takeUntil(this.destroy$),takeUntil(this.replaceRead('captain-statement'))).subscribe({
       next: (data) => {
         this.statementDetails = data;
         this.isLoadingStatement = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Failed to load statement', err);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load statement', err);
         this.isLoadingStatement = false;
         this.cdr.detectChanges();
       },
@@ -833,7 +824,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     this.isPrintingMerchantStatement = true;
     this.subs.sink = this.reconciliationService.getCompleteMerchantStatement(
       this.selectedMerchantForStatement.merchantId, this.statementSearchTerm,
-    ).subscribe({
+    ).pipe(takeUntil(this.destroy$)).subscribe({
       next: statement => {
         this.merchantStatementData = statement;
         this.isPrintingMerchantStatement = false;
@@ -841,7 +832,7 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         printDocument('#merchant-statement-print-area', true);
       },
       error: error => {
-        console.error('Failed to load complete merchant statement for printing', error);
+        this.dataError='تعذر تحميل بعض البيانات المالية. حدّث الصفحة للتحقق من الأرصدة.'; console.error('Failed to load complete merchant statement for printing', error);
         this.isPrintingMerchantStatement = false;
         this.cdr.detectChanges();
       },
@@ -852,7 +843,12 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     printDocument('#driver-statement-print-area', true);
   }
 
+  private replaceRead(key:string):Subject<void> {
+    this.pendingReads.get(key)?.next();this.pendingReads.get(key)?.complete();const signal=new Subject<void>();this.pendingReads.set(key,signal);return signal;
+  }
   ngOnDestroy(): void {
+    if(this.closeTimer) clearTimeout(this.closeTimer);
+    this.destroy$.next();this.destroy$.complete();this.pendingReads.forEach(s=>s.complete());
     this.subs.unsubscribe();
   }
 }

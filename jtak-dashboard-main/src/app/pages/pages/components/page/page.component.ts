@@ -16,6 +16,12 @@ import { TranslateService } from '@ngx-translate/core';
 export class PageComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
   private pageLoadSub?: Subscription;
+  private copySub?: Subscription;
+  private saveSub?: Subscription;
+  private scopeVersion = 0;
+  hasLoaded = false;
+  loadError = false;
+  isCopying = false;
   id: string;
   _pageData: Page | null = null;
   formGroup: UntypedFormGroup;
@@ -49,10 +55,10 @@ export class PageComponent implements OnInit, OnDestroy {
   ) {}
 
   loadForm() {
-    this.formGroup = this.fb.group({
-      title: [this._pageData?.Title || this.id],
-      body: [this._pageData?.body || '', [Validators.required]],
-    });
+    const values = { title: this._pageData?.Title || this.id, body: this._pageData?.body || '' };
+    if (this.formGroup) this.formGroup.reset(values);
+    else this.formGroup = this.fb.group({ title: [values.title], body: [values.body, [Validators.required]] });
+    if (this.hasLoaded) this.formGroup.enable(); else this.formGroup.disable();
   }
 
   get isTermsPage(): boolean {
@@ -77,14 +83,19 @@ export class PageComponent implements OnInit, OnDestroy {
   }
 
   selectTermsApp(app: string): void {
-    if (this.selectedTermsApp === app || this.isSaving) return;
+    if (this.selectedTermsApp === app || this.isSaving || this.isCopying || !this.termsApps.some(item => item.key === app)) return;
     this.selectedTermsApp = app;
     this.loadPage();
   }
 
-  private loadPage(): void {
+  loadPage(): void {
     if (!this.id) return;
+    this.scopeVersion++;
+    this.copySub?.unsubscribe();
+    this.isCopying = false;
     this.pageLoadSub?.unsubscribe();
+    this.hasLoaded = false;
+    this.loadError = false;
     this.isLoadingPage = true;
     this.pageLoadSub = this.service.getPage(
       this.id,
@@ -93,16 +104,15 @@ export class PageComponent implements OnInit, OnDestroy {
       next: (res) => {
         this._pageData = res || ({} as Page);
         this._pageData.Title = this.id;
+        this.hasLoaded = true;
         this.loadForm();
         this.isLoadingPage = false;
         this.cdk.detectChanges();
       },
       error: () => {
+        this.loadError = true;
         this._pageData = null;
-        this.formGroup = this.fb.group({
-          title: [this.id],
-          body: ['', [Validators.required]],
-        });
+        this.loadForm();
         this.isLoadingPage = false;
         this.toasterService.error(this.translate.instant('PAGES.TERMS_LOAD_ERROR'));
         this.cdk.detectChanges();
@@ -111,18 +121,23 @@ export class PageComponent implements OnInit, OnDestroy {
   }
 
   copyCustomerTerms(): void {
-    if (!this.isTermsPage || this.selectedTermsApp === 'customer' || this.isSaving) return;
-    this.service.getPage(this.id, 'customer').subscribe({
+    if (!this.isTermsPage || this.selectedTermsApp === 'customer' || this.isSaving || this.isLoadingPage || this.isCopying || !this.hasLoaded) return;
+    this.isCopying = true;
+    this.formGroup.disable();
+    this.copySub = this.service.getPage(this.id, 'customer').subscribe({
       next: (page) => {
+        this.isCopying = false;
+        this.formGroup.enable();
+        this.formGroup.markAsDirty();
         this.formGroup.patchValue({ body: page?.body || '' });
         this.toasterService.info(this.translate.instant('PAGES.TERMS_COPY_SUCCESS'));
       },
-      error: () => this.toasterService.error(this.translate.instant('PAGES.TERMS_COPY_ERROR')),
+      error: () => { this.isCopying = false; this.formGroup.enable(); this.toasterService.error(this.translate.instant('PAGES.TERMS_COPY_ERROR')); },
     });
   }
 
   save() {
-    if (!this.formGroup || this.formGroup.invalid || this.isSaving) {
+    if (!this.formGroup || this.formGroup.invalid || this.isSaving || this.isLoadingPage || this.isCopying || !this.hasLoaded || this.isPageBodyEmpty) {
       this.formGroup?.markAllAsTouched();
       return;
     }
@@ -131,17 +146,26 @@ export class PageComponent implements OnInit, OnDestroy {
       body: this.formGroup.value.body,
     };
     this.isSaving = true;
-    this.service.setPage(
+    this.formGroup.disable();
+    const scope = this.scopeVersion;
+    this.saveSub = this.service.setPage(
       this.id,
       page,
       this.isTermsPage ? this.selectedTermsApp : undefined
     ).subscribe({
       next: () => {
+        this.isSaving = false;
+        if (scope !== this.scopeVersion) return;
+        this.formGroup.enable();
+        this.formGroup.markAsPristine();
         if (this._pageData) this._pageData.body = page.body;
         this.toasterService.success('تم الحفظ بنجاح');
         this.isSaving = false;
       },
       error: () => {
+        this.isSaving = false;
+        if (scope !== this.scopeVersion) return;
+        this.formGroup.enable();
         this.toasterService.error(this.translate.instant('PAGES.TERMS_SAVE_ERROR'));
         this.isSaving = false;
       },
@@ -150,6 +174,8 @@ export class PageComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subs.unsubscribe();
     this.pageLoadSub?.unsubscribe();
+    this.copySub?.unsubscribe();
+    this.saveSub?.unsubscribe();
     this.editor.destroy();
   }
 }

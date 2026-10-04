@@ -2,12 +2,13 @@
   [item]="item"
   [itemName]="item.toUser"
   moduleName="Payment"
-  [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid || (deliveryBalance !== null && formGroup.controls.amount.value > deliveryBalance)"
+  [isLoading]="isLoading || isSaving || loadingBalances"
+  [saveDisabled]="!canSave"
   (cancelClicked)="modal.dismiss()"
   (saveClicked)="save()"
 >
   <ng-container *ngIf="item">
+    <div class="alert alert-danger" role="alert" *ngIf="loadError">{{ loadError }}</div>
     <form class="form form-label-right" [formGroup]="formGroup">
       <div class="row g-3">
 
@@ -42,6 +43,7 @@
             <app-input-container [control]="formGroup.controls.amount">
               <input
                 type="number"
+                step="0.01"
                 class="form-control form-control-solid"
                 formControlName="amount"
                 id="amount"

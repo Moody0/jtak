@@ -40,7 +40,7 @@ export class DeleteRestaurantCategoryModalComponent implements OnDestroy {
   }
 
   confirm(): void {
-    if (!this.item || !this.item.id) return;
+    if (this.isDeleting || !this.item || !this.item.id) return;
 
     this.isDeleting = true;
     this.subs.sink = this.service.deleteItem(this.item.id).subscribe({

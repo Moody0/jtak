@@ -177,11 +177,13 @@ export class MerchantsListComponent
   filterByKind(kind: number | 'all'): void {
     this.selectedKind = kind;
     this.selection.clear();
+    this.applyFilters();
   }
 
   filterByStatus(status: 'all' | 'active' | 'disabled'): void {
     this.selectedStatus = status;
     this.selection.clear();
+    this.applyFilters();
   }
 
   getDisplayedItems(items: Merchant[]): Merchant[] {
@@ -202,6 +204,13 @@ export class MerchantsListComponent
 
       return true;
     });
+  }
+
+  private applyFilters(): void {
+    const filter: any = {};
+    if (this.selectedKind !== 'all') filter.kind = this.selectedKind;
+    if (this.selectedStatus !== 'all') filter.active = this.selectedStatus === 'active';
+    this.service.patchState({ filter, paginator: Object.assign(this.service.paginator, { page: 0 }) });
   }
 
   paginate(paginator: PaginatorState): void {

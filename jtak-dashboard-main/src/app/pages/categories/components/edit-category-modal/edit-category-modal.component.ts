@@ -30,6 +30,7 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
   parentCategories: Category[] = [];
   isLoading$: Observable<boolean>;
   formGroup: UntypedFormGroup;
+  isSaving = false;
   userRoles = Object.entries(AppUserRoleMap);
 
   orderPresets: number[] = [0, 1, 2, 3, 4, 5, 10];
@@ -49,7 +50,7 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
   }
 
   loadItem(): void {
-    this.service.getAll(true).subscribe((cats) => {
+    this.subs.sink = this.service.getAll(true, true).subscribe((cats) => {
       this.parentCategories = cats || [];
     });
     if (!this.item) {
@@ -106,6 +107,12 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
   }
 
   save(): void {
+    if (this.isSaving) return;
+    if (this.formGroup.invalid) { this.formGroup.markAllAsTouched(); return; }
+    if (!String(this.formGroup.get('title')?.value || '').trim()) {
+      this.formGroup.get('title')?.setErrors({ required: true }); return;
+    }
+    this.isSaving = true;
     const formValues = { ...this.formGroup.value };
     if (!formValues.parentId) {
       formValues.parentId = null;
@@ -129,7 +136,10 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
           this.modal.close({ ...formValues, id });
         })
       )
-      .subscribe();
+      .subscribe({ error: (error) => {
+        this.isSaving = false;
+        this.toasterService.error((Array.isArray(error?.error?.errors) ? error.error.errors.join('، ') : error?.error?.message) || 'تعذر حفظ التصنيف. حاول مرة أخرى.');
+      } });
   }
 
   edit(formValues: Category): void {
@@ -141,7 +151,10 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
           this.modal.close(formValues);
         })
       )
-      .subscribe();
+      .subscribe({ error: (error) => {
+        this.isSaving = false;
+        this.toasterService.error(error?.error?.message || 'تعذر حفظ التصنيف. حاول مرة أخرى.');
+      } });
   }
 
   ngOnDestroy(): void {

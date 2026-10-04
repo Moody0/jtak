@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, Input, OnDestroy, OnInit } from '@angular
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
-import { Subject } from 'rxjs';
+import { Subscription, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { SubSink } from 'subsink';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
@@ -16,6 +16,7 @@ import { MarketBestSellingService } from '../../services/market-best-selling.ser
 })
 export class AddMarketBestSellingModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
+  private searchRequest?: Subscription;
   private searchSubject = new Subject<string>();
 
   @Input() existingIds: number[] = [];
@@ -59,8 +60,9 @@ export class AddMarketBestSellingModalComponent implements OnInit, OnDestroy {
   }
 
   performSearch(query: string): void {
+    this.searchRequest?.unsubscribe();
     this.isSearching = true;
-    this.subs.sink = this.bestSellingService.searchProducts(query, undefined, 30).subscribe({
+    this.subs.sink = this.searchRequest = this.bestSellingService.searchProducts(query, undefined, 30).subscribe({
       next: (res) => {
         this.candidates = res || [];
         this.isSearching = false;
@@ -75,6 +77,7 @@ export class AddMarketBestSellingModalComponent implements OnInit, OnDestroy {
   }
 
   selectProduct(prod: SearchProductCandidate): void {
+    if (this.isSubmitting || this.existingIds.includes(prod.id)) return;
     this.selectedProduct = prod;
     this.formGroup.patchValue({
       productId: prod.id,
@@ -84,6 +87,11 @@ export class AddMarketBestSellingModalComponent implements OnInit, OnDestroy {
   }
 
   submit(): void {
+    if (this.isSubmitting) return;
+    if (this.existingIds.includes(Number(this.formGroup.value.productId))) {
+      this.toastr.warning("المنتج موجود بالفعل في القسم");
+      return;
+    }
     if (this.formGroup.invalid) {
       this.formGroup.markAllAsTouched();
       return;
@@ -119,6 +127,7 @@ export class AddMarketBestSellingModalComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.searchRequest?.unsubscribe();
     this.subs.unsubscribe();
   }
 }

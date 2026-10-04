@@ -1,4 +1,5 @@
 <div class="ops-users-container">
+  <div *ngIf="service.listError$ | async as error" class="alert alert-danger" role="alert">{{error}}</div>
 
   <!-- 1. Operations Utility Bar -->
   <div class="ops-utility-bar">
@@ -172,21 +173,21 @@
           <button
             type="button"
             class="btn btn-sm btn-light-success"
-            (click)="bulkSetStatus(items, true)"
+            (click)="bulkSetStatus(items, true)" [disabled]="isMutating"
           >
             <i class="fas fa-check-circle me-1"></i> {{ 'PRODUCTS_PAGE.ENABLE' | translate }}
           </button>
           <button
             type="button"
             class="btn btn-sm btn-light-warning"
-            (click)="bulkSetStatus(items, false)"
+            (click)="bulkSetStatus(items, false)" [disabled]="isMutating"
           >
             <i class="fas fa-ban me-1"></i> {{ 'PRODUCTS_PAGE.DISABLE' | translate }}
           </button>
           <button
             type="button"
             class="btn btn-sm btn-light-danger"
-            (click)="bulkDelete(items)"
+            (click)="bulkDelete(items)" [disabled]="isMutating"
           >
             <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
           </button>
@@ -342,7 +343,7 @@
                     class="ops-btn-action"
                     [class.btn-toggle-disable]="user.isActive"
                     [class.btn-toggle-active]="!user.isActive"
-                    (click)="toggleUserStatus(user)"
+                    (click)="toggleUserStatus(user)" [disabled]="isMutating"
                     [title]="user.isActive ? ('PRODUCTS_PAGE.DISABLE' | translate) : ('PRODUCTS_PAGE.ENABLE' | translate)"
                   >
                     <i [class]="user.isActive ? 'fas fa-ban' : 'fas fa-check-circle'"></i>

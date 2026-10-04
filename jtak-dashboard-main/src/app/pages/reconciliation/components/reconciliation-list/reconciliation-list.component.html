@@ -1,4 +1,5 @@
 <div class="ops-reconciliation-container">
+  <div class="alert alert-danger" role="alert" *ngIf="dataError">{{ dataError }}</div>
   <!-- 1. Streamlined Operations Utility Bar -->
   <div class="ops-utility-bar mb-4">
     <div class="ops-utility-left">
@@ -16,7 +17,7 @@
       </div>
     </div>
     <div class="ops-utility-right">
-      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="loadMerchantSummary(); loadMerchants(); loadCaptains(); loadHistory(); loadSettlementRequests()" [disabled]="isLoading || isLoadingRequests || isLoadingMerchants">
+      <button type="button" class="btn btn-sm ops-btn-refresh" (click)="dataError=''; loadMerchantSummary(); loadMerchants(); loadCaptains(); loadHistory(); loadSettlementRequests()" [disabled]="isLoading || isLoadingRequests || isLoadingMerchants">
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading || isLoadingRequests || isLoadingMerchants"></i>
         <span>{{ 'COMMON.REFRESH' | translate }}</span>
       </button>
@@ -69,7 +70,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-primary">
-            {{ (merchantSummary?.totalMerchantPayables || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (merchantSummary?.totalMerchantPayables || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">إجمالي الذمم الدائنة لكافة التجار في دفتر الحسابات (Vendor Payable)</div>
         </div>
@@ -85,7 +86,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-warning">
-            {{ (merchantSummary?.totalReservedSettlements || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (merchantSummary?.totalReservedSettlements || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">المبالغ المعلقة ضمن طلبات تسوية قيد المراجعة أو الصرف</div>
         </div>
@@ -101,7 +102,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-success">
-            {{ (merchantSummary?.totalAvailableForSettlement || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (merchantSummary?.totalAvailableForSettlement || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">صافي الرصيد المتبقي المؤهل للصرف والتسوية الفورية</div>
         </div>
@@ -117,7 +118,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-info">
-            {{ (merchantSummary?.totalJTakCommission || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (merchantSummary?.totalJTakCommission || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">إجمالي إيرادات وعمولات المنصة المحققة من طلبات التجار</div>
         </div>
@@ -133,7 +134,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-dark">
-            {{ (merchantSummary?.totalCompletedSettlements || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (merchantSummary?.totalCompletedSettlements || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">إجمالي الحوالات والمبالغ المسددة فعلياً للتجار</div>
         </div>
@@ -222,29 +223,29 @@
 
               <!-- 4. Gross Sales -->
               <td class="text-end">
-                <span class="ops-price-amount">{{ m.grossSales | number: '1.0-0' }}</span>
+                <span class="ops-price-amount">{{ m.grossSales | number: '1.0-2' }}</span>
                 <span class="ops-price-curr ms-1">ل.س</span>
               </td>
 
               <!-- 5. JTak Share -->
               <td class="text-end">
-                <span class="ops-price-amount text-info">{{ m.jTakShare | number: '1.0-0' }}</span>
+                <span class="ops-price-amount text-info">{{ m.jTakShare | number: '1.0-2' }}</span>
                 <span class="ops-price-curr ms-1">ل.س</span>
               </td>
 
               <!-- 6. Merchant Net -->
               <td class="text-end">
-                <span class="ops-price-amount text-primary">{{ m.merchantNet | number: '1.0-0' }}</span>
+                <span class="ops-price-amount text-primary">{{ m.merchantNet | number: '1.0-2' }}</span>
                 <span class="ops-price-curr ms-1">ل.س</span>
               </td>
 
               <!-- 7. Reserved & Approved Awaiting Payout -->
               <td class="text-end">
                 <span class="badge ops-pill-pay" *ngIf="m.reservedAmount > 0">
-                  <i class="fas fa-lock me-1"></i>{{ m.reservedAmount | number: '1.0-0' }} ل.س
+                  <i class="fas fa-lock me-1"></i>{{ m.reservedAmount | number: '1.0-2' }} ل.س
                 </span>
                 <div class="text-primary fs-9 mt-1" *ngIf="m.approvedAwaitingReceiptAmount > 0" title="مبالغ تمت الموافقة عليها وبانتظار تسليم الإشعار والصرف">
-                  <i class="fas fa-clock me-1"></i>موافق عليه: {{ m.approvedAwaitingReceiptAmount | number: '1.0-0' }} ل.س
+                  <i class="fas fa-clock me-1"></i>موافق عليه: {{ m.approvedAwaitingReceiptAmount | number: '1.0-2' }} ل.س
                 </div>
                 <span *ngIf="m.reservedAmount === 0" class="text-muted fs-8">-</span>
               </td>
@@ -252,7 +253,7 @@
               <!-- 8. Available for Settlement -->
               <td class="text-end">
                 <span class="badge ops-pill-due" *ngIf="m.availableAmount > 0">
-                  <i class="fas fa-check me-1"></i>{{ m.availableAmount | number: '1.0-0' }} ل.س
+                  <i class="fas fa-check me-1"></i>{{ m.availableAmount | number: '1.0-2' }} ل.س
                 </span>
                 <span *ngIf="m.availableAmount === 0" class="text-muted fs-8">0 ل.س</span>
               </td>
@@ -260,7 +261,7 @@
               <!-- 9. Current Balance (Ledger VendorPayable) -->
               <td class="text-end">
                 <strong class="ops-price-amount font-weight-bolder" [ngClass]="m.currentBalance > 0 ? 'text-success' : 'text-muted'">
-                  {{ m.currentBalance | number: '1.0-0' }}
+                  {{ m.currentBalance | number: '1.0-2' }}
                 </strong>
                 <span class="ops-price-curr ms-1">ل.س</span>
               </td>
@@ -354,11 +355,11 @@
                 <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
                 <div *ngIf="request.merchantAllocations && request.merchantAllocations.length > 0" class="small text-muted mt-1">
                   <span *ngFor="let alloc of request.merchantAllocations" class="badge badge-light me-1">
-                    {{ alloc.merchantTitle }}: {{ alloc.amount | number:'1.0-0' }} ل.س
+                    {{ alloc.merchantTitle }}: {{ alloc.amount | number:'1.0-2' }} ل.س
                   </span>
                 </div>
               </td>
-              <td><strong class="text-success fs-6">{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
+              <td><strong class="text-success fs-6">{{ request.amount | number:'1.0-2' }}</strong> ل.س</td>
               <td>
                 <div class="fw-bold">{{ request.method || 'حوالة / نقدي' }}</div>
                 <small class="text-muted d-block">{{ request.accountDetails }}</small>
@@ -431,7 +432,7 @@
                 <div class="fw-bold">{{ request.requestedByName }}</div>
                 <small class="text-muted" dir="ltr">{{ request.requestedByPhone }}</small>
               </td>
-              <td><strong>{{ request.amount | number:'1.0-0' }}</strong> ل.س</td>
+              <td><strong>{{ request.amount | number:'1.0-2' }}</strong> ل.س</td>
               <td>
                 <span class="badge" [ngClass]="{
                   'badge-light-warning': request.status === requestStatus.Pending,
@@ -498,7 +499,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-primary">
-            {{ totalFloatInField | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            {{ totalFloatInField | number: '1.0-2' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
           <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.GROSS_CASH_HINT' | translate }}</div>
         </div>
@@ -513,7 +514,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-info">
-            {{ totalWagesEarned | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            {{ totalWagesEarned | number: '1.0-2' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
           <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.EARNED_WAGES_HINT' | translate }}</div>
         </div>
@@ -528,7 +529,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-warning">
-            {{ totalNetDue | number: '1.0-0' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+            {{ totalNetDue | number: '1.0-2' }} <span class="ops-kpi-card-curr">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
           </div>
           <div class="ops-kpi-card-hint">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE_HINT' | translate }}</div>
         </div>
@@ -607,7 +608,7 @@
               <!-- 4. Cash Float (Collected) -->
               <td class="text-end">
                 <span class="ops-price-amount" [class.text-muted]="(cap.cashFloatBalance || 0) === 0">
-                  {{ cap.cashFloatBalance | number: '1.0-0' }}
+                  {{ cap.cashFloatBalance | number: '1.0-2' }}
                 </span>
                 <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
               </td>
@@ -615,7 +616,7 @@
               <!-- 5. Earned Wages -->
               <td class="text-end">
                 <span class="ops-price-amount" [ngClass]="(cap.wagesEarnedBalance || 0) > 0 ? 'text-info' : 'text-muted'">
-                  {{ cap.wagesEarnedBalance | number: '1.0-0' }}
+                  {{ cap.wagesEarnedBalance | number: '1.0-2' }}
                 </span>
                 <span class="ops-price-curr ms-1">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
               </td>
@@ -631,12 +632,12 @@
                 </ng-container>
                 <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue > 0">
                   <span class="badge ops-pill-due">
-                    <i class="fas fa-arrow-down me-1"></i>{{ cap.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+                    <i class="fas fa-arrow-down me-1"></i>{{ cap.expectedNetCashDue | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
                   </span>
                 </ng-container>
                 <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue < 0">
                   <span class="badge ops-pill-pay">
-                    <i class="fas fa-arrow-up me-1"></i>{{ (cap.expectedNetCashDue * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
+                    <i class="fas fa-arrow-up me-1"></i>{{ (cap.expectedNetCashDue * -1) | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}
                   </span>
                 </ng-container>
               </td>
@@ -687,6 +688,10 @@
   <!-- TAB 3: AUTHORITATIVE SETTLEMENT PAYMENT HISTORY & PRINTING -->
   <!-- ========================================================================= -->
   <div *ngIf="activeTab === 'history'">
+    <div class="alert alert-info" *ngIf="(historySummary?.currencyTotals?.length || 0)>0">
+      إجماليات البطاقات بالليرة السورية. إجمالي كل عملة:
+      <span class="mx-2" *ngFor="let total of historySummary?.currencyTotals">{{total.amount | number:'1.0-2'}} {{total.currency}}</span>
+    </div>
     <!-- 1. History KPI Summary Cards -->
     <div class="row g-3 mb-4">
       <!-- Card 1: Total Completed Payments -->
@@ -699,7 +704,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-primary">
-            {{ (historySummary?.totalCompletedAmount || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (historySummary?.totalCompletedAmount || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">
             إجمالي <strong>{{ historySummary?.totalCompletedCount || 0 }}</strong> دفعة وتسوية مالية مكتملة ومقيدة بالدفتر
@@ -717,7 +722,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-warning">
-            {{ (historySummary?.merchantCompletedAmount || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (historySummary?.merchantCompletedAmount || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">
             إجمالي <strong>{{ historySummary?.merchantCompletedCount || 0 }}</strong> حوالة ومسدد تم صرفه للتجار
@@ -735,7 +740,7 @@
             </div>
           </div>
           <div class="ops-kpi-card-value text-success">
-            {{ (historySummary?.driverCompletedAmount || 0) | number: '1.0-0' }} <span class="ops-kpi-card-curr">ل.س</span>
+            {{ (historySummary?.driverCompletedAmount || 0) | number: '1.0-2' }} <span class="ops-kpi-card-curr">ل.س</span>
           </div>
           <div class="ops-kpi-card-hint">
             إجمالي <strong>{{ historySummary?.driverCompletedCount || 0 }}</strong> عملية توريد أو صرف (ليس صافي النقد بالخزينة)
@@ -863,7 +868,7 @@
 
               <!-- 5. Completed Amount -->
               <td class="text-end font-weight-bolder">
-                <span class="ops-price-amount text-success fs-7">{{ item.amount | number: '1.0-0' }}</span>
+                <span class="ops-price-amount text-success fs-7">{{ item.amount | number: '1.0-2' }}</span>
                 <span class="ops-price-curr ms-1">{{ item.currency || 'ل.س' }}</span>
               </td>
 
@@ -1010,6 +1015,7 @@
     </div>
 
     <div class="modal-body p-4 merchant-statement-screen-body">
+  <div class="alert alert-danger" role="alert" *ngIf="dataError">{{ dataError }}</div>
       <!-- Real-time Balance Strip -->
       <div class="row g-2 mb-4 merchant-statement-kpi-row">
       <div class="col-md-3 col-sm-6">
@@ -1021,7 +1027,7 @@
             </div>
           </div>
           <strong class="fs-5 text-dark" [ngClass]="(merchantStatementData?.currentBalance || 0) > 0 ? 'text-success' : 'text-dark'">
-            {{ (merchantStatementData?.currentBalance ?? selectedMerchantForStatement?.currentVendorPayableBalance ?? 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.currentBalance ?? selectedMerchantForStatement?.currentVendorPayableBalance ?? 0) | number:'1.0-2' }} ل.س
           </strong>
         </div>
       </div>
@@ -1034,7 +1040,7 @@
             </div>
           </div>
           <strong class="fs-5 text-warning">
-            {{ (merchantStatementData?.reservedAmount ?? selectedMerchantForStatement?.reservedSettlementAmount ?? 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.reservedAmount ?? selectedMerchantForStatement?.reservedSettlementAmount ?? 0) | number:'1.0-2' }} ل.س
           </strong>
         </div>
       </div>
@@ -1047,7 +1053,7 @@
             </div>
           </div>
           <strong class="fs-5 text-success">
-            {{ (merchantStatementData?.availableAmount ?? selectedMerchantForStatement?.availableSettlementAmount ?? 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.availableAmount ?? selectedMerchantForStatement?.availableSettlementAmount ?? 0) | number:'1.0-2' }} ل.س
           </strong>
         </div>
       </div>
@@ -1060,7 +1066,7 @@
             </div>
           </div>
           <strong class="fs-5 text-info">
-            {{ (merchantStatementData?.approvedAwaitingReceiptAmount ?? selectedMerchantForStatement?.approvedAwaitingPayoutAmount ?? 0) | number:'1.0-0' }} ل.س
+            {{ (merchantStatementData?.approvedAwaitingReceiptAmount ?? selectedMerchantForStatement?.approvedAwaitingPayoutAmount ?? 0) | number:'1.0-2' }} ل.س
           </strong>
         </div>
       </div>
@@ -1120,8 +1126,8 @@
       <!-- Transactions Statement Table (Authoritative Chronological Running Balance) -->
       <div class="print-statement-summary d-none d-print-flex">
         <span>عدد الحركات: <strong>{{ (merchantStatementData?.items || merchantStatementData?.transactions)?.length || 0 }}</strong></span>
-        <span>إجمالي المدين (دفعات وخصومات): <strong>{{ statementDebitTotal | number:'1.0-0' }} ل.س</strong></span>
-        <span>إجمالي الدائن (استحقاقات): <strong>{{ statementCreditTotal | number:'1.0-0' }} ل.س</strong></span>
+        <span>إجمالي المدين (دفعات وخصومات): <strong>{{ statementDebitTotal | number:'1.0-2' }} ل.س</strong></span>
+        <span>إجمالي الدائن (استحقاقات): <strong>{{ statementCreditTotal | number:'1.0-2' }} ل.س</strong></span>
         <span *ngIf="statementSearchTerm">التصفية: {{ statementSearchTerm }}</span>
       </div>
       <div class="table-responsive border rounded ops-modal-table-wrap">
@@ -1196,19 +1202,19 @@
 
               <!-- 5. Gross Amount -->
               <td class="text-end">
-                <span *ngIf="tx.grossAmount" class="fw-semibold text-dark">{{ tx.grossAmount | number:'1.0-0' }}</span>
+                <span *ngIf="tx.grossAmount" class="fw-semibold text-dark">{{ tx.grossAmount | number:'1.0-2' }}</span>
                 <span *ngIf="!tx.grossAmount" class="text-muted">-</span>
               </td>
 
               <!-- 6. JTak Share -->
               <td class="text-end text-info font-weight-bold">
-                <span *ngIf="tx.jTakShare">{{ tx.jTakShare | number:'1.0-0' }}</span>
+                <span *ngIf="tx.jTakShare">{{ tx.jTakShare | number:'1.0-2' }}</span>
                 <span *ngIf="!tx.jTakShare" class="text-muted">-</span>
               </td>
 
               <!-- 7. Merchant Net -->
               <td class="text-end text-primary font-weight-bold">
-                <span *ngIf="tx.merchantNet">{{ tx.merchantNet | number:'1.0-0' }}</span>
+                <span *ngIf="tx.merchantNet">{{ tx.merchantNet | number:'1.0-2' }}</span>
                 <span *ngIf="!tx.merchantNet" class="text-muted">-</span>
               </td>
 
@@ -1227,17 +1233,17 @@
 
               <!-- 10. Debit (Paid / Reverse) -->
               <td class="text-end text-danger font-weight-bold">
-                {{ tx.debit > 0 ? (tx.debit | number:'1.0-0') : '-' }}
+                {{ tx.debit > 0 ? (tx.debit | number:'1.0-2') : '-' }}
               </td>
 
               <!-- 11. Credit (New sales earned) -->
               <td class="text-end text-success font-weight-bold">
-                {{ tx.credit > 0 ? (tx.credit | number:'1.0-0') : '-' }}
+                {{ tx.credit > 0 ? (tx.credit | number:'1.0-2') : '-' }}
               </td>
 
               <!-- 12. Running Balance -->
               <td class="text-end font-weight-bolder text-dark">
-                {{ tx.runningBalance | number:'1.0-0' }} <small class="text-muted fs-9">ل.س</small>
+                {{ tx.runningBalance | number:'1.0-2' }} <small class="text-muted fs-9">ل.س</small>
               </td>
 
               <!-- 13. Description -->
@@ -1282,7 +1288,7 @@
             </tr>
             <tr *ngFor="let s of merchantStatementData?.settlementHistory">
               <td><span class="ops-txn-code">{{ s.requestNumber }}</span></td>
-              <td class="text-end text-success font-weight-bold">{{ s.amount | number:'1.0-0' }} ل.س</td>
+              <td class="text-end text-success font-weight-bold">{{ s.amount | number:'1.0-2' }} ل.س</td>
               <td>{{ s.method || 'حوالة / نقدي' }}</td>
               <td>
                 <div><small class="text-dark fw-bold" *ngIf="s.payoutSourceAccount">{{ s.payoutSourceAccount }}</small></div>
@@ -1372,6 +1378,7 @@
     <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
   </div>
   <div class="modal-body">
+  <div class="alert alert-danger" role="alert" *ngIf="dataError">{{ dataError }}</div>
     <div *ngIf="settlementSuccess" class="alert alert-custom alert-light-success fade show mb-5" role="alert">
       <div class="alert-icon"><i class="flaticon2-check-mark"></i></div>
       <div class="alert-text">
@@ -1401,15 +1408,15 @@
         <div class="row">
           <div class="col-md-4">
             <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.GROSS_CASH' | translate }}</span>
-            <strong class="text-dark">{{ selectedCaptain.cashFloatBalance | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+            <strong class="text-dark">{{ selectedCaptain.cashFloatBalance | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
           </div>
           <div class="col-md-4">
             <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.EARNED_WAGES' | translate }}</span>
-            <strong class="text-info">-{{ selectedCaptain.wagesEarnedBalance | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+            <strong class="text-info">-{{ selectedCaptain.wagesEarnedBalance | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
           </div>
           <div class="col-md-4">
             <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE' | translate }}</span>
-            <strong class="text-warning font-size-lg">{{ selectedCaptain.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+            <strong class="text-warning font-size-lg">{{ selectedCaptain.expectedNetCashDue | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
           </div>
         </div>
       </div>
@@ -1438,11 +1445,11 @@
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <strong *ngIf="settleDiscrepancy === 0"><i class="fas fa-check-circle mr-1 me-1"></i> تطابق تام: النقد المستلم يطابق صافي المبلغ المتوقع تماماً.</strong>
-            <strong *ngIf="settleDiscrepancy < 0"><i class="fas fa-exclamation-triangle mr-1 me-1"></i> عجز نقدي: السائق لديه عجز بمقدار {{ (settleDiscrepancy * -1) | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. اختر طريقة معالجته أدناه.</strong>
-            <strong *ngIf="settleDiscrepancy > 0"><i class="fas fa-plus-circle mr-1 me-1"></i> فائض نقدي: السائق سلّم زيادة بمقدار {{ settleDiscrepancy | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. سيتم قيده كفائض صندوق.</strong>
+            <strong *ngIf="settleDiscrepancy < 0"><i class="fas fa-exclamation-triangle mr-1 me-1"></i> عجز نقدي: السائق لديه عجز بمقدار {{ (settleDiscrepancy * -1) | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. اختر طريقة معالجته أدناه.</strong>
+            <strong *ngIf="settleDiscrepancy > 0"><i class="fas fa-plus-circle mr-1 me-1"></i> فائض نقدي: السائق سلّم زيادة بمقدار {{ settleDiscrepancy | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}. سيتم قيده كفائض صندوق.</strong>
           </div>
           <span class="badge badge-white font-weight-bolder font-size-sm py-2 px-3">
-            الفارق: {{ settleDiscrepancy > 0 ? '+' : '' }}{{ settleDiscrepancy | number: '1.0-0' }}
+            الفارق: {{ settleDiscrepancy > 0 ? '+' : '' }}{{ settleDiscrepancy | number: '1.0-2' }}
           </span>
         </div>
       </div>
@@ -1517,6 +1524,7 @@
     </div>
   </div>
   <div class="modal-body p-4">
+  <div class="alert alert-danger" role="alert" *ngIf="dataError">{{ dataError }}</div>
     <div *ngIf="isLoadingStatement" class="text-center py-5">
       <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
       <p class="mt-2 text-muted">{{ 'COMMON.LOADING' | translate }}</p>
@@ -1557,7 +1565,7 @@
             </div>
             <div class="col-3 text-end">
               <span class="text-muted d-block fs-9">صافي التوريد المتوقع:</span>
-              <strong class="text-primary fs-7">{{ statementDetails?.expectedNetCashDue | number: '1.0-0' }} ل.س</strong>
+              <strong class="text-primary fs-7">{{ statementDetails?.expectedNetCashDue | number: '1.0-2' }} ل.س</strong>
             </div>
           </div>
         </div>
@@ -1571,7 +1579,7 @@
         </div>
         <div class="text-end">
           <span class="text-muted font-size-xs d-block">{{ 'RECONCILIATION_PAGE.NET_REMITTANCE' | translate }}</span>
-          <strong class="text-primary font-size-h6">{{ statementDetails.expectedNetCashDue | number: '1.0-0' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+          <strong class="text-primary font-size-h6">{{ statementDetails.expectedNetCashDue | number: '1.0-2' }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
         </div>
       </div>
 
@@ -1597,9 +1605,9 @@
               <td>{{ entry.postedDate | date: 'short' }}</td>
               <td><code>{{ entry.transactionNumber }}</code></td>
               <td><span class="badge badge-light-primary">{{ entry.referenceType }}</span></td>
-              <td class="text-end text-success font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-0') : '-' }}</td>
-              <td class="text-end text-danger font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-0') : '-' }}</td>
-              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-0' }}</td>
+              <td class="text-end text-success font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-2') : '-' }}</td>
+              <td class="text-end text-danger font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-2') : '-' }}</td>
+              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-2' }}</td>
               <td>{{ entry.memo }}</td>
             </tr>
           </tbody>
@@ -1628,9 +1636,9 @@
               <td>{{ entry.postedDate | date: 'short' }}</td>
               <td><code>{{ entry.transactionNumber }}</code></td>
               <td><span class="badge badge-light-info">{{ entry.referenceType }}</span></td>
-              <td class="text-end text-danger font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-0') : '-' }}</td>
-              <td class="text-end text-success font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-0') : '-' }}</td>
-              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-0' }}</td>
+              <td class="text-end text-danger font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-2') : '-' }}</td>
+              <td class="text-end text-success font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-2') : '-' }}</td>
+              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-2' }}</td>
               <td>{{ entry.memo }}</td>
             </tr>
           </tbody>
@@ -1695,6 +1703,7 @@
   </div>
 
   <div class="modal-body p-4" id="individualReceiptPrintArea">
+  <div class="alert alert-danger" role="alert" *ngIf="dataError">{{ dataError }}</div>
     <div *ngIf="isLoadingReceipt" class="text-center py-5">
       <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
       <p class="mt-2 text-muted">جاري تحميل بيانات الإيصال المالي الرسمي...</p>
@@ -1868,10 +1877,11 @@
 
   <!-- Print KPI Summary Strip -->
   <div class="d-flex justify-content-around flex-wrap gap-2 p-2 mb-3 border rounded bg-light fs-8" *ngIf="historyPrintTotals as totals">
-    <div>إجمالي الدفعات المكتملة: <strong>{{ totals.total | number: '1.0-0' }} ل.س</strong> ({{ historyPrintItems.length }} حركة)</div>
-    <div>مسددات التجار: <strong>{{ totals.merchant | number: '1.0-0' }} ل.س</strong></div>
-    <div>توريدات المناديب: <strong>{{ totals.captain | number: '1.0-0' }} ل.س</strong></div>
-    <div *ngIf="totals.earnings">دفعات أجور المناديب: <strong>{{ totals.earnings | number: '1.0-0' }} ل.س</strong></div>
+    <span>الإجماليات بالليرة السورية؛ لكل حركة عملتها المبيّنة في الجدول.</span>
+    <div>إجمالي الدفعات المكتملة: <strong>{{ totals.total | number: '1.0-2' }} ل.س</strong> ({{ historyPrintItems.length }} حركة)</div>
+    <div>مسددات التجار: <strong>{{ totals.merchant | number: '1.0-2' }} ل.س</strong></div>
+    <div>توريدات المناديب: <strong>{{ totals.captain | number: '1.0-2' }} ل.س</strong></div>
+    <div *ngIf="totals.earnings">دفعات أجور المناديب: <strong>{{ totals.earnings | number: '1.0-2' }} ل.س</strong></div>
   </div>
 
   <!-- Printable Table -->
@@ -1896,7 +1906,7 @@
         <td>{{ item.partyTypeLabel }}</td>
         <td><strong>{{ item.partyName }}</strong></td>
         <td dir="ltr">{{ formatPhoneNumber(item.phone) || '-' }}</td>
-        <td class="text-end fw-bold">{{ item.amount | number: '1.0-0' }} {{ item.currency }}</td>
+        <td class="text-end fw-bold">{{ item.amount | number: '1.0-2' }} {{ item.currency }}</td>
         <td class="fs-9">{{ item.method }}</td>
         <td class="font-monospace fs-9">{{ item.destinationAccount || '-' }}</td>
         <td class="fs-9">{{ item.completedAt | date: 'd MMM y' }}</td>

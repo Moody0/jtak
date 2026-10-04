@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { Subscription } from 'rxjs';
 import { SubSink } from 'subsink';
 import { ToastrService } from 'ngx-toastr';
 import { CampaignAudiences, CampaignRequest } from '../../models/notification.model';
@@ -15,6 +16,7 @@ import { Merchant } from '../../../merchant/models/merchant.model';
 })
 export class NotificationsCreateComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
+  private audienceRequest?: Subscription;
   formGroup: UntypedFormGroup;
   audiences: CampaignAudiences | null = null;
   statsLoading = true;
@@ -56,8 +58,11 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   }
 
   loadAudiences(): void {
+    if (this.isSending) return;
+    this.audienceRequest?.unsubscribe();
+    this.audiences = null;
     this.statsLoading = true;
-    this.subs.sink = this.notificationsService.getCampaignAudiences().subscribe({
+    this.audienceRequest = this.notificationsService.getCampaignAudiences().subscribe({
       next: (audiences) => {
         this.audiences = audiences;
         this.statsLoading = false;
@@ -70,6 +75,7 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   }
 
   selectTarget(target: CampaignRequest['target']): void {
+    if (this.isSending) return;
     this.formGroup.patchValue({ target, destination: 'home', destinationId: null });
     this.updateDestination();
   }
@@ -104,6 +110,7 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   }
 
   updateDestination(): void {
+    if (this.isSending) return;
     const control = this.formGroup.get('destinationId');
     const needsMerchant = this.formGroup.get('destination')?.value === 'merchant';
     control?.setValidators(needsMerchant ? [Validators.required, Validators.min(1)] : []);
@@ -155,6 +162,7 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   }
 
   applyPreset(preset: 'offer' | 'update' | 'orders'): void {
+    if (this.isSending) return;
     const examples = {
       offer: { titleAr: 'عروض جديدة في جيتك ماركت', textAr: 'تصفح أحدث المنتجات والعروض المتاحة الآن في التطبيق.' },
       update: { titleAr: 'تنبيه مهم من جيتك', textAr: 'لدينا تحديث مهم لك. افتح التطبيق للاطلاع على التفاصيل.' },
@@ -164,14 +172,17 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   }
 
   onFileUploaded(filesIds: string[]): void {
+    if (this.isSending) return;
     this.formGroup.patchValue({ image: filesIds[0] || '' });
   }
 
   onFileDelete(): void {
+    if (this.isSending) return;
     this.formGroup.patchValue({ image: '' });
   }
 
   reviewSend(): void {
+    if (this.isSending) return;
     this.formGroup.markAllAsTouched();
     const title = this.formGroup.get('titleAr')?.value?.trim() || '';
     const body = this.formGroup.get('textAr')?.value?.trim() || '';
@@ -191,10 +202,12 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
       textAr: this.formGroup.get('textAr')?.value.trim(),
     };
     this.isSending = true;
+    this.formGroup.disable({emitEvent: false});
     this.sendError = '';
     this.subs.sink = this.notificationsService.sendCampaign(request).subscribe({
       next: (result) => {
         this.isSending = false;
+        this.formGroup.enable({emitEvent: false});
         if (result.acceptedLanguages > 0) {
           this.toasterService.success(`قبلت Firebase الإرسال إلى ${this.targetLabel}. تم حفظ الإشعار لـ ${result.recipientAccounts} حساب.`);
           if (result.failedLanguages > 0) {
@@ -210,8 +223,9 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.isSending = false;
+        this.formGroup.enable({emitEvent: false});
         this.confirming = false;
-        this.sendError = error?.error?.message || 'تعذر إرسال الإشعار. تحقق من الاتصال وحاول مجددًا.';
+        this.sendError = error?.error?.errorDescription || error?.error?.message || 'تعذر تأكيد نتيجة الإرسال. حدّث سجل الإشعارات للتحقق قبل إعادة المحاولة.';
       },
     });
   }
@@ -237,6 +251,7 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.audienceRequest?.unsubscribe();
     this.subs.unsubscribe();
   }
 }

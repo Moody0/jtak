@@ -1,6 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
+import { Subscription } from 'rxjs';
 import { SubSink } from 'subsink';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
 import {
@@ -18,6 +19,8 @@ import { AddMarketBestSellingModalComponent } from '../add-market-best-selling-m
 })
 export class MarketBestSellingListComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
+  private loadRequest?: Subscription;
+  private destroyed = false;
 
   isLoading = false;
   isSaving = false;
@@ -47,8 +50,10 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
   }
 
   loadData(): void {
+    if (this.isSaving) return;
+    this.loadRequest?.unsubscribe();
     this.isLoading = true;
-    this.subs.sink = this.bestSellingService.getConfig().subscribe({
+    this.subs.sink = this.loadRequest = this.bestSellingService.getConfig().subscribe({
       next: (res: AdminMarketBestSellingSectionResponse) => {
         this.isLoading = false;
         this.loadError = false;
@@ -95,22 +100,28 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
   }
 
   setMode(newMode: 'Manual' | 'Hybrid' | 'Auto'): void {
+    if (this.busy) return;
+    const previous = this.mode;
     this.mode = newMode;
-    this.saveConfig(false);
+    this.saveConfig(false, () => this.mode = previous);
   }
 
   toggleSectionEnabled(): void {
+    if (this.busy) return;
+    const previous = this.enabled;
     this.enabled = !this.enabled;
-    this.saveConfig(false);
+    this.saveConfig(false, () => this.enabled = previous);
   }
 
   toggleItemActive(item: AdminMarketBestSellingProductItem): void {
-    if (this.pendingToggleIds.has(item.productId)) return;
+    if (this.busy) return;
+    this.isSaving = true;
     this.pendingToggleIds.add(item.productId);
     item.active = !item.active;
-    this.bestSellingService.toggleItem(item.productId, item.active).subscribe({
+    this.subs.sink = this.bestSellingService.toggleItem(item.productId, item.active).subscribe({
       next: () => {
         this.pendingToggleIds.delete(item.productId);
+        this.isSaving = false;
         this.toastr.success(
           item.active ? 'تم تفعيل ظهور الصنف بالقسم' : 'تم إخفاء الصنف من القسم'
         );
@@ -118,6 +129,7 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.pendingToggleIds.delete(item.productId);
+        this.isSaving = false;
         item.active = !item.active;
         this.toastr.error('تعذر تحديث حالة الصنف');
         this.cdr.detectChanges();
@@ -126,46 +138,54 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
   }
 
   moveUp(index: number): void {
-    if (this.hasSearchFilter || index <= 0 || index >= this.items.length) return;
+    if (this.busy || this.hasSearchFilter || index <= 0 || index >= this.items.length) return;
+    const previous = this.items.map(item => ({ ...item }));
     const temp = this.items[index];
     this.items[index] = this.items[index - 1];
     this.items[index - 1] = temp;
     this.reindexOrders();
-    this.saveReorder();
+    this.saveReorder(previous);
   }
 
   moveDown(index: number): void {
-    if (this.hasSearchFilter || index < 0 || index >= this.items.length - 1) return;
+    if (this.busy || this.hasSearchFilter || index < 0 || index >= this.items.length - 1) return;
+    const previous = this.items.map(item => ({ ...item }));
     const temp = this.items[index];
     this.items[index] = this.items[index + 1];
     this.items[index + 1] = temp;
     this.reindexOrders();
-    this.saveReorder();
+    this.saveReorder(previous);
   }
 
   removeItem(item: AdminMarketBestSellingProductItem): void {
+    if (this.busy) return;
     if (
       !confirm(
-        `هل أنت متأكد من إزالة صنف "${item.title}" من قسم الأكثر مبيعًا؟`
+        `هل أنت متأكد من إزالة صنف "${item.title}" من القائمة المختارة؟ ${this.mode !== 'Manual' ? 'قد يظهر تلقائياً حسب المبيعات. استخدم إخفاء الصنف لمنع ظهوره تماماً.' : ''}`
       )
     ) {
       return;
     }
 
-    this.bestSellingService.removeItem(item.productId).subscribe({
+    this.isSaving = true;
+    this.subs.sink = this.bestSellingService.removeItem(item.productId).subscribe({
       next: () => {
+        this.isSaving = false;
         this.items = this.items.filter((x) => x.productId !== item.productId);
         this.reindexOrders();
         this.toastr.success('تمت إزالة الصنف من قسم الأكثر مبيعًا');
         this.cdr.detectChanges();
       },
       error: () => {
+        this.isSaving = false;
+        this.cdr.detectChanges();
         this.toastr.error('تعذر إزالة الصنف');
       },
     });
   }
 
   openAddModal(): void {
+    if (this.busy) return;
     const modalRef = this.modalService.open(AddMarketBestSellingModalComponent, {
       size: 'lg',
       backdrop: 'static',
@@ -177,7 +197,7 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
 
     modalRef.result.then(
       (result) => {
-        if (result === true) {
+        if (!this.destroyed && result === true) {
           this.loadData();
         }
       },
@@ -185,7 +205,15 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
     );
   }
 
-  saveConfig(showToast = true): void {
+  get busy(): boolean { return this.isLoading || this.isSaving || this.loadError; }
+
+  saveConfig(showToast = true, rollback?: () => void): void {
+    if (this.busy) return;
+    if (!Number.isInteger(Number(this.maxItems)) || this.maxItems < 1 || this.maxItems > 50) {
+      rollback?.();
+      this.toastr.warning("عدد المنتجات يجب أن يكون بين 1 و50");
+      return;
+    }
     this.isSaving = true;
     const payload: MarketBestSellingSectionConfig = {
       mode: this.mode,
@@ -212,6 +240,7 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.isSaving = false;
+        rollback?.();
         this.toastr.error('تعذر حفظ الإعدادات');
         this.cdr.detectChanges();
       },
@@ -224,14 +253,19 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
     });
   }
 
-  private saveReorder(): void {
+  private saveReorder(previous: typeof this.items): void {
+    this.isSaving = true;
     const productIds = this.items.map((x) => x.productId);
     this.subs.sink = this.bestSellingService.reorder(productIds).subscribe({
       next: () => {
+        this.isSaving = false;
         this.toastr.success('تم تحديث الترتيب بنجاح');
         this.cdr.detectChanges();
       },
       error: () => {
+        this.isSaving = false;
+        this.items = previous;
+        this.cdr.detectChanges();
         this.toastr.error('تعذر حفظ الترتيب');
       },
     });
@@ -242,6 +276,8 @@ export class MarketBestSellingListComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    this.loadRequest?.unsubscribe();
     this.subs.unsubscribe();
   }
 }

@@ -57,7 +57,7 @@
       </div>
       <div class="kpi-metric-body">
         <span class="kpi-label">المحصل من الزبائن</span>
-        <strong class="kpi-value text-green">{{ (overview?.totalCashCollected || 0) | number:'1.0-0' }} <small>ل.س</small></strong>
+        <strong class="kpi-value text-green">{{ (overview?.totalCashCollected || 0) | number:'1.0-2' }} <small>ل.س</small></strong>
         <small class="kpi-sub">نقد العهدة المستلم</small>
       </div>
     </div>
@@ -69,7 +69,7 @@
       </div>
       <div class="kpi-metric-body">
         <span class="kpi-label">إجمالي أجور التوصيل</span>
-        <strong class="kpi-value text-purple">{{ (overview?.totalDeliveryFees || 0) | number:'1.0-0' }} <small>ل.س</small></strong>
+        <strong class="kpi-value text-purple">{{ (overview?.totalDeliveryFees || 0) | number:'1.0-2' }} <small>ل.س</small></strong>
         <small class="kpi-sub">المفوترة في الطلبات</small>
       </div>
     </div>
@@ -81,7 +81,7 @@
       </div>
       <div class="kpi-metric-body">
         <span class="kpi-label">استحقاقات الكباتن</span>
-        <strong class="kpi-value text-amber">{{ (overview?.totalCaptainEarnings || 0) | number:'1.0-0' }} <small>ل.س</small></strong>
+        <strong class="kpi-value text-amber">{{ (overview?.totalCaptainEarnings || 0) | number:'1.0-2' }} <small>ل.س</small></strong>
         <small class="kpi-sub">عمولات / كيلومتر محسوبة</small>
       </div>
     </div>
@@ -93,7 +93,7 @@
       </div>
       <div class="kpi-metric-body">
         <span class="kpi-label text-orange-bold">المطلوب تسليمه للشركة</span>
-        <strong class="kpi-value text-orange">{{ (overview?.totalNetDueToCompany || 0) | number:'1.0-0' }} <small>ل.س</small></strong>
+        <strong class="kpi-value text-orange">{{ (overview?.totalNetDueToCompany || 0) | number:'1.0-2' }} <small>ل.س</small></strong>
         <small class="kpi-sub">صافي التوريد الفعلي للخزينة</small>
       </div>
     </div>
@@ -286,22 +286,22 @@
 
             <!-- Cash Collected -->
             <td class="text-end fw-bold text-dark">
-              {{ item.totalCashCollected | number:'1.0-0' }} <small class="currency-label">ل.س</small>
+              {{ item.totalCashCollected | number:'1.0-2' }} <small class="currency-label">ل.س</small>
             </td>
 
             <!-- Delivery Fees -->
             <td class="text-end text-muted">
-              {{ item.totalDeliveryFees | number:'1.0-0' }} <small class="currency-label">ل.س</small>
+              {{ item.totalDeliveryFees | number:'1.0-2' }} <small class="currency-label">ل.س</small>
             </td>
 
             <!-- Captain Earnings -->
             <td class="text-end fw-bold text-amber">
-              {{ item.totalCaptainEarnings | number:'1.0-0' }} <small class="currency-label">ل.س</small>
+              {{ item.totalCaptainEarnings | number:'1.0-2' }} <small class="currency-label">ل.س</small>
             </td>
 
             <!-- Net Remittance Due to Company -->
             <td class="text-end fw-black text-orange col-net-due">
-              {{ item.netDueToCompany | number:'1.0-0' }} <small class="currency-label">ل.س</small>
+              {{ item.netDueToCompany | number:'1.0-2' }} <small class="currency-label">ل.س</small>
             </td>
 
             <!-- Settlement Status Badge -->
@@ -386,6 +386,7 @@
   </div>
 
   <div class="modal-body settlements-modal-body">
+  <div class="alert alert-danger" role="alert" *ngIf="errorMessage">{{ errorMessage }}</div>
     <!-- Selected Summary Sticky Bar -->
     <div class="modal-summary-ribbon">
       <div class="summary-metrics-strip">
@@ -395,15 +396,15 @@
         </div>
         <div class="summary-metric-item">
           <span class="metric-title">إجمالي المحصل:</span>
-          <strong class="metric-value text-green">{{ getSelectedCashCollected() | number:'1.0-0' }} <small>ل.س</small></strong>
+          <strong class="metric-value text-green">{{ getSelectedCashCollected() | number:'1.0-2' }} <small>ل.س</small></strong>
         </div>
         <div class="summary-metric-item">
           <span class="metric-title">استحقاق الكابتن:</span>
-          <strong class="metric-value text-amber">{{ getSelectedCaptainEarnings() | number:'1.0-0' }} <small>ل.س</small></strong>
+          <strong class="metric-value text-amber">{{ getSelectedCaptainEarnings() | number:'1.0-2' }} <small>ل.س</small></strong>
         </div>
         <div class="summary-metric-item summary-metric-item--due">
           <span class="metric-title">المطلوب للشركة (الصافي):</span>
-          <strong class="metric-value text-orange">{{ getSelectedNetDue() | number:'1.0-0' }} <small>ل.س</small></strong>
+          <strong class="metric-value text-orange">{{ getSelectedNetDue() | number:'1.0-2' }} <small>ل.س</small></strong>
         </div>
       </div>
 
@@ -512,7 +513,7 @@
 
             <!-- Delivery Fee -->
             <td class="text-end">
-              <span class="fw-semibold text-dark">{{ ord.customerDeliveryFee | number:'1.0-0' }} <small>ل.س</small></span>
+              <span class="fw-semibold text-dark">{{ ord.customerDeliveryFee | number:'1.0-2' }} <small>ل.س</small></span>
               <span class="free-promo-badge" *ngIf="ord.customerDeliveryFee === 0 && ord.originalDeliveryFee > 0">
                 (مجاني - أصل: {{ ord.originalDeliveryFee }})
               </span>
@@ -520,12 +521,12 @@
 
             <!-- Captain Earning -->
             <td class="text-end fw-bold text-amber">
-              {{ ord.captainEarning | number:'1.0-0' }} <small>ل.س</small>
+              {{ ord.captainEarning | number:'1.0-2' }} <small>ل.س</small>
             </td>
 
             <!-- Cash Collected -->
             <td class="text-end fw-bold text-green">
-              {{ ord.cashCollected | number:'1.0-0' }} <small>ل.س</small>
+              {{ ord.cashCollected | number:'1.0-2' }} <small>ل.س</small>
             </td>
 
             <!-- Status -->
@@ -563,6 +564,7 @@
   </div>
 
   <div class="modal-body p-4" id="printableReceiptArea">
+  <div class="alert alert-danger" role="alert" *ngIf="errorMessage">{{ errorMessage }}</div>
     <!-- Official Receipt Document -->
     <div class="receipt-document">
       <!-- Receipt Header -->
@@ -608,19 +610,19 @@
             </tr>
             <tr>
               <td class="col-title">إجمالي النقد المستلم من الزبائن (العهدة)</td>
-              <td class="col-value text-green">{{ (selectedReceipt?.totalCashCollected || 0) | number:'1.0-0' }} ل.س</td>
+              <td class="col-value text-green">{{ (selectedReceipt?.totalCashCollected || 0) | number:'1.0-2' }} ل.س</td>
             </tr>
             <tr>
               <td class="col-title">إجمالي أجور التوصيل المفوترة للطلبات</td>
-              <td class="col-value text-purple">{{ (selectedReceipt?.totalDeliveryFees || 0) | number:'1.0-0' }} ل.س</td>
+              <td class="col-value text-purple">{{ (selectedReceipt?.totalDeliveryFees || 0) | number:'1.0-2' }} ل.س</td>
             </tr>
             <tr>
               <td class="col-title">إجمالي استحقاقات الكابتن المخصومة (أرباح الطلبات)</td>
-              <td class="col-value text-amber">- {{ (selectedReceipt?.totalCaptainEarnings || 0) | number:'1.0-0' }} ل.س</td>
+              <td class="col-value text-amber">- {{ (selectedReceipt?.wagesOffset ?? selectedReceipt?.totalCaptainEarnings ?? 0) | number:'1.0-2' }} ل.س</td>
             </tr>
             <tr class="row-highlight-net">
               <td class="col-title-net">الصافي المسلم لخزينة الشركة (المحصل - الاستحقاق)</td>
-              <td class="col-value-net">{{ (selectedReceipt?.netDueToCompany || 0) | number:'1.0-0' }} ل.س</td>
+              <td class="col-value-net">{{ (selectedReceipt?.netDueToCompany || 0) | number:'1.0-2' }} ل.س</td>
             </tr>
           </tbody>
         </table>

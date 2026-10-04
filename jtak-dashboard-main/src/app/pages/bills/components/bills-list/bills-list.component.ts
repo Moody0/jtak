@@ -48,6 +48,7 @@ export class BillsListComponent
 
   ngOnInit(): void {
     this.billsService.setDefaults();
+    this.sorting=this.billsService.sorting;this.paginator=this.billsService.paginator;
     this.searchForm();
     this.billsService.fetchPost();
 
@@ -57,45 +58,16 @@ export class BillsListComponent
 
     this.subs.sink = this.billsService.totalRecords$.subscribe((total) => {
       this.totalRecords = total || 0;
-      if (!this.kpiBillsCount) {
-        this.kpiBillsCount = this.totalRecords;
-      }
     });
 
-    this.subs.sink = this.billsService.items$.subscribe((items) => {
-      if (items && items.length) {
-        this.calculateKpis(items);
-      }
+    this.subs.sink = this.billsService.summary$.subscribe((summary) => {
+      this.kpiBillsCount=summary?.billsCount ?? 0;this.kpiTotalBilled=summary?.totalBilled ?? 0;
+      this.kpiMerchantShare=summary?.merchantShare ?? 0;this.kpiPlatformRevenue=summary?.platformRevenue ?? 0;
+      this.cdr.detectChanges();
     });
 
     this.sorting = this.billsService.sorting;
     this.paginator = this.billsService.paginator;
-  }
-
-  calculateKpis(items: Bill[]): void {
-    if (!items || !items.length) {
-      this.kpiBillsCount = 0;
-      this.kpiTotalBilled = 0;
-      this.kpiMerchantShare = 0;
-      this.kpiPlatformRevenue = 0;
-      this.cdr.detectChanges();
-      return;
-    }
-    const earnedBills = items.filter(b => b.isAddedToDues);
-    this.kpiBillsCount = earnedBills.length;
-    this.kpiTotalBilled = earnedBills.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
-    this.kpiMerchantShare = earnedBills.reduce((sum, b) => sum + (Number(b.merchantAmount) || 0), 0);
-    // JTakAmount is the commission already included in the invoice total.
-    // JTakAdditionalAmount is a separate informational field and must not be
-    // added again, otherwise merchant dues plus platform revenue exceed the
-    // invoice total. Use the invoice residual as the authoritative value so
-    // the KPI always reconciles with the amounts shown in each row.
-    this.kpiPlatformRevenue = earnedBills.reduce((sum, b) => {
-      const totalAmount = Number(b.totalAmount) || 0;
-      const merchantAmount = Number(b.merchantAmount) || 0;
-      return sum + Math.max(totalAmount - merchantAmount, 0);
-    }, 0);
-    this.cdr.detectChanges();
   }
 
   searchForm(): void {
@@ -110,23 +82,18 @@ export class BillsListComponent
   search(searchTerm: string): void {
     this.selection.clear();
     const paginator = this.billsService.paginator;
-    paginator.page = 1;
+    paginator.page = 0;
     this.billsService.patchState({ searchTerm, paginator });
   }
 
   filterByDues(filter: 'all' | 'added' | 'pending'): void {
     this.selectedDuesFilter = filter;
     this.selection.clear();
+    this.billsService.patchState({filter:{duesStatus:filter}});
   }
 
   getDisplayedItems(items: Bill[]): Bill[] {
-    if (!items) return [];
-
-    return items.filter((bill) => {
-      if (this.selectedDuesFilter === 'added' && !bill.isAddedToDues) return false;
-      if (this.selectedDuesFilter === 'pending' && bill.isAddedToDues) return false;
-      return true;
-    });
+    return items || [];
   }
 
   paginate(paginator: PaginatorState): void {

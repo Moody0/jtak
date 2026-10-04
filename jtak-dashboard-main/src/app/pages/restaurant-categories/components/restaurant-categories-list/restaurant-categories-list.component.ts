@@ -131,6 +131,7 @@ export class RestaurantCategoriesListComponent implements OnInit, OnDestroy {
       centered: true,
       backdrop: 'static',
     });
+    modalRef.componentInstance.availableCategories = this.availableCategories;
     modalRef.componentInstance.item = null;
     modalRef.componentInstance.nextOrder = this.items.length + 1;
 
@@ -150,6 +151,7 @@ export class RestaurantCategoriesListComponent implements OnInit, OnDestroy {
       centered: true,
       backdrop: 'static',
     });
+    modalRef.componentInstance.availableCategories = this.availableCategories;
     modalRef.componentInstance.item = { ...item };
 
     modalRef.result.then(
@@ -180,6 +182,7 @@ export class RestaurantCategoriesListComponent implements OnInit, OnDestroy {
   }
 
   toggleSectionEnabled(): void {
+    if (this.isSaving || this.isLoading) return;
     const previousState = this.enabled;
     this.enabled = !this.enabled;
     this.saveConfig(false, previousState);
@@ -208,6 +211,7 @@ export class RestaurantCategoriesListComponent implements OnInit, OnDestroy {
   }
 
   moveUp(index: number): void {
+    if (this.isSaving || this.isLoading) return;
     if (index <= 0 || index >= this.items.length) return;
     const temp = this.items[index];
     this.items[index] = this.items[index - 1];
@@ -216,6 +220,7 @@ export class RestaurantCategoriesListComponent implements OnInit, OnDestroy {
   }
 
   moveDown(index: number): void {
+    if (this.isSaving || this.isLoading) return;
     if (index < 0 || index >= this.items.length - 1) return;
     const temp = this.items[index];
     this.items[index] = this.items[index + 1];

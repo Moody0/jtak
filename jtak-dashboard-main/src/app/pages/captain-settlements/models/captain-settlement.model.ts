@@ -67,6 +67,7 @@ export interface ConfirmCaptainSettlementRequest {
 }
 
 export interface SettlementBatchReceipt {
+  wagesOffset?: number;
   batchId: string;
   captainId: string;
   captainName: string;

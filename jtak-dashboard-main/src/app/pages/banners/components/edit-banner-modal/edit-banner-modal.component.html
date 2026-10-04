@@ -3,7 +3,7 @@
   [itemName]="item.title"
   moduleName="Banner"
   [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid"
+  [saveDisabled]="formGroup.invalid || isSaving"
   (cancelClicked)="modal.dismiss()"
   (saveClicked)="save()"
 >
@@ -100,6 +100,7 @@
                   <option value="none">🚫 {{ 'BANNERS_PAGE.TARGET_TYPE_NONE' | translate }}</option>
                   <option value="restaurant">🍽️ {{ 'BANNERS_PAGE.TARGET_TYPE_RESTAURANT' | translate }}</option>
                   <option value="market">🛒 {{ 'BANNERS_PAGE.TARGET_TYPE_MARKET' | translate }}</option>
+                  <option value="category">📂 تصنيف منتجات</option>
                   <option value="offers">🏷️ {{ 'BANNERS_PAGE.TARGET_TYPE_OFFERS' | translate }}</option>
                   <option value="external">🌐 {{ 'BANNERS_PAGE.TARGET_TYPE_EXTERNAL' | translate }}</option>
                 </select>
@@ -107,6 +108,10 @@
 
               <!-- Contextual Action Details -->
               <div class="col-md-7">
+                <div *ngIf="formGroup.get('targetType')?.value === 'category'">
+                  <label class="form-label fw-bold">التصنيف الذي يفتحه الإعلان</label>
+                  <ng-select [items]="categories" bindLabel="title" bindValue="id" formControlName="targetCategoryId" [loading]="loadingCategories" placeholder="اختر التصنيف"></ng-select>
+                </div>
                 <!-- If None (Display Only) -->
                 <div *ngIf="formGroup.get('targetType')?.value === 'none'" class="h-100 d-flex align-items-center pt-md-4">
                   <div class="alert alert-secondary d-flex align-items-center w-100 py-2 px-3 mb-0">

@@ -25,6 +25,10 @@ export class BannersService extends TableService<Banner> implements OnDestroy {
     super(http);
   }
 
+  summary() { return this.http.get<{total: number; active: number; daily: number; dontMiss: number}>(this.BASE_URL + '/Admin/Banner/Summary'); }
+  setStatus(ids: number[], active: boolean) { return this.http.post<boolean>(this.BASE_URL + '/Admin/Banner/BulkStatus', {ids, active}); }
+  deleteMany(ids: number[]) { return this.http.post<boolean>(this.BASE_URL + '/Admin/Banner/BulkDelete', {ids}); }
+
   ngOnDestroy() {
     this.subscriptions.forEach((sb) => sb.unsubscribe());
   }

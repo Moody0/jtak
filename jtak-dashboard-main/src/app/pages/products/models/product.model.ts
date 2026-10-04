@@ -7,6 +7,7 @@ export interface Product extends BaseModel {
   photos: string;
   unit: string;
   active: boolean;
+  isPublishedToCustomer?: boolean | null;
   isFeatured: boolean;
   productCategoryId: number;
   productCategory: string;

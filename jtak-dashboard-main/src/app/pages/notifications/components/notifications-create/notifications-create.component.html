@@ -3,7 +3,7 @@
     <h2 class="modal-title fw-bolder mb-1">إرسال إشعار جديد</h2>
     <p class="text-muted mb-0">اختر التطبيق، اكتب الرسالة، وراجع المعاينة قبل الإرسال.</p>
   </div>
-  <button type="button" class="btn btn-icon btn-sm btn-light" aria-label="إغلاق" (click)="modal.dismiss()" [disabled]="isSending">
+  <button type="button" class="btn btn-icon btn-sm btn-light" aria-label="إغلاق" (click)="!isSending && modal.dismiss()" [disabled]="isSending">
     <i class="fas fa-times"></i>
   </button>
 </div>
@@ -101,7 +101,7 @@
     سيُرسل الإشعار إلى <strong>{{ targetLabel }}</strong> الآن. يوجد <strong>{{ targetCount | number }}</strong> حساب نشط؛ وقد تصل الرسالة أيضًا إلى أجهزة العملاء غير المسجلين عند اختيار تطبيق العملاء.
     <div class="mt-2">الصفحة التي ستفتح: <strong>{{ destinationLabel }}</strong></div>
   </div>
-  <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isSending">إلغاء</button>
+  <button type="button" class="btn btn-light" (click)="!isSending && modal.dismiss()" [disabled]="isSending">إلغاء</button>
   <button *ngIf="!confirming" type="button" class="btn btn-primary" (click)="reviewSend()" [disabled]="isSending || statsLoading || !audiences?.pushConfigured">
     <i class="fas fa-paper-plane me-1"></i> مراجعة الإرسال
   </button>

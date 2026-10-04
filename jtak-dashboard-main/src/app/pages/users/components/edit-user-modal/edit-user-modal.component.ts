@@ -54,6 +54,8 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   ];
 
   showPassword = false;
+  isSaving=false;
+  saveError='';
 
   constructor(
     private service: UsersService,
@@ -160,7 +162,7 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
 
   loadItem() {
     if (!this.item) {
-      this.item = EMPTY_USER;
+      this.item = {...EMPTY_USER};
     }
   }
 
@@ -175,10 +177,10 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
       firstName: [this.item.firstName, [Validators.required]],
       lastName: [this.item.lastName, [Validators.required]],
       phoneNumber: [
-        this.item.countryPhoneCode ? this.item.phoneNumber.replace(this.item.countryPhoneCode, '') : this.item.phoneNumber,
-        [Validators.required, Validators.minLength(8), Validators.maxLength(15)],
+        this.item.countryPhoneCode ? (this.item.phoneNumber || '').replace(this.item.countryPhoneCode, '') : this.item.phoneNumber,
+        [Validators.required, Validators.pattern(/^[0-9]{8,15}$/)],
       ],
-      countryPhoneCode: [this.item.countryPhoneCode || '+963'],
+      countryPhoneCode: [this.item.countryPhoneCode || '+963',[Validators.required,Validators.pattern(/^\+?[1-9][0-9]{0,3}$/)]],
       email: [this.item.email, [Validators.email]],
       password: ['', this.item?.id ? [] : [Validators.required, Validators.minLength(6)]],
       isActive: [this.item.isActive !== undefined ? this.item.isActive : true],
@@ -188,7 +190,16 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
       captainCompensationType: [compType],
       captainRate: [initialRate, [Validators.min(0)]],
       lang: [this.item.lang || 'ar']
-    });
+    },{validators:form=>{
+      const first=String(form.get('firstName')?.value || '').trim(),last=String(form.get('lastName')?.value || '').trim();
+      if(!first || !last || first.length>100 || last.length>100) return {invalidNames:true};
+      const password=String(form.get('password')?.value || '').trim();
+      if(password && password.length<6) return {invalidPassword:true};
+      const limit=Number(form.get('maxCashFloat')?.value),rate=Number(form.get('captainRate')?.value),type=Number(form.get('captainCompensationType')?.value);
+      const validMoney=(value:number)=>Number.isFinite(value) && value>=0 && value<=1000000000 && Math.abs(value*100-Math.round(value*100))<0.000001;
+      if(!validMoney(limit) || !validMoney(rate) || ![0,1,2].includes(type) || (type===2 && rate>100))return {invalidCompensation:true};
+      return null;
+    }});
   }
 
   onCompensationTypeChange(type: number): void {
@@ -218,6 +229,8 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   }
 
   save() {
+    if(this.isSaving) return;
+    if(this.formGroup.invalid){this.formGroup.markAllAsTouched();this.saveError='راجع البيانات. النسبة بين صفر و100% والمبالغ بحد أقصى منزلتين عشريتين، وكلمة المرور 6 أحرف على الأقل.';return;}
     const formValues: any = { ...this.formGroup.value };
 
     if (Number(formValues.role) === 3) {
@@ -240,27 +253,38 @@ export class EditUserModalComponent implements OnInit, OnDestroy {
   }
 
   create(formValues: User) {
+    if(this.isSaving) return;
+    this.isSaving=true;this.saveError='';this.formGroup.disable();
     this.subs.sink = this.service
       .create(formValues)
       .pipe(
         tap(() => {
-          this.toasterService.success('User Added');
+          this.toasterService.success('تم إنشاء المستخدم.');
           this.modal.close();
         })
       )
-      .subscribe();
+      .subscribe({error:error=>this.failed(error)});
   }
 
   edit(formValues: User) {
+    if(this.isSaving) return;
+    this.isSaving=true;this.saveError='';this.formGroup.disable();
     this.subs.sink = this.service
       .update(formValues)
       .pipe(
         tap(() => {
-          this.toasterService.success('User Updated');
+          this.toasterService.success('تم حفظ بيانات المستخدم.');
           this.modal.close();
         })
       )
-      .subscribe();
+      .subscribe({error:error=>this.failed(error)});
+  }
+
+  private failed(error:any):void {
+    this.isSaving=false;this.formGroup.enable();
+    const body=error?.error;
+    this.saveError=typeof body==='string' ? body : body?.errorDescription || body?.message || (Array.isArray(body?.errors) ? body.errors.map((e:any)=>e.description).join('، ') : '') || 'تعذر حفظ المستخدم. تحقق من البيانات والسجل قبل إعادة المحاولة.';
+    this.toasterService.error(this.saveError);
   }
 
   ngOnDestroy(): void {

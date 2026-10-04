@@ -191,6 +191,7 @@ export abstract class TableService<T> {
         take(1),
         tap((res: TableResponseModel<T>) => {
           if ((res as any)?.error || !Array.isArray(res?.items) || !Number.isFinite(Number(res?.totalRecords))) throw new Error('Invalid table response');
+          this.onListResponse(res);
           this._listError$.next('');
           this._items$.next(res.items);
           this._totalRecords$.next(res.totalRecords);
@@ -201,6 +202,7 @@ export abstract class TableService<T> {
           });
         }),
         catchError(() => {
+          this.onListResponse(null);
           this._listError$.next('تعذر تحميل البيانات. اضغط تحديث للمحاولة مرة أخرى.');
           this._isLoading$.next(false);
           return of({ items: [], totalRecords: 0 } as TableResponseModel<T>);
@@ -217,6 +219,7 @@ export abstract class TableService<T> {
   }
 
   // CREATE
+  protected onListResponse(response: any): void {}
   // server should return the object with ID
   create(item: BaseModel): Observable<string> {
     const url = `${this.BASE_URL}/${this.CREATE_URL}`;

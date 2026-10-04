@@ -27,8 +27,8 @@ const EMPTY_Merchant: Merchant = {
   address: '',
   shippingCoverageInMeters: 1000,
   profitOutOfMerchantPricePercent: 20,
-  lat: 37.064258,
-  lng: 37.378656,
+  lat: 34.7324,
+  lng: 36.7137,
   active: false,
   merchantKind: 0,
   deliveryTime: '20-30 دقيقة',
@@ -70,8 +70,10 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   confirmMerchantPassword = '';
   isLoading$: Observable<boolean>;
   formGroup: UntypedFormGroup;
+  isSaving = false;
   userRoles = Object.entries(AppUserRoleMap);
   zoom = 10;
+  get mapAvailable(): boolean { return !!(window as any).google?.maps?.Map; }
   center: google.maps.LatLngLiteral;
   marker: any;
   options: google.maps.MapOptions = {
@@ -286,7 +288,6 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.isLoading$ = this.service.isLoading$;
     this.loadItem();
-    this.loadForm();
   }
 
   loadItem() {
@@ -300,8 +301,9 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         this.item.shortDescription = 'مستودع مركزي لتخزين وتجهيز المنتجات';
       }
     }
+    this.loadForm();
     this.loadingUsers = true;
-    this.userService
+    this.subs.sink = this.userService
       .getMerchantUsers()
       .pipe(
         catchError(() => of([])),
@@ -360,9 +362,9 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       address: [this.item.address || ''],
 
       shippingCoverageInMeters: [this.item.shippingCoverageInMeters ?? 1000, [Validators.required]],
-      lat: [this.item.lat ?? 37.064258, [Validators.required]],
-      lng: [this.item.lng ?? 37.378656, [Validators.required]],
-      profitOutOfMerchantPricePercent: [this.item.profitOutOfMerchantPricePercent ?? 0, [Validators.required]],    
+      lat: [this.item.lat ?? 34.7324, [Validators.required]],
+      lng: [this.item.lng ?? 36.7137, [Validators.required]],
+      profitOutOfMerchantPricePercent: [this.item.profitOutOfMerchantPricePercent ?? 0, [Validators.required, Validators.min(0)]],    
       deliveryTime: [this.item.deliveryTime || '20-30 دقيقة'],
       deliveryFee: [this.item.deliveryFee !== undefined && this.item.deliveryFee !== null ? this.item.deliveryFee : 50, [Validators.required, Validators.min(0)]],
       minOrderAmount: [this.item.minOrderAmount !== undefined && this.item.minOrderAmount !== null ? this.item.minOrderAmount : 150, [Validators.required, Validators.min(0)]],
@@ -430,7 +432,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         lat: this.item.lat,
         lng: this.item.lng,
       },
-      options: { animation: google.maps.Animation.DROP, draggable: true },
+      options: { animation: (window as any).google?.maps?.Animation?.DROP, draggable: true },
     };
 
     this.cdk.detectChanges();
@@ -451,6 +453,11 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   }
 
   save() {
+    if (this.isSaving) return;
+    if (this.formGroup.invalid) { this.formGroup.markAllAsTouched(); return; }
+    if (!String(this.formGroup.get('title')?.value || '').trim()) {
+      this.formGroup.get('title')?.setErrors({ required: true }); return;
+    }
     const formValues = { ...this.formGroup.value };
     const merchantKind = Number(formValues.merchantKind);
     formValues.merchantKind = merchantKind;
@@ -503,6 +510,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.isSaving = true;
     this.checkPhoneUniqueness(formValues);
   }
 
@@ -535,6 +543,11 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       .getAllMerchants()
       .pipe(catchError(() => of(null)))
       .subscribe((merchants) => {
+        if (merchants === null) {
+          this.isSaving = false;
+          this.toasterService.error('تعذر فحص أرقام المتاجر. أعد المحاولة.');
+          return;
+        }
         const merchantId = Number(formValues.id || this.item?.id || 0);
         const duplicate = (merchants || []).find((merchant) => {
           if (merchant.id === merchantId) return false;
@@ -546,6 +559,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         });
 
         if (duplicate) {
+          this.isSaving = false;
           const existingPhones = [
             this.normalizePhone(duplicate.phone1),
             this.normalizePhone(duplicate.phone2),
@@ -576,7 +590,8 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
   }
 
   private handleSaveError(error: any): void {
-    const message = typeof error?.error === 'string'
+    this.isSaving = false;
+    const message = Array.isArray(error?.error?.errors) ? error.error.errors.join('، ') : typeof error?.error === 'string'
       ? error.error
       : error?.error?.message;
     this.toasterService.error(

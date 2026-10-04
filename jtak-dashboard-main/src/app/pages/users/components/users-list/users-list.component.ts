@@ -2,8 +2,8 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
-import { debounceTime, distinctUntilChanged, catchError } from 'rxjs/operators';
-import { forkJoin, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, catchError, map, finalize, mergeMap, tap } from 'rxjs/operators';
+import { forkJoin, of, throwError } from 'rxjs';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -37,6 +37,8 @@ export class UsersListComponent
   implements OnInit, OnDestroy, ISortView, IPaginatorView, ISearchView
 {
   private subs = new SubSink();
+  private destroyed=false;
+  isMutating=false;
   selection = new TableSelection<User>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
@@ -66,8 +68,8 @@ export class UsersListComponent
 
   ngOnInit(): void {
     this.service.setDefaults();
+    this.sorting=this.service.sorting;this.paginator=this.service.paginator;
     this.searchForm();
-    this.loadKpis();
     this.service.fetchPost();
 
     this.subs.sink = this.service.isLoading$.subscribe(
@@ -76,35 +78,11 @@ export class UsersListComponent
 
     this.subs.sink = this.service.totalRecords$.subscribe((total) => {
       this.totalRecords = total || 0;
-      if (!this.kpiTotal) {
-        this.kpiTotal = this.totalRecords;
-      }
     });
 
     this.sorting = this.service.sorting;
     this.paginator = this.service.paginator;
-  }
-
-  loadKpis(): void {
-    this.service
-      .getAllUsers()
-      .pipe(catchError(() => of([])))
-      .subscribe((users) => {
-        this.calculateKpis(users || []);
-      });
-  }
-
-  calculateKpis(users: User[]): void {
-    if (!users) return;
-    this.kpiTotal = this.totalRecords > users.length ? this.totalRecords : users.length;
-    this.kpiActive = users.filter((u) => u.isActive).length;
-    this.kpiCustomers = users.filter(
-      (u) => this.getUserRole(u) === AppRoleName.Customer
-    ).length;
-    this.kpiStaff = users.filter(
-      (u) => this.getUserRole(u) === AppRoleName.Delivery || this.getUserRole(u) === AppRoleName.Merchant
-    ).length;
-    this.cdr.detectChanges();
+    this.subs.sink=this.service.summary$.subscribe(summary=>{this.kpiTotal=summary?.total ?? 0;this.kpiActive=summary?.active ?? 0;this.kpiCustomers=summary?.customers ?? 0;this.kpiStaff=summary?.staff ?? 0;this.cdr.detectChanges();});
   }
 
   searchForm(): void {
@@ -128,43 +106,23 @@ export class UsersListComponent
   filterByRole(roleId: number | 'all'): void {
     this.selectedRoleId = roleId;
     this.selection.clear();
-    if (roleId !== 'all') {
-      this.service.fetchPost({ role: roleId });
-    } else {
-      this.service.fetchPost();
-    }
+    this.applyFilters();
   }
 
   filterByStatus(status: 'all' | 'active' | 'disabled'): void {
     this.selectedStatus = status;
     this.selection.clear();
+    this.applyFilters();
   }
 
-  getDisplayedItems(items: User[]): User[] {
-    if (!items) return [];
-
-    return items.filter((user) => {
-      // Admin accounts are intentionally excluded; customers, merchants and
-      // delivery couriers belong in this operational account directory.
-      const userRole = this.getUserRole(user);
-      if (userRole !== AppRoleName.Customer && userRole !== AppRoleName.Merchant && userRole !== AppRoleName.Delivery) {
-        return false;
-      }
-
-      // Role filter (client-side backup for mixed sets)
-      if (this.selectedRoleId !== 'all') {
-        if (userRole !== this.selectedRoleId) {
-          return false;
-        }
-      }
-
-      // Status filter
-      if (this.selectedStatus === 'active' && !user.isActive) return false;
-      if (this.selectedStatus === 'disabled' && user.isActive) return false;
-
-      return true;
-    });
+  private applyFilters():void {
+    const filter:any={};
+    if(this.selectedRoleId!=='all') filter.role=this.selectedRoleId;
+    if(this.selectedStatus!=='all') filter.isActive=this.selectedStatus==='active';
+    this.service.patchState({filter});
   }
+
+  getDisplayedItems(items:User[]):User[] {return items || [];}
 
   paginate(paginator: PaginatorState): void {
     this.selection.clear();
@@ -194,12 +152,12 @@ export class UsersListComponent
       windowClass: 'user-edit-modal',
       backdrop: 'static',
       keyboard: false,
+      beforeDismiss:()=>!modalRef.componentInstance.isSaving,
     });
     modalRef.componentInstance.item = item;
     modalRef.result.then(
       () => {
-        this.loadKpis();
-        this.service.fetchPost();
+        this.refresh();
       },
       () => {}
     );
@@ -209,61 +167,67 @@ export class UsersListComponent
     const modalRef = this.modalService.open(DeleteUserModalComponent, {
       centered: true,
       windowClass: 'user-delete-modal',
+      backdrop:'static',
+      beforeDismiss:()=>!modalRef.componentInstance.isSaving,
     });
     modalRef.componentInstance.id = id;
     modalRef.result.then(
       () => {
-        this.loadKpis();
-        this.service.fetchPost();
+        this.refresh();
       },
       () => {}
     );
   }
 
   toggleUserStatus(user: User): void {
-    this.service.changeUserStatus(user.isActive, user.id).subscribe(() => {
+    if(this.isMutating) return;
+    this.isMutating=true;
+    this.subs.sink=this.service.changeUserStatus(user.isActive, user.id).pipe(finalize(()=>this.isMutating=false)).subscribe({next:() => {
       const stateText = !user.isActive
         ? 'تم تفعيل حساب المستخدم بنجاح'
         : 'تم تعطيل حساب المستخدم بنجاح';
       this.toaster.success(stateText);
-      this.loadKpis();
-      this.service.fetchPost();
-    });
+      this.refresh();
+    },error:err=>{this.toaster.error(err?.error?.errorDescription || err?.error?.message || 'تعذر تغيير حالة المستخدم. حدّث القائمة للتحقق.');this.refresh();}});
   }
 
   bulkSetStatus(items: User[], targetActive: boolean): void {
+    if(this.isMutating) return;
     const requests = this.selection
       .selectedItems(items)
       .filter((item) => item.isActive !== targetActive)
-      .map((item) => this.service.changeUserStatus(item.isActive, item.id));
+      .map((item) => this.service.changeUserStatus(item.isActive, item.id).pipe(map(()=>true),catchError(()=>of(false))));
 
     if (!requests.length) return;
 
-    forkJoin(requests).subscribe(() => {
-      this.toaster.success(
+    this.isMutating=true;
+    this.subs.sink=forkJoin(requests).pipe(finalize(()=>this.isMutating=false)).subscribe(results => {
+      if(results.some(result=>!result))this.toaster.error(`تم تحديث ${results.filter(Boolean).length} من ${results.length} حساب. تعذر تحديث الباقي؛ راجع القائمة.`);
+      else this.toaster.success(
         targetActive
           ? 'تم تفعيل الحسابات المحددة بنجاح'
           : 'تم تعطيل الحسابات المحددة بنجاح'
       );
       this.selection.clear();
-      this.loadKpis();
-      this.service.fetchPost();
+      this.refresh();
     });
   }
 
   bulkDelete(items: User[]): void {
     const selected = this.selection.selectedItems(items);
     if (!selected.length) return;
-    const modalRef = this.modalService.open(BulkConfirmModalComponent);
+    const modalRef = this.modalService.open(BulkConfirmModalComponent,{backdrop:'static',beforeDismiss:()=>!modalRef.componentInstance.isLoading});
     modalRef.componentInstance.count = selected.length;
-    modalRef.componentInstance.itemLabel = selected.length === 1 ? 'user' : 'users';
+    modalRef.componentInstance.itemLabel = 'حساب';
+    modalRef.componentInstance.actionLabel = 'أرشفة';
+    modalRef.componentInstance.description = 'سيُوقف دخول الحسابات المحددة مع الاحتفاظ بالطلبات والسجلات المالية السابقة.';
     modalRef.componentInstance.action = () =>
-      forkJoin(selected.map((item) => this.service.delete(item.id)));
+      forkJoin(selected.map((item) => this.service.delete(item.id).pipe(map(()=>true),catchError(()=>of(false))))).pipe(
+        tap(()=>this.refresh()),mergeMap(results=>results.every(Boolean) ? of(results) : throwError(()=>({error:{message:`تمت أرشفة ${results.filter(Boolean).length} من ${results.length} حساب. راجع القائمة للحسابات المتبقية.`}}))));
     modalRef.result.then(
       () => {
         this.selection.clear();
-        this.loadKpis();
-        this.service.fetchPost();
+        this.refresh();
       },
       () => {}
     );
@@ -397,8 +361,8 @@ export class UsersListComponent
   }
 
   refresh(): void {
+    if(this.destroyed) return;
     this.selection.clear();
-    this.loadKpis();
     this.service.fetchPost();
   }
 
@@ -407,6 +371,7 @@ export class UsersListComponent
   }
 
   ngOnDestroy(): void {
+    this.destroyed=true;
     this.subs.unsubscribe();
   }
 }

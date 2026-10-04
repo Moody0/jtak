@@ -2,8 +2,8 @@
   [item]="item"
   [itemName]="item.title || ''"
   [moduleName]="isWarehouseRecord ? 'Warehouse' : 'Merchant'"
-  [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid"
+  [isLoading]="isSaving || (isLoading$ | async)"
+  [saveDisabled]="isSaving || formGroup.invalid"
   (cancelClicked)="modal.dismiss()"
   (saveClicked)="save()"
 >
@@ -637,6 +637,7 @@
 
             <div class="merchant-map">
               <google-map
+                *ngIf="mapAvailable"
                 height="320px"
                 width="100%"
                 [center]="center"
@@ -649,6 +650,11 @@
                   (mapDragend)="onCursorChange($event)"
                 ></map-marker>
               </google-map>
+              <p *ngIf="!mapAvailable" class="text-muted">الخريطة غير متاحة حالياً. أدخل إحداثيات موقع المتجر أدناه.</p>
+              <div class="row g-3 mt-2">
+                <div class="col"><label class="form-label">خط العرض</label><input type="number" class="form-control" formControlName="lat" min="-90" max="90" step="any"></div>
+                <div class="col"><label class="form-label">خط الطول</label><input type="number" class="form-control" formControlName="lng" min="-180" max="180" step="any"></div>
+              </div>
             </div>
           </section>
 

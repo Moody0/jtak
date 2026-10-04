@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Balance, User } from '../models/user.model';
 import { environment } from 'src/environments/environment';
 import { TableService, TableResponseModel } from 'src/app/_metronic/shared/crud-table';
-import { finalize, Observable, tap } from 'rxjs';
+import { finalize, Observable, tap, BehaviorSubject } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { TagVal } from '../models/TagVal-dto.model';
 
@@ -11,6 +11,8 @@ import { TagVal } from '../models/TagVal-dto.model';
   providedIn: 'root',
 })
 export class UsersService extends TableService<User> implements OnDestroy {
+  readonly summary$=new BehaviorSubject<any>(null);
+  protected onListResponse(response:any):void {this.summary$.next(response?.summary ?? null);}
   BASE_URL = environment.apiUrl;
   GET_ALL_URL = 'Admin/Users/DataTable';
   GET_ONE_URL = 'Admin/Users';

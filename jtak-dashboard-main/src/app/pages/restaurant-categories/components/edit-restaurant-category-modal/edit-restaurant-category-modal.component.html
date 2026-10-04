@@ -17,6 +17,15 @@
 
 <div class="modal-body py-4">
   <form [formGroup]="formGroup" (ngSubmit)="save()">
+    <div class="mb-4">
+      <label class="form-label">تصنيف المنتجات المرتبط</label>
+      <select class="form-select" formControlName="productCategoryId">
+        <option [ngValue]="null">المطابقة باسم التصنيف</option>
+        <option *ngFor="let category of availableCategories" [ngValue]="category.id">
+          {{ category.parentTitle ? category.parentTitle + ' / ' : '' }}{{ category.title }}
+        </option>
+      </select>
+    </div>
     <div class="row g-4">
       
       <!-- Right/Sidebar: Live Mobile Preview Card -->

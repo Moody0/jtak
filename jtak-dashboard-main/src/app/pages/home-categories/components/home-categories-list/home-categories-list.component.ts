@@ -1,5 +1,5 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
-import { forkJoin, of } from 'rxjs';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { Subscription, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import {
   HomeCategoriesAdminVm,
@@ -23,7 +23,11 @@ import { RestaurantCategoryItem } from 'src/app/pages/restaurant-categories/mode
   templateUrl: './home-categories-list.component.html',
   styleUrls: ['./home-categories-list.component.scss'],
 })
-export class HomeCategoriesListComponent implements OnInit {
+export class HomeCategoriesListComponent implements OnInit, OnDestroy {
+  private requests = new Subscription();
+  private loadRequest?: Subscription;
+  private successTimer?: ReturnType<typeof setTimeout>;
+  ngOnDestroy(): void { this.requests.unsubscribe(); this.loadRequest?.unsubscribe(); clearTimeout(this.successTimer); }
   loading = true;
   saving = false;
   saveSuccess = false;
@@ -66,6 +70,8 @@ export class HomeCategoriesListComponent implements OnInit {
   }
 
   load(): void {
+    if (this.saving) return;
+    this.loadRequest?.unsubscribe();
     if (
       !this.loading &&
       this.hasUnsavedChanges &&
@@ -76,7 +82,7 @@ export class HomeCategoriesListComponent implements OnInit {
     this.loading = true;
     this.saveError = null;
     this.restaurantCategoriesLoadError = false;
-    forkJoin({
+    this.loadRequest = forkJoin({
       home: this.service.get(),
       restaurantCategories: this.restaurantCategoriesService.getConfig().pipe(catchError(() => of(null))),
     }).subscribe({
@@ -128,7 +134,7 @@ export class HomeCategoriesListComponent implements OnInit {
         this.saveError =
           typeof err?.error === 'string' && err.error.trim().length
             ? err.error
-            : 'تعذر تحميل إعدادات فئات الصفحة الرئيسية (HTTP 500). يرجى التأكد من استيراد تحديث قاعدة البيانات في الخادم.';
+            : 'تعذر تحميل إعدادات فئات الصفحة الرئيسية. تحقق من الاتصال وحاول مرة أخرى.';
         this.cdr.detectChanges();
       },
     });
@@ -351,15 +357,8 @@ export class HomeCategoriesListComponent implements OnInit {
   }
 
   get jtakMarketMerchantId(): number | null {
-    const namedMarkets = this.merchants.filter((merchant) => {
-      const title = (merchant.title || '').toLowerCase().replace(/[\s_-]/g, '');
-      return title.includes('jtakmarket') || title.includes('جيتكماركت');
-    });
-    if (namedMarkets.length === 1) return namedMarkets[0].id;
-    if (namedMarkets.length > 1) return null;
-
-    const groceries = this.merchants.filter((merchant) => merchant.merchantKind === 1);
-    return groceries.length === 1 ? groceries[0].id : null;
+    const markets = this.merchants.filter(merchant => merchant.isJtakMarket === true);
+    return markets.length === 1 ? markets[0].id : null;
   }
 
   merchantKindOptionLabel(kind: HomeCategoryMerchantKind): string {
@@ -413,8 +412,9 @@ export class HomeCategoriesListComponent implements OnInit {
 
     switch (tile.linkType) {
       case HomeCategoryLinkType.ProductCategory: {
-        const category = this.categories.find((item) => item.id === tile.productCategoryId);
-        return category && category.productCount > 0 && category.merchantCount > 0
+        const targets = this.categories.filter(item => item.id === tile.productCategoryId || item.id === tile.secondaryProductCategoryId);
+        if (!this.categories.some(item => item.id === tile.productCategoryId)) return 'لن تظهر للعملاء حالياً: القسم الأساسي غير موجود أو غير مفعّل.';
+        return targets.some(category => category.productCount > 0 && category.merchantCount > 0)
           ? null
           : 'لن تظهر للعملاء حالياً: لا توجد منتجات مسعّرة لدى متجر نشط في هذا القسم.';
       }
@@ -517,7 +517,7 @@ export class HomeCategoriesListComponent implements OnInit {
   get visibleCount(): number {
     if (!this.config.enabled) return 0;
     const active = this.config.tiles.filter(
-      (tile) => tile.active && this.tileAvailabilityProblem(tile) === null
+      (tile) => tile.active && this.tileProblem(tile) === null && this.tileAvailabilityProblem(tile) === null
     ).length;
     return this.config.maxItems > 0 ? Math.min(active, this.config.maxItems) : active;
   }
@@ -528,11 +528,12 @@ export class HomeCategoriesListComponent implements OnInit {
     }
     const activeBefore = this.config.tiles
       .slice(0, index + 1)
-      .filter((tile) => tile.active).length;
+      .filter((tile) => tile.active && this.tileProblem(tile) === null && this.tileAvailabilityProblem(tile) === null).length;
     return this.config.tiles[index].active && activeBefore > this.config.maxItems;
   }
 
   save(): void {
+    if (this.loading || this.saving) return;
     this.saveError = null;
     this.saveSuccess = false;
 
@@ -543,12 +544,14 @@ export class HomeCategoriesListComponent implements OnInit {
 
     this.renumber();
     this.saving = true;
-    this.service.save(this.config).subscribe({
+    const submittedTiles = this.config.tiles.slice();
+    const submitted: HomeCategoriesConfig = JSON.parse(this.serializeConfig());
+    this.requests.add(this.service.save(submitted).subscribe({
       next: (tiles) => {
         const persistedTiles = [...(tiles ?? [])].sort(
           (a, b) => (a.order ?? 0) - (b.order ?? 0)
         );
-        const secondaryTargetWasDropped = this.config.tiles.some((tile, index) => {
+        const secondaryTargetWasDropped = submitted.tiles.some((tile, index) => {
           const requestedId = Number(tile.secondaryProductCategoryId);
           if (!Number.isInteger(requestedId) || requestedId <= 0) return false;
           return Number(persistedTiles[index]?.secondaryProductCategoryId) !== requestedId;
@@ -563,11 +566,19 @@ export class HomeCategoriesListComponent implements OnInit {
         }
 
         this.resolved = tiles ?? [];
-        this.savedConfigSnapshot = this.serializeConfig();
+        submitted.tiles.forEach((tile, index) => {
+          const id = persistedTiles[index]?.id;
+          if (id && !tile.id) {
+            if (this.config.tiles.includes(submittedTiles[index]) && !submittedTiles[index].id) submittedTiles[index].id = id;
+            tile.id = id;
+          }
+        });
+        this.savedConfigSnapshot = JSON.stringify(submitted);
         this.saving = false;
         this.saveSuccess = true;
         this.cdr.detectChanges();
-        setTimeout(() => {
+        clearTimeout(this.successTimer);
+        this.successTimer = setTimeout(() => {
           this.saveSuccess = false;
           this.cdr.detectChanges();
         }, 3000);
@@ -578,7 +589,7 @@ export class HomeCategoriesListComponent implements OnInit {
           typeof err?.error === 'string' ? err.error : 'تعذر حفظ الإعدادات، حاول مرة أخرى';
         this.cdr.detectChanges();
       },
-    });
+    }));
   }
 
   trackByIndex(index: number): number {

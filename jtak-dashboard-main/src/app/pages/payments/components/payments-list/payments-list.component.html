@@ -1,4 +1,5 @@
 <div class="ops-payments-container">
+  <div class="alert alert-danger" role="alert" *ngIf="paymentsService.listError$ | async as error">{{ error }}</div>
 
   <!-- 1. Operations Utility Bar -->
   <div class="ops-utility-bar">
@@ -35,13 +36,14 @@
     <div class="col-xl-3 col-sm-6">
       <div class="ops-kpi-card kpi-total">
         <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'PAYMENTS_PAGE.KPI_TOTAL_PAID' | translate }}</span>
+          <span class="ops-kpi-label">إجمالي المدفوع بالليرة</span>
           <div class="ops-kpi-icon"><i class="fas fa-money-bill-wave"></i></div>
         </div>
         <div class="ops-kpi-body">
           <span class="ops-kpi-value text-success">{{ kpiTotalPaid | number }}</span>
           <span class="ops-kpi-unit">{{ 'COMMON.CURRENCY_SYP' | translate }}</span>
         </div>
+        <div *ngFor="let total of kpiOtherCurrencies" class="small">{{ total.totalPaid | number:'1.0-2' }} {{ total.currency }}</div>
       </div>
     </div>
 
@@ -77,12 +79,12 @@
     <div class="col-xl-3 col-sm-6">
       <div class="ops-kpi-card kpi-merchants">
         <div class="ops-kpi-header">
-          <span class="ops-kpi-label">{{ 'PAYMENTS_PAGE.KPI_ACTIVE_MERCHANTS' | translate }}</span>
+          <span class="ops-kpi-label">الجهات المستلمة</span>
           <div class="ops-kpi-icon"><i class="fas fa-store"></i></div>
         </div>
         <div class="ops-kpi-body">
           <span class="ops-kpi-value text-purple">{{ kpiUniqueMerchants | number }}</span>
-          <span class="ops-kpi-unit">{{ 'PAYMENTS_PAGE.KPI_ACTIVE_MERCHANTS_SUB' | translate }}</span>
+          <span class="ops-kpi-unit">متاجر ومندوبون وخزينة الشركة</span>
         </div>
       </div>
     </div>

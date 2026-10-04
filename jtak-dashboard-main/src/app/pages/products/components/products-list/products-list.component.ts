@@ -339,8 +339,8 @@ export class ProductsListComponent
       };
     }
 
-    if (!isActive || !hasPrice) {
-      const reason = !isActive && !hasPrice ? 'معطل وبدون سعر' : !isActive ? 'معطل' : 'بدون سعر بيع';
+    if (!isActive || !hasPrice || product.isPublishedToCustomer === false) {
+      const reason = !isActive && !hasPrice ? 'معطل وبدون سعر' : !isActive ? 'معطل' : !hasPrice ? 'بدون سعر بيع' : 'المتجر أو التصنيف معطّل';
       return {
         status: 'assigned_inactive',
         label: `مسند (${reason})`,
@@ -428,8 +428,10 @@ export class ProductsListComponent
     }
     this.selection.clear();
     const paginator = this.service.paginator;
-    paginator.page = 1;
-    this.service.patchState({ filter: categoryId ? { categoryId } : {}, paginator });
+    paginator.page = 0;
+    const filter: any = categoryId ? { categoryId } : {};
+    if (this.selectedStatus !== 'all') filter.active = this.selectedStatus === 'active';
+    this.service.patchState({ filter, paginator });
   }
 
   getSelectedCategoryLabel(): string {
@@ -441,6 +443,7 @@ export class ProductsListComponent
   filterByStatus(status: 'all' | 'active' | 'disabled'): void {
     this.selectedStatus = status;
     this.selection.clear();
+    this.applyCategoryFilter(this.selectedCategoryId);
   }
 
   getDisplayedItems(items: Product[]): Product[] {

@@ -128,7 +128,7 @@
         <div class="ops-config-body">
           <label class="ops-input-label" for="exchange-rate-input">سعر الصرف (1 دولار أمريكي =)</label>
           <div class="ops-input-group">
-            <input id="exchange-rate-input" type="number" [(ngModel)]="exchangeRate" min="1" step="100"
+            <input id="exchange-rate-input" type="number" [(ngModel)]="exchangeRate" [disabled]="isSavingRate" min="1" step="100"
               [disabled]="isSavingRate" placeholder="15000" />
             <span class="ops-input-addon">{{ 'DASHBOARD.SYP' | translate }}</span>
           </div>
@@ -176,7 +176,7 @@
                 تفعيل التوصيل المجاني لجميع المتاجر، بما فيها جيتك ماركت
               </label>
               <input class="form-check-input ms-0" type="checkbox" id="freeDeliveryToggle"
-                [(ngModel)]="driverPricing.isFreeDeliveryEnabled" />
+                [(ngModel)]="driverPricing.isFreeDeliveryEnabled" [disabled]="isSavingDriverPricing || driverPricingLoading || !driverPricingLoaded" />
             </div>
             <div class="mt-1" style="font-size: 0.72rem; color: #64748b;">
               {{ driverPricing.isFreeDeliveryEnabled ? '✓ التوصيل مجاني 0 ل.س للزبون (استحقاق الكابتن محفوظ)' : 'التسعير مفعل حسب المسافة' }}
@@ -188,14 +188,14 @@
             <div class="col-6">
               <label class="ops-input-label" for="cust-rate-km">سعر الكيلومتر</label>
               <div class="ops-input-group">
-                <input id="cust-rate-km" type="number" [(ngModel)]="driverPricing.customerRatePerKm" min="0" step="5" placeholder="45" />
+                <input id="cust-rate-km" type="number" [(ngModel)]="driverPricing.customerRatePerKm" [disabled]="isSavingDriverPricing || driverPricingLoading || !driverPricingLoaded" min="0" step="5" placeholder="45" />
                 <span class="ops-input-addon">ل.س/كم</span>
               </div>
             </div>
             <div class="col-6">
               <label class="ops-input-label" for="cust-min-fee">الحد الأدنى للأجرة</label>
               <div class="ops-input-group">
-                <input id="cust-min-fee" type="number" [(ngModel)]="driverPricing.minDeliveryFee" min="0" step="5" placeholder="50" />
+                <input id="cust-min-fee" type="number" [(ngModel)]="driverPricing.minDeliveryFee" [disabled]="isSavingDriverPricing || driverPricingLoading || !driverPricingLoaded" min="0" step="5" placeholder="50" />
                 <span class="ops-input-addon">ل.س</span>
               </div>
             </div>
@@ -228,11 +228,12 @@
           </div>
         </div>
 
+        <div *ngIf="driverPricingLoadError" class="alert alert-danger">تعذر تحميل تسعير التوصيل. أعد التحميل قبل الحفظ. <button type="button" class="btn btn-sm btn-light" (click)="loadDriverPricing()">إعادة المحاولة</button></div>
         <div class="ops-config-footer">
           <a routerLink="/captain-settlements" class="text-muted" style="font-size: 0.75rem; text-decoration: underline;">
             تسويات الكباتن الفردية
           </a>
-          <button type="button" class="ops-btn-action ops-btn-primary" (click)="saveDriverPricing()" [disabled]="isSavingDriverPricing">
+          <button type="button" class="ops-btn-action ops-btn-primary" (click)="saveDriverPricing()" [disabled]="isSavingDriverPricing || driverPricingLoading || !driverPricingLoaded">
             <span *ngIf="isSavingDriverPricing" class="spinner-border spinner-border-sm"></span>
             <i *ngIf="!isSavingDriverPricing" class="fas fa-save"></i>
             <span>{{ isSavingDriverPricing ? 'جاري الحفظ...' : 'حفظ تسعير التوصيل' }}</span>

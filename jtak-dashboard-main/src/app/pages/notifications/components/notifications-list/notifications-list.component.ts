@@ -32,6 +32,7 @@ export class NotificationsListComponent implements
     ISearchView
 {
   private subs = new SubSink();
+  private destroyed = false;
   selection = new TableSelection<any>((item) => item.id);
   isLoading: boolean;
   totalRecords: number;
@@ -84,9 +85,11 @@ export class NotificationsListComponent implements
     const modalRef = this.modalService.open(NotificationsCreateComponent, {
       size: 'xl',
       centered: true,
+      backdrop: 'static',
+      beforeDismiss: () => !modalRef.componentInstance?.isSending,
     });
     modalRef.result.then(
-      () => this.notificationsService.fetchPost(),
+      () => { if (!this.destroyed) this.notificationsService.fetchPost(); },
       () => {}
     );
   }
@@ -95,7 +98,7 @@ export class NotificationsListComponent implements
     const selected = this.selection.selectedItems(items);
     if (!selected.length) return;
 
-    const modalRef = this.modalService.open(BulkConfirmModalComponent);
+    const modalRef = this.modalService.open(BulkConfirmModalComponent, {backdrop: 'static', beforeDismiss: () => !modalRef.componentInstance?.isLoading});
     modalRef.componentInstance.count = selected.length;
     modalRef.componentInstance.itemLabel = 'notifications';
     modalRef.componentInstance.actionLabel = 'حذف';
@@ -106,6 +109,7 @@ export class NotificationsListComponent implements
 
     modalRef.result.then(
       () => {
+        if (this.destroyed) return;
         this.selection.clear();
         this.toasterService.success('تم حذف الإشعارات المحددة من سجل التطبيق.');
         this.notificationsService.fetchPost();
@@ -125,6 +129,10 @@ export class NotificationsListComponent implements
 
   ngOnInit(): void {
     this.notificationsService.setDefaults();
+    this.sorting = this.notificationsService.sorting;
+    this.paginator = this.notificationsService.paginator;
+    this.subs.sink = this.notificationsService.totalRecords$.subscribe(total => this.totalRecords = total || 0);
+    this.subs.sink = this.notificationsService.items$.subscribe(() => this.selection.clear());
     this.searchForm();
     this.notificationsService.fetchPost();
     this.subs.sink = this.notificationsService.isLoading$.subscribe(
@@ -135,6 +143,7 @@ export class NotificationsListComponent implements
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.subs.unsubscribe();
   }
 }

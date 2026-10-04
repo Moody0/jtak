@@ -2,6 +2,7 @@ import { Component, OnInit, Input, OnDestroy } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { Observable } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
 import { ProductMerchant } from '../../models/product-merchant.model';
 import { ProductMerchantsService } from '../../services/product-merchants.service';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
@@ -17,20 +18,25 @@ export class SetProductModalComponent implements OnInit {
   productMerchants: ProductMerchant[] = [];
   private subs = new SubSink();
   isLoading$: Observable<boolean>;
+  saving = false;
+  loadError = false;
+  loaded = false;
   search = '';
   toggleAll = true;
 
   constructor(
     public productMerchantsService: ProductMerchantsService,
     public modal: NgbActiveModal,
-    public filesService: FilesService
+    public filesService: FilesService,
+    private toaster: ToastrService
   ) {}
 
   ngOnInit(): void {
     this.isLoading$ = this.productMerchantsService.isLoading$;
-    this.productMerchantsService
+    this.subs.sink = this.productMerchantsService
       .getProducts(this.mid)
-      .subscribe((result: any) => {
+      .subscribe({ next: (result: any) => {
+        this.loaded = true;
         if (result.length > 0) {
           const data = result.map((item: any) => ({
             ...item,
@@ -46,7 +52,7 @@ export class SetProductModalComponent implements OnInit {
             this.toggleAll = this.toggleAll && product.isSelected;
           }
         }
-      });
+      }, error: () => { this.loadError = true; this.toaster.error('تعذر تحميل المنتجات. أعد فتح النافذة للمحاولة.'); } });
   }
 
   ngOnDestroy(): void {
@@ -56,16 +62,16 @@ export class SetProductModalComponent implements OnInit {
   onSearchChange(searchTerm: string) {
     this.productMerchantsDraft = this.productMerchants.filter(
       (item) =>
-        item.product.includes(searchTerm) ||
-        (item.productCat1 !== null && item.productCat1.includes(searchTerm)) ||
-        (item.productCat2 !== null && item.productCat2.includes(searchTerm))
+        (item.product || '').includes(searchTerm) ||
+        (!!item.productCat1 && item.productCat1.includes(searchTerm)) ||
+        (!!item.productCat2 && item.productCat2.includes(searchTerm))
     );
   }
 
   toggleAllChanged(event: any) {
     this.toggleAll = event.target.checked;
 
-    for (let product of this.productMerchants) {
+    for (let product of this.productMerchantsDraft) {
       product.isSelected = this.toggleAll;
     }
   }
@@ -76,22 +82,26 @@ export class SetProductModalComponent implements OnInit {
       (i) => i.productId === productId
     );
 
+    if (pi < 0) return;
     updatedProductMerchants[pi] = {
       ...updatedProductMerchants[pi],
       isSelected: !updatedProductMerchants[pi].isSelected,
     };
 
     this.productMerchants = this.sortProductMerchants(updatedProductMerchants);
+    this.onSearchChange(this.search);
   }
 
   save() {
+    if (this.saving || !this.loaded || this.loadError) return;
+    this.saving = true;
     const data = this.productMerchants.filter((item) => item.isSelected);
 
-    this.productMerchantsService
+    this.subs.sink = this.productMerchantsService
       .saveProducts(+this.mid, data)
-      .subscribe((result) => {
-        this.modal.close();
-      });
+      .subscribe({ next: () => this.modal.close(true), error: () => {
+        this.saving = false; this.toaster.error('تعذر حفظ ربط المنتجات. حاول مرة أخرى.');
+      } });
   }
 
   private sortProductMerchants(products: ProductMerchant[]) {

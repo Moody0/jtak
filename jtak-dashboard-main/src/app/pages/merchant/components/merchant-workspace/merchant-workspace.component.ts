@@ -1,7 +1,7 @@
 ﻿import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import { SubSink } from 'subsink';
 import { ToastrService } from 'ngx-toastr';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
@@ -43,6 +43,7 @@ interface MerchantCategorySummary {
 export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   private readonly subs = new SubSink();
   private merchantId = 0;
+  private loadRequest?: Subscription;
   private originalProducts: ProductMerchant[] = [];
 
   merchant: Merchant | null = null;
@@ -66,31 +67,10 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
 
   loadMerchantCategoryOverrides(): void {
     this.merchantCategoryOverrides.clear();
-    try {
-      const raw = localStorage.getItem(`jtak_merchant_cat_overrides_${this.merchantId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        this.merchantCategoryOverrides = new Map(Object.entries(parsed));
-      } else if (this.merchantId === 19) {
-        this.saveMerchantCategoryOverride('مشروبات', '2026_9_9_3ae93292b1cf4576a06055f5c19d2996.webp', true);
-      }
-    } catch {
-      // Storage unavailable
-    }
   }
 
   saveMerchantCategoryOverride(categoryName: string, icon: string, active: boolean): void {
-    const key = categoryName.trim().toLowerCase();
-    this.merchantCategoryOverrides.set(key, { icon, active });
-    try {
-      const obj: { [key: string]: { icon?: string; active?: boolean } } = {};
-      this.merchantCategoryOverrides.forEach((val, k) => {
-        obj[k] = val;
-      });
-      localStorage.setItem(`jtak_merchant_cat_overrides_${this.merchantId}`, JSON.stringify(obj));
-    } catch {
-      // Storage unavailable
-    }
+    this.merchantCategoryOverrides.set(categoryName.trim().toLowerCase(), { icon, active });
   }
 
   constructor(
@@ -547,18 +527,30 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   loadWorkspace(): void {
+    const mid = this.merchantId;
+    this.loadRequest?.unsubscribe();
+    this.products = [];
+    this.originalProducts = [];
+    this.selectedProductIds.clear();
+    this.searchTerm = '';
+    this.categoryFilter = '';
+    this.paginator.page = 0;
     this.isLoading = true;
     this.loadError = false;
     this.merchant = this.merchantsService.getWorkspaceMerchant(this.merchantId)
       || this.createMerchantPlaceholder(this.merchantId);
     this.loadMerchantCategoryOverrides();
 
-    this.subs.sink = forkJoin({
+    this.loadRequest = forkJoin({
+      merchant: this.merchantsService.getItem(mid),
       products: this.productMerchantsService.getProducts(this.merchantId),
       categories: this.categoriesService.getAll(false, true),
       rootCategories: this.categoriesService.getAll(true, true),
     }).subscribe({
-      next: ({ products: response, categories, rootCategories }: any) => {
+      next: ({ merchant, products: response, categories, rootCategories }: any) => {
+        if (mid !== this.merchantId) return;
+        this.merchant = merchant;
+        this.merchantsService.rememberWorkspaceMerchant(merchant);
         const rootMap = new Map<number, string>();
         (rootCategories || []).forEach((r: any) => rootMap.set(r.id, (r.title || '').trim()));
         const roots = (rootCategories || []).map((r: any) => ({
@@ -586,6 +578,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.isLoading = false;
+        if (mid !== this.merchantId) return;
         this.loadError = true;
         this.cdr.detectChanges();
       },
@@ -662,6 +655,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   deleteSelectedProducts(): void {
+    const mid = this.merchantId;
     const ids = Array.from(this.selectedProductIds);
     if (!ids.length) return;
     const modalRef = this.modalService.open(BulkConfirmModalComponent);
@@ -669,9 +663,10 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     modalRef.componentInstance.itemLabel = ids.length === 1 ? 'منتج' : 'منتجات';
     modalRef.componentInstance.actionLabel = 'حذف المنتجات المحددة';
     modalRef.componentInstance.description = `هل أنت متأكد من حذف ${ids.length} منتج من الكتالوج العام نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`;
-    modalRef.componentInstance.action = () => forkJoin(ids.map((id) => this.productsService.delete(id)));
+    modalRef.componentInstance.action = () => this.productsService.deleteSelected(ids);
     modalRef.result.then(
       () => {
+        if (mid !== this.merchantId) return;
         const idSet = new Set(ids);
         this.products = this.products.filter((product) => !idSet.has(product.productId));
         this.originalProducts = this.originalProducts.filter((product) => !idSet.has(product.productId));
@@ -688,7 +683,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     if (!ids.size) return;
     let modified = 0;
     this.products.forEach((p) => {
-      if (ids.has(p.productId) && !p.isSelected) {
+      if (ids.has(p.productId) && !p.isSelected && this.canAddProductToCurrentMerchant(p)) {
         p.isSelected = true;
         modified++;
       }
@@ -873,6 +868,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   deleteProduct(item: ProductMerchant): void {
+    const mid = this.merchantId;
     const modalRef = this.modalService.open(BulkConfirmModalComponent);
     modalRef.componentInstance.count = 1;
     modalRef.componentInstance.itemLabel = 'product';
@@ -880,6 +876,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     modalRef.componentInstance.description = `Delete “${item.product}” from the global catalog? This affects every merchant and cannot be undone.`;
     modalRef.componentInstance.action = () => this.productsService.delete(item.productId);
     modalRef.result.then(() => {
+      if (mid !== this.merchantId) return;
       this.products = this.products.filter((product) => product.productId !== item.productId);
       this.originalProducts = this.originalProducts.filter((product) => product.productId !== item.productId);
       this.toaster.success('Product deleted');
@@ -905,6 +902,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   deleteCategory(category: MerchantCategorySummary): void {
+    const mid = this.merchantId;
     const total = category.isMain ? category.totalProducts : category.total;
     if (!category.id || total > 0) return;
     if (category.isMain && category.subcategoriesCount > 0) {
@@ -918,6 +916,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
     modalRef.componentInstance.description = `Delete “${category.name}”? This cannot be undone.`;
     modalRef.componentInstance.action = () => this.categoriesService.delete(category.id);
     modalRef.result.then(() => {
+      if (mid !== this.merchantId) return;
       this.catalogCategories = this.catalogCategories.filter((item) => item.id !== category.id);
       this.toaster.success('Category deleted');
       this.cdr.detectChanges();
@@ -937,11 +936,13 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   saveCatalog(): void {
     if (!this.hasChanges || this.isSaving) return;
     this.isSaving = true;
-    const selected = this.products.filter((item) => item.isSelected);
-    this.productMerchantsService.saveProducts(this.merchantId, selected).subscribe({
+    const mid = this.merchantId;
+    const selected = this.products.filter((item) => item.isSelected).map(item => ({ ...item }));
+    this.subs.sink = this.productMerchantsService.saveProducts(mid, selected).subscribe({
       next: () => {
-        this.originalProducts = this.products.map((item) => ({ ...item }));
         this.isSaving = false;
+        if (mid !== this.merchantId) return;
+        this.loadWorkspace();
         this.toaster.success('Merchant catalog saved');
         this.cdr.detectChanges();
       },
@@ -954,11 +955,12 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   editMerchant(): void {
+    const mid = this.merchantId;
     if (!this.merchant) return;
     const modalRef = this.modalService.open(EditMerchantModalComponent, { size: 'lg' });
     modalRef.componentInstance.item = { ...this.merchant };
     modalRef.result.then((updated: Merchant | undefined) => {
-      if (!updated || !this.merchant) return;
+      if (!updated || !this.merchant || mid !== this.merchantId) return;
       this.merchant = { ...this.merchant, ...updated, id: this.merchantId };
       this.merchantsService.rememberWorkspaceMerchant(this.merchant);
       this.cdr.detectChanges();
@@ -980,20 +982,22 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   private openProductEditor(product: Product | null): void {
+    const mid = this.merchantId;
     const modalRef = this.modalService.open(EditProductModalComponent, { size: 'lg' });
     modalRef.componentInstance.item = product;
     modalRef.result.then((updated: Product | undefined) => {
-      if (!updated) return;
+      if (!updated || mid !== this.merchantId) return;
       this.reloadCatalogPreservingAssignments();
       this.cdr.detectChanges();
     }, () => {});
   }
 
   private openCategoryEditor(category: Category | null): void {
+    const mid = this.merchantId;
     const modalRef = this.modalService.open(EditCategoryModalComponent, { size: 'lg' });
     modalRef.componentInstance.item = category;
     modalRef.result.then((updated: Category | undefined) => {
-      if (!updated) return;
+      if (!updated || mid !== this.merchantId) return;
       this.saveMerchantCategoryOverride(updated.title, updated.icon || '', updated.active);
       const index = this.catalogCategories.findIndex((item) => item.id === updated.id);
       const parent = this.catalogCategories.find((item) => item.id === updated.parentId)?.title || '';
@@ -1049,24 +1053,17 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   private reloadCatalogPreservingAssignments(): void {
-    const pending = new Map(this.products.map((item) => [item.productId, {
-      isSelected: item.isSelected,
-      maxOrderQuantity: item.maxOrderQuantity,
-    }]));
-    this.productMerchantsService.getProducts(this.merchantId).subscribe((response: any) => {
-      this.products = (response || []).map((item: ProductMerchant) => {
-        const changed = pending.get(item.productId);
-        const resolvedCat = this.resolveCategoryForProduct(item);
-        return {
-          ...item,
-          productCategoryId: item.productCategoryId || (resolvedCat ? resolvedCat.id : 0),
-          isSelected: changed ? changed.isSelected : item.merchantId === this.merchantId,
-          maxOrderQuantity: changed ? changed.maxOrderQuantity : item.maxOrderQuantity,
-        };
-      });
-      this.originalProducts = this.products.map((item) => ({ ...item }));
+    const mid = this.merchantId;
+    const pending = new Map(this.products.filter(item => {
+      const original = this.originalProducts.find(x => x.productId === item.productId);
+      return original && (original.isSelected !== item.isSelected || original.maxOrderQuantity !== item.maxOrderQuantity);
+    }).map(item => [item.productId, { isSelected: item.isSelected, maxOrderQuantity: item.maxOrderQuantity }]));
+    this.subs.sink = this.productMerchantsService.getProducts(mid).subscribe({ next: (response: any) => {
+      if (mid !== this.merchantId) return;
+      this.originalProducts = (response || []).map((item: ProductMerchant) => ({ ...item, isSelected: item.merchantId === mid }));
+      this.products = this.originalProducts.map(item => ({ ...item, ...(pending.get(item.productId) || {}) }));
       this.cdr.detectChanges();
-    });
+    }, error: () => this.toaster.error('تعذر تحديث المنتجات بعد التعديل. اضغط تحديث.') });
   }
 
   private createMerchantPlaceholder(id: number): Merchant {
@@ -1093,6 +1090,7 @@ export class MerchantWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.loadRequest?.unsubscribe();
     this.subs.unsubscribe();
   }
 }

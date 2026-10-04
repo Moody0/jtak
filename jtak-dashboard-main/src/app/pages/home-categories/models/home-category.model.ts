@@ -92,6 +92,7 @@ export interface HomeCategoryTarget {
 }
 
 export interface HomeCategoryMerchant {
+  isJtakMarket?: boolean;
   id: number;
   title: string;
   photo?: string | null;

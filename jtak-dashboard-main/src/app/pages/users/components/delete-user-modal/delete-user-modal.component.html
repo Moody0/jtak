@@ -1,8 +1,9 @@
 <app-delete-modal
   moduleName="User"
-  title="Delete User"
-  [isLoading]="service.isLoading$ | async"
-  (cancelClicked)="modal.dismiss()"
+  title="أرشفة المستخدم"
+  [isLoading]="isSaving"
+  (cancelClicked)="!isSaving && modal.dismiss()"
   (deleteClicked)="delete()"
 >
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">{{errorMessage}}</div>
 </app-delete-modal>

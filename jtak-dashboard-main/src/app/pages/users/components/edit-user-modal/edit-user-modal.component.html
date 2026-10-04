@@ -3,12 +3,13 @@
   [item]="item"
   [itemName]="item.fullName || ''"
   moduleName="User"
-  [isLoading]="isLoading$ | async"
-  [saveDisabled]="formGroup.invalid"
-  (cancelClicked)="modal.dismiss()"
+  [isLoading]="isSaving"
+  [saveDisabled]="formGroup.invalid || isSaving"
+  (cancelClicked)="!isSaving && modal.dismiss()"
   (saveClicked)="save()"
 >
   <ng-container *ngIf="item">
+    <div *ngIf="saveError" class="alert alert-danger" role="alert">{{saveError}}</div>
     <div class="user-editor-layout">
 
       <!-- Form Column -->
@@ -413,7 +414,7 @@
                 <!-- Role Details / Custody -->
                 <div class="contact-item" *ngIf="isDeliveryRole">
                   <i class="fas fa-shield-alt text-warning"></i>
-                  <span>العهدة: {{ (formGroup.get('maxCashFloat')?.value || 0) | number }} ل.س</span>
+                  <span>حد العهدة: {{ (formGroup.get('maxCashFloat')?.value || 0) | number }} ل.س</span>
                 </div>
                 <div class="contact-item" *ngIf="isDeliveryRole">
                   <i class="fas fa-coins text-warning"></i>

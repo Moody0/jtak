@@ -20,6 +20,9 @@ import { CaptainSettlementService } from '../../services/captain-settlement.serv
 })
 export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
   private subs = new Subscription();
+  private summaryRequest?:Subscription;
+  private ordersRequest?:Subscription;
+  private receiptRequest?:Subscription;
 
   // Filters
   fromDate: string = '';
@@ -59,11 +62,12 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
 
   initDefaultDates(): void {
     const today = new Date();
-    this.toDate = today.toISOString().substring(0, 10);
+    const localDate=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    this.toDate = localDate(today);
 
     // Default to first day of the current month
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    this.fromDate = firstDay.toISOString().substring(0, 10);
+    this.fromDate = localDate(firstDay);
   }
 
   loadCaptainsLookup(): void {
@@ -80,11 +84,13 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
   }
 
   loadSummary(): void {
+    this.summaryRequest?.unsubscribe();
+    if(this.fromDate && this.toDate && this.fromDate>this.toDate){this.errorMessage='تاريخ البداية يجب ألا يأتي بعد تاريخ النهاية.';this.isLoading=false;return;}
     this.isLoading = true;
     this.errorMessage = null;
 
     this.subs.add(
-      this.settlementService
+      this.summaryRequest=this.settlementService
         .getSummary({
           fromDate: this.fromDate,
           toDate: this.toDate,
@@ -122,16 +128,18 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
     captain: CaptainSettlementItem,
     content: TemplateRef<any>
   ): void {
+    if(this.isSettling)return;
+    this.ordersRequest?.unsubscribe();this.errorMessage=null;
     this.selectedCaptainForOrders = captain;
     this.captainOrdersDetail = null;
     this.selectedOrderIds = [];
     this.settlementNotes = '';
     this.isLoadingOrders = true;
 
-    this.modalService.open(content, { size: 'xl', centered: true, scrollable: true });
+    this.modalService.open(content, { size: 'xl', centered: true, scrollable: true, beforeDismiss:()=>!this.isSettling });
 
     this.subs.add(
-      this.settlementService
+      this.ordersRequest=this.settlementService
         .getCaptainOrders(captain.captainId, {
           fromDate: this.fromDate,
           toDate: this.toDate,
@@ -148,6 +156,7 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
           },
           error: (err) => {
             this.isLoadingOrders = false;
+            this.errorMessage=err?.error?.message || 'تعذر تحميل طلبات الكابتن. حاول مرة أخرى.';
             console.error('Failed to load captain orders', err);
           },
         })
@@ -155,6 +164,7 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
   }
 
   toggleSelectAllOrders(): void {
+    if(this.isSettling)return;
     if (!this.captainOrdersDetail) return;
     const unsettled = this.captainOrdersDetail.orders.filter((o) => !o.isSettled);
     if (this.selectedOrderIds.length === unsettled.length) {
@@ -169,6 +179,7 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
   }
 
   toggleOrderSelection(orderId: number): void {
+    if(this.isSettling)return;
     const idx = this.selectedOrderIds.indexOf(orderId);
     if (idx > -1) {
       this.selectedOrderIds.splice(idx, 1);
@@ -196,10 +207,11 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
   }
 
   getSelectedNetDue(): number {
-    return this.getSelectedCashCollected() - this.getSelectedCaptainEarnings();
+    return Math.max(0,this.getSelectedCashCollected() - this.getSelectedCaptainEarnings());
   }
 
   confirmSettlementFromModal(receiptModalTemplate: TemplateRef<any>, activeModal: any): void {
+    if(this.isSettling)return;
     if (!this.selectedCaptainForOrders || this.selectedOrderIds.length === 0) {
       window.alert('يرجى تحديد طلب واحد على الأقل لإجراء التسوية');
       return;
@@ -245,6 +257,7 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
     receiptModalTemplate: TemplateRef<any>
   ): void {
     const count = captain.unsettledOrdersCount;
+    if(this.isSettling)return;
     if (count === 0) {
       window.alert('لا توجد طلبات غير مسوّاة لهذا الكابتن');
       return;
@@ -283,19 +296,21 @@ export class CaptainSettlementsListComponent implements OnInit, OnDestroy {
 
   openReceiptModal(batchCode: string, content: TemplateRef<any>): void {
     if (!batchCode) return;
+    this.receiptRequest?.unsubscribe();this.errorMessage=null;
     this.selectedReceipt = null;
     this.isLoadingReceipt = true;
 
     this.modalService.open(content, { size: 'lg', centered: true });
 
     this.subs.add(
-      this.settlementService.getBatchReceipt(batchCode).subscribe({
+      this.receiptRequest=this.settlementService.getBatchReceipt(batchCode).subscribe({
         next: (receipt) => {
           this.selectedReceipt = receipt;
           this.isLoadingReceipt = false;
         },
         error: (err) => {
           this.isLoadingReceipt = false;
+          this.errorMessage=err?.error?.message || 'تعذر تحميل إيصال التسوية. حاول مرة أخرى.';
           console.error('Failed to load batch receipt', err);
         },
       })

@@ -1,4 +1,5 @@
 <div class="card card-custom gutter-b">
+  <div class="alert alert-danger" *ngIf="notificationsService.listError$ | async as error">{{ error }}</div>
   <div class="card-header">
     <div class="card-title">
       <div>

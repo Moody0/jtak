@@ -1,155 +1,74 @@
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { SubSink } from 'subsink';
-import { Observable } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { tap } from 'rxjs/operators';
 import { Payment } from '../../models/payments.model';
 import { paymentsService } from '../../services/payments.service';
-import { MerchantsService } from '../../services/merchants.service';
-import { Merchant } from '../../models/merchant.model'
+import { MerchantsService } from 'src/app/pages/merchant/services/merchants.service';
 import { DeliveriesService } from '../../services/deliveries.service';
-import { Deliver } from '../../models/deliver.model';
-import { UsersService } from 'src/app/pages/users/services/users.service';
 
-const EMPTY_PAYMENT: Payment = {
-  id: '',
-  toUserId: '',
-  toUser: '',
-  byUserId: '',
-  byUser: '',
-  amount: 0,
-  newBalance: 0,
-  handoverDate: '',
-  createdDate: '',
-};
-
-@Component({
-  selector: 'app-create-payment-modal',
-  templateUrl: './create-payment-modal.component.html',
-  styleUrls: ['./create-payment-modal.component.scss'],
-})
-export class CreatePaymentModalComponent implements OnInit {
-  private subs = new SubSink();
-  isLoading: boolean;
-  merchants: Merchant[] = [];
-  deliveries: Deliver[] = [];
+@Component({selector:'app-create-payment-modal',templateUrl:'./create-payment-modal.component.html',styleUrls:['./create-payment-modal.component.scss']})
+export class CreatePaymentModalComponent implements OnInit, OnDestroy {
+  private subs = new Subscription();
+  private balanceRequest?: Subscription;
+  private requestKey = '';
+  private submittedPayload = '';
   @Input() item: Payment;
-  isLoading$: Observable<boolean>;
+  merchants: {id:string; merchantId:number; fullName:string}[] = [];
+  deliveries: any[] = [];
   formGroup: UntypedFormGroup;
   merchantBalance: number | null = null;
   deliveryBalance: number | null = null;
-  constructor(
-    private usersService: UsersService,
-    private paymentsService: paymentsService,
-    private fb: UntypedFormBuilder,
-    public modal: NgbActiveModal,
-    private toasterService: ToastrService,
-    public merchantsService: MerchantsService,
-    public deliveriesService: DeliveriesService
-  ) { }
+  isSaving = false;
+  isLoading = false;
+  loadingBalances = false;
+  loadError = '';
+
+  constructor(private paymentsService:paymentsService,private fb:UntypedFormBuilder,public modal:NgbActiveModal,
+    private toasterService:ToastrService,private merchantsService:MerchantsService,private deliveriesService:DeliveriesService) {}
 
   ngOnInit(): void {
-    this.isLoading$ = this.paymentsService.isLoading$;
-    this.merchantsService.getMerchants().subscribe((resulte: any) => {
-      this.merchants = resulte
-    })
-    this.deliveriesService.getDeliveries().subscribe((resulte: any) => {
-      this.deliveries = resulte
-    })
-    this.subs.sink = this.paymentsService.isLoading$.subscribe(
-      (res) => (this.isLoading = res)
-    );
-    this.loadItem();
-    this.loadForm();
+    this.item = this.item || {id:'',toUser:'',byUser:'',toUserId:'',byUserId:'',amount:0,newBalance:0,handoverDate:'',createdDate:''};
+    this.formGroup=this.fb.group({toUser:[null,Validators.required],byUser:[null,Validators.required],amount:[this.item.amount,[Validators.required,Validators.min(0.01)]]});
+    this.isLoading=true;
+    this.subs.add(this.merchantsService.getAllMerchants().subscribe({
+      next: items=>{this.merchants=(items || []).filter(m=>!!m.ownerId).map(m=>({id:m.ownerId,merchantId:Number(m.id),fullName:m.title}));this.isLoading=false;},
+      error:()=>{this.isLoading=false;this.loadError='تعذر تحميل المتاجر. أعد فتح النافذة وحاول مرة أخرى.';}
+    }));
+    this.subs.add(this.deliveriesService.getDeliveries().subscribe({next:(items:any)=>this.deliveries=items || [],error:()=>this.loadError='تعذر تحميل المندوبين. أعد فتح النافذة وحاول مرة أخرى.'}));
   }
 
-  loadItem() {
-    if (!this.item) {
-      this.item = EMPTY_PAYMENT;
-    }
+  get canSave(): boolean {
+    const amount=Number(this.formGroup?.get('amount')?.value);
+    return !!this.formGroup && this.formGroup.valid && !this.isSaving && !this.isLoading && !this.loadingBalances && !this.loadError &&
+      Number.isFinite(amount) && amount>0 && Math.abs(amount*100-Math.round(amount*100))<0.000001 &&
+      this.deliveryBalance !== null && this.merchantBalance !== null && amount <= this.deliveryBalance && amount <= this.merchantBalance;
   }
 
-  loadForm() {
-    this.formGroup = this.fb.group({
-      id: [this.item?.id],
-      toUser: [this.item.toUser, [Validators.required]],
-      byUser: [this.item.byUser, [Validators.required]],
-      amount: [this.item.amount, [Validators.required, Validators.min(1)]],
-      //newBalance: [this.item.newBalance, [Validators.required]],
-      //handoverDate: [this.item.handoverDate, [Validators.required]]
+  save(): void {
+    if(!this.canSave){this.formGroup.markAllAsTouched();this.toasterService.warning('أدخل مبلغاً صحيحاً لا يتجاوز عهدة المندوب أو مستحقات المتجر المتاحة، بحد أقصى منزلتين عشريتين.');return;}
+    const values=this.formGroup.value;
+    const payload:any={byUserId:values.byUser.id,toUserId:values.toUser.id,merchantId:values.toUser.merchantId,amount:Number(values.amount)};
+    const snapshot=JSON.stringify(payload);
+    if(snapshot!==this.submittedPayload){this.submittedPayload=snapshot;this.requestKey=`web-${Date.now()}-${Math.random().toString(36).slice(2,14)}`;}
+    payload.requestKey=this.requestKey;
+    this.isSaving=true;this.formGroup.disable();
+    this.subs.add(this.paymentsService.create(payload).subscribe({
+      next:()=>{this.toasterService.success('تم تسجيل استلام المتجر للدفعة');this.modal.close(true);},
+      error:err=>{this.isSaving=false;this.formGroup.enable();this.toasterService.error(err?.error?.message || err?.error?.error || 'تعذر تأكيد تسجيل الدفعة. حدّث السجل للتحقق قبل إعادة المحاولة.');}
+    }));
+  }
+
+  changedMerchant(_:any): void {this.loadBalances();}
+  changedDelivery(_:any): void {this.loadBalances();}
+  private loadBalances(): void {
+    this.balanceRequest?.unsubscribe();this.merchantBalance=this.deliveryBalance=null;this.loadingBalances=true;
+    const values=this.formGroup.value;
+    this.balanceRequest=this.paymentsService.availableBalances(values.byUser?.id,values.toUser?.merchantId).subscribe({
+      next:balances=>{this.merchantBalance=balances.merchantBalance;this.deliveryBalance=balances.deliveryBalance;this.loadingBalances=false;},
+      error:()=>{this.loadingBalances=false;this.toasterService.error('تعذر تحميل الأرصدة المتاحة. أعد اختيار المتجر والمندوب.');}
     });
   }
-
-  onFileUploaded(filesIds: string[], key: string) {
-    var oldVal = this.formGroup.controls[key].value;
-    this.formGroup.patchValue({
-      key: oldVal + filesIds.join(",")
-    });
-  }
-
-  onFileDelete(key: string) {
-    this.formGroup.patchValue({
-      [key]: '',
-    });
-  }
-
-  save() {
-    const amount = Number(this.formGroup.value.amount) || 0;
-    if (this.deliveryBalance !== null && amount > this.deliveryBalance) {
-      this.toasterService.warning(`المبلغ المطلوب يتجاوز عهدة المندوب المتاحة (${this.deliveryBalance} ل.س).`);
-      return;
-    }
-
-    const formValues = {
-      id: this.formGroup.value.id,
-      toUserId: this.formGroup.value.toUser.id,
-      toUser: this.formGroup.value.toUser.fullName,
-      byUserId: this.formGroup.value.byUser.id,
-      byUser: this.formGroup.value.byUser.fullName,
-      amount: amount,
-      newBalance: 0,
-      handoverDate: null,
-      createdDate: null,
-    }
-    delete formValues.id;
-    this.create(formValues);
-  }
-
-
-  create(formValues: Payment) {
-    this.subs.sink = this.paymentsService
-      .create(formValues)
-      .pipe(
-        tap(() => {
-          this.toasterService.success('تم تسجيل الدفعة المالية بنجاح');
-          this.modal.close();
-        })
-      )
-      .subscribe();
-  }
-
-  changedMerchant(e: Merchant) {
-    this.merchantBalance = null;
-    if (e?.id) {
-      this.usersService.getBalance(e.id).subscribe(b => {
-        this.merchantBalance = b?.amount ?? 0;
-      });
-    }
-  }
-
-  changedDelivery(e: Deliver) {
-    this.deliveryBalance = null;
-    if (e?.id) {
-      this.usersService.getBalance(e.id).subscribe(b => {
-        this.deliveryBalance = b?.amount ?? 0;
-      });
-    }
-  }
-
-  ngOnDestroy(): void {
-    this.subs.unsubscribe();
-  }
+  ngOnDestroy(): void {this.balanceRequest?.unsubscribe();this.subs.unsubscribe();}
 }
-

@@ -273,11 +273,12 @@ export class AuditLogDetailsModalComponent implements OnInit {
     }
   }
 
-  copyJson(jsonText: string | null, label: string): void {
+  async copyJson(jsonText: string | null, label: string): Promise<void> {
     if (!jsonText) return;
-    navigator.clipboard.writeText(jsonText).then(() => {
+    try {
+      await navigator.clipboard.writeText(jsonText);
       this.toastr.success(`تم نسخ بيانات ${label} إلى الحافظة.`);
-    });
+    } catch { this.toastr.error('تعذر النسخ. انسخ البيانات يدوياً أو افتح اللوحة عبر HTTPS.'); }
   }
 
   dismiss(): void {

@@ -28,6 +28,7 @@ export class EditRestaurantCategoryModalComponent implements OnInit, OnDestroy {
   @Input() item: RestaurantCategoryItem | null = null;
   @Input() nextOrder: number = 1;
 
+  @Input() availableCategories: import("../../models/restaurant-category.model").RestaurantCategoryTarget[] = [];
   formGroup: UntypedFormGroup;
   isSaving = false;
 
@@ -63,6 +64,7 @@ export class EditRestaurantCategoryModalComponent implements OnInit, OnDestroy {
     const isEdit = !!this.item && this.item.id > 0;
     this.formGroup = this.fb.group({
       id: [isEdit ? this.item!.id : 0],
+      productCategoryId: [isEdit ? this.item!.productCategoryId ?? null : null],
       title: [isEdit ? this.item!.title : '', [Validators.required, Validators.maxLength(100)]],
       titleEn: [isEdit ? (this.item!.titleEn || '') : '', [Validators.maxLength(100)]],
       filterTag: [isEdit ? (this.item!.filterTag || '') : ''],
@@ -114,6 +116,7 @@ export class EditRestaurantCategoryModalComponent implements OnInit, OnDestroy {
   }
 
   save(): void {
+    if (this.isSaving) return;
     if (this.formGroup.invalid) {
       this.formGroup.markAllAsTouched();
       return;
@@ -124,6 +127,7 @@ export class EditRestaurantCategoryModalComponent implements OnInit, OnDestroy {
 
     const payload: RestaurantCategoryItem = {
       id: formVal.id,
+      productCategoryId: formVal.productCategoryId ? Number(formVal.productCategoryId) : null,
       title: (formVal.title || '').trim(),
       titleEn: (formVal.titleEn || '').trim(),
       filterTag: (formVal.filterTag || formVal.title || '').trim(),

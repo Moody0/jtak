@@ -1,4 +1,5 @@
 <div class="ops-banners-container">
+  <div class="alert alert-danger" *ngIf="bannersService.listError$ | async as error">{{ error }}</div>
 
   <!-- 1. Operations Utility Bar -->
   <div class="ops-utility-bar">
@@ -289,6 +290,10 @@
                       <span>{{ target.label }}</span>
                     </span>
                     <span class="ops-target-pill pill-offers" *ngIf="target.type === 'offers'">
+                      <i [class]="target.icon + ' me-1'"></i>
+                      <span>{{ target.label }}</span>
+                    </span>
+                    <span class="ops-target-pill pill-market" *ngIf="target.type === 'category'">
                       <i [class]="target.icon + ' me-1'"></i>
                       <span>{{ target.label }}</span>
                     </span>

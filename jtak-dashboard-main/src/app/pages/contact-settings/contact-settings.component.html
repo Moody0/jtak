@@ -27,7 +27,7 @@
           type="button"
           class="btn btn-sm btn-light-secondary fw-bold"
           (click)="resetDefaults()"
-          [disabled]="isLoading || isSaving"
+          [disabled]="isLoading || isSaving || !hasLoaded"
         >
           <i class="fas fa-undo"></i>
           <span class="ms-1">{{ 'CONTACT_SETTINGS_PAGE.RESET_DEFAULTS' | translate }}</span>
@@ -37,7 +37,7 @@
           type="button"
           class="btn btn-sm btn-primary fw-bold"
           (click)="save()"
-          [disabled]="isLoading || isSaving || form.invalid"
+          [disabled]="isLoading || isSaving || !hasLoaded || form.invalid"
         >
           <i class="fas fa-save" *ngIf="!isSaving"></i>
           <span class="spinner-border spinner-border-sm me-1" *ngIf="isSaving"></span>
@@ -47,6 +47,8 @@
     </div>
   </div>
 
+  <div *ngIf="loadError" class="alert alert-danger" role="alert">تعذر تحميل الإعدادات. اضغط تحديث لإعادة المحاولة قبل الحفظ.</div>
+
   <div *ngIf="isLoading" class="text-center py-10">
     <div class="spinner-border text-primary" role="status">
       <span class="visually-hidden">Loading...</span>
@@ -54,6 +56,7 @@
     <div class="text-muted fs-7 mt-3">{{ 'COMMON.LOADING' | translate }}</div>
   </div>
 
+  <div *ngIf="hasLoaded && form.invalid && form.dirty" class="alert alert-warning" role="alert">راجع رقم الهاتف والواتساب والبريد الإلكتروني. روابط التواصل يجب أن تكون روابط http أو https صالحة.</div>
   <form *ngIf="!isLoading" [formGroup]="form" (ngSubmit)="save()">
     <div class="row g-5">
       <!-- Left Column: Form Controls -->
@@ -126,7 +129,7 @@
                 <input
                   type="text"
                   class="form-control form-control-solid"
-                  formControlName="phoneFormatted"
+                  formControlName="phoneFormatted" readonly
                   [placeholder]="'CONTACT_SETTINGS_PAGE.FORMATTED_PHONE_PLACEHOLDER' | translate"
                   dir="ltr"
                 />
@@ -143,7 +146,7 @@
                 <input
                   type="text"
                   class="form-control form-control-solid"
-                  formControlName="phoneInternational"
+                  formControlName="phoneInternational" readonly
                   placeholder="+963985615705"
                   dir="ltr"
                 />

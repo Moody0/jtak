@@ -115,6 +115,7 @@ driverSearchGroup: UntypedFormGroup;
   }
   exchangeRate: number = 15000;
   isSavingRate: boolean = false;
+  private settingsSaveTimers: ReturnType<typeof setTimeout>[] = [];
   rateSaveSuccess: boolean = false;
   rateSaveError: boolean = false;
   featuredCategories: Category[] = [];
@@ -212,13 +213,13 @@ driverSearchGroup: UntypedFormGroup;
     this.isSavingFeaturedCategories = true;
     this.featuredCategoriesSaveSuccess = false;
     this.featuredCategoriesSaveError = false;
-    this.service.getSettings().subscribe({
+    this.subs.sink = this.service.getSettings().subscribe({
       next: (settings: any) => {
         const payload = {
           ...settings,
           homeFeaturedCategoryIds: this.featuredCategories.map(category => category.id),
         };
-        this.service.saveSettings(payload).subscribe({
+        this.subs.sink = this.service.saveSettings(payload).subscribe({
           next: () => {
             this.featuredCategoryIds = this.featuredCategories.map(category => category.id);
             this.isSavingFeaturedCategories = false;
@@ -241,26 +242,27 @@ driverSearchGroup: UntypedFormGroup;
   }
 
   saveExchangeRate() {
-    if (!this.exchangeRate || this.exchangeRate <= 0) return;
+    if (this.isSavingRate || !Number.isFinite(this.exchangeRate) || this.exchangeRate <= 0 || this.exchangeRate > 100000000 || Math.abs(this.exchangeRate * 1e6 - Math.round(this.exchangeRate * 1e6)) > 0.01) return;
+    const requestedRate = this.exchangeRate;
     this.isSavingRate = true;
     this.rateSaveSuccess = false;
     this.rateSaveError = false;
 
-    this.service.getSettings().subscribe({
+    this.subs.sink = this.service.getSettings().subscribe({
       next: (settings: any) => {
         const payload = {
           ...settings,
-          usdToSypExchangeRate: this.exchangeRate
+          usdToSypExchangeRate: requestedRate
         };
-        this.service.saveSettings(payload).subscribe({
+        this.subs.sink = this.service.saveSettings(payload).subscribe({
           next: () => {
             this.isSavingRate = false;
             this.rateSaveSuccess = true;
             this.cdr.detectChanges();
-            setTimeout(() => {
+            this.settingsSaveTimers.push(setTimeout(() => {
               this.rateSaveSuccess = false;
               this.cdr.detectChanges();
-            }, 3000);
+            }, 3000));
           },
           error: () => {
             this.isSavingRate = false;
@@ -289,6 +291,8 @@ driverSearchGroup: UntypedFormGroup;
     customerRatePerKm: 45,
     minDeliveryFee: 50
   };
+  driverPricingLoaded = false;
+  driverPricingLoadError = false;
   isSavingDriverPricing: boolean = false;
   driverPricingSaveSuccess: boolean = false;
   driverPricingSaveError: boolean = false;
@@ -338,9 +342,14 @@ driverSearchGroup: UntypedFormGroup;
   }
 
   loadDriverPricing() {
+    if (this.driverPricingLoading || this.isSavingDriverPricing) return;
+    this.driverPricingLoaded = false;
+    this.driverPricingLoadError = false;
     this.driverPricingLoading = true;
     this.subs.sink = this.service.getDriverPricing().subscribe({
       next: (pricing: any) => {
+        this.driverPricingLoaded = !!pricing;
+        this.driverPricingLoadError = !pricing;
         if (pricing) {
           this.driverPricing = {
             mode: pricing.mode ?? 0,
@@ -359,6 +368,7 @@ driverSearchGroup: UntypedFormGroup;
         this.cdr.detectChanges();
       },
       error: () => {
+        this.driverPricingLoadError = true;
         this.driverPricingLoading = false;
         this.cdr.detectChanges();
       }
@@ -366,6 +376,7 @@ driverSearchGroup: UntypedFormGroup;
   }
 
   saveDriverPricing() {
+    if (this.isSavingDriverPricing || this.driverPricingLoading || !this.driverPricingLoaded) return;
     this.isSavingDriverPricing = true;
     this.driverPricingSaveSuccess = false;
     this.driverPricingSaveError = false;
@@ -388,10 +399,10 @@ driverSearchGroup: UntypedFormGroup;
         this.isSavingDriverPricing = false;
         this.driverPricingSaveSuccess = true;
         this.cdr.detectChanges();
-        setTimeout(() => {
+        this.settingsSaveTimers.push(setTimeout(() => {
           this.driverPricingSaveSuccess = false;
           this.cdr.detectChanges();
-        }, 3500);
+        }, 3500));
       },
       error: () => {
         this.isSavingDriverPricing = false;
@@ -534,5 +545,6 @@ driverSearchGroup: UntypedFormGroup;
 
   ngOnDestroy(): void {
     this.subs.unsubscribe();
+    this.settingsSaveTimers.forEach(timer => clearTimeout(timer));
   }
 }

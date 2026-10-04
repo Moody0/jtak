@@ -1,3 +1,6 @@
+<div *ngIf="service.listError$ | async as loadError" class="alert alert-danger" role="alert">
+  {{ loadError }} <button class="btn btn-sm btn-light" (click)="refresh()">إعادة المحاولة</button>
+</div>
 <div class="ops-products-container">
 
   <!-- 1. Products Header -->

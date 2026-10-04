@@ -20,7 +20,7 @@
           type="button"
           class="btn"
           [ngClass]="selectedTermsApp === app.key ? 'btn-primary' : 'btn-light-primary'"
-          [disabled]="isLoadingPage || isSaving"
+          [disabled]="isLoadingPage || isSaving || isCopying"
           (click)="selectTermsApp(app.key)"
         >{{ app.labelKey | translate }}</button>
       </div>
@@ -28,10 +28,12 @@
         *ngIf="selectedTermsApp !== 'customer'"
         type="button"
         class="btn btn-light"
-        [disabled]="isLoadingPage || isSaving"
+        [disabled]="isLoadingPage || isSaving || isCopying"
         (click)="copyCustomerTerms()"
       >{{ 'PAGES.TERMS_COPY_CUSTOMER' | translate }}</button>
     </div>
+
+    <div *ngIf="loadError" class="alert alert-danger" role="alert">تعذر تحميل محتوى الصفحة. <button type="button" class="btn btn-sm btn-light" (click)="loadPage()">إعادة المحاولة</button></div>
 
     <div *ngIf="isLoadingPage" class="d-flex justify-content-center py-10">
       <span class="spinner-border text-primary" role="status" [attr.aria-label]="'PAGES.TERMS_LOADING' | translate"></span>
@@ -48,7 +50,6 @@
                 [editor]="editor"
                 outputFormat="html"
                 formControlName="body"
-                [disabled]="isSaving"
                 [placeholder]="''"
               ></ngx-editor>
               <div *ngIf="isPageBodyEmpty" class="page-editor-placeholder" aria-hidden="true">
@@ -58,7 +59,7 @@
           </div>
         </div>
         <div class="text-end mt-4">
-          <button type="submit" class="btn btn-primary font-weight-bold" [disabled]="isSaving || formGroup.invalid">
+          <button type="submit" class="btn btn-primary font-weight-bold" [disabled]="isSaving || isCopying || !hasLoaded || isPageBodyEmpty || formGroup.invalid">
             <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-2" role="status"></span>
             {{ 'COMMON.SAVE' | translate }}
           </button>

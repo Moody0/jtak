@@ -3,7 +3,6 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { ToastrService } from 'ngx-toastr';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
 import { BannersService } from '../../services/banners.service';
 
 
@@ -16,6 +15,7 @@ import { BannersService } from '../../services/banners.service';
 export class DeleteBannerModalComponent implements OnInit, OnDestroy {
 
   private subs = new SubSink();
+  deleting = false;
   @Input() id: string;
   isLoading$: Observable<boolean>;
 
@@ -26,12 +26,12 @@ export class DeleteBannerModalComponent implements OnInit, OnDestroy {
   }
 
   delete() {
-    this.subs.sink = this.bannersService.delete(this.id).pipe(
-      tap(() => {
-        this.toasterService.success('User Deleted');
-        this.modal.close();
-      }),
-    ).subscribe();
+    if (this.deleting) return;
+    this.deleting = true;
+    this.subs.sink = this.bannersService.delete(this.id).subscribe({
+      next: () => { this.toasterService.success('تم حذف الإعلان'); this.modal.close(true); },
+      error: err => { this.deleting = false; this.toasterService.error(typeof err?.error === 'string' ? err.error : 'تعذر حذف الإعلان، حاول مرة أخرى'); }
+    });
   }
 
   ngOnDestroy(): void {

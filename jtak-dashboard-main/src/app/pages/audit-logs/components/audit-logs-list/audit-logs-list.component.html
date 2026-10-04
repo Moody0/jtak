@@ -1,3 +1,5 @@
+<div *ngIf="summaryError" class="alert alert-warning" role="alert">تعذر تحديث إحصاءات السجل. قد تكون الأرقام المعروضة قديمة. <button type="button" class="btn btn-sm btn-light" (click)="loadSummary()">إعادة المحاولة</button></div>
+<div *ngIf="auditLogsService.listError$ | async" class="alert alert-danger" role="alert">تعذر تحميل سجل العمليات. <button type="button" class="btn btn-sm btn-light" (click)="refresh()">إعادة المحاولة</button></div>
 <div class="audit-logs-page-container">
   <!-- 1. Header & Utility Bar -->
   <div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4">

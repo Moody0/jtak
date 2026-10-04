@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, Input, OnDestroy, OnInit } from '@angular
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
-import { Subject } from 'rxjs';
+import { Subscription, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { SubSink } from 'subsink';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
@@ -16,6 +16,7 @@ import { PopularProductsService } from '../../services/popular-products.service'
 })
 export class AddPopularProductModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
+  private searchRequest?: Subscription;
   private searchSubject = new Subject<string>();
 
   @Input() existingIds: number[] = [];
@@ -60,8 +61,9 @@ export class AddPopularProductModalComponent implements OnInit, OnDestroy {
   }
 
   performSearch(query: string): void {
+    this.searchRequest?.unsubscribe();
     this.isSearching = true;
-    this.subs.sink = this.popularService.searchProducts(query, undefined, 40).subscribe({
+    this.subs.sink = this.searchRequest = this.popularService.searchProducts(query, undefined, 40).subscribe({
       next: (res) => {
         this.isSearching = false;
         this.candidates = res || [];
@@ -76,6 +78,7 @@ export class AddPopularProductModalComponent implements OnInit, OnDestroy {
   }
 
   selectProduct(prod: SearchProductCandidate): void {
+    if (this.isSubmitting || this.existingIds.includes(prod.id)) return;
     this.selectedProduct = prod;
     this.formGroup.patchValue({
       productId: prod.id,
@@ -84,6 +87,11 @@ export class AddPopularProductModalComponent implements OnInit, OnDestroy {
   }
 
   submit(): void {
+    if (this.isSubmitting) return;
+    if (this.existingIds.includes(Number(this.formGroup.value.productId))) {
+      this.toastr.warning("المنتج موجود بالفعل في القسم");
+      return;
+    }
     if (this.formGroup.invalid || !this.selectedProduct) {
       this.toastr.warning('يرجى اختيار منتج أولاً');
       return;
@@ -92,7 +100,7 @@ export class AddPopularProductModalComponent implements OnInit, OnDestroy {
     this.isSubmitting = true;
     const val = this.formGroup.value;
 
-    this.popularService
+    this.subs.sink = this.popularService
       .addItem({
         productId: val.productId,
         order: val.order || this.nextOrder,
@@ -119,6 +127,7 @@ export class AddPopularProductModalComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.searchRequest?.unsubscribe();
     this.subs.unsubscribe();
   }
 }

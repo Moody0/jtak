@@ -46,7 +46,7 @@ export class productReviewsListComponent
   kpiWithTextCount = 0;
 
   // Rating Filter State
-  selectedRatingFilter: 'all' | '5' | '4' | '3' | 'critical' | 'with_text' | 'with_photo' = 'all';
+  selectedRatingFilter: 'all' | '5' | '4' | '3' | 'critical' | 'with_text' = 'all';
 
   // Modal State
   selectedReview: productReview | null = null;
@@ -69,6 +69,8 @@ export class productReviewsListComponent
 
   ngOnInit(): void {
     this.productReviewsService.setDefaults();
+    this.sorting = this.productReviewsService.sorting;
+    this.paginator = this.productReviewsService.paginator;
     this.searchForm();
     this.productReviewsService.fetchPost();
 
@@ -78,45 +80,18 @@ export class productReviewsListComponent
 
     this.subs.sink = this.productReviewsService.totalRecords$.subscribe((total) => {
       this.totalRecords = total || 0;
-      if (!this.kpiTotal && this.totalRecords) {
-        this.kpiTotal = this.totalRecords;
-      }
     });
 
-    this.subs.sink = this.productReviewsService.items$.subscribe((items) => {
-      this.calculateKpis(items || []);
+    this.subs.sink = this.productReviewsService.items$.subscribe(() => this.selection.clear());
+    this.subs.sink = this.productReviewsService.summary$.subscribe(summary => {
+      this.kpiTotal = summary?.total ?? 0;
+      this.kpiAvgRating = summary?.averageRating ?? 0;
+      this.kpiFiveStarCount = summary?.fiveStarCount ?? 0;
+      this.kpiFiveStarPct = summary?.fiveStarPct ?? 0;
+      this.kpiCriticalCount = summary?.criticalCount ?? 0;
+      this.kpiWithTextCount = summary?.withTextCount ?? 0;
+      this.cdr.detectChanges();
     });
-
-    this.sorting = this.productReviewsService.sorting;
-    this.paginator = this.productReviewsService.paginator;
-  }
-
-  calculateKpis(items: productReview[]): void {
-    if (!items || !items.length) return;
-    this.kpiTotal = this.totalRecords > items.length ? this.totalRecords : items.length;
-
-    let sumRating = 0;
-    let fiveStar = 0;
-    let critical = 0;
-    let withPhoto = 0;
-    let withText = 0;
-
-    for (const r of items) {
-      const rate = Number(r.rate || 0);
-      sumRating += rate;
-      if (rate >= 5) fiveStar++;
-      if (rate <= 2 && rate > 0) critical++;
-      if (r.imageReview && String(r.imageReview).trim()) withPhoto++;
-      if (r.textReview && String(r.textReview).trim()) withText++;
-    }
-
-    this.kpiAvgRating = Math.round((sumRating / items.length) * 10) / 10;
-    this.kpiFiveStarCount = fiveStar;
-    this.kpiFiveStarPct = Math.round((fiveStar / items.length) * 100);
-    this.kpiCriticalCount = critical;
-    this.kpiWithPhotoCount = withPhoto;
-    this.kpiWithTextCount = withText;
-    this.cdr.detectChanges();
   }
 
   searchForm(): void {
@@ -137,35 +112,14 @@ export class productReviewsListComponent
     this.searchGroup.get('searchTerm')?.setValue('');
   }
 
-  filterByRating(filter: 'all' | '5' | '4' | '3' | 'critical' | 'with_text' | 'with_photo'): void {
+  filterByRating(filter: 'all' | '5' | '4' | '3' | 'critical' | 'with_text'): void {
     this.selectedRatingFilter = filter;
+    this.productReviewsService.patchState({ filter: { ratingFilter: filter } });
     this.selection.clear();
   }
 
   getDisplayedItems(items: productReview[]): productReview[] {
-    if (!items) return [];
-
-    return items.filter((item) => {
-      const rate = Number(item.rate || 0);
-
-      switch (this.selectedRatingFilter) {
-        case '5':
-          return rate >= 5;
-        case '4':
-          return rate >= 4 && rate < 5;
-        case '3':
-          return rate >= 3 && rate < 4;
-        case 'critical':
-          return rate <= 2;
-        case 'with_text':
-          return Boolean(item.textReview && String(item.textReview).trim());
-        case 'with_photo':
-          return Boolean(item.imageReview && String(item.imageReview).trim());
-        case 'all':
-        default:
-          return true;
-      }
-    });
+    return items || [];
   }
 
   paginate(paginator: PaginatorState): void {
@@ -253,11 +207,14 @@ export class productReviewsListComponent
       .trim();
   }
 
-  copyText(text: string, label: string = 'النص'): void {
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
+  async copyText(text: string | number, label: string = 'النص'): Promise<void> {
+    if (text === null || text === undefined || text === '') return;
+    try {
+      await navigator.clipboard.writeText(String(text));
       this.toaster.info(`تم نسخ ${label} إلى الحافظة`);
-    });
+    } catch {
+      this.toaster.error('تعذر النسخ إلى الحافظة. يمكنك تحديد النص ونسخه يدوياً.');
+    }
   }
 
   refresh(): void {

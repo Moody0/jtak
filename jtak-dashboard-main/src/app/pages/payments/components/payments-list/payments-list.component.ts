@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { SubSink } from 'subsink';
 import { TableSelection } from 'src/app/modules/shared/utils/table-selection';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
@@ -28,6 +29,8 @@ export class PaymentsListComponent
   implements OnInit, OnDestroy, ISortView, IPaginatorView, ISearchView
 {
   private subs = new SubSink();
+  private overviewRequest?:Subscription;
+  private destroyed=false;
   selection = new TableSelection<Payment>((item) => item.id);
   isLoading = false;
   totalRecords = 0;
@@ -35,6 +38,7 @@ export class PaymentsListComponent
 
   // Real Financial KPIs
   kpiTotalPaid = 0;
+  kpiOtherCurrencies:{currency:string;totalPaid:number}[]=[];
   kpiTransactions = 0;
   kpiAvgPayment = 0;
   kpiUniqueMerchants = 0;
@@ -55,6 +59,7 @@ export class PaymentsListComponent
 
   ngOnInit(): void {
     this.paymentsService.setDefaults();
+    this.sorting=this.paymentsService.sorting;this.paginator=this.paymentsService.paginator;
     this.searchForm();
     this.paymentsService.fetchPost();
     this.loadDriverCashAdvances();
@@ -65,29 +70,16 @@ export class PaymentsListComponent
 
     this.subs.sink = this.paymentsService.totalRecords$.subscribe((total) => {
       this.totalRecords = total || 0;
-      if (!this.kpiTransactions) {
-        this.kpiTransactions = this.totalRecords;
-      }
     });
 
-    this.subs.sink = this.paymentsService.items$.subscribe((items) => {
-      if (items && items.length) {
-        this.calculateKpis(items);
-      }
+    this.subs.sink = this.paymentsService.summary$.subscribe(summary=>{
+      this.kpiOtherCurrencies=(summary?.currencyTotals || []).filter((item:any)=>item.currency!=='SYP');
+      this.kpiTransactions=summary?.recordsCount ?? 0;this.kpiTotalPaid=summary?.totalPaid ?? 0;
+      this.kpiAvgPayment=summary?.averagePayment ?? 0;this.kpiUniqueMerchants=summary?.uniqueRecipients ?? 0;this.cdr.detectChanges();
     });
 
     this.sorting = this.paymentsService.sorting;
     this.paginator = this.paymentsService.paginator;
-  }
-
-  calculateKpis(items: Payment[]): void {
-    if (!items || !items.length) return;
-    this.kpiTransactions = this.totalRecords > items.length ? this.totalRecords : items.length;
-    this.kpiTotalPaid = items.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    this.kpiAvgPayment = Math.round(this.kpiTotalPaid / (items.length || 1));
-    const uniquePayees = new Set(items.map((p) => p.toUser || p.toUserId));
-    this.kpiUniqueMerchants = uniquePayees.size;
-    this.cdr.detectChanges();
   }
 
   searchForm(): void {
@@ -101,7 +93,8 @@ export class PaymentsListComponent
 
   search(searchTerm: string): void {
     this.selection.clear();
-    this.paymentsService.patchState({ searchTerm });
+    this.paginator.page=0;
+    this.paymentsService.patchState({ searchTerm, paginator:this.paginator });
   }
 
   getDisplayedItems(items: Payment[]): Payment[] {
@@ -131,6 +124,7 @@ export class PaymentsListComponent
       size: 'lg',
       backdrop: 'static',
       keyboard: false,
+      beforeDismiss: () => !modalRef.componentInstance.isSaving,
     });
     modalRef.componentInstance.item = null;
     modalRef.result.then(
@@ -146,6 +140,7 @@ export class PaymentsListComponent
       size: 'lg',
       backdrop: 'static',
       keyboard: false,
+      beforeDismiss: () => !modalRef.componentInstance.isSaving,
       scrollable: true,
     });
     modalRef.result.then(
@@ -155,6 +150,7 @@ export class PaymentsListComponent
   }
 
   refresh(): void {
+    if(this.destroyed) return;
     this.selection.clear();
     this.paymentsService.fetchPost();
     this.loadDriverCashAdvances();
@@ -163,7 +159,8 @@ export class PaymentsListComponent
   loadDriverCashAdvances(): void {
     this.isLoadingDriverCashAdvances = true;
     this.driverCashAdvancesError = '';
-    this.cashAdvancesService.getOverview().subscribe({
+    this.overviewRequest?.unsubscribe();
+    this.overviewRequest=this.cashAdvancesService.getOverview().subscribe({
       next: (overview) => {
         this.driverCashAdvances = overview;
         this.isLoadingDriverCashAdvances = false;
@@ -176,6 +173,7 @@ export class PaymentsListComponent
   }
 
   ngOnDestroy(): void {
+    this.destroyed=true;this.overviewRequest?.unsubscribe();
     this.subs.unsubscribe();
   }
 }
