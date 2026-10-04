@@ -133,10 +133,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               color: kCharcoalDark,
                             ),
                             decoration: InputDecoration(
-                              prefixIcon: Transform.flip(
-                                flipX: true,
-                                child: const Icon(PhosphorIconsRegular.user, color: Color(0xFF94A3B8), size: 20),
-                              ),
+                              prefixIcon: const Icon(PhosphorIconsRegular.user, color: Color(0xFF94A3B8), size: 20),
                               filled: true,
                               fillColor: const Color(0xFFF8FAFC),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -237,10 +234,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     textDirection: TextDirection.ltr,
                                   ),
                                 ),
-                                Transform.flip(
-                                  flipX: true,
-                                  child: const Icon(PhosphorIconsRegular.lock, size: 16, color: Color(0xFF94A3B8)),
-                                ),
+                                const Icon(PhosphorIconsRegular.lock, size: 16, color: Color(0xFF94A3B8)),
                               ],
                             ),
                           ),
@@ -297,15 +291,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: const Color(0xFFFFF0E8),
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Center(
-                child: Transform.flip(
-                  flipX: true,
-                  child: const Icon(
-                    PhosphorIconsFill.userCircle,
-                    color: kPrimaryOrange,
-                    size: 42,
-                    textDirection: TextDirection.ltr,
-                  ),
+              child: const Center(
+                child: Icon(
+                  PhosphorIconsFill.userCircle,
+                  color: kPrimaryOrange,
+                  size: 42,
+                  textDirection: TextDirection.ltr,
                 ),
               ),
             ),
@@ -373,13 +364,8 @@ class _ProfilePageState extends State<ProfilePage> {
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
       leading: Center(
-        child: HeaderCircleButton(
+        child: HeaderCircleButton.back(
           onTap: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: kCharcoalDark,
-            size: 20,
-          ),
         ),
       ),
       title: Text(

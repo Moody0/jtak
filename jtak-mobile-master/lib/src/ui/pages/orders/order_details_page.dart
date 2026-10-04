@@ -17,6 +17,7 @@ import '../../../core/data/mock_catalog_data.dart';
 import '../../../core/enums/order_details_status_enum.dart';
 import '../../../core/models/order/order_details_model.dart';
 import '../../../core/models/order/order_model.dart';
+import '../../../core/services/contact_settings_service.dart';
 import '../../../core/services/locator.dart';
 import '../../../core/services/route_directions_service.dart';
 import '../../../ui/sections/rate_order.dart';
@@ -91,8 +92,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   void _updatePreviewRoute(LatLng driverPos, LatLng clientPos) async {
     if (_lastPreviewDriverPos != null) {
-      final double d = (driverPos.latitude - _lastPreviewDriverPos!.latitude).abs() +
-          (driverPos.longitude - _lastPreviewDriverPos!.longitude).abs();
+      final double d =
+          (driverPos.latitude - _lastPreviewDriverPos!.latitude).abs() +
+              (driverPos.longitude - _lastPreviewDriverPos!.longitude).abs();
       if (d < 0.0002 && _previewRoadPoints.isNotEmpty) return;
     }
     _lastPreviewDriverPos = driverPos;
@@ -181,11 +183,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   const SizedBox(height: 14),
 
                   // 2. Delivery Confirmation PIN Code Card (رمز تأكيد الاستلام)
-                  if (currentOrder.deliveryOtp != null &&
-                      currentOrder.deliveryOtp!.trim().isNotEmpty &&
-                      status != OrderDetailsStatus.customerCanceled &&
-                      status != OrderDetailsStatus.deliveryCanceled &&
-                      status != OrderDetailsStatus.merchantRejected) ...[
+                  if (status == OrderDetailsStatus.shipping &&
+                      currentOrder.deliveryOtp != null &&
+                      currentOrder.deliveryOtp!.trim().isNotEmpty) ...[
                     _buildDeliveryPinCard(currentOrder, status),
                     const SizedBox(height: 14),
                   ],
@@ -264,10 +264,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      PhosphorIconsRegular.info,
-                      size: 15,
-                      color: Color(0xFF475569),
+                    Transform.flip(
+                      flipX: true,
+                      child: const Icon(
+                        PhosphorIconsRegular.info,
+                        size: 15,
+                        color: Color(0xFF475569),
+                      ),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -319,8 +322,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
       case OrderDetailsStatus.readyForPickup:
         stageIndex = 1;
-        mainTitle = 'طلبك جاهز للاستلام';
-        subtitle = 'أنهى $merchantName تجهيز الطلب وبانتظار تعيين مندوب التوصيل';
+        mainTitle = 'تم تجهيز طلبك';
+        subtitle =
+            'أنهى متجر $merchantName تجهيز طلبك، وهو بانتظار أن يستلمه المندوب';
         break;
 
       case OrderDetailsStatus.shipping:
@@ -348,9 +352,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         // those take priority here and order.warning is never used as the
         // displayed reason.
         final String reason = order.notes ??
-            (order.orderDetails?.firstWhere(
-                (d) => d.warning != null && d.warning!.trim().isNotEmpty,
-                orElse: () => OrderDetailsModel()).warning) ??
+            (order.orderDetails
+                ?.firstWhere(
+                    (d) => d.warning != null && d.warning!.trim().isNotEmpty,
+                    orElse: () => OrderDetailsModel())
+                .warning) ??
             '';
         if (reason.trim().isNotEmpty) {
           subtitle =
@@ -566,9 +572,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   // 2. Delivery Confirmation PIN Card (رمز تأكيد الاستلام)
   // ---------------------------------------------------------------------------
   Widget _buildDeliveryPinCard(OrderModel order, OrderDetailsStatus status) {
-    final String cleanOtp = (order.deliveryOtp ?? '')
-        .replaceAll(RegExp(r'\s+'), '')
-        .trim();
+    final String cleanOtp =
+        (order.deliveryOtp ?? '').replaceAll(RegExp(r'\s+'), '').trim();
     final bool isDelivered = status == OrderDetailsStatus.delivered;
 
     return Container(
@@ -577,7 +582,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         color: isDelivered ? const Color(0xFFF8FAFC) : const Color(0xFFFFF7ED),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDelivered ? const Color(0xFFE2E8F0) : const Color(0xFFFFEDD5),
+          color:
+              isDelivered ? const Color(0xFFE2E8F0) : const Color(0xFFFFEDD5),
           width: 1.2,
         ),
       ),
@@ -590,14 +596,19 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isDelivered ? const Color(0xFFE2E8F0) : const Color(0xFFFFF0E8),
+                  color: isDelivered
+                      ? const Color(0xFFE2E8F0)
+                      : const Color(0xFFFFF0E8),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Icon(
-                    isDelivered ? PhosphorIconsFill.checkCircle : PhosphorIconsFill.shieldCheck,
+                    isDelivered
+                        ? PhosphorIconsFill.checkCircle
+                        : PhosphorIconsFill.shieldCheck,
                     size: 22,
-                    color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                    color:
+                        isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
                   ),
                 ),
               ),
@@ -611,7 +622,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
-                        color: isDelivered ? const Color(0xFF475569) : kCharcoalDark,
+                        color: isDelivered
+                            ? const Color(0xFF475569)
+                            : kCharcoalDark,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -649,7 +662,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isDelivered ? const Color(0xFFCBD5E1) : const Color(0xFFFFB280),
+                            color: isDelivered
+                                ? const Color(0xFFCBD5E1)
+                                : const Color(0xFFFFB280),
                             width: 1.4,
                           ),
                           boxShadow: const [
@@ -667,7 +682,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                             style: GoogleFonts.ibmPlexSansArabic(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
-                              color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                              color: isDelivered
+                                  ? const Color(0xFF64748B)
+                                  : kPrimaryOrange,
                             ),
                           ),
                         ),
@@ -685,11 +702,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       SnackBar(
                         content: Row(
                           children: [
-                            const Icon(PhosphorIconsFill.checkCircle, color: Colors.white, size: 18),
+                            const Icon(PhosphorIconsFill.checkCircle,
+                                color: Colors.white, size: 18),
                             const SizedBox(width: 8),
                             Text(
                               'تم نسخ رمز التأكيد: \u200E$cleanOtp\u200E',
-                              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+                              style: GoogleFonts.ibmPlexSansArabic(
+                                  fontWeight: FontWeight.w700),
                               textDirection: TextDirection.rtl,
                             ),
                           ],
@@ -697,18 +716,22 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         duration: const Duration(seconds: 2),
                         backgroundColor: kCharcoalDark,
                         behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     );
                   },
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isDelivered ? const Color(0xFFCBD5E1) : const Color(0xFFFFD8C2),
+                        color: isDelivered
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFFFFD8C2),
                         width: 1.0,
                       ),
                     ),
@@ -718,7 +741,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         Icon(
                           PhosphorIconsRegular.copy,
                           size: 15,
-                          color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                          color: isDelivered
+                              ? const Color(0xFF64748B)
+                              : kPrimaryOrange,
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -726,7 +751,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
-                            color: isDelivered ? const Color(0xFF64748B) : kPrimaryOrange,
+                            color: isDelivered
+                                ? const Color(0xFF64748B)
+                                : kPrimaryOrange,
                           ),
                         ),
                       ],
@@ -767,8 +794,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: const Color(0xFFFFF0E8),
-                  border: Border.all(
-                      color: const Color(0xFFFFD6C2), width: 1.5),
+                  border:
+                      Border.all(color: const Color(0xFFFFD6C2), width: 1.5),
                 ),
                 child: ClipOval(
                   child: Image.asset(
@@ -815,7 +842,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               if (driverPos != null && isLive) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   decoration: BoxDecoration(
                     color: const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(9),
@@ -852,8 +880,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   side: const BorderSide(color: Color(0xFFFFEDD5), width: 1.2),
                 ),
               ),
-              icon: const Icon(PhosphorIconsFill.phoneCall,
-                  size: 18, color: kPrimaryOrange),
+              icon: Transform.flip(
+                flipX: true,
+                child: const Icon(PhosphorIconsFill.phoneCall,
+                    size: 18, color: kPrimaryOrange),
+              ),
               label: Text(
                 'اتصال بمندوب التوصيل',
                 style: GoogleFonts.ibmPlexSansArabic(
@@ -1001,7 +1032,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       polylines: {
                         if (driverPos != null) ...[
                           Polyline(
-                            polylineId: const PolylineId('route_preview_border'),
+                            polylineId:
+                                const PolylineId('route_preview_border'),
                             points: _previewRoadPoints.isNotEmpty
                                 ? _previewRoadPoints
                                 : [driverPos, clientPos],
@@ -1076,12 +1108,28 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   // ---------------------------------------------------------------------------
   Widget _buildOrderItemsCard(OrderModel order) {
     final details = order.orderDetails ?? [];
-    final double computedTotal = order.price ??
+    final double computedTotal = order.adjustedProductSubtotal ??
+        order.price ??
         details.fold<double>(0.0, (sum, item) {
+          if (item.orderDetailStatus == OrderDetailsStatus.merchantRejected) {
+            return sum;
+          }
           final p = (item.singleFinalPrice ?? item.singlePrice ?? 0);
           final q = (item.quantity ?? 1);
           return sum + (p * q);
         });
+    final double deliveryFee = order.deliveryFee ?? 0.0;
+    final double grandTotal = order.adjustedGrandTotal ??
+        order.grandTotal ??
+        (computedTotal + deliveryFee);
+    final bool hasPartial = order.hasPartialFulfillment == true ||
+        (order.rejectedItemsTotal != null && order.rejectedItemsTotal! > 0);
+    final double originalSubtotal = order.originalProductSubtotal ??
+        (computedTotal + (order.rejectedItemsTotal ?? 0.0));
+    final double rejectedTotal = order.rejectedItemsTotal ??
+        (order.originalGrandTotal != null && order.adjustedGrandTotal != null
+            ? (order.originalGrandTotal! - order.adjustedGrandTotal!)
+            : 0.0);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1097,13 +1145,37 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'طلبي',
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: kCharcoalDark,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'طلبي',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: kCharcoalDark,
+                    ),
+                  ),
+                  if (hasPartial) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFFEDD5)),
+                      ),
+                      child: Text(
+                        'توفر جزئي',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFEA580C),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               GestureDetector(
                 onTap: () {
@@ -1138,6 +1210,54 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             ],
           ),
 
+          // Partial Fulfillment Warning Banner
+          if (hasPartial)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFFEDD5), width: 1.2),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    PhosphorIconsFill.warningCircle,
+                    color: Color(0xFFEA580C),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'تعديل في محتويات الطلب (توفر جزئي)',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF9A3412),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'اعتذر المتجر عن توفير بعض الأصناف. تم استبعادها تلقائياً وتحديث المبلغ المستحق للدفع عند الاستلام بدقة.',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 11.5,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFFC2410C),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // B. Collapsible Items List
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 220),
@@ -1170,12 +1290,63 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   }),
                 const Divider(height: 24, color: Color(0xFFE2E8F0)),
 
+                // Partial Fulfillment Breakdown if items were rejected
+                if (hasPartial && rejectedTotal > 0) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'المجموع الأصلي للمنتجات',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        '${OrderSingleItem.formatPrice(originalSubtotal)} $kMainCurrencySymbol',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'خصم أصناف غير متوفرة',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                      Text(
+                        '- ${OrderSingleItem.formatPrice(rejectedTotal)} $kMainCurrencySymbol',
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                ],
+
                 // Subtotal Row: Right = "المجموع الجزئي", Left = Price
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'المجموع الجزئي',
+                      hasPartial
+                          ? 'المجموع للمنتجات المتوفرة'
+                          : 'المجموع الجزئي',
                       style: GoogleFonts.ibmPlexSansArabic(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -1192,6 +1363,64 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'رسوم التوصيل',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                    Text(
+                      '${OrderSingleItem.formatPrice(deliveryFee)} $kMainCurrencySymbol',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: kPrimaryOrange,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Color(0xFFE2E8F0)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'المجموع الكلي',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: kCharcoalDark,
+                          ),
+                        ),
+                        if (order.isCod)
+                          Text(
+                            'المبلغ المطلوب للدفع عند الاستلام',
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF059669),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Text(
+                      '${OrderSingleItem.formatPrice(grandTotal)} $kMainCurrencySymbol',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: kCharcoalDark,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
             secondChild: const SizedBox.shrink(),
@@ -1202,6 +1431,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
   Widget _buildOrderItemRow(OrderDetailsModel item) {
+    final bool isRejected =
+        item.orderDetailStatus == OrderDetailsStatus.merchantRejected;
     final double itemPrice =
         (item.singleFinalPrice ?? item.singlePrice ?? 0) * (item.quantity ?? 1);
     final mockItem = MockCatalogData.getMenuItemById(item.productId ?? 0);
@@ -1210,86 +1441,115 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         ? raw.split(',').first.trim()
         : (mockItem?.imageUrl ?? '');
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Right in RTL: Image Thumbnail
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: ImageView(
-              img,
-              width: 58,
-              height: 58,
-              fit: BoxFit.cover,
+    return Opacity(
+      opacity: isRejected ? 0.6 : 1.0,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Right in RTL: Image Thumbnail
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isRejected
+                    ? const Color(0xFFFCA5A5)
+                    : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: ImageView(
+                img,
+                width: 58,
+                height: 58,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-        ),
 
-        const SizedBox(width: 12),
+          const SizedBox(width: 12),
 
-        // Middle in RTL: Title & Add-ons Dialog Trigger
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.productTitle ?? mockItem?.title ?? 'وجبة خاصة',
-                textAlign: TextAlign.start,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: kCharcoalDark,
+          // Middle in RTL: Title & Add-ons Dialog Trigger & Rejected Badge
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productTitle ?? mockItem?.title ?? 'وجبة خاصة',
+                  textAlign: TextAlign.start,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: isRejected ? const Color(0xFF94A3B8) : kCharcoalDark,
+                    decoration: isRejected ? TextDecoration.lineThrough : null,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              GestureDetector(
-                onTap: () => _showAddonsDialog(context, item),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'عرض الإضافات',
+                if (isRejected) ...[
+                  const SizedBox(height: 3),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'غير متوفر (مستبعد)',
                       style: GoogleFonts.ibmPlexSansArabic(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF64748B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFDC2626),
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    const Icon(
-                      PhosphorIconsBold.caretDown,
-                      size: 11,
-                      color: Color(0xFF64748B),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 3),
+                  GestureDetector(
+                    onTap: () => _showAddonsDialog(context, item),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'عرض الإضافات',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(
+                          PhosphorIconsBold.caretDown,
+                          size: 11,
+                          color: Color(0xFF64748B),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
 
-        const SizedBox(width: 10),
+          const SizedBox(width: 10),
 
-        // Left in RTL: Price
-        Text(
-          '${OrderSingleItem.formatPrice(itemPrice)} $kMainCurrencySymbol',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w800,
-            color: kCharcoalDark,
+          // Left in RTL: Price
+          Text(
+            '${OrderSingleItem.formatPrice(itemPrice)} $kMainCurrencySymbol',
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w800,
+              color: isRejected ? const Color(0xFF94A3B8) : kCharcoalDark,
+              decoration: isRejected ? TextDecoration.lineThrough : null,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1466,8 +1726,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         ],
       );
     } else if (status == OrderDetailsStatus.pending ||
-        status == OrderDetailsStatus.customerPending ||
-        status == OrderDetailsStatus.merchantAccepted) {
+        status == OrderDetailsStatus.customerPending) {
       return GestureDetector(
         onTap: () => _confirmCancelOrder(order),
         behavior: HitTestBehavior.opaque,
@@ -1721,16 +1980,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Center(
                 child: Container(
                   width: 40,
@@ -1760,63 +2019,111 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              ListTile(
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final orderNum =
-                      currentOrder.id != null ? '#${currentOrder.id}' : '';
-                  final msg = orderNum.isNotEmpty
-                      ? 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص طلبي رقم $orderNum'
-                      : 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص طلبي';
-                  await LunchUrl.openWhatsApp(
-                    phone: kSupportWhatsAppNumber,
-                    message: msg,
-                    context: context,
-                  );
-                },
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(10),
+              // WhatsApp Item
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final orderNum =
+                        currentOrder.id != null ? '#${currentOrder.id}' : '';
+                    final msg = orderNum.isNotEmpty
+                        ? 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص طلبي رقم $orderNum'
+                        : 'مرحباً خدمة عملاء جيتك، أحتاج مساعدة بخصوص طلبي';
+                    await LunchUrl.openWhatsApp(
+                      phone: ContactSettingsService.instance.whatsAppNumber,
+                      message: msg,
+                      context: context,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Transform.flip(
+                            flipX: true,
+                            child: const Icon(PhosphorIconsFill.whatsappLogo,
+                                color: Color(0xFF059669), size: 22),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'محادثة الدعم عبر الواتساب',
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.5,
+                              color: kCharcoalDark,
+                            ),
+                          ),
+                        ),
+                        const Icon(PhosphorIconsBold.caretLeft,
+                            size: 14, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
                   ),
-                  child: const Icon(PhosphorIconsFill.whatsappLogo,
-                      color: Color(0xFF059669)),
                 ),
-                title: Text(
-                  'محادثة الدعم عبر الواتساب',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                      fontWeight: FontWeight.w700, fontSize: 14),
-                ),
-                trailing: const Icon(PhosphorIconsBold.caretLeft, size: 14),
               ),
-              ListTile(
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await LunchUrl.makeCall(kSupportPhoneNumber, context: context);
-                },
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF0E8),
-                    borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 4),
+              // Call Hotline Item
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await LunchUrl.makeCall(
+                        ContactSettingsService.instance.phoneNumber,
+                        context: context);
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF0E8),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Transform.flip(
+                            flipX: true,
+                            child: const Icon(PhosphorIconsFill.phoneCall,
+                                color: kPrimaryOrange, size: 22),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'الاتصال بالخط الساخن المباشر',
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.5,
+                              color: kCharcoalDark,
+                            ),
+                          ),
+                        ),
+                        const Icon(PhosphorIconsBold.caretLeft,
+                            size: 14, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
                   ),
-                  child: const Icon(PhosphorIconsFill.phoneCall,
-                      color: kPrimaryOrange),
                 ),
-                title: Text(
-                  'الاتصال بالخط الساخن المباشر',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                      fontWeight: FontWeight.w700, fontSize: 14),
-                ),
-                trailing: const Icon(PhosphorIconsBold.caretLeft, size: 14),
               ),
               const SizedBox(height: 12),
             ],
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _confirmCancelOrder(OrderModel order) {

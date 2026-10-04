@@ -96,8 +96,14 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
+        shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
+        leading: Center(
+          child: HeaderCircleButton.back(
+            onTap: () => Navigator.pop(context),
+          ),
+        ),
         title: Text(
           'إعدادات الإشعارات',
           style: GoogleFonts.ibmPlexSansArabic(
@@ -105,9 +111,6 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             fontWeight: FontWeight.w800,
             color: kCharcoalDark,
           ),
-        ),
-        leading: HeaderCircleButton.back(
-          onTap: () => Navigator.pop(context),
         ),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
@@ -137,10 +140,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(
-                          PhosphorIconsFill.bellRinging,
-                          color: kPrimaryOrange,
-                          size: 22,
+                        child: Transform.flip(
+                          flipX: true,
+                          child: const Icon(
+                            PhosphorIconsFill.bellRinging,
+                            color: kPrimaryOrange,
+                            size: 22,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -227,7 +233,12 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               color: iconBg,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Center(
+              child: Transform.flip(
+                flipX: true,
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(

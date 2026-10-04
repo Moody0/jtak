@@ -121,7 +121,9 @@ class AccountPage extends StatelessWidget {
           final UserModel user = authService.user!;
           final String displayName = GlobalVar.checkString(user.fullName)
               ? user.fullName!
-              : (GlobalVar.checkString(user.phoneNumber) ? user.phoneNumber! : 'مستخدم جيتك');
+              : (GlobalVar.checkString(user.phoneNumber)
+                  ? user.phoneNumber!
+                  : 'مستخدم جيتك');
 
           return Container(
             padding: const EdgeInsets.all(16),
@@ -185,7 +187,8 @@ class AccountPage extends StatelessWidget {
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
@@ -195,7 +198,8 @@ class AccountPage extends StatelessWidget {
                       children: [
                         Transform.flip(
                           flipX: true,
-                          child: const Icon(PhosphorIconsRegular.pencilSimple, size: 14, color: kCharcoalDark),
+                          child: const Icon(PhosphorIconsRegular.pencilSimple,
+                              size: 14, color: kCharcoalDark),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -238,7 +242,8 @@ class AccountPage extends StatelessWidget {
                     child: Center(
                       child: Transform.flip(
                         flipX: true,
-                        child: const Icon(PhosphorIconsFill.user, size: 24, color: kPrimaryOrange),
+                        child: const Icon(PhosphorIconsFill.user,
+                            size: 24, color: kPrimaryOrange),
                       ),
                     ),
                   ),
@@ -273,9 +278,11 @@ class AccountPage extends StatelessWidget {
               GestureDetector(
                 onTap: () async {
                   HapticFeedback.mediumImpact();
-                  var res = await Navigator.pushNamed(context, LoginPage.routeName);
+                  var res =
+                      await Navigator.pushNamed(context, LoginPage.routeName);
                   if (res is bool && res && context.mounted) {
-                    Provider.of<HomeNavigationProvider>(context, listen: false).changePage(0);
+                    Provider.of<HomeNavigationProvider>(context, listen: false)
+                        .changePage(0);
                   }
                 },
                 behavior: HitTestBehavior.opaque,
@@ -304,7 +311,6 @@ class AccountPage extends StatelessWidget {
       },
     );
   }
-
 
   // ---------------------------------------------------------------------------
   // Account & Preferences Group
@@ -392,10 +398,37 @@ class AccountPage extends StatelessWidget {
             icon: PhosphorIconsFill.fileText,
             iconColor: const Color(0xFFF59E0B),
             iconBg: const Color(0xFFFFFBEB),
-            title: 'الشروط والأحكام وسياسة الخصوصية',
+            title: 'الشروط والأحكام',
             onTap: () {
               HapticFeedback.lightImpact();
-              _appPageNavigation(context, 'TermsAndConditions', 'الشروط والأحكام');
+              _appPageNavigation(
+                  context, 'TermsAndConditions', 'الشروط والأحكام');
+            },
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: PhosphorIconsFill.creditCard,
+            iconColor: const Color(0xFF2563EB),
+            iconBg: const Color(0xFFEFF6FF),
+            title: context.str?.app.paymentPolicy ?? 'سياسة الدفع',
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _appPageNavigation(
+                context,
+                'PaymentPolicy',
+                context.str?.app.paymentPolicy ?? 'سياسة الدفع',
+              );
+            },
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: PhosphorIconsFill.shieldCheck,
+            iconColor: const Color(0xFF10B981),
+            iconBg: const Color(0xFFECFDF5),
+            title: 'سياسة الخصوصية',
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _appPageNavigation(context, 'PrivacyPolicy', 'سياسة الخصوصية');
             },
           ),
           if (isLogin) ...[
@@ -416,7 +449,12 @@ class AccountPage extends StatelessWidget {
   }
 
   Widget _buildDivider() {
-    return const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9), indent: 56, endIndent: 16);
+    return const Divider(
+        height: 1,
+        thickness: 1,
+        color: Color(0xFFF1F5F9),
+        indent: 56,
+        endIndent: 16);
   }
 
   Widget _buildMenuItem({
@@ -447,12 +485,11 @@ class AccountPage extends StatelessWidget {
                 ),
                 child: Center(
                   child: Transform.flip(
-                    flipX: icon != PhosphorIconsFill.signOut,
+                    flipX: true,
                     child: Icon(
                       icon,
                       size: 19,
                       color: iconColor,
-                      textDirection: TextDirection.ltr,
                     ),
                   ),
                 ),
@@ -528,7 +565,8 @@ class AccountPage extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             onPressed: () async {
@@ -548,7 +586,8 @@ class AccountPage extends StatelessWidget {
     );
   }
 
-  void _appPageNavigation(BuildContext context, String pageType, String pageTitle) {
+  void _appPageNavigation(
+      BuildContext context, String pageType, String pageTitle) {
     context.navigatePage(AppPage(pageType: pageType, pageTitle: pageTitle));
   }
 }

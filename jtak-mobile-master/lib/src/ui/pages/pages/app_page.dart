@@ -167,13 +167,8 @@ class _AppPageState extends State<AppPage> {
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
       leading: Center(
-        child: HeaderCircleButton(
+        child: HeaderCircleButton.back(
           onTap: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: kCharcoalDark,
-            size: 20,
-          ),
         ),
       ),
       title: Text(
@@ -590,14 +585,17 @@ class _AppPageState extends State<AppPage> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Center(
-              child: SvgPicture.asset(
-                '${kAssetSvgBase}whatsapp.svg',
-                width: 28,
-                height: 28,
-                errorBuilder: (_, __, ___) => const Icon(
-                  PhosphorIconsFill.chatCircleDots,
-                  color: Color(0xFF25D366),
-                  size: 26,
+              child: Transform.flip(
+                flipX: true,
+                child: SvgPicture.asset(
+                  '${kAssetSvgBase}whatsapp.svg',
+                  width: 28,
+                  height: 28,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    PhosphorIconsFill.chatCircleDots,
+                    color: Color(0xFF25D366),
+                    size: 26,
+                  ),
                 ),
               ),
             ),
@@ -1126,10 +1124,27 @@ class _AppPageState extends State<AppPage> {
   // 2. LEGAL DOCUMENT EMPTY STATE
   // ---------------------------------------------------------------------------
   Widget _buildLegalDocumentEmptyState() {
-    final isPrivacyPolicy = widget.pageType.toLowerCase() == 'privacypolicy';
-    final icon = isPrivacyPolicy
-        ? PhosphorIconsFill.shieldCheck
-        : PhosphorIconsFill.fileText;
+    final pageTypeLower = widget.pageType.toLowerCase();
+    final isPrivacyPolicy = pageTypeLower.contains('privacy');
+    final isPaymentPolicy = pageTypeLower.contains('payment');
+
+    final IconData icon;
+    final Color iconColor;
+    final Color iconBg;
+
+    if (isPrivacyPolicy) {
+      icon = PhosphorIconsFill.shieldCheck;
+      iconColor = const Color(0xFF10B981);
+      iconBg = const Color(0xFFECFDF5);
+    } else if (isPaymentPolicy) {
+      icon = PhosphorIconsFill.creditCard;
+      iconColor = const Color(0xFF2563EB);
+      iconBg = const Color(0xFFEFF6FF);
+    } else {
+      icon = PhosphorIconsFill.fileText;
+      iconColor = const Color(0xFFF59E0B);
+      iconBg = const Color(0xFFFFFBEB);
+    }
 
     return Container(
       width: double.infinity,
@@ -1146,15 +1161,18 @@ class _AppPageState extends State<AppPage> {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: isPrivacyPolicy
-                  ? const Color(0xFFECFDF5)
-                  : const Color(0xFFFFF3EB),
+              color: iconBg,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(
-              icon,
-              size: 26,
-              color: isPrivacyPolicy ? const Color(0xFF10B981) : kPrimaryOrange,
+            child: Center(
+              child: Transform.flip(
+                flipX: true,
+                child: Icon(
+                  icon,
+                  size: 26,
+                  color: iconColor,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
