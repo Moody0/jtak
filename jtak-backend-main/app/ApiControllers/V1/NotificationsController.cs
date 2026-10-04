@@ -2,6 +2,7 @@
 using App.Shared.Services;
 using App.Shared.Services.Helpers;
 using App.Shared.Entities;
+using App.Shared.Entities.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -36,8 +37,9 @@ namespace App.ApiControllers.V1
         [Route("{page}")]
         public async Task<ActionResult<NotificationMessageDto[]>> GetNotifications(int page = 0)
         {
+            if (page < 0 || page > 10000) return BadRequest(ApiErr.Create("رقم الصفحة غير صالح."));
             var user = await _userManager.GetUserAsync(User);
-            var notifications = (await _notificationService.GetNotifications(user?.Id))
+            var notifications = (await _notificationService.GetNotifications(user?.Id, page: page))
                 .Select(x => new NotificationMessageDto
                 {
                     CreatedDate = x.CreatedDate,
@@ -48,9 +50,6 @@ namespace App.ApiControllers.V1
                     EntityData = x.EntityData,
                     EventKey = x.EventKey
                 })
-                .OrderByDescending(x => x.CreatedDate)
-                .Skip(20 * page)
-                .Take(20)
                 .ToArray();
 
             return notifications;
@@ -69,6 +68,7 @@ namespace App.ApiControllers.V1
 
         [HttpGet]
         [Route("Test/{id}")]
+        [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
         public async Task<ActionResult<bool>> Test(Guid id)
         {
             await _notificationService.SendPushNotification(new Shared.Entities.Notification

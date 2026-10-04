@@ -29,7 +29,7 @@ namespace App.ApiControllers.V1.Admin
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiErr))]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.DeliveryPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
     public class BalancesController : SolApiController
     {
         private readonly IAppUnitOfWork _uow;

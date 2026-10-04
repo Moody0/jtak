@@ -7,6 +7,8 @@ using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using System.Data;
 using Microsoft.Extensions.Logging;
 using Modules.Catalog.Entities;
 using Modules.Catalog.Services;
@@ -86,12 +88,18 @@ namespace App.ApiControllers.V1.Admin
             var before = merchant.DeliveryFee;
             merchant.DeliveryFee = model.Amount.Value;
             await _catalogUnitOfWork.SaveChangesAsync();
-            if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+            if (_auditService != null) await AuditSafely(new AdminAuditLogEntry {
                 Module = "Settings", Action = "UpdateJtakMarketDeliveryFee", EntityType = "Merchant",
                 EntityId = merchant.Id.ToString(), Description = "تحديث أجرة التوصيل الثابتة لجيتك ماركت",
                 Result = "Success", BeforeState = new { Amount = before }, AfterState = new { Amount = merchant.DeliveryFee }
             });
             return Ok(new { Amount = merchant.DeliveryFee });
+        }
+
+        private async Task AuditSafely(AdminAuditLogEntry entry)
+        {
+            try { await _auditService.LogAsync(entry); }
+            catch (Exception ex) { _logger?.LogError(ex, "Settings saved, but audit logging failed for {Action}.", entry.Action); }
         }
 
         public class JtakMarketDeliveryFeeInput { public decimal? Amount { get; set; } }
@@ -115,7 +123,7 @@ namespace App.ApiControllers.V1.Admin
             var before = await _genericSetting.GetValue<JtakMarketCourierPaySetting>(JtakMarketCourierPaySetting.Key)
                 ?? new JtakMarketCourierPaySetting();
             await _genericSetting.SetValue(JtakMarketCourierPaySetting.Key, setting);
-            if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+            if (_auditService != null) await AuditSafely(new AdminAuditLogEntry {
                 Module = "Settings", Action = "UpdateJtakMarketCourierPay", EntityType = "JtakMarketCourierPaySetting",
                 EntityId = JtakMarketCourierPaySetting.Key, Description = "تحديث نظام أجر مندوب جيتك ماركت",
                 Result = "Success", BeforeState = before, AfterState = setting
@@ -139,7 +147,7 @@ namespace App.ApiControllers.V1.Admin
                 try { before = await _coverage.GetSettingAsync(); }
                 catch (InvalidOperationException) { /* Authorized admins can repair corrupt settings. */ }
                 var after = await _coverage.SaveAsync(model.RadiusKm);
-                if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+                if (_auditService != null) await AuditSafely(new AdminAuditLogEntry {
                     Module = "Settings", Action = "UpdateDeliveryCoverage", EntityType = "HomsCoverageSetting",
                     EntityId = HomsCoverageSetting.Key, Description = $"تحديث نصف قطر التوصيل في حمص إلى {after.RadiusKm} كم",
                     Result = "Success", BeforeState = before, AfterState = after
@@ -155,7 +163,10 @@ namespace App.ApiControllers.V1.Admin
         [HttpPut]
         public async Task<ActionResult<bool>> SetSettings(SettingsVm vm)
         {
-            if (vm?.DriverPricing != null && !vm.DriverPricing.IsValid)
+            if (vm == null) return BadRequest(ApiErr.Create("بيانات الإعدادات مطلوبة."));
+            if (vm.UsdToSypExchangeRate <= 0m || vm.UsdToSypExchangeRate > 100000000m || decimal.Round(vm.UsdToSypExchangeRate, 6) != vm.UsdToSypExchangeRate)
+                return BadRequest(ApiErr.Create("سعر الصرف يجب أن يكون موجباً، حتى 100 مليون وست منازل عشرية."));
+            if (vm.DriverPricing != null && !vm.DriverPricing.IsValid)
                 return BadRequest("إعدادات أجور السائق غير صالحة. يجب تحديد أجر موجب والتحقق من القيم والحد الأقصى للأجرة.");
 
             var previousSettings = await _genericSetting.GetValue<SettingsVm>(nameof(SettingsVm), CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
@@ -168,36 +179,69 @@ namespace App.ApiControllers.V1.Admin
                 HomeFeaturedProductIds = previousSettings?.HomeFeaturedProductIds
             };
 
-            vm.HomeFeaturedCategories = null;
-            vm.HomeFeaturedProducts = null;
-            await _genericSetting.SetValue(nameof(SettingsVm), vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
-
-            // The rest of the settings blob is stored per language, but a rate
-            // is not translatable and every culture has to resolve the same
-            // one, so it is kept under its own neutral key as well.
-            if (vm.UsdToSypExchangeRate > 0 && (previousRate?.Rate ?? 0) != vm.UsdToSypExchangeRate)
+            var rateChanged = (previousRate?.Rate ?? previousSettings?.UsdToSypExchangeRate ?? 0m) != vm.UsdToSypExchangeRate;
+            var appDb = _unitOfWork?.Context;
+            var catalogDb = _catalogUnitOfWork?.Context;
+            if (appDb == null || !appDb.Database.IsRelational() || (rateChanged && (catalogDb == null || !catalogDb.Database.IsRelational())))
+                return BadRequest(ApiErr.Create("تعذر حفظ الإعدادات المالية بأمان. تحقق من اتصال قاعدة البيانات."));
+            var originalCatalogConnection = rateChanged ? catalogDb.Database.GetDbConnection() : null;
+            var appConnection = appDb.Database.GetDbConnection();
+            if (rateChanged && (catalogDb.Database.ProviderName != appDb.Database.ProviderName ||
+                !string.Equals(originalCatalogConnection.ConnectionString, appConnection.ConnectionString, StringComparison.Ordinal)))
+                return BadRequest(ApiErr.Create("سعر الصرف والأسعار يجب أن تكون في قاعدة البيانات نفسها."));
+            try
             {
-                await _genericSetting.SetValue(UsdExchangeRateSetting.Key,
-                                               new UsdExchangeRateSetting { Rate = vm.UsdToSypExchangeRate });
+                if (rateChanged) catalogDb.Database.SetDbConnection(appConnection, contextOwnsConnection: false);
+                await using var transaction = await appDb.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                await using var enlistment = rateChanged ? await catalogDb.Database.UseTransactionAsync(transaction.GetDbTransaction()) : null;
+                vm.HomeFeaturedCategories = null;
+                vm.HomeFeaturedProducts = null;
+                await _genericSetting.SetValue(nameof(SettingsVm), vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+                if (!rateChanged && previousRate == null)
+                    await _genericSetting.SetValue(UsdExchangeRateSetting.Key, new UsdExchangeRateSetting { Rate = vm.UsdToSypExchangeRate });
+                if (rateChanged)
+                {
+                    await _genericSetting.SetValue(UsdExchangeRateSetting.Key, new UsdExchangeRateSetting { Rate = vm.UsdToSypExchangeRate });
+                    var repriced = await _merchantService.RepriceUsdDenominatedProducts(vm.UsdToSypExchangeRate);
+                    _logger?.LogInformation("Exchange rate changed to {Rate}; repriced {Count} products.", vm.UsdToSypExchangeRate, repriced);
+                }
+                if (vm.DriverPricing != null)
+                {
+                    if (_driverPricingService != null)
+                    {
+                        if (!await _driverPricingService.SaveSettingAsync(vm.DriverPricing))
+                            throw new InvalidOperationException("تعذر حفظ إعدادات أجور السائق.");
+                    }
+                    else await _genericSetting.SetValue(DriverPricingSetting.Key, vm.DriverPricing);
+                }
+                await transaction.CommitAsync();
 
-                // Dollar-quoted products store their selling price in the local
-                // currency, so the new rate has to be written through to them.
-                var repriced = await _merchantService.RepriceUsdDenominatedProducts(vm.UsdToSypExchangeRate);
-                _logger.LogInformation("Exchange rate changed to {Rate}; repriced {Count} dollar-quoted products.",
-                                       vm.UsdToSypExchangeRate, repriced);
+            }
+            catch (Exception ex)
+            {
+                appDb.ChangeTracker.Clear();
+                catalogDb?.ChangeTracker.Clear();
+                _logger?.LogError(ex, "Global settings transaction failed; no financial changes committed.");
+                return BadRequest(ApiErr.Create("تعذر حفظ الإعدادات والأسعار. لم يتم تطبيق التغيير؛ حاول مجدداً."));
+            }
+            finally
+            {
+                if (rateChanged) catalogDb.Database.SetDbConnection(originalCatalogConnection, contextOwnsConnection: false);
             }
 
-            if (vm.DriverPricing != null)
+            // Database work has committed; a cache failure must never report a rolled-back save.
+            try
             {
-                if (_driverPricingService != null)
-                    await _driverPricingService.SaveSettingAsync(vm.DriverPricing);
-                else
-                    await _genericSetting.SetValue(DriverPricingSetting.Key, vm.DriverPricing);
+                _genericSetting.InvalidateCache(nameof(SettingsVm), CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+                _genericSetting.InvalidateCache(UsdExchangeRateSetting.Key);
+                _genericSetting.InvalidateCache(DriverPricingSetting.Key);
+                if (rateChanged) _merchantService.InvalidateRepricedUsdCache();
             }
+            catch (Exception ex) { _logger?.LogError(ex, "Settings committed, but cache refresh failed."); }
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await AuditSafely(new AdminAuditLogEntry
                 {
                     Module = "Settings",
                     Action = "UpdateSettings",
@@ -274,7 +318,7 @@ namespace App.ApiControllers.V1.Admin
             {
                 settings.HomeFeaturedCategories = Array.Empty<ProductCategoryDto>();
             }
-            settings.HomeFeaturedProducts = settings.HomeFeaturedProductIds?.Any() == true ? await _service.Queryable().Select(x => _mapper.Map<ProductDto>(x)).ToArrayAsync() : Array.Empty<ProductDto>();
+            settings.HomeFeaturedProducts = settings.HomeFeaturedProductIds?.Any() == true ? await _service.Queryable().Where(x => settings.HomeFeaturedProductIds.Contains(x.Id) && x.Active).Select(x => _mapper.Map<ProductDto>(x)).ToArrayAsync() : Array.Empty<ProductDto>();
 
             return settings;
         }
@@ -311,7 +355,7 @@ namespace App.ApiControllers.V1.Admin
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await AuditSafely(new AdminAuditLogEntry
                 {
                     Module = "Settings",
                     Action = "UpdateDriverPricing",
@@ -345,7 +389,7 @@ namespace App.ApiControllers.V1.Admin
             await _genericSetting.SetValue(ErrandDriverEarningSetting.Key, setting);
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await AuditSafely(new AdminAuditLogEntry
                 {
                     Module = "Settings", Action = "UpdateErrandDriverEarning",
                     EntityType = "ErrandDriverEarningSetting", EntityId = ErrandDriverEarningSetting.Key,
@@ -363,7 +407,9 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<SystemContactSettings>> GetContact()
         {
             var setting = await _genericSetting.GetValue<SystemContactSettings>(SystemContactSettings.Key);
-            return Ok(setting ?? new SystemContactSettings());
+            setting ??= new SystemContactSettings();
+            setting.Normalize();
+            return Ok(setting);
         }
 
         /// <summary>
@@ -374,12 +420,14 @@ namespace App.ApiControllers.V1.Admin
         {
             if (model == null) return BadRequest(ApiErr.Create("بيانات الإعدادات غير صالحة."));
             model.Normalize();
+            var validationError = model.ValidationError();
+            if (validationError != null) return BadRequest(ApiErr.Create(validationError));
             var before = await _genericSetting.GetValue<SystemContactSettings>(SystemContactSettings.Key);
             await _genericSetting.SetValue(SystemContactSettings.Key, model);
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await AuditSafely(new AdminAuditLogEntry
                 {
                     Module = "Settings",
                     Action = "UpdateContactSettings",

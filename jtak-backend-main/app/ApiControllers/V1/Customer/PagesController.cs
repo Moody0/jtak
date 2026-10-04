@@ -68,11 +68,7 @@ namespace App.ApiControllers.V1.Customer
             if (!TryGetTermsSettingKey(app, out var settingKey))
                 return BadRequest(new { message = "Unknown app. Use customer, delivery, or warehouse." });
 
-            var language = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
-            var page = await PageSettingsReader.GetPage(_service, settingKey, language);
-            if (string.IsNullOrWhiteSpace(page.Body) && settingKey != "TermsAndConditions")
-                page = await PageSettingsReader.GetPage(_service, "TermsAndConditions", language);
-            return page;
+            return await PageSettingsReader.GetTermsPage(_service, settingKey, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
         }
 
         private static bool TryGetTermsSettingKey(string app, out string settingKey)

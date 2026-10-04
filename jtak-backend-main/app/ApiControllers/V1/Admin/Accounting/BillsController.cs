@@ -18,7 +18,7 @@ namespace App.ApiControllers.V1.Admin
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiErr))]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.DeliveryPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
     public class BillsController : SolApiController
     {
         private readonly IMerchantService _merchantService;
@@ -39,7 +39,7 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
-        public async Task<ActionResult<TableResponseModel<BillDto>>> DataTable([FromBody] MetronicTable request)
+        public async Task<ActionResult<TableResponseModel<BillDto>>> DataTable([FromBody] MetronicTable request, [FromQuery] string duesStatus = "all")
         {
             var merchantsList = await _merchantService.Queryable()
                 .AsNoTracking()
@@ -50,8 +50,10 @@ namespace App.ApiControllers.V1.Admin
                 .GroupBy(x => x.Id)
                 .ToDictionary(g => g.Key, g => g.First().Title ?? string.Empty);
 
-            var bills = await _service.GetDataTableAsync(request, merchants);
-            return bills;
+            bool? added = duesStatus == "added" ? true : duesStatus == "pending" ? false : null;
+            var bills = await _service.GetDataTableAsync(request, merchants, null, added);
+            var summary = await _service.GetSummaryAsync(request, merchants, added);
+            return Ok(new { bills.Items, bills.TotalRecords, bills.TotalRecordsFiltered, Summary = summary });
         }
     }
 }

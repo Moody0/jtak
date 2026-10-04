@@ -265,11 +265,12 @@ namespace App.ApiControllers.V1.Customer
         public async Task<ActionResult<MerchantDto[]>> MerchantsWithOffers([FromQuery] decimal? lat = null,
                                                                            [FromQuery] decimal? lng = null)
         {
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
             var virtualMarketId = await _merchantService.GetJtakMarketMerchantId();
             var offers = _merchantProductRepository.Queryable().AsNoTracking()
                 .Where(x => x.Discount > 0m && x.MerchantPrice > 0m &&
                             x.Product.Active && x.Product.DeletionDate == null &&
-                            x.Product.ProductCategory != null && x.Product.ProductCategory.Active &&
+                            x.Product.ProductCategoryId.HasValue && visibleCategoryIds.Contains(x.Product.ProductCategoryId.Value) &&
                             x.Merchant.Active && x.Merchant.DeletionDate == null);
 
             if (lat.HasValue && lng.HasValue)
@@ -316,11 +317,12 @@ namespace App.ApiControllers.V1.Customer
         [Route("Merchants/{mid}/Products")]
         public async Task<ActionResult<MerchantProductDto[]>> GetMerchantProducts(int mid)
         {
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
             var products = await _service.Queryable()
                                    .Include(x => x.MerchantProducts)
                                    .Include(x => x.ProductCategory)
                                    .ThenInclude(x => x.Parent)
-                                   .Where(x => x.DeletionDate == null && x.Active && (x.ProductCategory == null || x.ProductCategory.Active))
+                                   .Where(x => x.DeletionDate == null && x.Active && (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)))
                                    .OrderBy(x => x.ProductCategory.Order)
                                    .Select(x => new MerchantProductDto
                                    {
@@ -390,54 +392,19 @@ namespace App.ApiControllers.V1.Customer
             }
             model.ProductCategory = item.ProductCategory?.Title;
 
-            if (merchantId.HasValue && merchantId.Value > 0)
-            {
-                var mp = await _merchantService.GetBestProductPrice(id, new[] { merchantId.Value });
-                if (mp != null && mp.FinalPrice > 0)
-                {
-                    model.Price = mp.Price;
-                    model.FinalPrice = mp.FinalPrice;
-                    model.MerchantId = mp.MerchantId;
-                    model.MerchantKind = mp.MerchantKind;
-                    model.PriceUsd = mp.PriceUsd;
-                    model.OriginalPrice = mp.OriginalPrice;
-                    model.Discount = mp.Discount;
-                    model.MaxOrderQuantity = mp.MaxOrderQuantity;
-                }
-            }
-            else
-            {
-                var mp = await _merchantService.GetBestProductPrice(id, null);
-                if (mp != null && mp.FinalPrice > 0)
-                {
-                    model.Price = mp.Price;
-                    model.FinalPrice = mp.FinalPrice;
-                    model.MerchantId = mp.MerchantId;
-                    model.MerchantKind = mp.MerchantKind;
-                    model.PriceUsd = mp.PriceUsd;
-                    model.OriginalPrice = mp.OriginalPrice;
-                    model.Discount = mp.Discount;
-                    model.MaxOrderQuantity = mp.MaxOrderQuantity;
-                }
-            }
-
-            if (model.FinalPrice <= 0)
-            {
-                var fallbackMp = item.MerchantProducts?.FirstOrDefault(m => m.MerchantPrice > 0);
-                if (fallbackMp != null)
-                {
-                    var quote = MerchantProductDto.FromStored(fallbackMp, await _merchantService.GetUsdRate());
-                    var fallbackMerchant = await _merchantService.FindAsync(fallbackMp.MerchantId);
-                    model.MerchantId = fallbackMp.MerchantId;
-                    model.MerchantKind = (int)(fallbackMerchant?.MerchantKind ?? MerchantKind.Grocery);
-                    model.PriceUsd = quote.PriceUsd;
-                    model.OriginalPrice = quote.OriginalPrice;
-                    model.Discount = quote.Discount;
-                    model.MaxOrderQuantity = quote.MaxOrderQuantity;
-                    model.FinalPrice = quote.FinalPrice;
-                    model.Price = quote.Price;
-                }
-            }
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
+            if (item.ProductCategoryId.HasValue && !visibleCategoryIds.Contains(item.ProductCategoryId.Value)) return NotFound();
+            var mp = await _merchantService.GetBestProductPrice(id,
+                merchantId.HasValue && merchantId.Value > 0 ? new[] { merchantId.Value } : null);
+            if (mp == null || mp.FinalPrice <= 0) return NotFound();
+            model.Price = mp.Price;
+            model.FinalPrice = mp.FinalPrice;
+            model.MerchantId = mp.MerchantId;
+            model.MerchantKind = mp.MerchantKind;
+            model.PriceUsd = mp.PriceUsd;
+            model.OriginalPrice = mp.OriginalPrice;
+            model.Discount = mp.Discount;
+            model.MaxOrderQuantity = mp.MaxOrderQuantity;
 
             return model;
         }
@@ -471,6 +438,7 @@ namespace App.ApiControllers.V1.Customer
         [Route("Search")]
         public async Task<ActionResult<ProductLiteDto[]>> Search(ProductSearchVm vm)
         {
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
             vm.q = vm.q?.Trim().ToLower();
             var doSearch = !string.IsNullOrEmpty(vm.q);
 
@@ -488,7 +456,7 @@ namespace App.ApiControllers.V1.Customer
                                     (x.ProductCategory.Title.ToLower().Contains(vm.q) ||
                                      (x.ProductCategory.Parent != null &&
                                       x.ProductCategory.Parent.Title.ToLower().Contains(vm.q)))))
-                            .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active) && x.Active);
+                            .Where(x => x.DeletionDate == null && (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)) && x.Active);
 
             if (vm.OnlyOffers)
             {
@@ -602,6 +570,7 @@ namespace App.ApiControllers.V1.Customer
         [Route("SearchGrouped")]
         public async Task<ActionResult<ProductCategoryLiteDto[]>> SearchGrouped(ProductSearchVm vm)
         {
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
             vm.q = vm.q?.Trim().ToLower();
             var doSearch = !string.IsNullOrEmpty(vm.q);
             var categoryIds = vm.ProductCategoryId.HasValue
@@ -622,7 +591,7 @@ namespace App.ApiControllers.V1.Customer
                                     (x.ProductCategory.Title.ToLower().Contains(vm.q) ||
                                      (x.ProductCategory.Parent != null &&
                                       x.ProductCategory.Parent.Title.ToLower().Contains(vm.q)))))
-                            .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active) && x.Active);
+                            .Where(x => x.DeletionDate == null && (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)) && x.Active);
 
             if (vm.OnlyOffers)
             {
@@ -713,11 +682,9 @@ namespace App.ApiControllers.V1.Customer
 
         private async Task<int[]> GetActiveCategoryTreeIds(int rootId)
         {
-            var categories = await _categoryService.Queryable()
-                .AsNoTracking()
-                .Where(x => x.DeletionDate == null && x.Active)
-                .Select(x => new { x.Id, x.ParentId })
-                .ToArrayAsync();
+            var visibleIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
+            var categories = await _categoryService.Queryable().AsNoTracking()
+                .Where(x => visibleIds.Contains(x.Id)).Select(x => new { x.Id, x.ParentId }).ToArrayAsync();
 
             if (!categories.Any(x => x.Id == rootId))
                 return Array.Empty<int>();
@@ -749,7 +716,8 @@ namespace App.ApiControllers.V1.Customer
         [Route("Popular")]
         public async Task<ActionResult<PopularProductDto[]>> GetPopular([FromQuery] int take = 15)
         {
-            if (take <= 0 || take > 50) take = 15;
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
+            if (take <= 0 || take > 100) take = 15;
 
             PopularSectionConfig popularConfig = null;
             if (_genericSetting != null)
@@ -768,10 +736,12 @@ namespace App.ApiControllers.V1.Customer
             {
                 return Array.Empty<PopularProductDto>();
             }
+            take = Math.Min(take, Math.Clamp(popularConfig?.MaxItems > 0 ? popularConfig.MaxItems : 15, 1, 100));
 
             string mode = popularConfig?.Mode ?? "Hybrid";
+            var excludedProductIds = popularConfig?.Items?.Where(x => x != null && !x.Active && x.ProductId > 0).Select(x => x.ProductId).ToList() ?? new List<int>();
             var activeConfigItems = popularConfig?.Items?
-                .Where(x => x.Active && x.ProductId > 0)
+                .Where(x => x != null && x.Active && x.ProductId > 0)
                 .OrderBy(x => x.Order)
                 .ToList() ?? new List<PopularProductItemConfig>();
 
@@ -790,10 +760,12 @@ namespace App.ApiControllers.V1.Customer
                 .AsNoTracking()
                 .Include(x => x.MerchantProducts)
                 .Include(x => x.ProductCategory)
-                .Where(x => x.DeletionDate == null && x.Active && (x.ProductCategory == null || x.ProductCategory.Active));
+                .Where(x => x.DeletionDate == null && x.Active && (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)) &&
+                            !excludedProductIds.Contains(x.Id) &&
+                            x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0));
 
             var productsQuery = baseProductsQuery
-                .Where(x => x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId)));
+                .Where(x => x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0));
 
             var candidateProducts = new System.Collections.Generic.List<Product>();
 
@@ -975,12 +947,7 @@ namespace App.ApiControllers.V1.Customer
                 var customItem = activeConfigItems.FirstOrDefault(x => x.ProductId == p.Id);
                 var itemTitle = (!string.IsNullOrWhiteSpace(customItem?.CustomTitle)) ? customItem.CustomTitle : p.Title;
 
-                string eta = "15-25 دقيقة";
-                if (!string.IsNullOrEmpty(merchant?.ShortDescription) && merchant.ShortDescription.Contains("•"))
-                {
-                    var parts = merchant.ShortDescription.Split('•');
-                    if (parts.Length > 1) eta = parts[1].Trim();
-                }
+                string eta = merchant?.DeliveryTime ?? "";
 
                 result.Add(new PopularProductDto
                 {
@@ -999,7 +966,7 @@ namespace App.ApiControllers.V1.Customer
                     MerchantKind = (int)(merchant?.MerchantKind ?? MerchantKind.Restaurant),
                     MaxOrderQuantity = maxOrderQuantity,
                     Eta = eta,
-                    Distance = "1.8 كم",
+                    Distance = "",
                     OrdersCount = 1
                 });
 
@@ -1035,7 +1002,8 @@ namespace App.ApiControllers.V1.Customer
             {
                 enabled = config?.Enabled ?? true,
                 sectionTitle = config?.SectionTitle ?? "الأكثر طلباً",
-                sectionTitleEn = config?.SectionTitleEn ?? "Most Popular"
+                sectionTitleEn = config?.SectionTitleEn ?? "Most Popular",
+                maxItems = Math.Clamp(config?.MaxItems > 0 ? config.MaxItems : 15, 1, 100)
             });
         }
 
@@ -1085,6 +1053,7 @@ namespace App.ApiControllers.V1.Customer
             [FromQuery] int? merchantId = null,
             [FromQuery] int take = 10)
         {
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
             if (take <= 0 || take > 50) take = 10;
 
             MarketBestSellingSectionConfig config = null;
@@ -1111,8 +1080,9 @@ namespace App.ApiControllers.V1.Customer
             take = Math.Min(take, Math.Clamp(configuredMaxItems, 1, 50));
 
             string mode = config?.Mode ?? "Hybrid";
+            var excludedProductIds = config?.Items?.Where(x => x != null && !x.Active && x.ProductId > 0).Select(x => x.ProductId).ToList() ?? new List<int>();
             var activeConfigItems = config?.Items?
-                .Where(x => x.Active && x.ProductId > 0)
+                .Where(x => x != null && x.Active && x.ProductId > 0)
                 .OrderBy(x => x.Order)
                 .ToList() ?? new List<MarketBestSellingItemConfig>();
 
@@ -1129,7 +1099,8 @@ namespace App.ApiControllers.V1.Customer
                 .AsNoTracking()
                 .Include(x => x.MerchantProducts)
                 .Include(x => x.ProductCategory)
-                .Where(x => x.DeletionDate == null && x.Active && (x.ProductCategory == null || x.ProductCategory.Active));
+                .Where(x => x.DeletionDate == null && x.Active && (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)) &&
+                            !excludedProductIds.Contains(x.Id) && x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0));
 
             var productsQuery = baseProductsQuery
                 .Where(x => x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0));
@@ -1295,11 +1266,11 @@ namespace App.ApiControllers.V1.Customer
                     Price = priceQuote?.Price ?? mp?.MerchantPrice ?? 0m,
                     FinalPrice = priceQuote?.FinalPrice ?? mp?.MerchantPrice ?? 0m,
                     MerchantId = mid,
-                    MerchantTitle = m?.Title ?? "سوبر ماركت جيتك",
+                    MerchantTitle = m?.Title ?? "المتجر",
                     MerchantLogo = m?.Photo ?? "",
                     MerchantKind = (int)(m?.MerchantKind ?? MerchantKind.Grocery),
-                    Eta = m?.DeliveryTime ?? "10 - 20 دقيقة",
-                    Distance = "1.5 كم",
+                    Eta = m?.DeliveryTime ?? "",
+                    Distance = "",
                     OrdersCount = 0,
                     CustomBadge = itemConfig?.CustomBadge
                 });

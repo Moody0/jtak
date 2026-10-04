@@ -175,6 +175,7 @@ namespace App.ApiControllers.V1.Admin.Catalog
             if (item.Order > 0)
                 existing.Order = item.Order;
             existing.Active = item.Active;
+            existing.ProductCategoryId = item.ProductCategoryId;
 
             config = NormalizeConfig(config);
             await _genericSetting.SetValue(SettingKey, config, null);

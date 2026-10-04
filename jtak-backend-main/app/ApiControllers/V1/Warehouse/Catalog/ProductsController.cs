@@ -65,6 +65,9 @@ namespace App.ApiControllers.V1.Warehouse
             {
                 request.PageNumber -= 1;
             }
+            var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
+            var mids = await _merchantService.GetMerchantIds(uid.Value);
             var list = await _service.ListMetronicTableQueryable(request, x => new ProductDto
             {
                 Id = x.Id,
@@ -73,7 +76,7 @@ namespace App.ApiControllers.V1.Warehouse
                 ProductCategory = x.ProductCategory.Title,
                 Photos = x.Photos,
                 ProductCategoryId = x.ProductCategoryId
-            }, x => true, x => x.ProductCategoryId);
+            }, x => x.DeletionDate == null && x.MerchantProducts.Any(mp => mids.Contains(mp.MerchantId)), x => x.ProductCategoryId);
 
             return list;
         }
@@ -86,7 +89,17 @@ namespace App.ApiControllers.V1.Warehouse
         [Route("Prices")]
         public async Task<ActionResult<int>> SetPrices(int mid, [FromBody] MerchantProductPriceDto[] products)
         {
-            var mids = await _merchantService.GetMerchantIds(User.GetUserId().Value);
+            var uid = User.GetUserId();
+            if (!uid.HasValue) return Unauthorized();
+            var mids = await _merchantService.GetMerchantIds(uid.Value);
+            if (mids.Length == 0) return Forbid();
+            if (products == null || products.Any(x => x == null || x.MerchantPrice < 0 ||
+                x.MaxOrderQuantity < 1 || x.MaxOrderQuantity > 999) || products.GroupBy(x => x.ProductId).Any(x => x.Count() > 1))
+                return BadRequest("بيانات الأسعار غير صالحة.");
+            var ids = products.Select(x => x.ProductId).ToArray();
+            var ownedCount = await _service.Queryable().CountAsync(x => ids.Contains(x.Id) && x.DeletionDate == null &&
+                x.MerchantProducts.Any(mp => mids.Contains(mp.MerchantId)));
+            if (ownedCount != ids.Length) return Forbid();
             var result = await _merchantService.SetMerchantProductPrices(mids, products);
             foreach (var m in mids)
             {
@@ -112,7 +125,7 @@ namespace App.ApiControllers.V1.Warehouse
                 .Include(x => x.MerchantProducts)
                 .Include(x => x.ProductCategory)
                 .ThenInclude(x => x.Parent)
-                .Where(x => x.DeletionDate == null && (x.ProductCategory == null || x.ProductCategory.Active))
+                .Where(x => x.DeletionDate == null && x.MerchantProducts.Any(mp => mids.Contains(mp.MerchantId)))
                 .OrderBy(x => x.ProductCategory != null ? x.ProductCategory.Order : 999)
                 .Select(x => new MerchantProductDto
                 {
@@ -138,10 +151,19 @@ namespace App.ApiControllers.V1.Warehouse
             foreach (var mid in mids)
             {
                 var mps = await _merchantService.GetAllMerchantPrices(mid);
-                foreach (var product in products)
+                foreach (var metadata in products)
                 {
-                    if (mps.ContainsKey(product.ProductId))
+                    if (mps.ContainsKey(metadata.ProductId))
                     {
+                        var product = new MerchantProductDto {
+                            ProductId = metadata.ProductId, Product = metadata.Product, ProductBarcode = metadata.ProductBarcode,
+                            ProductBrand = metadata.ProductBrand, ProductCat1 = metadata.ProductCat1, ProductCat2 = metadata.ProductCat2,
+                            ProductPhotos = metadata.ProductPhotos, ProductDescription = metadata.ProductDescription,
+                            ProductUnit = metadata.ProductUnit, ProductCategoryId = metadata.ProductCategoryId,
+                            ProductActive = metadata.ProductActive, ProductIsFeatured = metadata.ProductIsFeatured,
+                            CategoryParentId = metadata.CategoryParentId, CategoryActive = metadata.CategoryActive,
+                            CategoryIcon = metadata.CategoryIcon
+                        };
                         var mp = mps[product.ProductId];
                         product.ProfitOutOfMerchantPricePercent = mp.ProfitOutOfMerchantPricePercent;
                         product.MerchantPrice = mp.MerchantPrice;
@@ -200,6 +222,9 @@ namespace App.ApiControllers.V1.Warehouse
             if (!uid.HasValue) return Unauthorized();
             var mids = await _merchantService.GetMerchantIds(uid.Value);
             if (mids == null || mids.Length == 0) return Forbid();
+            if (dto.Price <= 0) return BadRequest("سعر الصنف يجب أن يكون أكبر من صفر.");
+            if (dto.ProductCategoryId.HasValue && !await _categoryService.Queryable().AnyAsync(x => x.Id == dto.ProductCategoryId && x.DeletionDate == null && x.Active))
+                return BadRequest("التصنيف المحدد غير موجود أو غير مفعّل.");
             if (dto.MaxOrderQuantity.HasValue && (dto.MaxOrderQuantity.Value < 1 || dto.MaxOrderQuantity.Value > 999))
                 return BadRequest("يجب أن يكون الحد الأقصى للطلب بين 1 و999.");
             var maxOrderQuantity = await AreRestaurantMerchants(mids) ? dto.MaxOrderQuantity : null;
@@ -233,6 +258,7 @@ namespace App.ApiControllers.V1.Warehouse
                 _cache.Remove($"AllMerchantPrices_{mid}");
             }
 
+            InvalidateProduct(product.Id, mids);
             return Ok(product.Id);
         }
 
@@ -251,18 +277,28 @@ namespace App.ApiControllers.V1.Warehouse
             if (!uid.HasValue) return Unauthorized();
             var mids = await _merchantService.GetMerchantIds(uid.Value);
             if (mids == null || mids.Length == 0) return Forbid();
+            if (dto.Price <= 0) return BadRequest("سعر الصنف يجب أن يكون أكبر من صفر.");
+            if (dto.ProductCategoryId.HasValue && !await _categoryService.Queryable().AnyAsync(x => x.Id == dto.ProductCategoryId && x.DeletionDate == null))
+                return BadRequest("التصنيف المحدد غير موجود.");
             if (dto.MaxOrderQuantity.HasValue && (dto.MaxOrderQuantity.Value < 1 || dto.MaxOrderQuantity.Value > 999))
                 return BadRequest("يجب أن يكون الحد الأقصى للطلب بين 1 و999.");
             var maxOrderQuantity = await AreRestaurantMerchants(mids) ? dto.MaxOrderQuantity : null;
 
-            var product = await _service.FindAsync(id);
+            var product = await FindOwnedProduct(id, mids);
             if (product == null) return NotFound();
+
+            if (product.MerchantProducts.Any(mp => !mids.Contains(mp.MerchantId)) &&
+                ((product.Title ?? "").Trim() != dto.Title.Trim() || (product.Description ?? "").Trim() != (dto.Description ?? "").Trim() ||
+                (dto.Photos != null && (product.Photos ?? "") != NormalizePhotos(dto.Photos)) ||
+                (!string.IsNullOrEmpty(dto.Unit) && product.Unit != dto.Unit.Trim()) ||
+                (dto.ProductCategoryId.HasValue && product.ProductCategoryId != dto.ProductCategoryId) || product.Active != dto.Active))
+                return BadRequest("هذا المنتج مشترك بين متاجر. يمكنك تعديل سعرك؛ لتغيير بياناته اطلب من الإدارة نسخة مستقلة لمتجرك.");
 
             product.Title = dto.Title.Trim();
             product.Description = dto.Description?.Trim();
-            if (!string.IsNullOrEmpty(dto.Photos))
+            if (dto.Photos != null)
             {
-                product.Photos = string.Join(",", dto.Photos.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                product.Photos = NormalizePhotos(dto.Photos);
             }
             if (!string.IsNullOrEmpty(dto.Unit))
             {
@@ -295,6 +331,7 @@ namespace App.ApiControllers.V1.Warehouse
                 _cache.Remove($"AllMerchantPrices_{mid}");
             }
 
+            InvalidateProduct(id, mids);
             return Ok(true);
         }
 
@@ -311,9 +348,11 @@ namespace App.ApiControllers.V1.Warehouse
             var mids = await _merchantService.GetMerchantIds(uid.Value);
             if (mids == null || mids.Length == 0) return Forbid();
 
-            var product = await _service.FindAsync(id);
+            var product = await FindOwnedProduct(id, mids);
             if (product == null) return NotFound();
 
+            if (product.MerchantProducts.Any(mp => !mids.Contains(mp.MerchantId)))
+                return BadRequest("هذا المنتج مشترك بين متاجر. اطلب من الإدارة نسخة مستقلة قبل تغيير توافره.");
             if (dto != null && dto.Active.HasValue)
             {
                 product.Active = dto.Active.Value;
@@ -331,6 +370,7 @@ namespace App.ApiControllers.V1.Warehouse
                 _cache.Remove($"AllMerchantPrices_{mid}");
             }
 
+            InvalidateProduct(id, mids);
             return Ok(product.Active);
         }
 
@@ -347,9 +387,24 @@ namespace App.ApiControllers.V1.Warehouse
             var mids = await _merchantService.GetMerchantIds(uid.Value);
             if (mids == null || mids.Length == 0) return Forbid();
 
-            var product = await _service.FindAsync(id);
+            var product = await FindOwnedProduct(id, mids);
             if (product == null) return NotFound();
 
+            if (product.MerchantProducts.Any(mp => !mids.Contains(mp.MerchantId)))
+            {
+                foreach (var mid in mids)
+                {
+                    var remaining = await _service.Queryable().Where(x => x.Id != id && x.DeletionDate == null)
+                        .SelectMany(x => x.MerchantProducts.Where(mp => mp.MerchantId == mid))
+                        .Select(mp => new MerchantProductAssignDto { ProductId = mp.ProductId, MerchantPrice = mp.MerchantPrice,
+                            PriceUsd = mp.PriceUsd, OriginalPrice = mp.OriginalPrice, Discount = mp.Discount,
+                            DiscountPercent = mp.DiscountPercent, MaxOrderQuantity = mp.MaxOrderQuantity }).ToArrayAsync();
+                    await _merchantService.AssignMerchantProducts(new[] { mid }, remaining);
+                }
+                InvalidateProduct(id, mids);
+                InvalidateProduct(id, mids);
+            return Ok(true);
+            }
             product.DeletionDate = DateTime.UtcNow;
             product.Active = false;
             await _unitOfWork.SaveChangesAsync();
@@ -360,6 +415,7 @@ namespace App.ApiControllers.V1.Warehouse
                 _cache.Remove($"AllMerchantPrices_{mid}");
             }
 
+            InvalidateProduct(id, mids);
             return Ok(true);
         }
 
@@ -380,19 +436,35 @@ namespace App.ApiControllers.V1.Warehouse
         [HttpGet]
         [Route("{id}")]
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
-        [AllowAnonymous]
-        public async Task<ActionResult<ProductDto>> Get(int id)
+        public async Task<ActionResult<MerchantProductDto>> Get(int id)
         {
-            var item = await _service.FindAsync(id);
-            var user = await _userManager.GetUserAsync(User);
-            var isAdmin = user != null ? await _userManager.IsInRoleAsync(user, AppRoleName.Admin.ToString()) : false;
-            if (item == null || (!isAdmin && (!item.Active || (item.ProductCategory != null && !item.ProductCategory.Active))))
-                return NotFound();
+            var result = await Get();
+            if (result.Result is not OkObjectResult ok) return result.Result;
+            var product = ((MerchantProductDto[])ok.Value).FirstOrDefault(x => x.ProductId == id);
+            if (product == null) return NotFound();
+            return product;
+        }
 
-            var model = _mapper.Map<ProductDto>(item);
-            model.Tags = item.Tags.Select(x => _mapper.Map<TagDto>(x.Tag)).ToArray();
-            model.ProductCategory = item.ProductCategory?.Title;
-            return model;
+        private Task<Product> FindOwnedProduct(int id, int[] mids) => _service.Queryable()
+            .Include(x => x.MerchantProducts).FirstOrDefaultAsync(x => x.Id == id && x.DeletionDate == null &&
+                x.MerchantProducts.Any(mp => mids.Contains(mp.MerchantId)));
+
+        private static string NormalizePhotos(string photos) => string.Join(",", photos.Split(",",
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+        private void InvalidateProduct(int id, int[] mids)
+        {
+            _cache.Remove($"Product-{id}");
+            _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove("ProductCategories");
+            _cache.Remove("ProductCategoriesTree");
+            _cache.Remove("PopularProductsCache");
+            foreach (var mid in mids)
+            {
+                _cache.Remove($"ActiveMerchantPrices_{mid}");
+                _cache.Remove($"AllMerchantPrices_{mid}");
+                _cache.Remove($"MerchantProduct_{mid}_{id}");
+            }
         }
     }
 

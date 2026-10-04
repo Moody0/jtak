@@ -38,9 +38,20 @@ namespace App.ApiControllers.V1.Admin
         }
 
         [HttpPost("DataTable")]
-        public async Task<ActionResult<TableResponseModel<OrderReviewAdminDto>>> DataTable([FromBody] MetronicTable request)
+        public async Task<ActionResult<TableResponseModel<OrderReviewAdminDto>>> DataTable([FromBody] MetronicTable request, [FromQuery] string ratingFilter = "all")
         {
             var query = _orders.Context.MerchantReviews.AsNoTracking();
+            query = ratingFilter switch
+            {
+                "all" => query,
+                "5" => query.Where(x => x.Rate == 5),
+                "4" => query.Where(x => x.Rate == 4),
+                "3" => query.Where(x => x.Rate == 3),
+                "critical" => query.Where(x => x.Rate >= 1 && x.Rate <= 2),
+                "with_text" => query.Where(x => x.TextReview != null && x.TextReview.Trim() != ""),
+                _ => null
+            };
+            if (query == null) return BadRequest(ApiErr.Create("فلتر التقييم غير صالح."));
             var search = request?.Search?.Trim();
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -50,6 +61,7 @@ namespace App.ApiControllers.V1.Admin
                     .ToArrayAsync();
                 var matchingReviewerIds = await _users.Context.Users.AsNoTracking()
                     .Where(user =>
+                        (user.FullName != null && user.FullName.Contains(search)) ||
                         (user.FirstName != null && user.FirstName.Contains(search)) ||
                         (user.LastName != null && user.LastName.Contains(search)))
                     .Select(user => user.Id)
@@ -66,6 +78,15 @@ namespace App.ApiControllers.V1.Admin
             }
 
             var totalRecords = await query.CountAsync();
+            var fiveStarCount = await query.CountAsync(x => x.Rate == 5);
+            var summary = new {
+                Total = totalRecords,
+                AverageRating = totalRecords == 0 ? 0 : Math.Round(await query.AverageAsync(x => (double)x.Rate), 1),
+                FiveStarCount = fiveStarCount,
+                FiveStarPct = totalRecords == 0 ? 0 : (int)Math.Round(100d * fiveStarCount / totalRecords),
+                CriticalCount = await query.CountAsync(x => x.Rate >= 1 && x.Rate <= 2),
+                WithTextCount = await query.CountAsync(x => x.TextReview != null && x.TextReview.Trim() != "")
+            };
             var sortAscending = string.Equals(request?.SortOrder, "ASC", StringComparison.OrdinalIgnoreCase);
             query = request?.SortField?.Trim()?.ToLowerInvariant() switch
             {
@@ -76,8 +97,9 @@ namespace App.ApiControllers.V1.Admin
                 _ => query.OrderByDescending(review => review.CreatedDate).ThenByDescending(review => review.Id)
             };
 
-            // The dashboard paginator sends zero-based page numbers.
-            var pageNumber = Math.Max(request?.PageNumber ?? 0, 0);
+            query = ((IOrderedQueryable<MerchantReview>)query).ThenByDescending(x => x.Id);
+            // TableService converts the widget's zero-based index to a one-based API page.
+            var pageNumber = Math.Max(request?.PageNumber ?? 1, 1) - 1;
             var pageSize = Math.Clamp(request?.PageSize ?? 10, 1, 100);
             var reviews = await query.Skip(pageNumber * pageSize).Take(pageSize).ToArrayAsync();
             var merchantIds = reviews.Select(review => review.MerchantId).Distinct().ToArray();
@@ -89,17 +111,18 @@ namespace App.ApiControllers.V1.Admin
                 .ToDictionaryAsync(merchant => merchant.Id, merchant => merchant.Title);
             var reviewers = await _users.Context.Users.AsNoTracking()
                 .Where(user => reviewerIds.Contains(user.Id))
-                .Select(user => new { user.Id, user.FirstName, user.LastName })
+                .Select(user => new { user.Id, user.FullName, user.FirstName, user.LastName })
                 .ToDictionaryAsync(user => user.Id,
-                    user => string.Join(" ", new[] { user.FirstName, user.LastName }.Where(name => !string.IsNullOrWhiteSpace(name))));
+                    user => !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : string.Join(" ", new[] { user.FirstName, user.LastName }.Where(name => !string.IsNullOrWhiteSpace(name))));
 
-            return Ok(new TableResponseModel<OrderReviewAdminDto>
+            return Ok(new
             {
                 Items = reviews.Select(review => new OrderReviewAdminDto
                 {
                     Id = review.Id,
                     OrderId = review.OrderId,
                     MerchantId = review.MerchantId,
+                    ReviewerId = review.ReviewerId,
                     MerchantTitle = merchants.TryGetValue(review.MerchantId, out var title) ? title : $"#{review.MerchantId}",
                     ReviewerName = reviewers.TryGetValue(review.ReviewerId, out var reviewer) ? reviewer : string.Empty,
                     CreatedDate = review.CreatedDate,
@@ -107,7 +130,8 @@ namespace App.ApiControllers.V1.Admin
                     TextReview = review.TextReview
                 }).ToArray(),
                 TotalRecords = totalRecords,
-                TotalRecordsFiltered = totalRecords
+                TotalRecordsFiltered = totalRecords,
+                Summary = summary
             });
         }
     }
@@ -119,6 +143,7 @@ namespace App.ApiControllers.V1.Admin
         public int MerchantId { get; set; }
         public string MerchantTitle { get; set; }
         public string ReviewerName { get; set; }
+        public Guid ReviewerId { get; set; }
         public DateTime CreatedDate { get; set; }
         public int Rate { get; set; }
         public string TextReview { get; set; }

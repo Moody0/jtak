@@ -36,26 +36,30 @@ namespace Modules.Catalog.Services
         Task<int> AssignMerchantProducts(int[] mid, MerchantProductAssignDto[] mps);
         Task<int> SetMerchantProductPrices(int[] mid, MerchantProductPriceDto[] mps);
         Task<int> RepriceUsdDenominatedProducts(decimal usdRate);
+        void InvalidateRepricedUsdCache();
         Task<(decimal Lat, decimal Lng)[]> GetMerchantLocations(int[] mids);
         Task<decimal> GetUsdRate();
     }
     public class MerchantService : SolService<Merchant, MerchantDto>, IMerchantService
     {
         private readonly IMemoryCache _cache;
+        private (int MerchantId, int ProductId)[] _repricedUsdCacheKeys = Array.Empty<(int, int)>();
         private readonly ITrackableRepository<MerchantProduct, CatalogDbContext> _merchantProductRepo;
         private readonly ICatalogUnitOfWork _uow;
         private readonly IGenericSettingService _genericSetting;
         private readonly HomsCoverageService _coverage;
+        private readonly ITrackableRepository<ProductCategory, CatalogDbContext> _categories;
         public MerchantService(ITrackableRepository<Merchant, CatalogDbContext> r,
             ITrackableRepository<MerchantProduct, CatalogDbContext> merchantProductRepo,
             ICatalogUnitOfWork uow,
             IGenericSettingService genericSetting,
-            IMemoryCache cache, HomsCoverageService coverage = null) : base(r)
+            IMemoryCache cache, HomsCoverageService coverage = null, ITrackableRepository<ProductCategory, CatalogDbContext> categories = null) : base(r)
         {
             _merchantProductRepo = merchantProductRepo;
             _uow = uow;
             _genericSetting = genericSetting;
             _cache = cache;
+            _categories = categories;
             _coverage = coverage ?? new HomsCoverageService(genericSetting);
         }
 
@@ -156,7 +160,7 @@ namespace Modules.Catalog.Services
                     var list = await _merchantProductRepo.Queryable()
                                                          .AsNoTracking()
                                                          .Include(x => x.Merchant)
-                                                         .Where(x => x.MerchantId == mid && x.Merchant.Active)
+                                                         .Where(x => x.MerchantId == mid && x.Merchant.Active && x.Merchant.DeletionDate == null && x.MerchantPrice > 0 && x.Product.Active && x.Product.DeletionDate == null)
                                                          .Select(x => new MerchantProductDto { MerchantKind = (int)x.Merchant.MerchantKind, ProductId = x.ProductId, Product = x.Product.Title, ProductBarcode = x.Product.Barcode, ProductBrand = x.Product.Brand, ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent, MerchantPrice = x.MerchantPrice, OriginalPrice = x.OriginalPrice, PriceUsd = x.PriceUsd, Discount = x.Discount, DiscountPercent = x.DiscountPercent, MaxOrderQuantity = x.MaxOrderQuantity })
                                                          .ToListAsync();
                     foreach (var item in list)
@@ -189,10 +193,12 @@ namespace Modules.Catalog.Services
                 async () =>
                 {
                     var usdRate = await GetUsdRate();
+                    var visibleIds = _categories == null ? null : await _cache.GetValue("VisibleProductCategoryIds", null, async () => await CatalogCategoryVisibility.GetIdsAsync(_categories.Queryable()));
                     var list = await _merchantProductRepo.Queryable()
                                                          .AsNoTracking()
                                                          .Include(x => x.Merchant)
-                                                         .Where(x => x.ProductId == pid && x.Merchant.Active && x.MerchantPrice > 0)
+                                                         .Where(x => x.ProductId == pid && x.Merchant.Active && x.Merchant.DeletionDate == null && x.MerchantPrice > 0 &&
+                                                             x.Product.Active && x.Product.DeletionDate == null && (visibleIds == null || !x.Product.ProductCategoryId.HasValue || visibleIds.Contains(x.Product.ProductCategoryId.Value)))
                                                          .Select(x => new MerchantProductDto
                                                          {
                                                              MerchantId = x.MerchantId,
@@ -218,10 +224,11 @@ namespace Modules.Catalog.Services
                 async () =>
                 {
                     var usdRate = await GetUsdRate();
+                    var visibleIds = _categories == null ? null : await _cache.GetValue("VisibleProductCategoryIds", null, async () => await CatalogCategoryVisibility.GetIdsAsync(_categories.Queryable()));
                     var item = await _merchantProductRepo.Queryable()
                                                          .AsNoTracking()
                                                          .Include(x => x.Merchant)
-                                                         .Where(x => x.MerchantId == mid && x.ProductId == pid && x.Merchant.Active)
+                                                         .Where(x => x.MerchantId == mid && x.ProductId == pid && x.Merchant.Active && x.Merchant.DeletionDate == null && x.MerchantPrice > 0 && x.Product.Active && x.Product.DeletionDate == null && (visibleIds == null || !x.Product.ProductCategoryId.HasValue || visibleIds.Contains(x.Product.ProductCategoryId.Value)))
                                                          .Select(x => new MerchantProductDto
                                                          {
                                                              MerchantId = x.MerchantId,
@@ -246,7 +253,7 @@ namespace Modules.Catalog.Services
                 if (mps.Count > 0)
                     return mps.First().Value;
             }
-            return mps?.FirstOrDefault(x => mids.Contains(x.Key)).Value;
+            return mids == null ? mps.Values.FirstOrDefault() : mps.FirstOrDefault(x => mids.Contains(x.Key)).Value;
         }
 
         public async Task<int> AssignMerchantProducts(int[] mids, MerchantProductAssignDto[] products)
@@ -289,8 +296,8 @@ namespace Modules.Catalog.Services
                         ProfitOutOfMerchantPricePercent = profitOutOfMerchantPricePercent,
                         AdditionalProfitPercent = 0m
                     });
-                    _cache.Remove($"ProductPrices_{item.ProductId}");
-                    _cache.Remove($"MerchantProduct_{mid}_{item.ProductId}");
+                    _cache.InvalidateValue($"ProductPrices_{item.ProductId}");
+                    _cache.InvalidateValue($"MerchantProduct_{mid}_{item.ProductId}");
                 }
                 foreach (var item in toBeUpdated)
                 {
@@ -306,18 +313,18 @@ namespace Modules.Catalog.Services
                     mp.DiscountPercent = item?.DiscountPercent ?? mp.DiscountPercent;
                     mp.OriginalPrice = item?.OriginalPrice;
                     mp.MaxOrderQuantity = item?.MaxOrderQuantity;
-                    _cache.Remove($"ProductPrices_{item.ProductId}");
-                    _cache.Remove($"MerchantProduct_{mid}_{item.ProductId}");
+                    _cache.InvalidateValue($"ProductPrices_{item.ProductId}");
+                    _cache.InvalidateValue($"MerchantProduct_{mid}_{item.ProductId}");
                 }
                 foreach (var item in toBeRemoved)
                 {
                     await _merchantProductRepo.DeleteAsync(new object[] { mid, item.ProductId });
-                    _cache.Remove($"ProductPrices_{item.ProductId}");
-                    _cache.Remove($"MerchantProduct_{mid}_{item.ProductId}");
+                    _cache.InvalidateValue($"ProductPrices_{item.ProductId}");
+                    _cache.InvalidateValue($"MerchantProduct_{mid}_{item.ProductId}");
                 }
                 await _uow.SaveChangesAsync();
-                _cache.Remove($"ActiveMerchantPrices_{mid}");
-                _cache.Remove($"AllMerchantPrices_{mid}");
+                _cache.InvalidateValue($"ActiveMerchantPrices_{mid}");
+                _cache.InvalidateValue($"AllMerchantPrices_{mid}");
 
                 //await SetMerchantPercent(mid, merchant.ProfitOutOfMerchantPricePercent);
             }
@@ -354,6 +361,18 @@ namespace Modules.Catalog.Services
         /// from its USD base and the given rate. Products priced directly in the
         /// local currency carry no USD base and are deliberately left alone.
         /// </summary>
+        // Repeat invalidation after commit so readers during repricing cannot retain old prices.
+        public void InvalidateRepricedUsdCache()
+        {
+            foreach (var key in _repricedUsdCacheKeys)
+            {
+                _cache.InvalidateValue($"ProductPrices_{key.ProductId}");
+                _cache.InvalidateValue($"MerchantProduct_{key.MerchantId}_{key.ProductId}");
+                _cache.InvalidateValue($"ActiveMerchantPrices_{key.MerchantId}");
+                _cache.InvalidateValue($"AllMerchantPrices_{key.MerchantId}");
+            }
+        }
+
         public async Task<int> RepriceUsdDenominatedProducts(decimal usdRate)
         {
             if (usdRate <= 0)
@@ -363,6 +382,7 @@ namespace Modules.Catalog.Services
                                                         .Where(x => x.PriceUsd != null)
                                                         .ToArrayAsync();
 
+            _repricedUsdCacheKeys = usdProducts.Select(p => (p.MerchantId, p.ProductId)).ToArray();
             var repriced = 0;
             foreach (var mp in usdProducts)
             {
@@ -371,8 +391,8 @@ namespace Modules.Catalog.Services
                     continue;
 
                 mp.MerchantPrice = price;
-                _cache.Remove($"ProductPrices_{mp.ProductId}");
-                _cache.Remove($"MerchantProduct_{mp.MerchantId}_{mp.ProductId}");
+                _cache.InvalidateValue($"ProductPrices_{mp.ProductId}");
+                _cache.InvalidateValue($"MerchantProduct_{mp.MerchantId}_{mp.ProductId}");
                 repriced++;
             }
 
@@ -383,8 +403,8 @@ namespace Modules.Catalog.Services
 
             foreach (var mid in usdProducts.Select(x => x.MerchantId).Distinct())
             {
-                _cache.Remove($"ActiveMerchantPrices_{mid}");
-                _cache.Remove($"AllMerchantPrices_{mid}");
+                _cache.InvalidateValue($"ActiveMerchantPrices_{mid}");
+                _cache.InvalidateValue($"AllMerchantPrices_{mid}");
             }
             return repriced;
         }
@@ -403,12 +423,12 @@ namespace Modules.Catalog.Services
             {
                 item.ProfitOutOfMerchantPricePercent = percent;
                 item.AdditionalProfitPercent = 0m;
-                _cache.Remove($"ProductPrices_{item.ProductId}");
-                _cache.Remove($"MerchantProduct_{mid}_{item.ProductId}");
+                _cache.InvalidateValue($"ProductPrices_{item.ProductId}");
+                _cache.InvalidateValue($"MerchantProduct_{mid}_{item.ProductId}");
             }
             await _uow.SaveChangesAsync();
-            _cache.Remove($"ActiveMerchantPrices_{mid}");
-            _cache.Remove($"AllMerchantPrices_{mid}");
+            _cache.InvalidateValue($"ActiveMerchantPrices_{mid}");
+            _cache.InvalidateValue($"AllMerchantPrices_{mid}");
             return true;
         }
 
@@ -435,8 +455,8 @@ namespace Modules.Catalog.Services
                         {
                             existing.MerchantPrice = np.MerchantPrice;
                             ApplyUsdPricing(existing, null, usdRate);
-                            _cache.Remove($"ProductPrices_{np.ProductId}");
-                            _cache.Remove($"MerchantProduct_{mid}_{np.ProductId}");
+                            _cache.InvalidateValue($"ProductPrices_{np.ProductId}");
+                            _cache.InvalidateValue($"MerchantProduct_{mid}_{np.ProductId}");
                         }
                         existing.ProfitOutOfMerchantPricePercent = commissionRate;
                         existing.AdditionalProfitPercent = 0m;
@@ -453,15 +473,15 @@ namespace Modules.Catalog.Services
                             AdditionalProfitPercent = 0m,
                             MaxOrderQuantity = np.MaxOrderQuantity
                         });
-                        _cache.Remove($"ProductPrices_{np.ProductId}");
-                        _cache.Remove($"MerchantProduct_{mid}_{np.ProductId}");
+                        _cache.InvalidateValue($"ProductPrices_{np.ProductId}");
+                        _cache.InvalidateValue($"MerchantProduct_{mid}_{np.ProductId}");
                     }
-                    _cache.Remove($"ProductPrices_{np.ProductId}");
-                    _cache.Remove($"MerchantProduct_{mid}_{np.ProductId}");
+                    _cache.InvalidateValue($"ProductPrices_{np.ProductId}");
+                    _cache.InvalidateValue($"MerchantProduct_{mid}_{np.ProductId}");
                 }
 
-                _cache.Remove($"ActiveMerchantPrices_{mid}");
-                _cache.Remove($"AllMerchantPrices_{mid}");
+                _cache.InvalidateValue($"ActiveMerchantPrices_{mid}");
+                _cache.InvalidateValue($"AllMerchantPrices_{mid}");
             }
 
             await _uow.SaveChangesAsync();
@@ -501,7 +521,7 @@ namespace Modules.Catalog.Services
             await Queryable().Where(x => x.Id == id).Select(x => x.OwnerId).FirstOrDefaultAsync();
 
         public async Task<int[]> GetMerchantIds(Guid id) =>
-            await Queryable().Where(x => x.OwnerId == id).Select(x => x.Id).ToArrayAsync();
+            await Queryable().Where(x => x.OwnerId == id && x.DeletionDate == null).Select(x => x.Id).ToArrayAsync();
 
         public async Task<(decimal Lat, decimal Lng)[]> GetMerchantLocations(int[] mids) =>
             (await Queryable().Where(x => mids.Contains(x.Id))

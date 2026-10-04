@@ -77,14 +77,15 @@ namespace App.ApiControllers.V1.Admin
         [HttpPost]
         [Route("DataTable")]
         public async Task<ActionResult<TableResponseModel<ProductDto>>> DataTable(
-            [FromBody] MetronicTable request, [FromQuery] int? categoryId = null)
+            [FromBody] MetronicTable request, [FromQuery] int? categoryId = null, [FromQuery] bool? active = null)
         {
             if (request != null && request.PageNumber > 0)
             {
                 request.PageNumber -= 1;
             }
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_productCategoryService.Queryable());
             var lang = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
-            Expression<Func<Product, bool>> productFilter = x => x.DeletionDate == null;
+            Expression<Func<Product, bool>> productFilter = x => x.DeletionDate == null && (!active.HasValue || x.Active == active.Value);
             if (categoryId.HasValue)
             {
                 if (categoryId.Value <= 0)
@@ -110,12 +111,13 @@ namespace App.ApiControllers.V1.Admin
                 }
 
                 var categoryIds = selectedIds.ToList();
-                productFilter = x => x.DeletionDate == null &&
+                productFilter = x => x.DeletionDate == null && (!active.HasValue || x.Active == active.Value) &&
                     x.ProductCategoryId.HasValue && categoryIds.Contains(x.ProductCategoryId.Value);
             }
             var list = await _service.ListMetronicTableQueryable(request, x => new ProductDto
             {
                 Id = x.Id,
+                IsPublishedToCustomer = x.Active && (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)) && x.MerchantProducts.Any(mp => mp.Merchant != null && mp.Merchant.Active && mp.Merchant.DeletionDate == null && mp.MerchantPrice > 0),
                 Title = x.Title,
                 TitleEn = x.TitleEn,
                 Barcode = x.Barcode,
@@ -131,56 +133,65 @@ namespace App.ApiControllers.V1.Admin
                 ProductCategory = x.ProductCategory != null ? x.ProductCategory.Title : string.Empty,
                 Active = x.Active,
                 MerchantId = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => (int?)mp.MerchantId)
                     .FirstOrDefault(),
                 Merchant = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty)
                     .FirstOrDefault(),
                 MerchantTitle = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.Merchant != null ? mp.Merchant.Title : string.Empty)
                     .FirstOrDefault(),
                 Price = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.MerchantPrice)
                     .FirstOrDefault(),
                 PriceUsd = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.PriceUsd)
                     .FirstOrDefault(),
                 OriginalPrice = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.OriginalPrice)
                     .FirstOrDefault(),
                 Discount = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.Discount)
                     .FirstOrDefault(),
                 DiscountPercent = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.DiscountPercent)
                     .FirstOrDefault(),
                 ProfitOutOfMerchantPricePercent = x.MerchantProducts
-                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null && mp.Merchant.Active)
-                    .OrderBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
+                    .Where(mp => mp.Merchant != null && mp.Merchant.DeletionDate == null)
+                    .OrderBy(mp => mp.Merchant.Active ? 0 : 1)
+                    .ThenBy(mp => mp.Merchant.MerchantKind == MerchantKind.Restaurant ? 0 : 1)
                     .ThenBy(mp => mp.MerchantId)
                     .Select(mp => mp.ProfitOutOfMerchantPricePercent)
                     .FirstOrDefault(),
@@ -197,6 +208,8 @@ namespace App.ApiControllers.V1.Admin
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         public async Task<ActionResult<BulkImportDesc>> BulkImport(ProductsBulkImport item)
         {
+            if (item == null || !System.Text.RegularExpressions.Regex.IsMatch(item.File ?? "", @"^\d{4}_\d{1,2}_\d{1,2}_[a-fA-F0-9]{32}\.xlsx$"))
+                return BadRequest(ApiErr.Create("اختر ملف Excel صالحاً تم رفعه إلى النظام."));
             var marketMerchantId = await _merchantService.GetJtakMarketMerchantId();
             if (!marketMerchantId.HasValue)
             {
@@ -204,14 +217,21 @@ namespace App.ApiControllers.V1.Admin
             }
 
             var file = _env.ContentRootPath + FileHelper.GetVirtualPath(item.File).Replace("/", "\\").Replace("~", "");
+            if (!System.IO.File.Exists(file)) return BadRequest(ApiErr.Create("ملف الاستيراد غير موجود. أعد رفعه أولاً."));
             BulkImportDesc result = new();
             var importedProducts = new System.Collections.Generic.List<Product>();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-            using (var package = new ExcelPackage(new FileInfo(file)))
+            ExcelPackage workbook;
+            try { workbook = new ExcelPackage(new FileInfo(file)); }
+            catch (Exception ex) {
+                _logger.LogWarning(ex, "Could not open uploaded catalog workbook");
+                return BadRequest(ApiErr.Create("تعذر قراءة ملف Excel. تأكد من سلامة الملف وأعد رفعه."));
+            }
+            using (var package = workbook)
             {
-                if (!package.Workbook.Worksheets.Any())
+                if (package.Workbook.Worksheets.Count < 3 || package.Workbook.Worksheets.Take(3).Any(x => x.Dimension == null))
                 {
-                    return BadRequest("Invalid file");
+                    return BadRequest(ApiErr.Create("يجب أن يحتوي الملف على ثلاث أوراق غير فارغة: المنتجات، التصنيفات الفرعية، التصنيفات الرئيسية."));
                 }
 
                 var cat1Sheet = package.Workbook.Worksheets[2];
@@ -222,11 +242,14 @@ namespace App.ApiControllers.V1.Admin
                 var allCats = await _productCategoryService.Queryable().ToArrayAsync();
                 for (int row = cat1Sheet.Dimension.Start.Row; row <= cat1Sheet.Dimension.End.Row; row++)
                 {
-                    var cat = new ProductCategory { Title = cat1Sheet.Cells[row, 0].Text, Active = true };
+                    var title = cat1Sheet.Cells[row, 1].Text?.Trim();
+                    if (string.IsNullOrWhiteSpace(title) || IsImportHeader(title)) continue;
+                    var cat = new ProductCategory { Title = title, Active = true };
                     if (!allCats.Any(x => x.Title == cat.Title))
                     {
                         result.ImportedCat1++;
                         _productCategoryService.Insert(cat);
+                        allCats = allCats.Append(cat).ToArray();
                     }
                 }
                 await _uow.SaveChangesAsync();
@@ -235,17 +258,20 @@ namespace App.ApiControllers.V1.Admin
                 // Import Cat2
                 for (int row = cat2Sheet.Dimension.Start.Row; row <= cat2Sheet.Dimension.End.Row; row++)
                 {
-                    var parentTitle = cat2Sheet.Cells[row, 1].Text;
+                    var parentTitle = cat2Sheet.Cells[row, 2].Text?.Trim();
                     var parentCatId = allCats.FirstOrDefault(x => x.Title == parentTitle)?.Id;
 
                     if (!parentCatId.HasValue)
                         continue;
 
-                    var cat = new ProductCategory { Title = cat2Sheet.Cells[row, 0].Text, Active = true, ParentId = parentCatId.Value };
-                    if (!allCats.Any(x => x.Title == cat.Title))
+                    var title = cat2Sheet.Cells[row, 1].Text?.Trim();
+                    if (string.IsNullOrWhiteSpace(title) || IsImportHeader(title)) continue;
+                    var cat = new ProductCategory { Title = title, Active = true, ParentId = parentCatId.Value };
+                    if (!allCats.Any(x => x.Title == cat.Title && x.ParentId == parentCatId.Value))
                     {
                         result.ImportedCat2++;
                         _productCategoryService.Insert(cat);
+                        allCats = allCats.Append(cat).ToArray();
                     }
                 }
                 await _uow.SaveChangesAsync();
@@ -258,13 +284,13 @@ namespace App.ApiControllers.V1.Admin
                     StringComparer.OrdinalIgnoreCase);
                 for (int row = productsSheet.Dimension.Start.Row; row <= productsSheet.Dimension.End.Row; row++)
                 {
-                    var catTitle = productsSheet.Cells[row, 1].Text;
+                    var catTitle = productsSheet.Cells[row, 2].Text?.Trim();
                     var catId = allCats.FirstOrDefault(x => x.Title == catTitle)?.Id;
 
                     if (!catId.HasValue)
                         continue;
 
-                    var title = productsSheet.Cells[row, 0].Text?.Trim();
+                    var title = productsSheet.Cells[row, 1].Text?.Trim();
                     if (string.IsNullOrWhiteSpace(title))
                         continue;
 
@@ -301,8 +327,14 @@ namespace App.ApiControllers.V1.Admin
                 }
             }
             // TODO: Import images from zip?
+            _cache.Remove("ProductCategoriesTree");
+            _cache.Remove("ProductCategories");
+            _cache.Remove("VisibleProductCategoryIds");
             return result;
         }
+
+        private static bool IsImportHeader(string title) =>
+            new[] { "title", "category", "name", "اسم التصنيف", "التصنيف", "اسم المنتج" }.Contains(title.ToLowerInvariant());
 
         /// <summary>
         /// Create a new Product
@@ -317,6 +349,10 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create("اسم المنتج مطلوب."));
             }
 
+            if (item.PriceUsd < 0 || item.OriginalPrice < 0)
+                return BadRequest(ApiErr.Create("السعر بالدولار غير صالح."));
+            if (item.ProductCategoryId.HasValue && !await _productCategoryService.Queryable().AnyAsync(x => x.Id == item.ProductCategoryId && x.DeletionDate == null))
+                return BadRequest(ApiErr.Create("التصنيف المحدد غير موجود."));
             if (!item.ProductCategoryId.HasValue || item.ProductCategoryId.Value <= 0)
             {
                 return BadRequest(ApiErr.Create("يرجى اختيار تصنيف صالح للمنتج."));
@@ -421,6 +457,7 @@ namespace App.ApiControllers.V1.Admin
             }
 
             _cache.Remove($"ProductPrices_{entity.Id}");
+            _cache.Remove($"Product-{entity.Id}");
             _cache.Remove("ProductCategoriesTree");
             _cache.Remove("ProductCategories");
 
@@ -473,6 +510,10 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(ApiErr.Create("اسم المنتج مطلوب."));
             }
 
+            if (item.PriceUsd < 0 || item.OriginalPrice < 0)
+                return BadRequest(ApiErr.Create("السعر بالدولار غير صالح."));
+            if (item.ProductCategoryId.HasValue && !await _productCategoryService.Queryable().AnyAsync(x => x.Id == item.ProductCategoryId && x.DeletionDate == null))
+                return BadRequest(ApiErr.Create("التصنيف المحدد غير موجود."));
             if (!item.ProductCategoryId.HasValue || item.ProductCategoryId.Value <= 0)
             {
                 return BadRequest(ApiErr.Create("يرجى اختيار تصنيف صالح للمنتج."));
@@ -584,14 +625,7 @@ namespace App.ApiControllers.V1.Admin
                     targetMp.DiscountPercent = item.DiscountPercent ?? targetMp.DiscountPercent;
                     _merchantProductRepo.Update(targetMp);
 
-                    // Clean up any extraneous merchant links if product is uniquely assigned
-                    foreach (var otherMp in existingMps.Where(mp => mp.MerchantId != requestedMerchantId.Value))
-                    {
-                        _merchantProductRepo.Delete(otherMp);
-                        _cache.Remove($"ActiveMerchantPrices_{otherMp.MerchantId}");
-                        _cache.Remove($"AllMerchantPrices_{otherMp.MerchantId}");
-                        _cache.Remove($"MerchantProduct_{otherMp.MerchantId}_{entity.Id}");
-                    }
+
                 }
                 else
                 {
@@ -628,6 +662,7 @@ namespace App.ApiControllers.V1.Admin
             }
 
             _cache.Remove($"ProductPrices_{entity.Id}");
+            _cache.Remove($"Product-{entity.Id}");
             _cache.Remove("ProductCategoriesTree");
             _cache.Remove("ProductCategories");
 
@@ -682,6 +717,7 @@ namespace App.ApiControllers.V1.Admin
                 _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
             }
             _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
             _cache.Remove("ProductCategoriesTree");
 
             await _service.DeleteAsync(id);
@@ -726,6 +762,7 @@ namespace App.ApiControllers.V1.Admin
                     _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
                 }
                 _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
 
                 await _service.DeleteAsync(id);
             }
@@ -762,7 +799,8 @@ namespace App.ApiControllers.V1.Admin
             var restaurantAssignment = item.MerchantProducts?
                 .FirstOrDefault(x => x.Merchant?.MerchantKind == MerchantKind.Restaurant);
             var marketMerchantId = await _merchantService.GetJtakMarketMerchantId();
-            var targetMerchantId = restaurantAssignment?.MerchantId ?? marketMerchantId;
+            var sourceOffer = restaurantAssignment ?? item.MerchantProducts?.OrderBy(x => x.MerchantId == marketMerchantId ? 0 : 1).FirstOrDefault();
+            var targetMerchantId = sourceOffer?.MerchantId ?? marketMerchantId;
             if (!targetMerchantId.HasValue)
             {
                 return BadRequest(ApiErr.Create("تعذر تحديد متجر جيتك ماركت لربط النسخة الجديدة."));
@@ -770,7 +808,9 @@ namespace App.ApiControllers.V1.Admin
 
             var entity = new Product
             {
-                Title = item.Title,
+                Title = item.Title, TitleEn = item.TitleEn, Barcode = item.Barcode, Brand = item.Brand,
+                Unit = item.Unit, Currency = item.Currency, Active = item.Active, IsFeatured = item.IsFeatured,
+                DescriptionEn = item.DescriptionEn,
                 Description = item.Description,
                 Photos = item.Photos,
                 ProductCategoryId = item.ProductCategoryId,
@@ -783,10 +823,11 @@ namespace App.ApiControllers.V1.Admin
             {
                 MerchantId = targetMerchantId.Value,
                 ProductId = entity.Id,
-                MerchantPrice = restaurantAssignment?.MerchantPrice ?? 0m,
-                PriceUsd = restaurantAssignment?.PriceUsd,
-                Discount = restaurantAssignment?.Discount ?? 0m,
-                DiscountPercent = restaurantAssignment?.DiscountPercent,
+                MerchantPrice = sourceOffer?.MerchantPrice ?? 0m,
+                PriceUsd = sourceOffer?.PriceUsd,
+                Discount = sourceOffer?.Discount ?? 0m,
+                DiscountPercent = sourceOffer?.DiscountPercent,
+                OriginalPrice = sourceOffer?.OriginalPrice, MaxOrderQuantity = sourceOffer?.MaxOrderQuantity,
                 ProfitOutOfMerchantPricePercent = targetMerchant?.ProfitOutOfMerchantPricePercent ?? 0m,
                 AdditionalProfitPercent = 0m
             });
@@ -795,6 +836,7 @@ namespace App.ApiControllers.V1.Admin
             _cache.Remove($"AllMerchantPrices_{targetMerchantId.Value}");
             _cache.Remove($"MerchantProduct_{targetMerchantId.Value}_{entity.Id}");
             _cache.Remove($"ProductPrices_{entity.Id}");
+            _cache.Remove($"Product-{entity.Id}");
 
             await _tagService.SetTags(entity.Id, item.Tags?.Select(x => x.TagId).ToArray() ?? Array.Empty<int>());
             _logger.LogInformation("Duplicate New {0}", entity.GetType().Name);
@@ -805,7 +847,7 @@ namespace App.ApiControllers.V1.Admin
         private async Task<string> ValidateProductMerchant(int merchantId, int? marketMerchantId)
         {
             var merchant = await _merchantService.FindAsync(merchantId);
-            if (merchant == null || merchant.DeletionDate != null || !merchant.Active)
+            if (merchant == null || merchant.DeletionDate != null)
             {
                 return "المتجر المحدد غير موجود أو غير مفعّل.";
             }
@@ -815,7 +857,7 @@ namespace App.ApiControllers.V1.Admin
                 return null;
             }
 
-            return "المنتجات غير المطعمية يجب ربطها بمتجر جيتك ماركت، وليس بمتجر آخر.";
+            return null;
         }
 
 
@@ -841,6 +883,7 @@ namespace App.ApiControllers.V1.Admin
                 _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
             }
             _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
             _cache.Remove($"Product-{id}");
             _cache.Remove("ProductCategoriesTree");
             _cache.Remove("ProductCategories");
@@ -883,6 +926,7 @@ namespace App.ApiControllers.V1.Admin
                 _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
             }
             _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
             _cache.Remove($"Product-{id}");
             _cache.Remove("ProductCategoriesTree");
             _cache.Remove("ProductCategories");
@@ -927,6 +971,7 @@ namespace App.ApiControllers.V1.Admin
                 _cache.Remove($"MerchantProduct_{mp.MerchantId}_{id}");
             }
             _cache.Remove($"ProductPrices_{id}");
+            _cache.Remove($"Product-{id}");
             _cache.Remove($"Product-{id}");
             _cache.Remove("ProductCategoriesTree");
             _cache.Remove("ProductCategories");

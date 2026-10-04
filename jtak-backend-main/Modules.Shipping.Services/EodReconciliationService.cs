@@ -333,7 +333,7 @@ namespace Modules.Accounting.Services
             var batch = new DailySettlementBatch
             {
                 Id = Guid.NewGuid(),
-                BatchCode = $"BATCH-{DateTime.UtcNow:yyyyMMddHHmmss}-{request.CaptainUserId.ToString().Substring(0, 4).ToUpperInvariant()}",
+                BatchCode = $"BATCH-{DateTime.UtcNow:yyyyMMddHHmmss}-{request.CaptainUserId.ToString().Substring(0, 4).ToUpperInvariant()}-{Guid.NewGuid():N}",
                 CaptainUserId = request.CaptainUserId,
                 BatchDate = DateTime.UtcNow,
                 TotalCashCollected = floatBal,

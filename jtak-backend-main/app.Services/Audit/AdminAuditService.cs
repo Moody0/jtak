@@ -62,14 +62,8 @@ namespace App.Shared.Services
 
             if (string.IsNullOrWhiteSpace(ipAddress) && httpContext != null)
             {
-                if (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor) && !string.IsNullOrWhiteSpace(forwardedFor))
-                {
-                    ipAddress = forwardedFor.ToString().Split(',').FirstOrDefault()?.Trim();
-                }
-                else
-                {
-                    ipAddress = httpContext.Connection?.RemoteIpAddress?.ToString();
-                }
+                // Trusted proxy middleware already resolves the remote IP. Raw headers are spoofable.
+                ipAddress = httpContext.Connection?.RemoteIpAddress?.ToString();
             }
 
             if (string.IsNullOrWhiteSpace(userAgent) && httpContext != null)
@@ -125,13 +119,15 @@ namespace App.Shared.Services
                 if (!string.IsNullOrWhiteSpace(filter.Action))
                 {
                     var act = filter.Action.Trim();
-                    query = query.Where(x => x.Action == act);
+                    query = act == "Update" ? query.Where(x => x.Action == "Edit" || x.Action.StartsWith("Update")) :
+                        act == "DisableUser" ? query.Where(x => x.Action == "DisableUser" || x.Action == "Disable") :
+                        act == "EnableUser" ? query.Where(x => x.Action == "EnableUser" || x.Action == "Enable") : query.Where(x => x.Action == act);
                 }
 
                 if (!string.IsNullOrWhiteSpace(filter.Result))
                 {
                     var res = filter.Result.Trim();
-                    query = query.Where(x => x.Result == res);
+                    query = res == "Failed" ? query.Where(x => x.Result != "Success") : query.Where(x => x.Result == res);
                 }
 
                 if (filter.AdminUserId.HasValue && filter.AdminUserId.Value != Guid.Empty)
@@ -180,10 +176,12 @@ namespace App.Shared.Services
                 _ => query.OrderByDescending(x => x.CreatedDate)
             };
 
-            var pageNumber = Math.Max(request?.PageNumber ?? 1, 1);
-            var pageSize = Math.Max(request?.PageSize ?? 10, 1);
+            query = ((IOrderedQueryable<AdminAuditLog>)query).ThenBy(x => x.Id);
 
-            var items = await query.Skip((pageNumber - 1) * pageSize)
+            var pageNumber = Math.Max(request?.PageNumber ?? 1, 1);
+            var pageSize = Math.Clamp(request?.PageSize ?? 10, 1, 1000);
+
+            var items = await query.Skip((int)Math.Min(totalRecords, ((long)pageNumber - 1) * pageSize))
                                    .Take(pageSize)
                                    .Select(x => new AdminAuditLogDto
                                    {
@@ -249,8 +247,8 @@ namespace App.Shared.Services
                 ThisWeekOperations = thisWeek,
                 SuccessCount = successCount,
                 FailureCount = failureCount,
-                TopModule = topModuleGroup ?? "Orders",
-                TopAdmin = topAdminGroup ?? "Admin"
+                TopModule = topModuleGroup ?? "",
+                TopAdmin = topAdminGroup ?? ""
             };
         }
 

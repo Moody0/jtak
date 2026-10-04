@@ -54,7 +54,9 @@ namespace App.ApiControllers.V1.Customer
             var setting = _genericSetting != null
                 ? await _genericSetting.GetValue<SystemContactSettings>(SystemContactSettings.Key)
                 : null;
-            return Ok(setting ?? new SystemContactSettings());
+            setting ??= new SystemContactSettings();
+            setting.Normalize();
+            return Ok(setting);
         }
 
         [HttpPost]

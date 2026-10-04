@@ -31,6 +31,7 @@ namespace App.Shared.Services
                 async () => await Repository.Queryable()
                                             .Where(x => x.Active && (x.BannerLocation == location || x.BannerLocation == BannerLocation.All))
                                             .OrderBy(x => x.Order)
+                                            .ThenBy(x => x.Id)
                                             .Select(x => new BannerLiteDto
                                             {
                                                 Id = x.Id,
@@ -48,6 +49,7 @@ namespace App.Shared.Services
                 async () => await Repository.Queryable()
                                             .Where(x => x.Active)
                                             .OrderBy(x => x.Order)
+                                            .ThenBy(x => x.Id)
                                             .Select(x => new BannerLiteDto
                                             {
                                                 Id = x.Id,

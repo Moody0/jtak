@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
 using App.Shared.Entities;
@@ -58,6 +60,16 @@ namespace App.Helpers
                         errorDescription = DisabledMessage
                     }));
                     return;
+                }
+                var tokenRoles=principal.Claims.Where(c=>c.Type==ClaimTypes.Role || c.Type==OpenIddict.Abstractions.OpenIddictConstants.Claims.Role).Select(c=>c.Value).Distinct().ToArray();
+                if(tokenRoles.Length>0) {
+                    var roles=await userManager.GetRolesAsync(user);
+                    if(roles!=null && tokenRoles.Any(role=>!roles.Contains(role,StringComparer.OrdinalIgnoreCase))) {
+                        context.Response.StatusCode=StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType="application/json; charset=utf-8";
+                        await context.Response.WriteAsync(JsonSerializer.Serialize(new {error="ACCOUNT_ROLE_CHANGED",errorDescription="تغيّرت صلاحيات حسابك. حدّث تسجيل الدخول."}));
+                        return;
+                    }
                 }
             }
 

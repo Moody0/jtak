@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Validation.AspNetCore;
 using System.Globalization;
+using System;
+using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 
 namespace App.ApiControllers.V1.Admin
@@ -16,18 +18,19 @@ namespace App.ApiControllers.V1.Admin
     {
         private readonly IGenericSettingService _service;
 
-        public PagesController(IGenericSettingService service)
+        private readonly IAdminAuditService _audit;
+        private readonly ILogger<PagesController> _logger;
+
+        public PagesController(IGenericSettingService service, IAdminAuditService audit = null, ILogger<PagesController> logger = null)
         {
             _service = service;
+            _audit = audit;
+            _logger = logger;
         }
 
         [HttpPut]
         [Route("About")]
-        public async Task<ActionResult<PageVm>> About(PageVm vm)
-        {
-            await _service.SetValue("About", vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
-            return vm;
-        }
+        public async Task<ActionResult<PageVm>> About([FromBody] PageVm vm) => await SavePage("About", vm);
 
         [HttpPut]
         [Route("PrivacyPolicy")]
@@ -46,8 +49,7 @@ namespace App.ApiControllers.V1.Admin
             if (!TryGetTermsSettingKey(app, out var settingKey))
                 return BadRequest(new { message = "Unknown app. Use customer, delivery, or warehouse." });
 
-            await _service.SetValue(settingKey, vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
-            return vm;
+            return await SavePage(settingKey, vm);
         }
 
 
@@ -97,16 +99,22 @@ namespace App.ApiControllers.V1.Admin
 
             var language = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
             var page = await PageSettingsReader.GetPage(_service, settingKey, language);
-            if (string.IsNullOrWhiteSpace(page.Body) && settingKey != "TermsAndConditions")
-                page = await PageSettingsReader.GetPage(_service, "TermsAndConditions", language);
+            // Show only the content actually stored for this app; copying is explicit.
             return page;
         }
 
         private async Task<ActionResult<PageVm>> SavePage(string key, PageVm vm)
         {
-            if (vm == null) return BadRequest("Page content is required");
+            if (vm == null || string.IsNullOrWhiteSpace(System.Net.WebUtility.HtmlDecode(
+                System.Text.RegularExpressions.Regex.Replace(vm.Body ?? "", "<[^>]*>", ""))) || (vm.Body?.Length ?? 0) > 200000 || (vm.Title?.Length ?? 0) > 200)
+                return BadRequest(new { message = "أدخل محتوى نصياً للصفحة، حتى 200 ألف حرف، وعنواناً حتى 200 حرف." });
+            var before = await PageSettingsReader.GetPage(_service, key, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
             vm.Title = string.IsNullOrWhiteSpace(vm.Title) ? key : vm.Title;
             await _service.SetValue(key, vm, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+            if (_audit != null)
+                try { await _audit.LogAsync(new AdminAuditLogEntry { Module = "Pages", Action = "Update", EntityType = "Page", EntityId = key,
+                    Description = "تحديث محتوى صفحة التطبيق", Result = "Success", BeforeState = before, AfterState = vm }); }
+                catch (Exception ex) { _logger?.LogError(ex, "Page saved but audit logging failed for {Page}.", key); }
             return vm;
         }
 

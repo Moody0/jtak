@@ -51,9 +51,10 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<HomeCategoriesAdminVm>> Get()
         {
             var config = await _service.GetConfig();
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
 
             var categories = await _categoryService.Queryable().AsNoTracking()
-                                                   .Where(x => x.DeletionDate == null && x.Active)
+                                                   .Where(x => visibleCategoryIds.Contains(x.Id))
                                                    .OrderBy(x => x.ParentId == null ? 0 : 1)
                                                    .ThenBy(x => x.Title)
                                                    .Select(x => new HomeCategoryTargetDto
@@ -77,6 +78,8 @@ namespace App.ApiControllers.V1.Admin
                                                       MerchantKind = x.MerchantKind
                                                   })
                                                   .ToArrayAsync();
+            var jtakMarketId = await _merchantService.GetJtakMarketMerchantId();
+            foreach (var merchant in merchants) merchant.IsJtakMarket = merchant.Id == jtakMarketId;
 
             // Match HomeCategoriesService: query offers directly so Pomelo does
             // not translate a correlated Product.SelectMany into CROSS APPLY.
@@ -84,7 +87,7 @@ namespace App.ApiControllers.V1.Admin
                 .Where(mp => mp.Product.DeletionDate == null &&
                              mp.Product.Active &&
                              mp.Product.ProductCategoryId.HasValue &&
-                             mp.Product.ProductCategory.Active &&
+                             visibleCategoryIds.Contains(mp.Product.ProductCategoryId.Value) &&
                              mp.MerchantPrice > 0 &&
                              mp.Merchant.DeletionDate == null &&
                              mp.Merchant.Active)
@@ -161,6 +164,9 @@ namespace App.ApiControllers.V1.Admin
         {
             if (config == null)
                 return BadRequest("لا توجد إعدادات للحفظ");
+            if (config.MaxItems < 0) return BadRequest("عدد الفئات لا يمكن أن يكون سالباً");
+            var ids = (config.Tiles ?? new List<HomeCategoryTile>()).Where(t => t != null && !string.IsNullOrWhiteSpace(t.Id)).Select(t => t.Id).ToArray();
+            if (ids.Distinct().Count() != ids.Length) return BadRequest("لا يمكن تكرار معرف الفئة");
 
             foreach (var tile in config.Tiles ?? new List<HomeCategoryTile>())
             {
@@ -185,6 +191,10 @@ namespace App.ApiControllers.V1.Admin
         /// </summary>
         private static string Validate(HomeCategoryTile tile)
         {
+            if (tile == null) return "بيانات الفئة غير مكتملة";
+            if (!Enum.IsDefined(typeof(HomeCategoryLinkType), tile.LinkType)) return "نوع وجهة غير معروف";
+            if (tile.MerchantKind.HasValue && !Enum.IsDefined(typeof(MerchantKind), tile.MerchantKind.Value)) return "نوع متجر غير معروف";
+            if (tile.ProductCategoryId <= 0 || tile.SecondaryProductCategoryId <= 0 || tile.MerchantId <= 0 || tile.RestaurantCategoryId <= 0) return "اختر وجهة صحيحة للفئة";
             if (string.IsNullOrWhiteSpace(tile.Title))
                 return "كل فئة يجب أن تحتوي على اسم";
 
@@ -276,6 +286,7 @@ namespace App.ApiControllers.V1.Admin
 
     public class HomeCategoryMerchantDto
     {
+        public bool IsJtakMarket { get; set; }
         public int Id { get; set; }
         public string Title { get; set; }
         public string Photo { get; set; }

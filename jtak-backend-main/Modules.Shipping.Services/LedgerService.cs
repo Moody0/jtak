@@ -141,6 +141,8 @@ namespace Modules.Accounting.Services
             // 3. Entry Sanity Checks
             foreach (var entry in request.Entries)
             {
+                if (entry.Debit != decimal.Round(entry.Debit, 2) || entry.Credit != decimal.Round(entry.Credit, 2))
+                    throw new InvalidOperationException("Ledger amounts must have at most two decimal places.");
                 if (entry.Debit < 0 || entry.Credit < 0)
                 {
                     throw new InvalidOperationException("Negative debit or credit values are strictly prohibited in ledger entries.");
@@ -637,7 +639,7 @@ namespace Modules.Accounting.Services
             var existing = await _context.JournalTransactions
                 .Include(t => t.Entries)
                 .ThenInclude(e => e.Account)
-                .FirstOrDefaultAsync(t => t.IdempotencyKey == idempotencyKey);
+                .FirstOrDefaultAsync(t => t.IdempotencyKey == idempotencyKey || (t.ReferenceType == "CaptainToMerchantPayment" && t.ReferenceId == referenceId.Trim()));
             if (existing != null) return MapToDto(existing);
 
             var captainFloat = await GetOrCreateUserAccountAsync(

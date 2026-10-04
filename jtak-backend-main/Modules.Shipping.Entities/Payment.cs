@@ -17,6 +17,8 @@ namespace Modules.Accounting.Entities
     }
     public class PaymentDto
     {
+        public string RequestKey { get; set; }
+        public int MerchantId { get; set; }
         public int Id { get; set; }
         public string ReferenceNumber { get; set; }
         public string PaymentType { get; set; }

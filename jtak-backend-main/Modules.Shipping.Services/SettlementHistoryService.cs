@@ -31,6 +31,8 @@ namespace Modules.Accounting.Services
             _logger = logger;
         }
 
+        public Task<List<SettlementHistoryItemDto>> GetCompletedItemsAsync() => LoadCompletedSettlementsAsync();
+
         public async Task<SettlementHistoryDataTableResultDto> GetDataTableAsync(SettlementHistoryDataTableRequest request)
         {
             request ??= new SettlementHistoryDataTableRequest();
@@ -83,8 +85,8 @@ namespace Modules.Accounting.Services
             var filtered = FilterItems(allItems, request.PartyFilter, request.FromDate, request.ToDate, request.SearchTerm);
             var ordered = OrderItems(filtered, request.SortColumn, request.SortDirection);
 
-            // Limit print dataset to safe max (1000) to prevent browser freeze
-            return ordered.Take(1000).ToList();
+            // Printed totals must cover the complete filtered statement.
+            return ordered.ToList();
         }
 
         public async Task<SettlementReceiptDto> GetReceiptAsync(string id)
@@ -539,12 +541,13 @@ namespace Modules.Accounting.Services
             return new SettlementHistorySummaryDto
             {
                 TotalCompletedCount = items.Count,
-                TotalCompletedAmount = items.Sum(x => x.Amount),
+                TotalCompletedAmount = items.Where(x=>x.Currency=="SYP").Sum(x => x.Amount),
                 MerchantCompletedCount = merchants.Count,
-                MerchantCompletedAmount = merchants.Sum(x => x.Amount),
+                MerchantCompletedAmount = merchants.Where(x=>x.Currency=="SYP").Sum(x => x.Amount),
                 DriverCompletedCount = drivers.Count,
-                DriverCompletedAmount = drivers.Sum(x => x.Amount),
-                Currency = "SYP"
+                DriverCompletedAmount = drivers.Where(x=>x.Currency=="SYP").Sum(x => x.Amount),
+                Currency = "SYP",
+                CurrencyTotals = items.GroupBy(x=>x.Currency).Select(g=>new SettlementCurrencyTotalDto {Currency=g.Key,Amount=g.Sum(x=>x.Amount)}).ToList()
             };
         }
 

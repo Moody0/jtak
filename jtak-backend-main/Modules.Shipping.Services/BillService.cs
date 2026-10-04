@@ -17,7 +17,9 @@ namespace Modules.Accounting.Services
         Task<TableResponseModel<BillDto>> GetDataTableAsync(
             MetronicTable request,
             Dictionary<int, string> merchantTitles = null,
-            IEnumerable<int> allowedMerchantIds = null);
+            IEnumerable<int> allowedMerchantIds = null,
+            bool? addedToDues = null);
+        Task<BillFinancialSummary> GetSummaryAsync(MetronicTable request, Dictionary<int,string> merchantTitles, bool? addedToDues);
     }
 
     public class BillService : SolService<Bill, BillDto>, IBillService
@@ -26,12 +28,34 @@ namespace Modules.Accounting.Services
         {
         }
 
+        public async Task<BillFinancialSummary> GetSummaryAsync(MetronicTable request, Dictionary<int,string> merchantTitles, bool? addedToDues)
+        {
+            var query = Queryable().AsNoTracking();
+            if (addedToDues.HasValue) query = query.Where(b => b.IsAddedToDues == addedToDues.Value);
+            if (!string.IsNullOrWhiteSpace(request?.Search)) {
+                var term=request.Search.Trim(); var clean=term.TrimStart('#').Trim();
+                var numeric=int.TryParse(clean,out var id);
+                var money=decimal.TryParse(clean,NumberStyles.Any,CultureInfo.InvariantCulture,out var amount) || decimal.TryParse(clean,NumberStyles.Any,new CultureInfo("ar-SY"),out amount);
+                var matching=(merchantTitles ?? new()).Where(m=>m.Value?.Contains(term,StringComparison.OrdinalIgnoreCase)==true).Select(m=>m.Key).ToArray();
+                query=query.Where(b=>matching.Contains(b.MerchantId) || (numeric && (b.Id==id || b.OrderId==id || b.MerchantId==id)) || (money && (b.TotalAmount==amount || b.MerchantAmount==amount)));
+            }
+            var count=await query.CountAsync(); var posted=query.Where(b=>b.IsAddedToDues);
+            return new BillFinancialSummary {
+                BillsCount=count,
+                TotalBilled=await posted.SumAsync(b=>(decimal?)b.TotalAmount) ?? 0m,
+                MerchantShare=await posted.SumAsync(b=>(decimal?)b.MerchantAmount) ?? 0m,
+                PlatformRevenue=await posted.SumAsync(b=>(decimal?)(b.TotalAmount-b.MerchantAmount)) ?? 0m
+            };
+        }
+
         public async Task<TableResponseModel<BillDto>> GetDataTableAsync(
             MetronicTable request,
             Dictionary<int, string> merchantTitles = null,
-            IEnumerable<int> allowedMerchantIds = null)
+            IEnumerable<int> allowedMerchantIds = null,
+            bool? addedToDues = null)
         {
             var query = Queryable().AsNoTracking();
+            if (addedToDues.HasValue) query = query.Where(b => b.IsAddedToDues == addedToDues.Value);
 
             if (allowedMerchantIds != null)
             {
@@ -140,7 +164,7 @@ namespace Modules.Accounting.Services
 
             // Pagination
             var pageNumber = Math.Max(request?.PageNumber ?? 1, 1);
-            var pageSize = Math.Max(request?.PageSize ?? 10, 1);
+            var pageSize = Math.Clamp(request?.PageSize ?? 10, 1, 1000);
             var pagedBills = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
 
             var dtos = pagedBills.Select(x => new BillDto
@@ -168,5 +192,12 @@ namespace Modules.Accounting.Services
                 TotalRecordsFiltered = totalRecords
             };
         }
+    }
+
+    public class BillFinancialSummary {
+        public int BillsCount {get;set;}
+        public decimal TotalBilled {get;set;}
+        public decimal MerchantShare {get;set;}
+        public decimal PlatformRevenue {get;set;}
     }
 }

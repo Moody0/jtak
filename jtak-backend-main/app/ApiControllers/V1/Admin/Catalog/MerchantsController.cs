@@ -64,7 +64,7 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
-        public async Task<ActionResult<TableResponseModel<MerchantDto>>> DataTable([FromBody] MetronicTable request)
+        public async Task<ActionResult<TableResponseModel<MerchantDto>>> DataTable([FromBody] MetronicTable request, [FromQuery] MerchantKind? kind = null, [FromQuery] bool? active = null)
         {
             if (request != null && request.PageNumber > 0)
             {
@@ -96,7 +96,7 @@ namespace App.ApiControllers.V1.Admin
                 WorkingHours = x.WorkingHours,
                 Address = x.Address,
                 Photo = x.Photo
-            }, x => x.DeletionDate == null);
+            }, x => x.DeletionDate == null && (!kind.HasValue || x.MerchantKind == kind.Value) && (!active.HasValue || x.Active == active.Value));
             return list;
         }
 
@@ -215,6 +215,8 @@ namespace App.ApiControllers.V1.Admin
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         public async Task<ActionResult<int>> Create(MerchantDto item)
         {
+            var validationError = ValidateMerchant(item);
+            if (validationError != null) return BadRequest(ApiErr.Create(validationError));
             if (item == null || !await IsActiveMerchantAccountAsync(item.OwnerId))
                 return BadRequest(ApiErr.Create("اربط المتجر بحساب تاجر نشط قبل حفظه."));
             if (!Enum.IsDefined(typeof(MerchantKind), item.MerchantKind))
@@ -278,6 +280,8 @@ namespace App.ApiControllers.V1.Admin
         [Route("{id:int}")]
         public async Task<ActionResult<int>> Edit(int id, MerchantDto item)
         {
+            var validationError = ValidateMerchant(item);
+            if (validationError != null) return BadRequest(ApiErr.Create(validationError));
             if (item == null || !Enum.IsDefined(typeof(MerchantKind), item.MerchantKind))
                 return BadRequest(ApiErr.Create("اختر نوع نشاط صالحًا للمتجر."));
             var entity = await _service.FindAsync(id);
@@ -374,6 +378,16 @@ namespace App.ApiControllers.V1.Admin
             return entity.Id;
         }
 
+        private static string ValidateMerchant(MerchantDto item)
+        {
+            if (string.IsNullOrWhiteSpace(item?.Title)) return "اسم المتجر مطلوب.";
+            if (item.DeliveryFee < 0 || item.MinOrderAmount < 0 || item.ProfitOutOfMerchantPricePercent < 0)
+                return "رسوم التوصيل والحد الأدنى ونسبة جيتك لا يمكن أن تكون سالبة.";
+            if (item.Lat < -90 || item.Lat > 90 || item.Lng < -180 || item.Lng > 180)
+                return "موقع المتجر غير صالح.";
+            return null;
+        }
+
         private async Task<bool> IsActiveMerchantAccountAsync(Guid ownerId)
         {
             if (ownerId == Guid.Empty) return false;
@@ -396,6 +410,7 @@ namespace App.ApiControllers.V1.Admin
             if (targetMerchant == null || targetMerchant.DeletionDate != null)
                 return NotFound();
 
+            if (products?.Any(x => x == null) == true) return BadRequest(ApiErr.Create("بيانات المنتج غير صالحة."));
             if ((products ?? Array.Empty<MerchantProductAssignDto>()).Any(x => x.Discount < 0m))
                 return BadRequest(ApiErr.Create("قيمة الخصم لا يمكن أن تكون سالبة."));
 
@@ -406,10 +421,18 @@ namespace App.ApiControllers.V1.Admin
                 (products ?? Array.Empty<MerchantProductAssignDto>()).Any(x => x.MaxOrderQuantity.HasValue))
                 return BadRequest(ApiErr.Create("يمكن تحديد حد كمية الطلب للأصناف المطعمية فقط."));
 
+            if ((products ?? Array.Empty<MerchantProductAssignDto>()).Any(x => x == null || x.ProductId <= 0 ||
+                x.MerchantPrice < 0 || x.PriceUsd < 0 || (x.DiscountPercent.HasValue && (x.DiscountPercent < 0 || x.DiscountPercent >= 100))))
+                return BadRequest(ApiErr.Create("بيانات سعر أو خصم أحد المنتجات غير صالحة."));
+            if ((products ?? Array.Empty<MerchantProductAssignDto>()).GroupBy(x => x.ProductId).Any(x => x.Count() > 1))
+                return BadRequest(ApiErr.Create("يوجد منتج مكرر في قائمة الربط."));
+
             var selectedProductIds = (products ?? Array.Empty<MerchantProductAssignDto>())
                 .Select(x => x.ProductId)
                 .Distinct()
                 .ToArray();
+            if (await _productService.Queryable().CountAsync(x => selectedProductIds.Contains(x.Id) && x.DeletionDate == null) != selectedProductIds.Length)
+                return BadRequest(ApiErr.Create("أحد المنتجات المحددة غير موجود أو محذوف. حدّث القائمة وأعد المحاولة."));
             if (mid == marketMerchantId || targetMerchant.MerchantKind == MerchantKind.Restaurant)
             {
                 var conflictingProductIds = await _productService.Queryable().AsNoTracking()
@@ -457,6 +480,7 @@ namespace App.ApiControllers.V1.Admin
         [Route("Products/{mid}")]
         public async Task<ActionResult<MerchantProductDto[]>> GetProducts(int mid)
         {
+            if (await _service.FindAsync(mid) is not { DeletionDate: null }) return NotFound();
             var marketMerchantId = await _service.GetJtakMarketMerchantId();
             var products = await _productService.Queryable()
                                    .Include(x => x.MerchantProducts)
@@ -523,6 +547,12 @@ namespace App.ApiControllers.V1.Admin
             if (merchant != null)
             {
                 merchant.Active = false;
+            }
+            var productIds = (await _service.GetAllMerchantPrices(id)).Keys.ToArray();
+            foreach (var pid in productIds)
+            {
+                _cache.Remove($"ProductPrices_{pid}");
+                _cache.Remove($"MerchantProduct_{id}_{pid}");
             }
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();

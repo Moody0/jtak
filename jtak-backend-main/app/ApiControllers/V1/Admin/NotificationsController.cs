@@ -99,7 +99,8 @@ namespace App.ApiControllers.V1.Admin
                 TextTr = x.TextTr,
                 Image = x.Image,
                 Url = x.Url
-            }, x => x.NotificationType == NotificationType.GlobalNotification);
+            }, x => x.NotificationType == NotificationType.GlobalNotification &&
+                (x.Topic == "all" || x.Topic == "campaign_delivery" || x.Topic == "campaign_warehouse"));
             return list;
         }
 
@@ -177,7 +178,7 @@ namespace App.ApiControllers.V1.Admin
             var result = await _service.SendCampaignNotification(notification, recipients);
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Notifications",
                     Action = "Create",
@@ -201,7 +202,7 @@ namespace App.ApiControllers.V1.Admin
             var deletedCount = await _service.DeleteCampaignNotifications(requestedIds);
             if (_auditService != null && deletedCount > 0)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Notifications",
                     Action = "Delete",
@@ -213,6 +214,13 @@ namespace App.ApiControllers.V1.Admin
             }
 
             return Ok(new { deletedCount });
+        }
+
+        private async Task TryAuditAsync(AdminAuditLogEntry entry)
+        {
+            // The push or deletion has already completed; a logging failure must not invite a duplicate retry.
+            try { await _auditService.LogAsync(entry); }
+            catch (Exception ex) { System.Diagnostics.Trace.TraceError("Notification audit failed: {0}", ex); }
         }
 
         private async Task<Guid[]> ActiveRecipients(AppRoleName role)

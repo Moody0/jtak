@@ -57,6 +57,7 @@ namespace Modules.Catalog.Entities
 
     public class ProductDto
     {
+        public bool? IsPublishedToCustomer { get; set; }
         //[Display(Name = "Id", ResourceType = typeof(_Entities))]
         public int Id { get; set; }
 

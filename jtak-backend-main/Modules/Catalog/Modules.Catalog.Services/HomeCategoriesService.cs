@@ -150,8 +150,9 @@ namespace Modules.Catalog.Services
             if (!tiles.Any())
                 return Array.Empty<HomeCategoryTileDto>();
 
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
             var categories = await _categoryService.Queryable().AsNoTracking()
-                                                   .Where(x => x.DeletionDate == null && x.Active)
+                                                   .Where(x => visibleCategoryIds.Contains(x.Id))
                                                    .Select(x => new { x.Id, x.Title, x.Icon, x.ParentId })
                                                    .ToDictionaryAsync(x => x.Id);
 
@@ -168,7 +169,7 @@ namespace Modules.Catalog.Services
                 .Where(mp => mp.Product.DeletionDate == null &&
                              mp.Product.Active &&
                              mp.Product.ProductCategoryId.HasValue &&
-                             mp.Product.ProductCategory.Active &&
+                             visibleCategoryIds.Contains(mp.Product.ProductCategoryId.Value) &&
                              // MerchantPrice is the persisted customer-facing
                              // price and exists on older production schemas as
                              // well. Do not make the home-categories endpoint

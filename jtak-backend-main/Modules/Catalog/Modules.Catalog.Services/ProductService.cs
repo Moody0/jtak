@@ -22,16 +22,18 @@ namespace Modules.Catalog.Services
         ITrackableRepository<ProductTag> _productTagRepo;
         ICatalogUnitOfWork _unitOfWork;
         private readonly IMemoryCache _cache;
+        private readonly ITrackableRepository<ProductCategory, CatalogDbContext> _categories;
         public ProductService(ICatalogUnitOfWork unitOfWork,
                                 ITrackableRepository<Tag, CatalogDbContext> tagsRepo,
                                 ITrackableRepository<ProductTag, CatalogDbContext> productTagRepo,
                                 ITrackableRepository<Product, CatalogDbContext> r,
-                                IMemoryCache cache) : base(r)
+                                IMemoryCache cache, ITrackableRepository<ProductCategory, CatalogDbContext> categories = null) : base(r)
         {
             _tagsRepo = tagsRepo;
             _productTagRepo = productTagRepo;
             _unitOfWork = unitOfWork;
             _cache = cache;
+            _categories = categories;
         }
 
         public async Task<Product> FindAsync(int id) =>
@@ -45,9 +47,14 @@ namespace Modules.Catalog.Services
         public async Task<ProductLiteDto> GetProduct(int pid) =>
             await _cache.GetValue($"Product-{pid}", null, async () => await LoadProduct(pid));
 
-        private async Task<ProductLiteDto> LoadProduct(int pid) =>
-            await Repository.Queryable()
-                            .Where(x => x.Active && x.DeletionDate == null)
+        public override IQueryable<Product> OrderBy(IQueryable<Product> query, string orderColumn, System.ComponentModel.ListSortDirection dir) =>
+            base.OrderBy(query, orderColumn == "productCategory" ? "ProductCategory.Title" : orderColumn, dir);
+
+        private async Task<ProductLiteDto> LoadProduct(int pid)
+        {
+            var visibleIds = _categories == null ? null : await _cache.GetValue("VisibleProductCategoryIds", null, async () => await CatalogCategoryVisibility.GetIdsAsync(_categories.Queryable()));
+            return await Repository.Queryable()
+                            .Where(x => x.Active && x.DeletionDate == null && (visibleIds == null || !x.ProductCategoryId.HasValue || visibleIds.Contains(x.ProductCategoryId.Value)))
                             .Select(x => new ProductLiteDto
                             {
                                 Id = x.Id,
@@ -57,6 +64,7 @@ namespace Modules.Catalog.Services
                                 Photos = x.Photos
                             })
                             .FirstOrDefaultAsync(x => x.Id == pid);
+        }
 
         public override IQueryable<Product> Search(IQueryable<Product> query, string keyword)
         {

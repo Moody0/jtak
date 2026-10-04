@@ -42,6 +42,8 @@ namespace Modules.Accounting.Services
                             (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved))
                 .Select(x => x.Amount).ToListAsync();
             var active = activeAmounts.Sum();
+            var hasActiveRequest = await _context.SettlementRequests.AnyAsync(x => x.RequestedByUserId == captainUserId && x.PartyType == SettlementPartyType.Captain && x.Currency == currency &&
+                (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved));
 
             var position = await _safety.GetPositionAsync(captainUserId, currency: currency);
             var hasPendingAccounting = position.HasUnfinishedAccounting;
@@ -72,7 +74,7 @@ namespace Modules.Accounting.Services
                 NetCashDue = netCashDue,
                 IsCoveredByCustody = isCovered,
                 Currency = currency,
-                HasPendingRequest = active > 0m,
+                HasPendingRequest = hasActiveRequest,
                 HasPendingAccountingOrders = hasPendingAccounting
             };
         }
@@ -229,6 +231,8 @@ namespace Modules.Accounting.Services
         {
             var currency = "SYP";
             var balance = await GetCaptainBalanceAsync(userId, currency);
+            if (request?.Amount is decimal requestedAmount && (requestedAmount < 0m || requestedAmount != decimal.Round(requestedAmount, 2)))
+                throw new InvalidOperationException("أدخل مبلغاً غير سالب بحد أقصى منزلتين عشريتين.");
             if (balance.HasPendingAccountingOrders)
                 throw new InvalidOperationException("لا يمكن طلب تسوية مالية للمندوب لوجود طلبات مسلّمة معلقة لم تكتمل قيودها المحاسبية بعد.");
             if (balance.HasPendingRequest)
@@ -237,6 +241,8 @@ namespace Modules.Accounting.Services
                 throw new InvalidOperationException("لا توجد عهدة نقدية لتسويتها حالياً.");
 
             var isNetHandover = balance.WagesOffset > 0m && (request?.Method == "cash_to_admin_net" || (request?.Amount.HasValue == true && request.Amount.Value == balance.NetCashDue));
+            if (request?.Amount == 0m && !isNetHandover)
+                throw new InvalidOperationException("يرجى إدخال مبلغ صحيح أكبر من الصفر.");
             var amount = isNetHandover && request?.Amount.HasValue == true
                 ? request.Amount.Value
                 : (isNetHandover ? balance.NetCashDue : (request?.Amount.HasValue == true && request.Amount.Value > 0 ? request.Amount.Value : balance.AvailableAmount));
@@ -273,6 +279,8 @@ namespace Modules.Accounting.Services
             if (balance.HasPendingAccountingOrders)
                 throw new InvalidOperationException("لا يمكن طلب تسوية مالية للمتجر لوجود طلبات مسلّمة معلقة لم تكتمل قيودها المحاسبية بعد.");
             var amount = request?.Amount ?? balance.AvailableAmount;
+            if (amount != decimal.Round(amount, 2))
+                throw new InvalidOperationException("المبلغ يجب ألا يتجاوز منزلتين عشريتين.");
             if (amount <= 0m)
                 throw new InvalidOperationException("يرجى إدخال مبلغ صحيح أكبر من الصفر.");
             if (amount > balance.AvailableAmount)
@@ -368,9 +376,13 @@ namespace Modules.Accounting.Services
                     wagesAcc = await _ledger.GetOrCreateUserAccountAsync(entity.RequestedByUserId, AccountType.Liability,
                         SystemAccountCodes.CaptainEarningsPrefix, $"Earnings - {entity.RequestedByName}", entity.Currency);
                     var wagesBal = await _ledger.GetAccountBalanceAsync(wagesAcc.Id);
-                    wagesToOffset = Math.Min(currentFloat - entity.Amount, Math.Max(0m, wagesBal));
+                    var reservedWages = await _context.SettlementRequests.Where(r => r.RequestedByUserId == entity.RequestedByUserId && r.PartyType == SettlementPartyType.CaptainEarnings && r.Currency == entity.Currency &&
+                        (r.Status == SettlementRequestStatus.Pending || r.Status == SettlementRequestStatus.Approved)).SumAsync(r => (decimal?)r.Amount) ?? 0m;
+                    wagesToOffset = Math.Min(Math.Max(0m, position.SpendableCash - entity.Amount), Math.Max(0m, wagesBal - reservedWages));
                 }
                 var totalFloatToClear = entity.Amount + wagesToOffset;
+                if (totalFloatToClear <= 0m)
+                    throw new InvalidOperationException("لا يوجد مبلغ متاح لتسويته بعد المبالغ المحجوزة. حدّث الرصيد وراجع الطلب.");
 
                 var entries = new List<PostLedgerEntryRequest>();
                 if (entity.Amount > 0m)
@@ -501,6 +513,13 @@ namespace Modules.Accounting.Services
         private async Task<SettlementRequestDto> PostMerchantPayoutJournalAsync(
             SettlementRequest entity, string notes, bool isMerchantConfirmation, Guid? completedByAdminId)
         {
+            if (entity.Amount <= 0m || entity.Amount != decimal.Round(entity.Amount, 2) ||
+                entity.MerchantAllocations.Count == 0 || entity.MerchantAllocations.Any(a => a.Amount <= 0m || a.Amount != decimal.Round(a.Amount, 2)) ||
+                entity.MerchantAllocations.Sum(a => a.Amount) != entity.Amount)
+                throw new InvalidOperationException("توزيع مبلغ التسوية لا يطابق المبلغ المطلوب. راجع بيانات الطلب قبل الصرف.");
+            var merchantIds = entity.MerchantAllocations.Select(a => a.MerchantId).Distinct().ToArray();
+            if (_ordersContext != null && await _ordersContext.Orders.AnyAsync(o => o.AccountingStatus == OrderAccountingStatus.PendingAccounting && o.OrderDetails.Any(d => merchantIds.Contains(d.MerchantId))))
+                throw new InvalidOperationException("توجد طلبات مسلّمة قيد المعالجة المحاسبية لهذا المتجر. حاول بعد اكتمالها.");
             var entries = new List<PostLedgerEntryRequest>();
             foreach (var allocation in entity.MerchantAllocations)
             {
@@ -661,7 +680,7 @@ namespace Modules.Accounting.Services
             try
             {
                 var unpostedBatches = await _context.DailySettlementBatches
-                    .Where(b => b.CaptainUserId == captainUserId &&
+                    .Where(b => b.CaptainUserId == captainUserId && b.TotalCashCollected > 0 &&
                                 !_context.JournalTransactions.Any(jt => jt.Id == b.SettlementTransactionId))
                     .ToListAsync();
 
@@ -760,8 +779,8 @@ namespace Modules.Accounting.Services
                                 ByUser = "الكابتن",
                                 ToUserId = batch.HandledByAdminId != Guid.Empty ? batch.HandledByAdminId : Guid.NewGuid(),
                                 ToUser = "المسؤول المالي",
-                                Amount = batch.NetCashRemitted > 0 ? batch.NetCashRemitted : batch.TotalCashCollected,
-                                NewBalance = 0m,
+                                Amount = batch.NetCashRemitted,
+                                NewBalance = await _ledger.GetUserCashFloatBalanceAsync(batch.CaptainUserId, currency),
                                 HandoverDate = batch.BatchDate
                             });
                         }

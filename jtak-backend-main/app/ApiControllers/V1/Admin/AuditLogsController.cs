@@ -49,6 +49,8 @@ namespace App.ApiControllers.V1.Admin
             [FromQuery] DateTime? fromDate = null,
             [FromQuery] DateTime? toDate = null)
         {
+            if ((fromDate.HasValue && toDate.HasValue && fromDate.Value.Date > toDate.Value.Date) || toDate?.Year == 9999)
+                return BadRequest(ApiErr.Create("اختر فترة زمنية صحيحة، من التاريخ الأقدم إلى الأحدث."));
             var filter = new AdminAuditLogFilter
             {
                 Module = module,

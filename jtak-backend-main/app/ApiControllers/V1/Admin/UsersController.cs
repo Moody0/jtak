@@ -22,6 +22,15 @@ using App.Extensions;
 using URF.Core.Abstractions.Trackable;
 using Solf.Identity;
 using Solf.Extensions;
+using System.Data;
+using System.Text.RegularExpressions;
+using Modules.Accounting.Data;
+using Modules.Accounting.Services;
+using Modules.Accounting.Entities;
+using App.Orders.Data;
+using App.Catalog.Data;
+using Modules.Orders.Entities;
+using App.Shared.Entities.Domain;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -42,13 +51,20 @@ namespace App.ApiControllers.V1.Admin
         private readonly IWebHostEnvironment _env;
         private readonly IAdminAuditService _auditService;
         private readonly INotificationService _notificationService;
+        private readonly AccountingDbContext _accounting;
+        private readonly OrdersDbContext _orders;
+        private readonly CatalogDbContext _catalog;
+        private readonly ILedgerService _ledger;
+        private Guid? _disableNotice;
 
         public UsersController(UserManager<AppUser> userManager, IUserService service, ITagService tagService, IAppUnitOfWork uow, IMapper mapper, IWebHostEnvironment env, ILogger<UsersController> logger,
                                     RoleManager<SolRole> roleManager,
                                     ITrackableRepository<AppUser> userRepo,
                                     ITrackableRepository<SolUserRole> userRoleRepo,
                                     IAdminAuditService auditService = null,
-                                    INotificationService notificationService = null)
+                                    INotificationService notificationService = null,
+                                    AccountingDbContext accounting = null, OrdersDbContext orders = null,
+                                    CatalogDbContext catalog = null, ILedgerService ledger = null)
         {
             _env = env;
             _service = service;
@@ -62,6 +78,7 @@ namespace App.ApiControllers.V1.Admin
             _userRoleRepo = userRoleRepo;
             _auditService = auditService;
             _notificationService = notificationService;
+            _accounting = accounting; _orders = orders; _catalog = catalog; _ledger = ledger;
         }
 
         /// <summary>
@@ -71,7 +88,7 @@ namespace App.ApiControllers.V1.Admin
         [HttpPost]
         [Route("DataTable")]
         public async Task<ActionResult<TableResponseModel<UserDto>>> DataTable([FromBody] MetronicTable request,
-            [FromQuery] AppRoleName? role = null)
+            [FromQuery] AppRoleName? role = null, [FromQuery] bool? isActive = null)
         {
             // Keep the global account directory inclusive of app-facing account roles.
             // Admin accounts remain excluded from this operational list.
@@ -117,6 +134,15 @@ namespace App.ApiControllers.V1.Admin
             }
 
             // Server-side search filter
+            var adminIds=await db.Roles.Where(r=>r.Name==AppRoleName.Admin.ToString()).Select(r=>r.Id).ToListAsync();
+            var merchantIds=await db.Roles.Where(r=>r.Name==AppRoleName.Merchant.ToString()).Select(r=>r.Id).ToListAsync();
+            var deliveryIds=await db.Roles.Where(r=>r.Name==AppRoleName.Delivery.ToString()).Select(r=>r.Id).ToListAsync();
+            query=query.Where(u=>!db.UserRoles.Any(r=>r.UserId==u.Id && adminIds.Contains(r.RoleId)));
+            if(role==AppRoleName.Customer || role==AppRoleName.Delivery)
+                query=query.Where(u=>!db.UserRoles.Any(r=>r.UserId==u.Id && merchantIds.Contains(r.RoleId)));
+            if(role==AppRoleName.Customer)
+                query=query.Where(u=>!db.UserRoles.Any(r=>r.UserId==u.Id && deliveryIds.Contains(r.RoleId)));
+            if(isActive.HasValue) query=query.Where(u=>u.IsActive==isActive.Value);
             if (!string.IsNullOrWhiteSpace(request?.Search))
             {
                 var term = request.Search.Trim().ToLower();
@@ -130,6 +156,8 @@ namespace App.ApiControllers.V1.Admin
             }
 
             var totalRecords = await query.CountAsync();
+            var staffCount=await query.CountAsync(u=>db.UserRoles.Any(r=>r.UserId==u.Id && (merchantIds.Contains(r.RoleId) || deliveryIds.Contains(r.RoleId))));
+            var summary=new {Total=totalRecords,Active=await query.CountAsync(u=>u.IsActive),Customers=totalRecords-staffCount,Staff=staffCount};
 
             // Server-side sorting
             var sortField = request?.SortField?.Trim()?.ToLower();
@@ -147,9 +175,10 @@ namespace App.ApiControllers.V1.Admin
                 _ => query.OrderByDescending(x => x.CreatedDate).ThenByDescending(x => x.Id)
             };
 
-            // Support both 0-based and 1-based page requests seamlessly
+            query = ((IOrderedQueryable<AppUser>)query).ThenByDescending(x => x.Id);
+            // API pages are one-based; zero remains a legacy alias for the first page.
             var pageIndex = (request != null && request.PageNumber > 1) ? request.PageNumber - 1 : 0;
-            var pageSize = Math.Max(request?.PageSize ?? 10, 1);
+            var pageSize = Math.Clamp(request?.PageSize ?? 10, 1, 1000);
             var pagedUsers = await query.Skip(pageIndex * pageSize).Take(pageSize).ToListAsync();
 
             var dtoList = pagedUsers.Select(item => new UserDto
@@ -168,6 +197,7 @@ namespace App.ApiControllers.V1.Admin
                 CaptainCompensationType = item.CaptainCompensationType,
                 CaptainRate = item.CaptainRate,
                 Email = item.Email,
+                Lang = item.Lang,
                 EmailConfirmed = true,
                 Role = role ?? AppRoleName.Customer
             }).ToList();
@@ -205,11 +235,7 @@ namespace App.ApiControllers.V1.Admin
                 }
             }
 
-            return new TableResponseModel<UserDto>
-            {
-                Items = dtoList.ToArray(),
-                TotalRecords = totalRecords
-            };
+            return Ok(new { Items=dtoList.ToArray(),TotalRecords=totalRecords,TotalRecordsFiltered=totalRecords,Summary=summary });
         }
 
         /// <summary>
@@ -219,6 +245,13 @@ namespace App.ApiControllers.V1.Admin
         [HttpPost]
         [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
         public async Task<ActionResult<Guid>> Create(UserDto item)
+        {
+            var validation=ValidateUserInput(item, true);
+            if(validation!=null) return BadRequest(ApiErr.Create(validation));
+            return await IdentityTransactionAsync(()=>CreateCore(item));
+        }
+
+        private async Task<ActionResult<Guid>> CreateCore(UserDto item)
         {
             var countryCode = !string.IsNullOrWhiteSpace(item.CountryPhoneCode) ? item.CountryPhoneCode.Trim() : "+963";
             if (!countryCode.StartsWith("+")) countryCode = "+" + countryCode;
@@ -235,6 +268,7 @@ namespace App.ApiControllers.V1.Admin
             rawPhone = rawPhone.TrimStart('0');
 
             var fullPhone = countryCode + rawPhone;
+            if(!Regex.IsMatch(fullPhone, @"^\+[1-9][0-9]{7,14}$")) return BadRequest(ApiErr.Create("أدخل رقم هاتف صحيحاً مع رمز الدولة."));
             var isSyrianPhone = SyrianPhoneIdentity.TryNormalize(fullPhone, out var canonicalPhone);
             if (item.Role == AppRoleName.Merchant && !isSyrianPhone)
                 return BadRequest(ApiErr.Create("أدخل رقم موبايل سوري صحيح لحساب التاجر."));
@@ -251,30 +285,31 @@ namespace App.ApiControllers.V1.Admin
             {
                 FirstName = item.FirstName?.Trim() ?? "",
                 LastName = item.LastName?.Trim() ?? "",
-                FullName = $"{item.FirstName} {item.LastName}".Trim(),
+                FullName = $"{item.FirstName?.Trim()} {item.LastName?.Trim()}".Trim(),
                 Gender = item.Gender,
                 IsActive = item.IsActive,
                 ProfilePhoto = item.ProfilePhoto,
                 Birthday = item.Birthday,
                 PhoneNumber = fullPhone,
                 CountryPhoneCode = countryCode,
+                Lang = string.IsNullOrWhiteSpace(item.Lang) ? "ar" : item.Lang.Trim(),
                 Email = email,
                 UserName = fullPhone,
                 EmailConfirmed = true,
                 MaxCashFloat = item.MaxCashFloat ?? 5000000m,
-                CaptainCompensationType = item.CaptainCompensationType ?? CaptainCompensationType.SalariedEmployee,
-                CaptainRate = item.CaptainRate ?? 0m
+                CaptainCompensationType = item.Role==AppRoleName.Delivery ? item.CaptainCompensationType ?? CaptainCompensationType.SalariedEmployee : CaptainCompensationType.SalariedEmployee,
+                CaptainRate = item.Role==AppRoleName.Delivery && (item.CaptainCompensationType ?? CaptainCompensationType.SalariedEmployee)!=CaptainCompensationType.SalariedEmployee ? item.CaptainRate ?? 0m : 0m
             };
 
             if (item.Role == AppRoleName.Merchant && (string.IsNullOrWhiteSpace(item.Password) || item.Password.Trim().Length < 6))
                 return BadRequest(ApiErr.Create("أدخل كلمة مرور خاصة بحساب التاجر من 6 أحرف على الأقل."));
-            var password = !string.IsNullOrWhiteSpace(item.Password) ? item.Password.Trim() : "123456";
+            var password = item.Password.Trim();
             var result = await _userManager.CreateAsync(entity, password);
             if (!result.Succeeded)
             {
                 if (_auditService != null)
                 {
-                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    await TryAuditAsync(new AdminAuditLogEntry
                     {
                         Module = "Users",
                         Action = "Create",
@@ -299,7 +334,7 @@ namespace App.ApiControllers.V1.Admin
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Users",
                     Action = "Create",
@@ -331,10 +366,30 @@ namespace App.ApiControllers.V1.Admin
         [Route("{id}")]
         public async Task<ActionResult<Guid>> Edit(Guid id, UserDto item)
         {
+            var validation=ValidateUserInput(item, false);
+            if(validation!=null) return BadRequest(ApiErr.Create(validation));
+            if(_accounting!=null && _ledger!=null)
+                return await new DriverFinancialSafetyService(_accounting,_ledger,_uow.Context,_orders).WithDriverLockAsync(id,()=>IdentityTransactionAsync(()=>EditCore(id,item)));
+            return await IdentityTransactionAsync(()=>EditCore(id,item));
+        }
+
+        private async Task<ActionResult<Guid>> EditCore(Guid id, UserDto item)
+        {
             var entity = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
-            if (entity == null) return NotFound();
+            if (entity == null || entity.DeletionDate!=null) return NotFound();
 
             var currentRoles = await _userManager.GetRolesAsync(entity);
+            var effectiveType = item.CaptainCompensationType ?? entity.CaptainCompensationType;
+            var effectiveRate = item.CaptainRate ?? entity.CaptainRate;
+            if(item.Role == AppRoleName.Delivery && effectiveType == CaptainCompensationType.Percentage && effectiveRate > 100m)
+                return BadRequest(ApiErr.Create("نسبة المندوب لا يمكن أن تتجاوز 100%."));
+            if(currentRoles.Contains(AppRoleName.Admin.ToString())) return BadRequest(ApiErr.Create("حسابات الأدمن لا تُعدّل من قائمة مستخدمي التطبيقات."));
+            if(currentRoles.Contains(AppRoleName.Merchant.ToString()) && item.Role!=AppRoleName.Merchant && _catalog!=null && await _catalog.Merchants.AnyAsync(m=>m.OwnerId==id))
+                return BadRequest(ApiErr.Create("هذا المستخدم يملك متجراً. انقل ملكية متاجره قبل تغيير دوره."));
+            if(currentRoles.Contains(AppRoleName.Delivery.ToString()) && item.Role!=AppRoleName.Delivery && await HasDriverObligations(id))
+                return BadRequest(ApiErr.Create("للمندوب عهدة أو أرباح أو طلبات قيد التنفيذ. أكملها وسوِّ حسابه قبل تغيير دوره."));
+            foreach(var validator in _userManager.PasswordValidators)
+                if(!string.IsNullOrWhiteSpace(item.Password)) {var result=await validator.ValidateAsync(_userManager,entity,item.Password.Trim());if(!result.Succeeded)return BadRequest(result);}
             var beforeState = new
             {
                 entity.Id,
@@ -367,6 +422,8 @@ namespace App.ApiControllers.V1.Admin
             rawPhone = rawPhone.TrimStart('0');
 
             var fullPhone = countryCode + rawPhone;
+            if(!Regex.IsMatch(fullPhone, @"^\+[1-9][0-9]{7,14}$")) return BadRequest(ApiErr.Create("أدخل رقم هاتف صحيحاً مع رمز الدولة."));
+            if(item.Role==AppRoleName.Merchant && !SyrianPhoneIdentity.TryNormalize(fullPhone,out _)) return BadRequest(ApiErr.Create("أدخل رقم موبايل سوري صحيح لحساب التاجر."));
             if (SyrianPhoneIdentity.TryNormalize(fullPhone, out var canonicalPhone))
             {
                 var phoneMatch = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
@@ -377,12 +434,10 @@ namespace App.ApiControllers.V1.Admin
 
             entity.FirstName = item.FirstName?.Trim() ?? entity.FirstName;
             entity.LastName = item.LastName?.Trim() ?? entity.LastName;
-            entity.FullName = $"{item.FirstName} {item.LastName}".Trim();
-            entity.Gender = item.Gender;
+            entity.FullName = $"{entity.FirstName} {entity.LastName}".Trim();
             var wasActive = entity.IsActive;
             entity.IsActive = item.IsActive;
             entity.ProfilePhoto = item.ProfilePhoto;
-            entity.Birthday = item.Birthday;
             entity.PhoneNumber = fullPhone;
             entity.CountryPhoneCode = countryCode;
             if (!string.IsNullOrWhiteSpace(item.Email))
@@ -391,8 +446,7 @@ namespace App.ApiControllers.V1.Admin
             }
             entity.UserName = fullPhone;
             entity.EmailConfirmed = true;
-            entity.DefaultLat = item.DefaultLat;
-            entity.DefaultLng = item.DefaultLng;
+            if(!string.IsNullOrWhiteSpace(item.Lang)) entity.Lang=item.Lang.Trim();
             entity.MaxCashFloat = item.MaxCashFloat ?? entity.MaxCashFloat;
             if (item.CaptainCompensationType.HasValue)
             {
@@ -400,15 +454,16 @@ namespace App.ApiControllers.V1.Admin
             }
             if (item.CaptainRate.HasValue)
             {
-                entity.CaptainRate = Math.Max(0m, item.CaptainRate.Value);
+                entity.CaptainRate = item.CaptainRate.Value;
             }
+            if(item.Role!=AppRoleName.Delivery || entity.CaptainCompensationType==CaptainCompensationType.SalariedEmployee) {entity.CaptainRate=0m;if(item.Role!=AppRoleName.Delivery)entity.CaptainCompensationType=CaptainCompensationType.SalariedEmployee;}
 
             var res = await _userManager.UpdateAsync(entity);
             if (!res.Succeeded)
             {
                 if (_auditService != null)
                 {
-                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    await TryAuditAsync(new AdminAuditLogEntry
                     {
                         Module = "Users",
                         Action = "Edit",
@@ -422,9 +477,6 @@ namespace App.ApiControllers.V1.Admin
                 return BadRequest(res);
             }
 
-            if (wasActive && !entity.IsActive)
-                await NotifyAccountDisabled(entity.Id);
-
             if (!string.IsNullOrWhiteSpace(item.Password))
             {
                 var token = await _userManager.GeneratePasswordResetTokenAsync(entity);
@@ -433,7 +485,7 @@ namespace App.ApiControllers.V1.Admin
                 {
                     if (_auditService != null)
                     {
-                        await _auditService.LogAsync(new AdminAuditLogEntry
+                        await TryAuditAsync(new AdminAuditLogEntry
                         {
                             Module = "Users",
                             Action = "ResetPassword",
@@ -448,22 +500,14 @@ namespace App.ApiControllers.V1.Admin
                 }
             }
 
-            res = await _userManager.RemoveFromRolesAsync(entity, currentRoles);
-
-            if (!res.Succeeded)
-            {
-                return BadRequest(res);
-            }
             var role = item.Role.ToString();
-            res = await _userManager.AddToRoleAsync(entity, role);
-            if (!res.Succeeded)
-            {
-                return BadRequest(res);
-            }
+            if(!currentRoles.Contains(role)) {res=await _userManager.AddToRoleAsync(entity,role);if(!res.Succeeded)return BadRequest(res);}
+            var removedRoles=currentRoles.Where(r=>(r==AppRoleName.Merchant.ToString() || r==AppRoleName.Delivery.ToString()) && r!=role).ToArray();
+            if(removedRoles.Length>0) {res=await _userManager.RemoveFromRolesAsync(entity,removedRoles);if(!res.Succeeded)return BadRequest(res);}
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Users",
                     Action = "Edit",
@@ -486,7 +530,53 @@ namespace App.ApiControllers.V1.Admin
                 });
             }
 
+            if(wasActive && !entity.IsActive) _disableNotice=entity.Id;
             return entity.Id;
+        }
+
+        private async Task<ActionResult<Guid>> IdentityTransactionAsync(Func<Task<ActionResult<Guid>>> action)
+        {
+            ActionResult<Guid> result;
+            await using(var transaction=_uow?.Context?.Database.IsRelational()==true ? await _uow.Context.Database.BeginTransactionAsync(IsolationLevel.Serializable) : null) {
+                result=await action();
+                if(result.Result==null && result.Value!=Guid.Empty && transaction!=null) await transaction.CommitAsync();
+            }
+            if(result.Result==null && result.Value!=Guid.Empty && _disableNotice.HasValue) await NotifyAccountDisabled(_disableNotice.Value);
+            return result;
+        }
+
+        private async Task<bool> HasDriverObligations(Guid id)
+        {
+            if(_accounting!=null) {
+                if(await _accounting.SettlementRequests.AnyAsync(r=>r.RequestedByUserId==id && (r.Status==SettlementRequestStatus.Pending || r.Status==SettlementRequestStatus.Approved))) return true;
+                var currencies=await _accounting.Accounts.Where(a=>a.OwnerUserId==id).Select(a=>a.Currency).Distinct().ToListAsync();
+                if(_ledger!=null) foreach(var currency in currencies)
+                    if(await _ledger.GetUserCashFloatBalanceAsync(id,currency)!=0m || await _ledger.GetUserEarningsBalanceAsync(id,currency)!=0m) return true;
+            }
+            if(_orders!=null && await _orders.Orders.AnyAsync(o=>o.DeliveryId==id && (o.AccountingStatus==OrderAccountingStatus.PendingAccounting || o.AccountingStatus==OrderAccountingStatus.Failed ||
+                (o.DeliveredAt==null && o.OrderStatus==OrderStatus.Success && o.OrderDetails.Any(d=>d.OrderDetailStatus==OrderDetailStatus.Pending || d.OrderDetailStatus==OrderDetailStatus.MerchantAccepted || d.OrderDetailStatus==OrderDetailStatus.ReadyForPickup || d.OrderDetailStatus==OrderDetailStatus.ShippingStarted || d.OrderDetailStatus==OrderDetailStatus.CustomerPending))))) return true;
+            return _uow!=null && await _uow.Context.SupportMessages.AnyAsync(e=>e.ErrandDriverUserId==id && (e.ErrandStatus==ErrandStatus.Assigned || e.ErrandStatus==ErrandStatus.Purchased || e.ErrandStatus==ErrandStatus.PurchasePending || e.ErrandStatus==ErrandStatus.DeliveryPending || e.ErrandStatus==ErrandStatus.ReturnPending));
+        }
+
+        public static string ValidateUserInput(UserDto item,bool creating)
+        {
+            if(item==null) return "بيانات المستخدم مطلوبة.";
+            if(item.Role!=AppRoleName.Customer && item.Role!=AppRoleName.Merchant && item.Role!=AppRoleName.Delivery) return "اختر دوراً صالحاً لمستخدم التطبيق.";
+            if(string.IsNullOrWhiteSpace(item.FirstName) || string.IsNullOrWhiteSpace(item.LastName) || item.FirstName.Trim().Length>100 || item.LastName.Trim().Length>100) return "الاسم الأول واسم العائلة مطلوبان وبحد أقصى 100 حرف لكل منهما.";
+            if(string.IsNullOrWhiteSpace(item.PhoneNumber)) return "رقم الهاتف مطلوب.";
+            if(!string.IsNullOrWhiteSpace(item.Email) && !new EmailAddressAttribute().IsValid(item.Email.Trim())) return "أدخل بريداً إلكترونياً صحيحاً.";
+            if((creating || !string.IsNullOrWhiteSpace(item.Password)) && (item.Password?.Trim().Length ?? 0)<6) return "كلمة المرور يجب ألا تقل عن 6 أحرف.";
+            if(item.MaxCashFloat is decimal limit && (limit<0m || limit>1000000000m || limit!=decimal.Round(limit,2))) return "حد العهدة يجب أن يكون بين صفر ومليار وبحد أقصى منزلتين عشريتين.";
+            var type=item.CaptainCompensationType ?? CaptainCompensationType.SalariedEmployee;
+            var rate=item.CaptainRate ?? 0m;
+            if(!Enum.IsDefined(typeof(CaptainCompensationType),type) || rate<0m || rate>1000000000m || rate!=decimal.Round(rate,2) || (type==CaptainCompensationType.Percentage && rate>100m)) return "طريقة حساب المندوب أو قيمتها غير صالحة. النسبة بين صفر و100% والقيم بحد أقصى منزلتين عشريتين.";
+            if(!string.IsNullOrWhiteSpace(item.Lang) && !new[]{"ar","en","tr"}.Contains(item.Lang.Trim())) return "لغة المستخدم غير صالحة.";
+            return null;
+        }
+
+        private async Task TryAuditAsync(AdminAuditLogEntry entry)
+        {
+            try {await _auditService.LogAsync(entry);} catch(Exception ex) {_logger?.LogWarning(ex,"Unable to write user audit entry");}
         }
 
         [HttpPost("{id:guid}/ResetPassword")]
@@ -500,7 +590,7 @@ namespace App.ApiControllers.V1.Admin
             }
 
             var user = await _userManager.FindByIdAsync(id.ToString());
-            if (user == null || !await _userManager.IsInRoleAsync(user, AppRoleName.Merchant.ToString()))
+            if (user == null || user.DeletionDate != null || !await _userManager.IsInRoleAsync(user, AppRoleName.Merchant.ToString()))
             {
                 return NotFound();
             }
@@ -511,7 +601,7 @@ namespace App.ApiControllers.V1.Admin
             {
                 if (_auditService != null)
                 {
-                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    await TryAuditAsync(new AdminAuditLogEntry
                     {
                         Module = "Users",
                         Action = "ResetPassword",
@@ -528,7 +618,7 @@ namespace App.ApiControllers.V1.Admin
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Users",
                     Action = "ResetPassword",
@@ -551,13 +641,15 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<bool>> Enable(Guid id)
         {
             var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
-            if (user == null) return NotFound();
+            if (user == null || user.DeletionDate!=null) return NotFound();
+            if(await _userManager.IsInRoleAsync(user,AppRoleName.Admin.ToString())) return BadRequest(ApiErr.Create("حساب الأدمن لا يُغيّر من قائمة مستخدمي التطبيقات."));
             user.IsActive = true;
-            await _userManager.UpdateAsync(user);
+            var update=await _userManager.UpdateAsync(user);
+            if(!update.Succeeded) return BadRequest(ApiErr.Create(string.Join("، ", update.Errors.Select(e=>e.Description))));
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Users",
                     Action = "Enable",
@@ -580,10 +672,11 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<bool>> Disable(Guid id)
         {
             var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
-            if (user == null) return NotFound();
+            if (user == null || user.DeletionDate!=null) return NotFound();
+            if(await _userManager.IsInRoleAsync(user,AppRoleName.Admin.ToString())) return BadRequest(ApiErr.Create("لا يمكن تعطيل حساب الأدمن من قائمة مستخدمي التطبيقات."));
             user.IsActive = false;
             var update = await _userManager.UpdateAsync(user);
-            if (!update.Succeeded) return BadRequest(update.Errors);
+            if (!update.Succeeded) return BadRequest(ApiErr.Create(string.Join("، ", update.Errors.Select(e=>e.Description))));
 
             // Foreground clients can leave immediately. The API check remains
             // authoritative when FCM is delayed or unavailable.
@@ -591,7 +684,7 @@ namespace App.ApiControllers.V1.Admin
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Users",
                     Action = "Disable",
@@ -608,12 +701,12 @@ namespace App.ApiControllers.V1.Admin
         private async Task NotifyAccountDisabled(Guid userId)
         {
             if (_notificationService == null) return;
-            await _notificationService.SendPushNotification(new Notification
+            try {await _notificationService.SendPushNotification(new Notification
             {
                 Url = "account-disabled",
                 EntityData = userId.ToString(),
                 NotificationType = NotificationType.GlobalNotification
-            }, new[] { userId }, saveNotification: false, suppressedNotification: true);
+            }, new[] { userId }, saveNotification: false, suppressedNotification: true);} catch(Exception ex) {_logger?.LogWarning(ex,"Unable to notify disabled account");}
         }
 
         /// <summary>
@@ -624,13 +717,20 @@ namespace App.ApiControllers.V1.Admin
         [Route("{id}")]
         public async Task<ActionResult<bool>> Delete(Guid id)
         {
+            if(_accounting!=null && _ledger!=null)
+                return await new DriverFinancialSafetyService(_accounting,_ledger,_uow.Context,_orders).WithDriverLockAsync(id,()=>DeleteCore(id));
+            return await DeleteCore(id);
+        }
+
+        private async Task<ActionResult<bool>> DeleteCore(Guid id)
+        {
             var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
             if (user == null) return NotFound();
-            if (user.Email == AppDomainHelper.AdminEmail)
+            if (user.Email == AppDomainHelper.AdminEmail || await _userManager.IsInRoleAsync(user,AppRoleName.Admin.ToString()))
             {
                 if (_auditService != null)
                 {
-                    await _auditService.LogAsync(new AdminAuditLogEntry
+                    await TryAuditAsync(new AdminAuditLogEntry
                     {
                         Module = "Users",
                         Action = "Delete",
@@ -643,13 +743,19 @@ namespace App.ApiControllers.V1.Admin
                 }
                 return BadRequest("Cannot delete root admin user");
             }
+            if(await _userManager.IsInRoleAsync(user,AppRoleName.Delivery.ToString()) && await HasDriverObligations(id))
+                return BadRequest(ApiErr.Create("لا يمكن أرشفة المندوب قبل إنهاء طلباته وتسوية العهدة والأرباح. يمكنك تعطيل دخوله مؤقتاً."));
+            if(await _userManager.IsInRoleAsync(user,AppRoleName.Merchant.ToString()) && _catalog!=null && await _catalog.Merchants.AnyAsync(m=>m.OwnerId==id))
+                return BadRequest(ApiErr.Create("انقل ملكية متاجر التاجر قبل أرشفة حسابه حتى تبقى المستحقات مرتبطة بصاحبها. يمكنك تعطيل دخوله مؤقتاً."));
             user.IsActive = false;
             user.DeletionDate = DateTime.UtcNow;
-            await _userManager.UpdateAsync(user);
+            var update=await _userManager.UpdateAsync(user);
+            if(!update.Succeeded) return BadRequest(ApiErr.Create(string.Join("، ", update.Errors.Select(e=>e.Description))));
+            await NotifyAccountDisabled(user.Id);
 
             if (_auditService != null)
             {
-                await _auditService.LogAsync(new AdminAuditLogEntry
+                await TryAuditAsync(new AdminAuditLogEntry
                 {
                     Module = "Users",
                     Action = "Delete",

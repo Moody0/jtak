@@ -266,15 +266,8 @@ namespace App.ApiControllers.V1.Admin
                     config.Items[i].Order = i + 1;
                 }
 
-                try
-                {
-                    await _genericSetting.SetValue(SettingKey, config, null);
-                    _cache.Remove(CacheKey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to persist initial popular products config");
-                }
+                await _genericSetting.SetValue(SettingKey, config, null);
+                _cache.Remove(CacheKey);
             }
 
             return true;
@@ -375,12 +368,16 @@ namespace App.ApiControllers.V1.Admin
                 .AsNoTracking()
                 .Where(x => x.DeletionDate == null && x.Active && (merchantId == null || x.Id == merchantId))
                 .ToDictionaryAsync(x => x.Id, x => x);
+            var activeMerchantIds = merchants.Keys.ToList();
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
 
             var query = _productService.Queryable()
                 .AsNoTracking()
                 .Include(x => x.ProductCategory)
                 .Include(x => x.MerchantProducts)
-                .Where(x => x.DeletionDate == null && x.Active);
+                .Where(x => x.DeletionDate == null && x.Active &&
+                    (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)) &&
+                    x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0));
 
             if (!string.IsNullOrWhiteSpace(q))
             {
@@ -439,7 +436,8 @@ namespace App.ApiControllers.V1.Admin
 
         private async Task<PopularSectionConfig> GetOrInitConfigAsync()
         {
-            var config = await _genericSetting.GetValue<PopularSectionConfig>(SettingKey, null);
+            var stored = await _genericSetting.GetValue<PopularSectionConfig>(SettingKey, null);
+            var config = stored == null ? null : System.Text.Json.JsonSerializer.Deserialize<PopularSectionConfig>(System.Text.Json.JsonSerializer.Serialize(stored));
             if (config == null || config.Items == null)
             {
                 config = new PopularSectionConfig

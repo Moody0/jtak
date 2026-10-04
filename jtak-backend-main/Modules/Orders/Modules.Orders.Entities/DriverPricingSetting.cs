@@ -84,16 +84,21 @@ namespace Modules.Orders.Entities
         /// </summary>
         public decimal MinDeliveryFee { get; set; } = 50m;
 
+        private static bool ValidMoney(decimal value) => value >= 0m && value <= 100000000m && decimal.Round(value, 2) == value;
+
+        // A unit rate can retain conversion precision; settled money still uses two decimals.
+        private static bool ValidRate(decimal value) => value >= 0m && value <= 100000000m && decimal.Round(value, 6) == value;
+
         public bool IsValid =>
             Enum.IsDefined(typeof(DriverPricingMode), Mode) &&
             Enum.IsDefined(typeof(DistanceUnit), Unit) &&
-            FixedAmount >= 0m &&
-            DistanceBaseFee >= 0m &&
-            DistanceRatePerUnit >= 0m &&
-            MinEarning >= 0m &&
-            MaxEarning >= 0m &&
-            CustomerRatePerKm >= 0m &&
-            MinDeliveryFee >= 0m &&
+            ValidMoney(FixedAmount) &&
+            ValidMoney(DistanceBaseFee) &&
+            ValidRate(DistanceRatePerUnit) &&
+            ValidMoney(MinEarning) &&
+            ValidMoney(MaxEarning) &&
+            ValidRate(CustomerRatePerKm) &&
+            ValidMoney(MinDeliveryFee) &&
             (MaxEarning == 0m || MaxEarning >= MinEarning) &&
             (Mode != DriverPricingMode.Fixed || FixedAmount > 0m) &&
             (Mode != DriverPricingMode.Distance || DistanceBaseFee > 0m || MinEarning > 0m || DistanceRatePerUnit > 0m);

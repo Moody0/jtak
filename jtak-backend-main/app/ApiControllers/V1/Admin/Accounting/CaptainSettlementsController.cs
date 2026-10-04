@@ -112,6 +112,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
         public decimal TotalCashCollected { get; set; }
         public decimal TotalDeliveryFees { get; set; }
         public decimal TotalCaptainEarnings { get; set; }
+        public decimal WagesOffset { get; set; }
         public decimal NetDueToCompany { get; set; }
         public string HandledByAdminName { get; set; }
         public string Notes { get; set; }
@@ -139,6 +140,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
         private readonly IAdminAuditService _auditService;
         private readonly ILedgerService _ledgerService;
         private readonly INotificationService _notifications;
+        private readonly App.Shared.Data.App.AppDbContext _appDb;
 
         public CaptainSettlementsController(
             OrdersDbContext ordersDb,
@@ -146,7 +148,8 @@ namespace App.ApiControllers.V1.Admin.Accounting
             UserManager<AppUser> userManager,
             ILedgerService ledgerService,
             INotificationService notifications = null,
-            IAdminAuditService auditService = null)
+            IAdminAuditService auditService = null,
+            App.Shared.Data.App.AppDbContext appDb = null)
         {
             _ordersDb = ordersDb ?? throw new ArgumentNullException(nameof(ordersDb));
             _accountingDb = accountingDb ?? throw new ArgumentNullException(nameof(accountingDb));
@@ -154,6 +157,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
             _ledgerService = ledgerService ?? throw new ArgumentNullException(nameof(ledgerService));
             _notifications = notifications;
             _auditService = auditService;
+            _appDb = appDb;
         }
 
         /// <summary>
@@ -261,7 +265,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 var cashCollected = relevantOrders.Sum(o => CalculateCashCollected(o));
                 var deliveryFees = relevantOrders.Sum(o => o.DeliveryFee);
                 var captainEarnings = relevantOrders.Sum(o => CalculateCaptainEarning(o));
-                var netDueToCompany = cashCollected - captainEarnings;
+                var netDueToCompany = Math.Max(0m, cashCollected - captainEarnings);
 
                 var lastSettled = settledOrders.OrderByDescending(o => o.SettledAt).FirstOrDefault();
 
@@ -392,7 +396,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 TotalCashCollected = cashCollected,
                 TotalDeliveryFees = deliveryFees,
                 TotalCaptainEarnings = captainEarnings,
-                NetDueToCompany = cashCollected - captainEarnings,
+                NetDueToCompany = Math.Max(0m, cashCollected - captainEarnings),
                 Orders = orderItems
             };
 
@@ -408,7 +412,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
             if (request == null || request.CaptainId == Guid.Empty)
                 return BadRequest(ApiErr.Create("يجب تحديد الكابتن لإتمام التسوية"));
 
-            return await new DriverFinancialSafetyService(_accountingDb, _ledgerService, orders: _ordersDb)
+            return await new DriverFinancialSafetyService(_accountingDb, _ledgerService, _appDb, _ordersDb)
                 .WithDriverLockAsync(request.CaptainId, () => ConfirmSettlementCoreAsync(request));
         }
 
@@ -453,19 +457,29 @@ namespace App.ApiControllers.V1.Admin.Accounting
             }
 
             var orders = await query.ToListAsync();
+            if (request.OrderIds?.Count > 0 && (request.OrderIds.Distinct().Count() != request.OrderIds.Count || orders.Count != request.OrderIds.Count))
+                return BadRequest(ApiErr.Create("تغيّرت حالة بعض الطلبات المحددة. حدّث القائمة وأعد تحديد الطلبات قبل التسوية."));
             if (orders.Count == 0)
             {
                 return BadRequest(ApiErr.Create("لا توجد طلبات غير مسوّاة للكابتن في هذه الفترة المحددة."));
             }
 
             var nowUtc = DateTime.UtcNow;
-            var batchCode = $"SETTLE-{driver.Id.ToString()[..8].ToUpperInvariant()}-{nowUtc:yyyyMMddHHmmss}";
+            var batchCode = $"SETTLE-{driver.Id.ToString()[..8].ToUpperInvariant()}-{nowUtc:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
 
             var totalCashCollected = orders.Sum(o => CalculateCashCollected(o));
             var totalDeliveryFees = orders.Sum(o => o.DeliveryFee);
             var totalCaptainEarnings = orders.Sum(o => CalculateCaptainEarning(o));
-            var custodyBalance = await _ledgerService.GetUserCashFloatBalanceAsync(request.CaptainId, "SYP");
+            var position = await new DriverFinancialSafetyService(_accountingDb, _ledgerService, _appDb, _ordersDb).GetPositionAsync(request.CaptainId);
+            var hasHandover = await _accountingDb.SettlementRequests.AnyAsync(r => r.RequestedByUserId == request.CaptainId && r.PartyType == SettlementPartyType.Captain && r.Currency == "SYP" &&
+                (r.Status == SettlementRequestStatus.Pending || r.Status == SettlementRequestStatus.Approved));
+            if (position.HasUnfinishedAccounting || hasHandover)
+                return BadRequest(ApiErr.Create("يوجد طلب توريد قيد المراجعة أو حسابات لم تُرحّل بعد. أكملها قبل تسوية الطلبات."));
+            var custodyBalance = position.SpendableCash;
             var earningsBalance = await _ledgerService.GetUserEarningsBalanceAsync(request.CaptainId, "SYP");
+            var reservedEarnings = (await _accountingDb.SettlementRequests.Where(r => r.RequestedByUserId == request.CaptainId && r.PartyType == SettlementPartyType.CaptainEarnings && r.Currency == "SYP" &&
+                (r.Status == SettlementRequestStatus.Pending || r.Status == SettlementRequestStatus.Approved)).Select(r => r.Amount).ToListAsync()).Sum();
+            earningsBalance = Math.Max(0m, earningsBalance - reservedEarnings);
             if (totalCashCollected > Math.Max(0m, custodyBalance) + 0.001m ||
                 Math.Min(totalCashCollected, totalCaptainEarnings) > Math.Max(0m, earningsBalance) + 0.001m)
                 return BadRequest(ApiErr.Create("مبالغ الطلبات المحددة لا تطابق الرصيد المتبقي في العهدة أو الأرباح. حدّث البيانات وراجع التوريدات السابقة قبل التسوية."));
@@ -562,8 +576,8 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 ByUser = driver.FullName ?? driver.UserName,
                 ToUserId = adminId != Guid.Empty ? adminId : Guid.NewGuid(),
                 ToUser = adminName,
-                Amount = netDueToCompany > 0 ? netDueToCompany : totalCashCollected,
-                NewBalance = 0m,
+                Amount = netDueToCompany,
+                NewBalance = await _ledgerService.GetUserCashFloatBalanceAsync(request.CaptainId, "SYP"),
                 HandoverDate = nowUtc
             };
             _accountingDb.Payments.Add(payment);
@@ -576,10 +590,10 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 CaptainUserId = request.CaptainId,
                 BatchDate = nowUtc,
                 TotalCashCollected = totalCashCollected,
-                TotalWagesEarned = totalCaptainEarnings,
+                TotalWagesEarned = wagesToOffset,
                 NetCashRemitted = netDueToCompany,
                 HandledByAdminId = adminId,
-                SettlementTransactionId = settlementTxnId != Guid.Empty ? settlementTxnId : Guid.NewGuid(),
+                SettlementTransactionId = settlementTxnId,
                 IsLocked = true,
                 Notes = request.Notes ?? $"تسوية عدد {orders.Count} طلب للكابتن {driver.FullName ?? driver.UserName}"
             };
@@ -618,6 +632,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 TotalCashCollected = totalCashCollected,
                 TotalDeliveryFees = totalDeliveryFees,
                 TotalCaptainEarnings = totalCaptainEarnings,
+                WagesOffset = wagesToOffset,
                 NetDueToCompany = netDueToCompany,
                 HandledByAdminName = adminName,
                 Notes = batch.Notes,
@@ -689,9 +704,10 @@ namespace App.ApiControllers.V1.Admin.Accounting
             var admin = adminId != Guid.Empty ? await _userManager.FindByIdAsync(adminId.ToString()) : null;
 
             var cashCollected = batch?.TotalCashCollected ?? orders.Sum(o => CalculateCashCollected(o));
-            var captainEarnings = batch?.TotalWagesEarned ?? orders.Sum(o => CalculateCaptainEarning(o));
+            var captainEarnings = orders.Count > 0 ? orders.Sum(o => CalculateCaptainEarning(o)) : batch?.TotalWagesEarned ?? 0m;
+            var wagesOffset = batch?.TotalWagesEarned ?? Math.Min(cashCollected, captainEarnings);
             var deliveryFees = orders.Sum(o => o.DeliveryFee);
-            var netDue = batch?.NetCashRemitted ?? (cashCollected - captainEarnings);
+            var netDue = batch?.NetCashRemitted ?? Math.Max(0m, cashCollected - captainEarnings);
 
             var receipt = new SettlementBatchReceiptDto
             {
@@ -706,6 +722,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
                 TotalCashCollected = cashCollected,
                 TotalDeliveryFees = deliveryFees,
                 TotalCaptainEarnings = captainEarnings,
+                WagesOffset = wagesOffset,
                 NetDueToCompany = netDue,
                 HandledByAdminName = admin?.FullName ?? admin?.UserName ?? "مسؤول النظام",
                 Notes = batch?.Notes,
@@ -808,7 +825,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
             try
             {
                 var unpostedBatches = await _accountingDb.DailySettlementBatches
-                    .Where(b => !_accountingDb.JournalTransactions.Any(jt => jt.Id == b.SettlementTransactionId))
+                    .Where(b => b.TotalCashCollected > 0 && !_accountingDb.JournalTransactions.Any(jt => jt.Id == b.SettlementTransactionId))
                     .ToListAsync();
 
                 if (unpostedBatches.Count == 0) return 0;
@@ -911,8 +928,8 @@ namespace App.ApiControllers.V1.Admin.Accounting
                                 ByUser = driverName,
                                 ToUserId = batch.HandledByAdminId != Guid.Empty ? batch.HandledByAdminId : Guid.NewGuid(),
                                 ToUser = adminName,
-                                Amount = batch.NetCashRemitted > 0 ? batch.NetCashRemitted : batch.TotalCashCollected,
-                                NewBalance = 0m,
+                                Amount = batch.NetCashRemitted,
+                                NewBalance = await _ledgerService.GetUserCashFloatBalanceAsync(batch.CaptainUserId, "SYP"),
                                 HandoverDate = batch.BatchDate
                             });
                         }

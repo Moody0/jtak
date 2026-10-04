@@ -39,6 +39,7 @@ namespace Modules.Accounting.Entities
 
     public class SettlementHistorySummaryDto
     {
+        public List<SettlementCurrencyTotalDto> CurrencyTotals { get; set; } = new();
         public int TotalCompletedCount { get; set; }
         public decimal TotalCompletedAmount { get; set; }
         public int MerchantCompletedCount { get; set; }
@@ -46,6 +47,12 @@ namespace Modules.Accounting.Entities
         public int DriverCompletedCount { get; set; }
         public decimal DriverCompletedAmount { get; set; }
         public string Currency { get; set; } = "SYP";
+    }
+
+    public class SettlementCurrencyTotalDto
+    {
+        public string Currency { get; set; }
+        public decimal Amount { get; set; }
     }
 
     public class SettlementHistoryDataTableRequest

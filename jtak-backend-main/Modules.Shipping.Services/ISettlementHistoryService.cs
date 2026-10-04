@@ -7,6 +7,7 @@ namespace Modules.Accounting.Services
 {
     public interface ISettlementHistoryService
     {
+        Task<List<SettlementHistoryItemDto>> GetCompletedItemsAsync();
         Task<SettlementHistoryDataTableResultDto> GetDataTableAsync(SettlementHistoryDataTableRequest request);
         Task<SettlementHistorySummaryDto> GetSummaryAsync(SettlementHistoryPartyFilter partyFilter = SettlementHistoryPartyFilter.All, DateTime? fromDate = null, DateTime? toDate = null, string searchTerm = null);
         Task<SettlementReceiptDto> GetReceiptAsync(string id);

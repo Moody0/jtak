@@ -24,7 +24,7 @@ namespace App.ApiControllers.V1.Warehouse
         public Task<PageVm> PaymentPolicy() => GetPage("PaymentPolicy");
 
         [HttpGet("TermsAndConditions")]
-        public Task<PageVm> TermsAndConditions() => GetPage("TermsAndConditions_Warehouse");
+        public Task<PageVm> TermsAndConditions() => PageSettingsReader.GetTermsPage(_settings, "TermsAndConditions_Warehouse", CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
 
         private Task<PageVm> GetPage(string key) =>
             PageSettingsReader.GetPage(_settings, key, CultureInfo.CurrentCulture.TwoLetterISOLanguageName);

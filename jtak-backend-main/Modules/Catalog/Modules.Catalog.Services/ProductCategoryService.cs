@@ -58,12 +58,14 @@ namespace Modules.Catalog.Services
         #region Helpers
         private int ScanDepth = 1;
         private Dictionary<int, ProductCategoryDto> ProductCategories { get; set; }
-        private async Task<Dictionary<int, ProductCategoryDto>> LoadProductCategories() =>
-            await Repository.Queryable()
-                            .Where(x => x.Active && x.DeletionDate == null)
-                            .OrderBy(x => x.Order)
-                            .Select(x => new ProductCategoryDto { Id = x.Id, Title = x.Title, Icon = x.Icon, ParentId = x.ParentId, Active = x.Active, Order = x.Order })
-                            .ToDictionaryAsync(x => x.Id);
+        private async Task<Dictionary<int, ProductCategoryDto>> LoadProductCategories()
+        {
+            var visibleIds = await CatalogCategoryVisibility.GetIdsAsync(Repository.Queryable());
+            return await Repository.Queryable().Where(x => visibleIds.Contains(x.Id))
+                .OrderBy(x => x.Order)
+                .Select(x => new ProductCategoryDto { Id = x.Id, Title = x.Title, Icon = x.Icon, ParentId = x.ParentId, Active = x.Active, Order = x.Order })
+                .ToDictionaryAsync(x => x.Id);
+        }
 
         private async Task<ProductCategoryDto[]> LoadProductCategoriesTree()
         {

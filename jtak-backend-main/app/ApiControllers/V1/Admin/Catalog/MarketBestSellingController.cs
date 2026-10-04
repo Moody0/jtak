@@ -272,15 +272,8 @@ namespace App.ApiControllers.V1.Admin
                     config.Items[i].Order = i + 1;
                 }
 
-                try
-                {
-                    await _genericSetting.SetValue(SettingKey, config, null);
-                    _cache.Remove(CacheKey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to persist market best selling config on removal");
-                }
+                await _genericSetting.SetValue(SettingKey, config, null);
+                _cache.Remove(CacheKey);
             }
 
             return true;
@@ -394,12 +387,14 @@ namespace App.ApiControllers.V1.Admin
                             (merchantId == null || x.Id == merchantId))
                 .ToDictionaryAsync(x => x.Id, x => x);
             var activeMerchantIds = merchants.Keys.ToList();
+            var visibleCategoryIds = await CatalogCategoryVisibility.GetIdsAsync(_categoryService.Queryable());
 
             var query = _productService.Queryable()
                 .AsNoTracking()
                 .Include(x => x.ProductCategory)
                 .Include(x => x.MerchantProducts)
                 .Where(x => x.DeletionDate == null && x.Active &&
+                            (!x.ProductCategoryId.HasValue || visibleCategoryIds.Contains(x.ProductCategoryId.Value)) &&
                             x.MerchantProducts.Any(m => activeMerchantIds.Contains(m.MerchantId) && m.MerchantPrice > 0));
 
             if (!string.IsNullOrWhiteSpace(q))
@@ -423,7 +418,7 @@ namespace App.ApiControllers.V1.Admin
             var result = prods.Select(p =>
             {
                 var mp = p.MerchantProducts?
-                    .Where(m => merchants.ContainsKey(m.MerchantId))
+                    .Where(m => merchants.ContainsKey(m.MerchantId) && m.MerchantPrice > 0)
                     .OrderBy(m => m.MerchantPrice)
                     .FirstOrDefault();
 
@@ -459,15 +454,18 @@ namespace App.ApiControllers.V1.Admin
             MarketBestSellingSectionConfig config = null;
             try
             {
-                config = await _genericSetting.GetValue<MarketBestSellingSectionConfig>(SettingKey, null);
+                var stored = await _genericSetting.GetValue<MarketBestSellingSectionConfig>(SettingKey, null);
+                config = stored == null ? null : System.Text.Json.JsonSerializer.Deserialize<MarketBestSellingSectionConfig>(System.Text.Json.JsonSerializer.Serialize(stored));
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to read MarketBestSellingConfig from generic settings");
+                throw;
             }
 
             if (config != null)
             {
+                config.Items = (config.Items ?? new List<MarketBestSellingItemConfig>()).Where(x => x != null && x.ProductId > 0).OrderBy(x => x.Order).ToList();
                 return config;
             }
 
@@ -538,7 +536,7 @@ namespace App.ApiControllers.V1.Admin
             // Deduplicate items
             var distinctItems = new List<MarketBestSellingItemConfig>();
             var seenIds = new HashSet<int>();
-            foreach (var item in items)
+            foreach (var item in items.Where(x => x != null).OrderBy(x => x.Order))
             {
                 if (item.ProductId > 0 && !seenIds.Contains(item.ProductId))
                 {

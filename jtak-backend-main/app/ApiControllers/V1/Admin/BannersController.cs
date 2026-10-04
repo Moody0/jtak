@@ -13,6 +13,10 @@ using App.Shared.Data.App;
 using Solf.Models;
 using App.Shared.Entities.Enums;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace App.ApiControllers.V1.Admin
 {
@@ -56,7 +60,7 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DataTable")]
-        public async Task<ActionResult<TableResponseModel<BannerDto>>> DataTable([FromBody] MetronicTable request)
+        public async Task<ActionResult<TableResponseModel<BannerDto>>> DataTable([FromBody] MetronicTable request, [FromQuery] string section = "all", [FromQuery] string status = "all")
         {
             if (request != null && request.PageNumber > 0)
             {
@@ -65,6 +69,7 @@ namespace App.ApiControllers.V1.Admin
             return await _service.ListMetronicTableQueryable(request, x => new BannerDto
             {
                 Id = x.Id,
+                CreatedDate = x.CreatedDate,
                 Title = x.Title,
                 Description = x.Description,
                 FeaturedImage = x.FeaturedImage,
@@ -72,7 +77,62 @@ namespace App.ApiControllers.V1.Admin
                 Url = x.Url,
                 BannerLocation = x.BannerLocation,
                 Active = x.Active
-            });
+            }, x => (status == "all" || x.Active == (status == "active")) &&
+                (section == "all" ||
+                 (section == "daily" && (x.BannerLocation == BannerLocation.HomePage || x.BannerLocation == BannerLocation.All)) ||
+                 (section == "dont_miss" && (x.BannerLocation == BannerLocation.DontMiss || x.BannerLocation == BannerLocation.All)) ||
+                 (section == "both" && x.BannerLocation == BannerLocation.All)));
+        }
+
+        [HttpGet("Summary")]
+        public async Task<ActionResult<object>> Summary()
+        {
+            var banners = _service.Queryable().AsNoTracking();
+            return new { Total = await banners.CountAsync(), Active = await banners.CountAsync(x => x.Active),
+                Daily = await banners.CountAsync(x => x.BannerLocation == BannerLocation.HomePage || x.BannerLocation == BannerLocation.All),
+                DontMiss = await banners.CountAsync(x => x.BannerLocation == BannerLocation.DontMiss || x.BannerLocation == BannerLocation.All) };
+        }
+
+        public class BannerBulkRequest
+        {
+            public int[] Ids { get; set; }
+            public bool Active { get; set; }
+        }
+
+        [HttpPost("BulkStatus")]
+        public async Task<ActionResult<bool>> BulkStatus(BannerBulkRequest request)
+        {
+            if (request?.Ids == null || request.Ids.Length == 0 || request.Ids.Any(id => id <= 0))
+                return BadRequest("اختر إعلانات صحيحة أولاً");
+            var ids = request.Ids.Distinct().ToArray();
+            var banners = await _service.Queryable().Where(x => ids.Contains(x.Id)).ToArrayAsync();
+            if (banners.Length != ids.Length) return BadRequest("بعض الإعلانات لم تعد موجودة. أعد تحميل القائمة");
+            if (request.Active && banners.Any(b => string.IsNullOrWhiteSpace(b.FeaturedImage)))
+                return BadRequest("أضف صورة قبل تفعيل الإعلان");
+            foreach (var banner in banners) banner.Active = request.Active;
+            await _uow.SaveChangesAsync();
+            InvalidateBannerCache();
+            if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+                Module = "Banners", Action = "BulkStatus", EntityType = "Banner", EntityId = string.Join(",", ids),
+                Description = request.Active ? "تفعيل الإعلانات المحددة" : "تعطيل الإعلانات المحددة", Result = "Success", AfterState = new { ids, request.Active } });
+            return true;
+        }
+
+        [HttpPost("BulkDelete")]
+        public async Task<ActionResult<bool>> BulkDelete(BannerBulkRequest request)
+        {
+            if (request?.Ids == null || request.Ids.Length == 0 || request.Ids.Any(id => id <= 0))
+                return BadRequest("اختر إعلانات صحيحة أولاً");
+            var ids = request.Ids.Distinct().ToArray();
+            if (await _service.Queryable().CountAsync(x => ids.Contains(x.Id)) != ids.Length)
+                return BadRequest("بعض الإعلانات لم تعد موجودة. أعد تحميل القائمة");
+            foreach (var id in ids) await _service.DeleteAsync(id);
+            await _uow.SaveChangesAsync();
+            InvalidateBannerCache();
+            if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry {
+                Module = "Banners", Action = "BulkDelete", EntityType = "Banner", EntityId = string.Join(",", ids),
+                Description = "حذف الإعلانات المحددة", Result = "Success" });
+            return true;
         }
 
 
@@ -83,6 +143,8 @@ namespace App.ApiControllers.V1.Admin
         [HttpPost]
         public async Task<ActionResult<int>> Create(BannerDto model)
         {
+            var error = Validate(model);
+            if (error != null) return BadRequest(error);
             var uid = User.GetUserId();
             var entity = new Banner
             {
@@ -124,6 +186,8 @@ namespace App.ApiControllers.V1.Admin
         [Route("{id}")]
         public async Task<ActionResult<int>> Edit(int id, BannerDto model)
         {
+            var error = Validate(model);
+            if (error != null) return BadRequest(error);
             var entity = await _service.FindAsync(id);
             if (entity == null)
             {
@@ -185,6 +249,7 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<bool>> Delete(int id)
         {
             var banner = await _service.FindAsync(id);
+            if (banner == null) return NotFound("الإعلان غير موجود");
             await _service.DeleteAsync(id);
             await _uow.SaveChangesAsync();
             InvalidateBannerCache();
@@ -203,6 +268,21 @@ namespace App.ApiControllers.V1.Admin
             }
 
             return true;
+        }
+
+        private static string Validate(BannerDto model)
+        {
+            if (model == null || string.IsNullOrWhiteSpace(model.Title)) return "أدخل عنوان الإعلان";
+            if (!Enum.IsDefined(typeof(BannerLocation), model.BannerLocation)) return "اختر مكان ظهور صحيحاً";
+            if (model.Order < 0) return "ترتيب الإعلان لا يمكن أن يكون سالباً";
+            if (model.Active && string.IsNullOrWhiteSpace(model.FeaturedImage)) return "أضف صورة قبل تفعيل الإعلان";
+            model.Title = model.Title.Trim();
+            model.Url = Regex.Replace(model.Url ?? "", @"#section:[a-z_]+", "", RegexOptions.IgnoreCase).Trim();
+            var target = model.Url;
+            if (target.Length == 0 || target == "none" || target == "no_link" || target == "offers" || target == "promotions") return null;
+            if (Regex.IsMatch(target, @"^(restaurant|market|merchant|store|category):[1-9][0-9]*$") || Regex.IsMatch(target, @"^[1-9][0-9]*$")) return null;
+            if (Uri.TryCreate(target, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https") && !string.IsNullOrWhiteSpace(uri.Host)) return null;
+            return "اختر وجهة صحيحة أو أدخل رابطاً يبدأ بـ https:// أو http://";
         }
 
         private void InvalidateBannerCache()

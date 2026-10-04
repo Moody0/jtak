@@ -1,4 +1,4 @@
-﻿using App.Shared.Data.App;
+using App.Shared.Data.App;
 using App.Shared.Data.MultiContext;
 using App.Shared.Entities;
 using Microsoft.Extensions.Caching.Memory;
@@ -16,94 +16,72 @@ namespace App.Shared.Services
         Task SetValue<T>(string key, T val, string lang = null);
         T GetCachedValue<T>(string key, string lang = null);
         void SetCachedValue<T>(string key, T val, string lang = null);
+        void InvalidateCache(string key, string lang = null);
     }
     public class GenericSettingService : Service<GenericSetting>, IGenericSettingService
     {
         private readonly IAppUnitOfWork _unitOfWork;
         private readonly IMemoryCache _cache;
-        public GenericSettingService(ITrackableRepository<GenericSetting, AppDbContext> repository,
-                                     IMemoryCache cache,
-                                     IAppUnitOfWork unitOfWork) : base(repository)
+        private static readonly object CacheGate = new object();
+        private long Epoch(string key) => _cache.Get<long>(CacheKey(key) + ":epoch");
+        public GenericSettingService(ITrackableRepository<GenericSetting, AppDbContext> repository, IMemoryCache cache, IAppUnitOfWork unitOfWork) : base(repository)
+        { _unitOfWork = unitOfWork; _cache = cache; }
+        private static string SettingKey(string key, string lang) => lang == null ? key : $"{key}_{lang}";
+        private static string CacheKey(string key) => $"GenericSetting:json:{key}";
+        private bool InTransaction => _unitOfWork.Context.Database.CurrentTransaction != null;
+        private static readonly JsonSerializerOptions ReadOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        private static T Read<T>(string json)
         {
-            _unitOfWork = unitOfWork;
-            _cache = cache;
+            if (json == null) return default;
+            try { return JsonSerializer.Deserialize<T>(json, ReadOptions); }
+            catch (JsonException) { return default; }
+            catch (NotSupportedException) { return default; }
         }
-
-
-        public async Task<T> GetValue<T>(string key, string lang)
+        public async Task<T> GetValue<T>(string key, string lang = null)
         {
-            key = lang == null ? key : $"{key}_{lang}";
-            var cacheKey = GetTypedCacheKey<T>(key);
-            // Look for cache key.
-            if (!_cache.TryGetValue(cacheKey, out T result))
+            key = SettingKey(key, lang);
+            // Serialized values keep object/string readers coherent and return fresh instances.
+            long epoch;
+            lock (CacheGate)
             {
-                var setting = await Repository.FindAsync(key);
-                if (setting == null)
-                {
-                    _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
-                }
-                else if (setting.Value != null)
-                {
-                    try
-                    {
-                        result = JsonSerializer.Deserialize<T>(setting.Value);
-                        _cache.Set(cacheKey, result, TimeSpan.FromDays(1));
-                    }
-                    catch (Exception)
-                    {
-                        // Invalid settings should behave like a missing setting, but must not
-                        // make every request fail. Cache the fallback for the same period.
-                        result = default;
-                        _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
-                    }
-                }
-                else
-                {
-                    _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
-                }
+                epoch = Epoch(key);
+                if (!InTransaction && _cache.TryGetValue(CacheKey(key), out string cached)) return Read<T>(cached);
             }
-
-            return result ?? default;
-        }
-
-        public async Task SetValue<T>(string key, T val, string lang)
-        {
-            key = lang == null ? key : $"{key}_{lang}";
-            var cacheKey = GetTypedCacheKey<T>(key);
-            var value = val != null ? JsonSerializer.Serialize(val) : null;
             var setting = await Repository.FindAsync(key);
-            if (setting == null)
-            {
-                setting = new GenericSetting { Key = key, Value = value };
-                Repository.Insert(setting);
-            }
-            else
-            {
-                setting.Value = value;
-            }
+            var json = setting?.Value;
+            lock (CacheGate)
+                if (!InTransaction && Epoch(key) == epoch) _cache.Set(CacheKey(key), json, TimeSpan.FromDays(1));
+            return Read<T>(json);
+        }
+        public async Task SetValue<T>(string key, T val, string lang = null)
+        {
+            key = SettingKey(key, lang);
+            var json = val == null ? null : JsonSerializer.Serialize(val);
+            var setting = await Repository.FindAsync(key);
+            if (setting == null) Repository.Insert(new GenericSetting { Key = key, Value = json });
+            else setting.Value = json;
             await _unitOfWork.SaveChangesAsync();
-            _cache.Set(cacheKey, JsonSerializer.Deserialize<T>(setting.Value), TimeSpan.FromDays(1));
+            InvalidateCache(key);
+            // An outer transaction must commit before its new settings become visible.
+            lock (CacheGate)
+                if (!InTransaction) _cache.Set(CacheKey(key), json, TimeSpan.FromDays(1));
+        }
+        public void InvalidateCache(string key, string lang = null)
+        {
+            key = SettingKey(key, lang);
+            lock (CacheGate) { _cache.Set(CacheKey(key) + ":epoch", Epoch(key) + 1); _cache.Remove(CacheKey(key)); }
         }
 
-        public T GetCachedValue<T>(string key, string lang = null)
-        {
-            key = lang == null ? key : $"{key}_{lang}";
-            var cacheKey = GetTypedCacheKey<T>(key);
-            if (!_cache.TryGetValue(cacheKey, out T result))
-            {
-                _cache.Set<T>(cacheKey, default, TimeSpan.FromDays(1));
-                return default;
-            }
-            return result;
-        }
+        public T GetCachedValue<T>(string key, string lang = null) =>
+            !InTransaction && _cache.TryGetValue(CacheKey(SettingKey(key, lang)), out string json) ? Read<T>(json) : default;
         public void SetCachedValue<T>(string key, T val, string lang = null)
         {
-            key = lang == null ? key : $"{key}_{lang}";
-            var cacheKey = GetTypedCacheKey<T>(key);
-            var value = val != null ? JsonSerializer.Serialize(val) : null;
-            _cache.Set(cacheKey, JsonSerializer.Deserialize<T>(value), TimeSpan.FromDays(1));
+            var cacheKey = CacheKey(SettingKey(key, lang));
+            lock (CacheGate)
+            {
+                InvalidateCache(key, lang);
+                if (!InTransaction) _cache.Set(cacheKey, val == null ? null : JsonSerializer.Serialize(val), TimeSpan.FromDays(1));
+            }
         }
-
-        private static string GetTypedCacheKey<T>(string key) => $"{key}:{typeof(T).FullName}";
     }
 }

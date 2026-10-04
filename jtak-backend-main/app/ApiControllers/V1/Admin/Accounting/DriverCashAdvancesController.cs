@@ -111,7 +111,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
         public async Task<ActionResult<object>> Create([FromBody] CreateDriverCashAdvanceRequest request)
         {
             if (request == null || request.DriverUserId == Guid.Empty || request.Amount <= 0m ||
-                request.Amount > 1_000_000_000m || string.IsNullOrWhiteSpace(request.IdempotencyKey) ||
+                request.Amount > 1_000_000_000m || request.Amount != decimal.Round(request.Amount, 2) || string.IsNullOrWhiteSpace(request.IdempotencyKey) ||
                 request.IdempotencyKey.Length > 100 || string.IsNullOrWhiteSpace(request.Reason) ||
                 request.Reason.Trim().Length > 300)
                 return BadRequest(ApiErr.Create("أدخل المندوب والمبلغ وسبب صرف العهدة بشكل صحيح."));

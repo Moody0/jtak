@@ -32,7 +32,7 @@ namespace App.Shared.Services
     {
         string DefaultNotificationGroup { get; }
 
-        Task<Notification[]> GetNotifications(Guid? uid, DateTime? fromDate = null, DateTime? updateBefore = null, DateTime? updateAfter = null);
+        Task<Notification[]> GetNotifications(Guid? uid, DateTime? fromDate = null, DateTime? updateBefore = null, DateTime? updateAfter = null, int page = 0);
 
         Task MarkAsRead(Guid? uid, long? id = null);
         Task MarkAsRecived(Guid? uid, long? id = null);
@@ -270,8 +270,9 @@ namespace App.Shared.Services
         }
 
 
-        public async Task<Notification[]> GetNotifications(Guid? uid, DateTime? fromDate = null, DateTime? updateBefore = null, DateTime? updateAfter = null)
+        public async Task<Notification[]> GetNotifications(Guid? uid, DateTime? fromDate = null, DateTime? updateBefore = null, DateTime? updateAfter = null, int page = 0)
         {
+            if(page < 0 || page > 10000) throw new ArgumentOutOfRangeException(nameof(page));
             var myTopics = new List<string> { DefaultNotificationGroup };
 
             var entity = NotificationType.GlobalNotification;
@@ -284,6 +285,8 @@ namespace App.Shared.Services
                                                 myTopics.Contains(x.Topic) &&
                                                 (fromDate == null || x.CreatedDate < fromDate))
                                     .OrderByDescending(x => x.CreatedDate)
+                                    .ThenByDescending(x => x.Id)
+                                    .Skip(20 * page)
                                     .Take(20)
                                     .ToArrayAsync();
 
@@ -295,11 +298,12 @@ namespace App.Shared.Services
             }
             else
             {
-                // WORKING DON'T TOUCH IT !!
                 notifications = await Repository
                                     .Queryable()
                                     .Where(x => x.NotificationMessages.Any(m => m.UserId == uid) && (fromDate == null || x.CreatedDate < fromDate))
                                     .OrderByDescending(x => x.CreatedDate)
+                                    .ThenByDescending(x => x.Id)
+                                    .Skip(20 * page)
                                     .Take(20)
                                     .ToArrayAsync();
 
@@ -329,34 +333,37 @@ namespace App.Shared.Services
 
         public async Task MarkAsRead(Guid? uid, long? id)
         {
-            if (uid == null)
+            if (uid != null)
             {
                 var notificationMessages = await _nmRepo.Queryable().Where(x => x.UserId == uid && (id == null || x.NotificationId == id)).ToArrayAsync();
                 foreach (var notificationMessage in notificationMessages)
                 {
                     notificationMessage.RecivedDate ??= DateTime.UtcNow;
                     notificationMessage.ReadDate = DateTime.UtcNow;
+                    _nmRepo.Update(notificationMessage);
                 }
             }
             else
             {
-                var notification = await Repository.Queryable().FirstOrDefaultAsync(x => x.Id == id);
+                var notification = await Repository.Queryable().FirstOrDefaultAsync(x => x.Id == id && x.NotificationType == NotificationType.GlobalNotification && x.Topic == DefaultNotificationGroup);
+                if(notification == null) return;
                 notification.NotLoggedInReadCount++;
             }
-            await _nHubContext.Clients.User(uid.ToString()).SendAsync("NotificationCountUpdated", 0);
             await _unitOfWork.SaveChangesAsync();
+            if(uid.HasValue && _nHubContext != null) await _nHubContext.Clients.User(uid.Value.ToString()).SendAsync("NotificationCountUpdated", await CountUnreadNotifications(uid.Value));
         }
 
         public async Task MarkAsRecived(Guid? uid, long? id)
         {
-            if (uid == null)
+            if (uid != null)
             {
                 var notificationMessages = await _nmRepo.Queryable().Where(x => x.UserId == uid && (id == null || x.NotificationId == id)).ToArrayAsync();
-                foreach (var notificationMessage in notificationMessages) notificationMessage.RecivedDate = DateTime.UtcNow;
+                foreach (var notificationMessage in notificationMessages) { notificationMessage.RecivedDate ??= DateTime.UtcNow; _nmRepo.Update(notificationMessage); }
             }
             else
             {
-                var notification = await Repository.Queryable().FirstOrDefaultAsync(x => x.Id == id);
+                var notification = await Repository.Queryable().FirstOrDefaultAsync(x => x.Id == id && x.NotificationType == NotificationType.GlobalNotification && x.Topic == DefaultNotificationGroup);
+                if(notification == null) return;
                 notification.NotLoggedInRecivedCount++;
             }
             await _unitOfWork.SaveChangesAsync();
