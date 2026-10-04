@@ -5,6 +5,8 @@ import 'package:app_jtak_delivery/src/core/models/merchant_order_details.dart';
 import 'package:app_jtak_delivery/src/core/enums/order_details_status_enum.dart';
 import 'package:app_jtak_delivery/src/core/enums/payment_method_enum.dart';
 import 'package:app_jtak_delivery/src/core/models/balances_model.dart';
+import 'package:app_jtak_delivery/src/core/models/payment_model.dart';
+import 'package:app_jtak_delivery/src/ui/pages/main_page.dart';
 
 void main() {
   group('PhoneHelper - Syrian Phone & WhatsApp Normalization', () {
@@ -61,6 +63,50 @@ void main() {
       expect(balances.availableAmount, 100000.50);
       expect(balances.maxCashFloat, 500000.0);
       expect(balances.hasPendingSettlement, isTrue);
+    });
+  });
+
+  group('PaymentModel - Captain settlement history', () {
+    test('parses completed settlement requests from the accounting API', () {
+      final payment = PaymentModel.fromSettlementMap({
+        'requestNumber': 'SET-20260918092137-C9BBC4',
+        'amount': '4400.00',
+        'currency': 'SYP',
+        'status': 3,
+        'createdDate': '2026-09-18T12:20:46Z',
+        'completedAt': '2026-09-18T12:21:00Z',
+        'requestedByName': 'reham mammmmmmm',
+      });
+
+      expect(payment.isSettlement, isTrue);
+      expect(payment.referenceNumber, 'SET-20260918092137-C9BBC4');
+      expect(payment.amount, 4400.0);
+      expect(payment.statusCode, 3);
+      expect(payment.handoverDate, '2026-09-18T12:21:00Z');
+    });
+
+    test('supports string enum statuses returned by alternate serializers', () {
+      final payment = PaymentModel.fromSettlementMap({
+        'requestNumber': 'SET-1',
+        'amount': 2250,
+        'status': 'Completed',
+        'createdDate': '2026-09-17T22:36:04Z',
+      });
+
+      expect(payment.statusCode, 3);
+      expect(payment.status, 'Completed');
+    });
+
+    test('parses the admin rejection reason for rejected settlements', () {
+      final payment = PaymentModel.fromSettlementMap({
+        'requestNumber': 'SET-REJECTED',
+        'amount': 714,
+        'status': 2,
+        'rejectionReason': 'المبلغ المطلوب غير مطابق للمستندات',
+      });
+
+      expect(payment.statusCode, 2);
+      expect(payment.rejectionReason, 'المبلغ المطلوب غير مطابق للمستندات');
     });
   });
 
@@ -206,6 +252,12 @@ void main() {
       expect(order.isCanceled, isTrue);
       expect(order.isTerminal, isTrue);
       expect(order.canDeliverToCustomer, isFalse);
+    });
+  });
+
+  group('MainPage - Navigation Controller', () {
+    test('homeRequests notifier is initialized', () {
+      expect(MainPage.homeRequests.value, 0);
     });
   });
 }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:async';
+import 'package:geolocator/geolocator.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -12,6 +15,7 @@ import '../../core/services/locator.dart';
 import '../../utils/utilities/global_var.dart';
 import '../pages/account/profile_page.dart';
 import '../pages/order/orders_page.dart';
+import '../pages/order/errand_assignments_page.dart';
 import '../pages/setting_page.dart';
 import '../pages/transaction/transaction_page.dart';
 import '../sections/delivery_bottom_navigation.dart';
@@ -21,82 +25,144 @@ import '../widgets/incoming_order_modal.dart';
 class MainPage extends StatefulWidget {
   const MainPage({Key? key}) : super(key: key);
   static const String routeName = '/MainPage';
+  static final ValueNotifier<int> homeRequests = ValueNotifier(0);
   @override
   _MainPageState createState() => _MainPageState();
 }
 
 class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
-  Widget homeBody = const OrdersPage();
+  final GlobalKey<ProfilePageState> _profilePageKey =
+      GlobalKey<ProfilePageState>();
+  late final List<Widget> _tabPages = [
+    OrdersPage(),
+    TransactionPage(),
+    ProfilePage(key: _profilePageKey, showAppBar: false),
+    SettingPage(showAppBar: false),
+  ];
+  final Set<int> _visitedTabs = {0};
   String pageTitle = 'الطلبات الحالية';
   bool _checkingLocation = false;
+  bool _checkingInitialLocation = true;
+  bool _locationRecheckPending = false;
+  StreamSubscription<ServiceStatus>? _locationServiceSubscription;
   bool _locationReady = false;
   bool _servicesInitialized = false;
   bool _hasStartedLocationRequest = false;
+  bool _isShowingIncomingOrderModal = false;
   String? _locationError;
   LocationAccessIssue? _locationIssue;
 
   int _currentNavIndex = 0;
 
   void _onBottomNavChange(int index) {
-    if (_currentNavIndex == index) return;
+    if (index < 0 || index >= _tabPages.length) {
+      return;
+    }
+    if (_currentNavIndex == index) {
+      if (index == 2) {
+        final profileState = _profilePageKey.currentState;
+        if (profileState != null) unawaited(profileState.refreshProfile());
+      }
+      return;
+    }
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     setState(() {
       _currentNavIndex = index;
+      _visitedTabs.add(index);
       switch (index) {
         case 0:
-          homeBody = const OrdersPage();
           pageTitle = isArabic ? 'الطلبات الحالية' : 'Current Orders';
           break;
         case 1:
-          homeBody = const TransactionPage();
           pageTitle = isArabic ? 'سجل الحركات المالية' : 'Transactions';
           break;
         case 2:
-          homeBody = const ProfilePage();
           pageTitle = isArabic ? 'الملف الشخصي' : 'Profile';
           break;
         case 3:
-          homeBody = const SettingPage();
           pageTitle = isArabic ? 'الإعدادات' : 'Settings';
           break;
       }
     });
+    if (index == 2) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final profileState = _profilePageKey.currentState;
+        if (profileState != null) unawaited(profileState.refreshProfile());
+      });
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    MainPage.homeRequests.addListener(_openHomeTab);
     WidgetsBinding.instance.addObserver(this);
-    // Intentionally NOT requested here: firing the OS permission dialog
-    // before the driver understands why sinks the grant rate and, once
-    // "While using the app" is granted, a raw retry can never reach
-    // "Always" on Android 11+ (see requireAlwaysPermission). The rationale
-    // screen below primes the request instead of ambushing the driver.
+    // Push notifications must not depend on the driver's location permission
+    // gate. Register FCM as soon as the authenticated main page is mounted so
+    // the driver can still receive a new-order alert while the app is closed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_servicesInitialized) {
+        _servicesInitialized = true;
+        locator<AppParametersProvider>().initServices(context);
+      }
+      if (mounted) {
+        try {
+          _locationServiceSubscription =
+              Geolocator.getServiceStatusStream().listen(
+            (_) => unawaited(_ensureLocationAccess(requestPermission: false)),
+            onError: (Object error) =>
+                debugPrint('Location service status: $error'),
+          );
+        } catch (error) {
+          debugPrint('Could not monitor location service status: $error');
+        }
+        unawaited(_ensureLocationAccess(requestPermission: false));
+      }
+    });
+    // Inspect the OS grant on every launch. Only the continue button may
+    // request a missing permission; an existing grant skips the explanation.
   }
 
   @override
   void dispose() {
+    MainPage.homeRequests.removeListener(_openHomeTab);
+    _locationServiceSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  void _openHomeTab() {
+    if (mounted) _onBottomNavChange(0);
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Only auto-recheck once the driver has actually engaged with the flow
-    // (e.g. they tabbed out to Settings and back) — never before they've
-    // seen the rationale and chosen to start it themselves.
-    if (state == AppLifecycleState.resumed &&
-        _hasStartedLocationRequest &&
-        !_locationReady &&
-        !_checkingLocation) {
-      _ensureLocationAccess();
+    if (state == AppLifecycleState.resumed) {
+      unawaited(locator<AuthenticationService>().refreshCurrentUserProfile());
+      unawaited(locator<AppParametersProvider>()
+          .notificationServices
+          .refreshSubscriptions());
+      final profileState = _profilePageKey.currentState;
+      if (_currentNavIndex == 2 && profileState != null) {
+        unawaited(profileState.refreshProfile());
+      }
+    }
+    // A grant can be removed in Settings while the app is in the background.
+    // Returning from Settings must also restore access without another tap.
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_ensureLocationAccess(requestPermission: false));
     }
   }
 
-  Future<void> _ensureLocationAccess() async {
-    if (_checkingLocation || _locationReady) return;
+  Future<void> _ensureLocationAccess({bool requestPermission = true}) async {
+    if (!mounted) return;
+    if (_checkingLocation) {
+      if (!requestPermission) _locationRecheckPending = true;
+      return;
+    }
     _checkingLocation = true;
-    _hasStartedLocationRequest = true;
+    if (requestPermission) _hasStartedLocationRequest = true;
+    var accessGranted = false;
     if (mounted) {
       setState(() {
         _locationError = null;
@@ -105,53 +171,86 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     }
 
     try {
-      await LocationService(isMandatory: true).requireAlwaysPermission();
+      await LocationService(isMandatory: true)
+          .requireAlwaysPermission(requestIfDenied: requestPermission);
+      accessGranted = true;
+      if (!mounted) return;
       await locator<OrderProvider>().startLocationTracking();
-      await locator<OrderProvider>().fetchShiftStatus();
-      if (!_servicesInitialized && mounted) {
-        _servicesInitialized = true;
-        locator<AppParametersProvider>().initServices(context);
-      }
       if (mounted) {
         setState(() {
           _locationReady = true;
+          _checkingInitialLocation = false;
           _locationError = null;
           _locationIssue = null;
         });
       }
+      await locator<OrderProvider>().fetchShiftStatus();
     } on LocationAccessException catch (error) {
       if (mounted) {
         setState(() {
           _locationReady = false;
+          // First-time denial gets the explanation; GPS-off and blocked
+          // permissions show the settings action that resolves the problem.
+          if (error.issue != LocationAccessIssue.permissionDenied) {
+            _hasStartedLocationRequest = true;
+          }
           _locationError = error.message;
           _locationIssue = error.issue;
         });
       }
+      await locator<OrderProvider>().pauseLocationSharing();
     } catch (error) {
-      if (mounted) {
+      // A tracking/network failure must not pretend the OS grant disappeared.
+      if (accessGranted) {
+        debugPrint('Could not initialize delivery location tracking: $error');
+        if (mounted) setState(() => _locationReady = true);
+      } else if (mounted) {
         setState(() {
           _locationReady = false;
+          _hasStartedLocationRequest = true;
           _locationError = error.toString().replaceFirst('Exception: ', '');
           _locationIssue = null;
         });
       }
     } finally {
       _checkingLocation = false;
+      if (mounted) {
+        setState(() => _checkingInitialLocation = false);
+        if (_locationRecheckPending) {
+          _locationRecheckPending = false;
+          unawaited(_ensureLocationAccess(requestPermission: false));
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingInitialLocation) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     if (!_locationReady) return _locationGate(context);
 
     final orderProv = Provider.of<OrderProvider>(context);
 
-    if (orderProv.incomingOrderAlert != null) {
+    if (orderProv.incomingOrderAlert != null &&
+        !_isShowingIncomingOrderModal &&
+        ModalRoute.of(context)?.isCurrent == true &&
+        !Navigator.of(context).userGestureInProgress) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && orderProv.incomingOrderAlert != null) {
+        if (mounted &&
+            orderProv.incomingOrderAlert != null &&
+            !_isShowingIncomingOrderModal &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            !Navigator.of(context).userGestureInProgress) {
+          _isShowingIncomingOrderModal = true;
           final alertOrder = orderProv.incomingOrderAlert!;
           orderProv.dismissIncomingOrderAlert();
-          IncomingOrderModal.show(context, alertOrder);
+          IncomingOrderModal.show(context, alertOrder).whenComplete(() {
+            _isShowingIncomingOrderModal = false;
+          });
         }
       });
     }
@@ -168,9 +267,17 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       child: Scaffold(
         appBar: _appBar(context),
         body: SafeArea(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: homeBody,
+          child: IndexedStack(
+            index: _currentNavIndex,
+            children: List.generate(_tabPages.length, (index) {
+              if (!_visitedTabs.contains(index)) {
+                return const SizedBox.shrink();
+              }
+              return TickerMode(
+                enabled: index == _currentNavIndex,
+                child: _tabPages[index],
+              );
+            }),
           ),
         ),
         bottomNavigationBar: DeliveryBottomNavigation(
@@ -197,10 +304,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     );
   }
 
-  /// Shown once, before the OS permission dialog ever appears. Priming the
-  /// driver with *why* the app needs continuous location — instead of
-  /// ambushing them with a system prompt on first launch — measurably
-  /// improves grant rates and avoids the driver reflexively tapping "Deny".
+  /// Explain location access only when there is no usable OS permission.
   Widget _locationRationaleCard(bool isArabic) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final reasons = <(IconData, String, String)>[
@@ -405,13 +509,14 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
         Text(
           _locationError ??
               (isArabic
-                  ? 'يجب السماح بالموقع دائماً وتشغيل GPS لاستلام الطلبات ومشاركة موقعك أثناء التوصيل.'
-                  : 'Always-on location and GPS are required to receive orders and share your position during delivery.'),
+                  ? 'اسمح للتطبيق باستخدام موقعك وشغّل GPS لاستلام الطلبات ومشاركة موقعك أثناء التوصيل.'
+                  : 'Allow location access and enable GPS to receive orders and share your position during delivery.'),
           textAlign: TextAlign.center,
           style: GoogleFonts.ibmPlexSansArabic(
               fontSize: 14,
               height: 1.5,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              color:
+                  isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
         ),
         if (steps.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -485,7 +590,11 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                     : Icons.location_on_rounded),
             label: Text(
               primaryOpensSettings
-                  ? (isArabic ? 'فتح إعدادات التطبيق' : 'Open app settings')
+                  ? (_locationIssue == LocationAccessIssue.serviceDisabled
+                      ? (isArabic ? 'تشغيل الموقع' : 'Enable GPS')
+                      : (isArabic
+                          ? 'فتح إعدادات التطبيق'
+                          : 'Open app settings'))
                   : (isArabic ? 'السماح بالموقع' : 'Allow location'),
               style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
             ),
@@ -515,6 +624,16 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       elevation: 0,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       titleSpacing: 0,
+      automaticallyImplyLeading: false,
+      leading: isHomePage
+          ? IconButton(
+              tooltip: isArabic ? 'طلبات الشراء' : 'Purchase requests',
+              icon: const Icon(Icons.shopping_bag_outlined),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const ErrandAssignmentsPage(),
+              )),
+            )
+          : null,
       title: isHomePage
           ? Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -526,7 +645,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                   errorBuilder: (_, __, ___) => Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const HomeMirroredIcon(PhosphorIcons.mopedBold,
+                      const AppIcon(PhosphorIcons.mopedBold,
                           color: kPrimaryOrange, size: 24),
                       const SizedBox(width: 6),
                       Text(
@@ -576,11 +695,10 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 14),
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfilePage()),
-                  );
+                  HapticFeedback.lightImpact();
+                  _onBottomNavChange(2);
                 },
                 child: Container(
                   width: 38,
