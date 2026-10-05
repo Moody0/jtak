@@ -236,6 +236,18 @@ export class MerchantsListComponent
   }
 
   edit(item: Merchant | null, initialMerchantKind?: number): void {
+    if (item?.id) {
+      this.service.getItem(item.id).pipe(
+        catchError(() => of(item))
+      ).subscribe((fresh) => {
+        this.openEditModal((fresh as Merchant) || item, initialMerchantKind);
+      });
+      return;
+    }
+    this.openEditModal(null, initialMerchantKind);
+  }
+
+  private openEditModal(item: Merchant | null, initialMerchantKind?: number): void {
     const modalRef = this.modalService.open(EditMerchantModalComponent, {
       size: 'xl',
       backdrop: 'static',

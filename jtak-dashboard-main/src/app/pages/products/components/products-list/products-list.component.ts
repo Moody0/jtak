@@ -253,55 +253,21 @@ export class ProductsListComponent
     return null;
   }
 
-  /**
-   * Smart Subcategory Inference based on Syrian / Arabic gastronomy keywords
-   */
-  suggestSubcategory(title: string): string | null {
-    if (!title) return null;
-    const t = title.toLowerCase();
-    if (/وافل|كريب|تشيزكيك|كيك|برازق|مدلوقة|بقلاوة|مبرومة|حلاوة الجبن|كنافة|معمول|شوكولا|غريبة|بوظة|آيس كريم|حلوى|تورتة|دونات/.test(t)) {
-      return 'حلويات';
-    }
-    if (/كولد برو|لاتيه|قهوة|مشروب|عصير|سبانش|اسبريسو|موكا|شاي|كوكتيل|ميلك شيك|سموذي|مشروبات/.test(t)) {
-      return 'كافيه ومشروبات';
-    }
-    if (/برغر|برجر|فرايز|بطاطا|كرسبي|تشيكن|شاورما|بروستد|ساندويش|سندويش|تاكو|بيتزا|زنجر|فاير/.test(t)) {
-      return 'وجبات وسناك';
-    }
-    if (/فول|حمص|فلافل|فتة|مسبحة|تسقية|بيض|فطور|معجنات|فطائر|مناقيش/.test(t)) {
-      return 'فطور شعبي';
-    }
-    if (/مشاوي|كباب|شيش|شقف|كبة|لحمة|عرايس|طاووق|ريش|كفتة/.test(t)) {
-      return 'مشاوي ولحوم';
-    }
-    if (/حليب|لبن|جبن|زبدة|قشطة|ألبان|زبادي/.test(t)) {
-      return 'ألبان وأجبان';
-    }
-    return null;
-  }
-
   getCategoryBadge(product: Product): CategoryBadgeDisplay {
     const info = this.getCategoryInfo(product);
     if (info) {
       if (info.parentTitle) {
         return { parent: info.parentTitle, sub: info.title, isRootOnly: false, isSuggested: false };
       }
-      // Product only has Root Category (e.g. "المطاعم")
-      const suggested = this.suggestSubcategory(product.title);
-      if (suggested) {
-        return { parent: info.title, sub: suggested, isRootOnly: true, isSuggested: true };
-      }
-      return { parent: info.title, sub: 'غير مصنف فرعياً', isRootOnly: true, isSuggested: false };
+      return { parent: info.title, sub: '', isRootOnly: true, isSuggested: false };
     }
 
-    // Fallback if productCategoryId not in map
-    const suggested = this.suggestSubcategory(product.title);
-    const parentName = product.productCategory || 'المطاعم';
+    const parentName = product.productCategory || 'غير مصنف';
     return {
       parent: parentName,
-      sub: suggested || 'غير مصنف فرعياً',
+      sub: '',
       isRootOnly: true,
-      isSuggested: !!suggested,
+      isSuggested: false,
     };
   }
 
@@ -369,30 +335,7 @@ export class ProductsListComponent
       : 0;
   }
 
-  /**
-   * One-click action to adopt suggested subcategory
-   */
-  applySuggestedSubcategory(product: Product, subTitle: string, event: Event): void {
-    event.stopPropagation();
-    // Find matching subcategory
-    const matchingCat = this.categoriesList.find(
-      (c) => c.title.toLowerCase() === subTitle.toLowerCase() || c.fullPath.includes(subTitle)
-    );
 
-    if (matchingCat) {
-      const updatedProduct = {
-        ...product,
-        productCategoryId: matchingCat.id,
-      };
-      this.service.update(updatedProduct).subscribe(() => {
-        this.toaster.success(`تم اعتماد تصنيف "${subTitle}" للمنتج بنجاح`);
-        this.service.fetchPost();
-      });
-    } else {
-      // Open modal so admin can select exact subcategory
-      this.edit(product);
-    }
-  }
 
   searchForm(): void {
     this.searchGroup = this.fb.group({

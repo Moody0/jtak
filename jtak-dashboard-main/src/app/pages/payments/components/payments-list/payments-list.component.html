@@ -247,7 +247,8 @@
                 <span class="ops-date-cell" *ngIf="payment.handoverDate">
                   {{ payment.handoverDate | date:'yyyy/MM/dd' }}
                 </span>
-                <span class="text-muted fs-8" *ngIf="!payment.handoverDate">-</span>
+                <span class="badge badge-light-warning fs-8" *ngIf="!payment.handoverDate && payment.status === 'Pending'">بانتظار تأكيد التاجر</span>
+                <span class="text-muted fs-8" *ngIf="!payment.handoverDate && payment.status !== 'Pending'">-</span>
               </td>
             </tr>
 

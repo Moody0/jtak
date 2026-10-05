@@ -55,7 +55,7 @@ export class CreatePaymentModalComponent implements OnInit, OnDestroy {
     payload.requestKey=this.requestKey;
     this.isSaving=true;this.formGroup.disable();
     this.subs.add(this.paymentsService.create(payload).subscribe({
-      next:()=>{this.toasterService.success('تم تسجيل استلام المتجر للدفعة');this.modal.close(true);},
+      next:()=>{this.toasterService.success('تم إنشاء الدفعة. لن تُخصم من الحسابات إلا بعد تأكيد التاجر لاستلامها');this.modal.close(true);},
       error:err=>{this.isSaving=false;this.formGroup.enable();this.toasterService.error(err?.error?.message || err?.error?.error || 'تعذر تأكيد تسجيل الدفعة. حدّث السجل للتحقق قبل إعادة المحاولة.');}
     }));
   }

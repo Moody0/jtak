@@ -1,4 +1,4 @@
-﻿import { Injectable, Inject, OnDestroy } from '@angular/core';
+import { Injectable, Inject, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
 import { TableService, TableResponseModel } from 'src/app/_metronic/shared/crud-table';
@@ -72,6 +72,22 @@ export class MerchantsService extends TableService<Merchant> implements OnDestro
       return null;
     }
   }
+
+  clearWorkspaceMerchant(id?: number): void {
+    try {
+      if (id) {
+        sessionStorage.removeItem(`${this.workspaceStoragePrefix}${id}`);
+      } else {
+        Object.keys(sessionStorage)
+          .filter((k) => k.startsWith(this.workspaceStoragePrefix))
+          .forEach((k) => sessionStorage.removeItem(k));
+      }
+    } catch {
+      // Storage may be disabled.
+    }
+  }
+
+
 
   ngOnDestroy() {
     this.subscriptions.forEach((sb) => sb.unsubscribe());

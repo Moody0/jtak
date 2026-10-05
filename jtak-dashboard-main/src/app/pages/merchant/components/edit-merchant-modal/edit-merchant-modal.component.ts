@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, Input, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, Input, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
@@ -314,6 +314,15 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       )
       .subscribe((users) => {
         this.merchantUsers = users || [];
+        if (this.item?.ownerId) {
+          const ownerAccount = this.merchantUsers.find((u) => u.id === this.item.ownerId);
+          if (ownerAccount?.fullName) {
+            this.formGroup.patchValue({
+              ownerName: ownerAccount.fullName,
+              owner: ownerAccount.fullName,
+            });
+          }
+        }
         this.cdk.detectChanges();
       });
   }
@@ -622,6 +631,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       .update(formValues)
       .pipe(
         tap(() => {
+          this.service.clearWorkspaceMerchant(formValues.id);
           this.toasterService.success('Merchant Updated');
           this.modal.close(formValues);
         }),

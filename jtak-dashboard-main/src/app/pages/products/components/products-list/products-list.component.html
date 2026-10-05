@@ -307,7 +307,7 @@
                 </div>
               </td>
 
-              <!-- Category & Hierarchy with Smart Subcategory Resolution -->
+              <!-- Category & Hierarchy -->
               <td>
                 <div class="products-cat-cell" *ngIf="getCategoryBadge(product) as catBadge">
                   <!-- Root Category Department -->
@@ -316,27 +316,15 @@
                   </span>
 
                   <!-- Explicit Subcategory -->
-                  <span class="products-cat-sub-badge" *ngIf="!catBadge.isRootOnly">
+                  <span class="products-cat-sub-badge" *ngIf="!catBadge.isRootOnly && catBadge.sub">
                     <i class="fas fa-angle-left rtl-flip me-1"></i>
                     <strong>{{ catBadge.sub }}</strong>
                   </span>
 
-                  <!-- Inferred Smart Suggestion (1-Click Apply) -->
-                  <div
-                    class="products-suggested-chip"
-                    *ngIf="catBadge.isRootOnly && catBadge.isSuggested"
-                    (click)="applySuggestedSubcategory(product, catBadge.sub, $event)"
-                    title="اقتراح ذكي بناءً على بيانات الصنف - انقر للاعتماد الفوري"
-                  >
-                    <i class="fas fa-lightbulb text-warning me-1"></i>
-                    <span>{{ catBadge.sub }}</span>
-                    <span class="products-apply-btn"><i class="fas fa-check"></i></span>
-                  </div>
-
                   <!-- Needs Subcategory Warning -->
                   <span
                     class="products-cat-warn-chip"
-                    *ngIf="catBadge.isRootOnly && !catBadge.isSuggested"
+                    *ngIf="catBadge.isRootOnly"
                     (click)="edit(product)"
                     title="يرجى فتح المنتج وإسناده لتصنيف فرعي دقيق"
                   >
