@@ -296,7 +296,9 @@ driverSearchGroup: UntypedFormGroup;
   isSavingDriverPricing: boolean = false;
   driverPricingSaveSuccess: boolean = false;
   driverPricingSaveError: boolean = false;
-  driverPricingLoading: boolean = true;
+  // Must start false: loadDriverPricing() returns early while this is true,
+  // which would leave the pricing fields disabled forever.
+  driverPricingLoading: boolean = false;
   simulatedDistance: number = 4.5;
   errandDriverEarning = 0;
   errandDriverEarningLoading = true;
