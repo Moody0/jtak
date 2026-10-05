@@ -178,6 +178,16 @@ namespace App.ApiControllers.V1.Admin
             var x = await _service.FindAsync(id);
             if (x == null || x.DeletionDate != null) return NotFound();
 
+            var ownerName = x.OwnerName ?? "";
+            if (x.OwnerId != Guid.Empty && _userManager != null)
+            {
+                var ownerUser = await _userManager.FindByIdAsync(x.OwnerId.ToString());
+                if (ownerUser != null && !string.IsNullOrWhiteSpace(ownerUser.FullName))
+                {
+                    ownerName = ownerUser.FullName;
+                }
+            }
+
             return Ok(new MerchantDto
             {
                 Id = x.Id,
@@ -193,8 +203,8 @@ namespace App.ApiControllers.V1.Admin
                 Lat = x.Lat,
                 Lng = x.Lng,
                 OwnerId = x.OwnerId,
-                OwnerName = x.OwnerName ?? "",
-                Owner = x.OwnerName ?? "",
+                OwnerName = ownerName,
+                Owner = ownerName,
                 Active = x.Active,
                 MerchantKind = x.MerchantKind,
                 DeliveryTime = x.DeliveryTime,

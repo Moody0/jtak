@@ -53,7 +53,7 @@ namespace App.ApiControllers.V1.Warehouse
 
             var entity = await _merchantService.Queryable()
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.OwnerId == uid.Value);
+                .FirstOrDefaultAsync(x => x.OwnerId == uid.Value && x.DeletionDate == null);
 
             if (entity == null)
             {
@@ -74,7 +74,7 @@ namespace App.ApiControllers.V1.Warehouse
             if (!uid.HasValue) return Unauthorized();
 
             var entity = await _merchantService.Queryable()
-                .FirstOrDefaultAsync(x => x.OwnerId == uid.Value);
+                .FirstOrDefaultAsync(x => x.OwnerId == uid.Value && x.DeletionDate == null);
 
             if (entity == null)
             {
@@ -177,7 +177,7 @@ namespace App.ApiControllers.V1.Warehouse
 
             var entity = await _merchantService.Queryable()
                 .OrderByDescending(x => x.Id)
-                .FirstOrDefaultAsync(x => x.OwnerId == uid.Value);
+                .FirstOrDefaultAsync(x => x.OwnerId == uid.Value && x.DeletionDate == null);
 
             if (entity == null)
             {

@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Shared.Services;
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
@@ -125,7 +125,20 @@ namespace App.ApiControllers.V1.Warehouse
             var mUser = await _userManager.Users.Where(x => x.Id == payment.ToUserId).Select(x => x.FullName).FirstOrDefaultAsync();
 
             var mids = await _merchantService.GetMerchantIds(payment.ToUserId);
-            var merchantId = mids != null && mids.Length > 0 ? mids[0] : 0;
+            var merchantId = mids != null && mids.Length == 1 ? mids[0] : 0;
+            if (mids != null && mids.Length > 1)
+            {
+                // The admin selects one store; its title is stored on the payment. Never guess the store
+                // for an owner with several stores - that would credit the wrong merchant account.
+                var matches = await _merchantService.Queryable().AsNoTracking()
+                    .Where(m => mids.Contains(m.Id) && m.Title == payment.ToUser).Select(m => m.Id).Take(2).ToListAsync();
+                if (matches.Count != 1)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return BadRequest(ApiErr.Create("تعذر تحديد المتجر المقصود بهذه الدفعة. تواصل مع الإدارة."));
+                }
+                merchantId = matches[0];
+            }
 
             if (merchantId > 0)
             {
@@ -151,7 +164,9 @@ namespace App.ApiControllers.V1.Warehouse
                 var oldMerchantBalance = (await _balanceService.GetBalance(payment.ToUserId))?.Amount ?? 0;
 
                 payment.HandoverDate = DateTime.UtcNow;
-                payment.NewBalance = Math.Max(0m, oldMerchantBalance - payment.Amount);
+                payment.NewBalance = merchantId > 0
+                    ? Math.Max(0m, await _ledgerService.GetMerchantPayableBalanceAsync(merchantId))
+                    : Math.Max(0m, oldMerchantBalance - payment.Amount);
 
                 // Update legacy balance mirrors only on the first confirmation. The
                 // ledger service above uses Payment-{id} as its idempotency key.

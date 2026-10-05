@@ -278,13 +278,19 @@ namespace Modules.Accounting.Services
             var balance = await GetMerchantBalanceAsync(sources.Select(x => x.MerchantId), currency);
             if (balance.HasPendingAccountingOrders)
                 throw new InvalidOperationException("لا يمكن طلب تسوية مالية للمتجر لوجود طلبات مسلّمة معلقة لم تكتمل قيودها المحاسبية بعد.");
-            var amount = request?.Amount ?? balance.AvailableAmount;
+            // Courier cash payments awaiting this merchant's receipt confirmation are still in the
+            // merchant balance, but already promised to those payments, so they cannot be withdrawn.
+            var courierPending = await _safety.GetUnconfirmedMerchantPaymentsAsync(merchantOwnerId: userId);
+            decimal PendingFor(MerchantSettlementSource source) => courierPending
+                .Where(p => sources.Length <= 1 || p.ToUser == source.MerchantTitle).Sum(p => p.Amount);
+            var availableAmount = Math.Max(0m, balance.AvailableAmount - courierPending.Sum(p => p.Amount));
+            var amount = request?.Amount ?? availableAmount;
             if (amount != decimal.Round(amount, 2))
                 throw new InvalidOperationException("المبلغ يجب ألا يتجاوز منزلتين عشريتين.");
             if (amount <= 0m)
                 throw new InvalidOperationException("يرجى إدخال مبلغ صحيح أكبر من الصفر.");
-            if (amount > balance.AvailableAmount)
-                throw new InvalidOperationException($"المبلغ المطلوب يتجاوز الرصيد المتاح ({balance.AvailableAmount:N2} ل.س).");
+            if (amount > availableAmount)
+                throw new InvalidOperationException($"المبلغ المطلوب يتجاوز الرصيد المتاح ({availableAmount:N2} ل.س).");
 
             var entity = NewRequest(SettlementPartyType.Merchant, userId, name, phone, amount, currency, request);
             var remaining = amount;
@@ -296,7 +302,7 @@ namespace Modules.Accounting.Services
                                 (x.SettlementRequest.Status == SettlementRequestStatus.Pending ||
                                  x.SettlementRequest.Status == SettlementRequestStatus.Approved))
                     .SumAsync(x => (decimal?)x.Amount) ?? 0m;
-                var available = Math.Max(0m, payable - reserved);
+                var available = Math.Max(0m, payable - reserved - PendingFor(source));
                 var allocated = Math.Min(remaining, available);
                 if (allocated <= 0m) continue;
                 entity.MerchantAllocations.Add(new SettlementRequestMerchantAllocation

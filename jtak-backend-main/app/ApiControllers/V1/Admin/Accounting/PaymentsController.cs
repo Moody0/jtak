@@ -162,15 +162,18 @@ namespace App.ApiControllers.V1.Admin
                 }
                 if (merchant == null) return BadRequest(ApiErr.Create("حدد المتجر المستلم نفسه، وليس حساب مالك عدة متاجر."));
 
-                var key = $"AdminMerchantPayment-{dto.RequestKey.Trim()}";
-                var existing = await _auow.Context.JournalTransactions.Include(t => t.Entries).ThenInclude(e => e.Account).FirstOrDefaultAsync(t => t.IdempotencyKey == key);
-                if (existing != null)
-                    return MatchesPayment(existing, dto, merchant.Id) ? Ok(true) : Conflict(ApiErr.Create("مفتاح الدفعة مستخدم لعملية أخرى."));
-
                 var driver = await _userManager.FindByIdAsync(dto.ByUserId.ToString());
                 var recipient = await _userManager.FindByIdAsync(dto.ToUserId.ToString());
                 if (driver == null || !driver.IsActive || driver.DeletionDate != null || !await _userManager.IsInRoleAsync(driver, AppRoleName.Delivery.ToString()) || recipient == null)
                     return BadRequest(ApiErr.Create("اختر مندوب توصيل نشطاً ومتجراً له حساب مالك صحيح."));
+
+                // Double-submit protection: an identical payment still awaiting confirmation that was
+                // created moments ago is the same operation, not a new one.
+                var since = DateTime.UtcNow.AddMinutes(-2);
+                var duplicate = (await safety.GetUnconfirmedMerchantPaymentsAsync(dto.ByUserId, dto.ToUserId))
+                    .Any(p => p.ToUser == merchant.Title && p.Amount == dto.Amount && p.CreatedDate >= since);
+                if (duplicate) return Ok(true);
+
                 var position = await safety.GetPositionAsync(dto.ByUserId);
                 var available = await MerchantAvailableAsync(merchant.Id);
                 if (dto.Amount > position.SpendableCash)
@@ -178,36 +181,23 @@ namespace App.ApiControllers.V1.Admin
                 if (dto.Amount > available)
                     return BadRequest(ApiErr.Create($"المبلغ يتجاوز مستحقات المتجر المتاحة بعد التسويات المحجوزة ({available:N2} ل.س)."));
 
+                // The payment is only recorded here (HandoverDate == null => "قيد التسليم").
+                // The courier cash float, merchant payable and app balances are NOT touched until the
+                // merchant confirms receipt (Warehouse/Payments/RecivePayment). Meanwhile the amount is
+                // reserved on both sides so it cannot be spent or paid out twice.
                 var payment = new Payment { ByUserId = dto.ByUserId, ByUser = driver.FullName, ToUserId = dto.ToUserId, ToUser = merchant.Title,
-                    Amount = dto.Amount, NewBalance = position.Cash - dto.Amount, HandoverDate = DateTime.UtcNow };
+                    Amount = dto.Amount, NewBalance = Math.Max(0m, available - dto.Amount), HandoverDate = null };
                 _service.Insert(payment);
-                await _auow.SaveChangesAsync();
-                var cash = await _ledgerService.GetOrCreateUserAccountAsync(dto.ByUserId, AccountType.Asset, SystemAccountCodes.CaptainCashFloatPrefix, driver.FullName);
-                var payable = await _ledgerService.GetOrCreateMerchantAccountAsync(merchant.Id, merchant.Title);
-                await _ledgerService.PostTransactionAsync(new PostTransactionRequest {
-                    ReferenceType = "CaptainToMerchantPayment", ReferenceId = $"Payment-{payment.Id}", IdempotencyKey = key,
-                    Description = $"تسليم نقدي للمتجر {merchant.Title} من المندوب {driver.FullName}",
-                    Entries = new List<PostLedgerEntryRequest> { new() { AccountId = payable.Id, Debit = dto.Amount }, new() { AccountId = cash.Id, Credit = dto.Amount } }
-                });
-                var posted = await _auow.Context.JournalTransactions.Include(t => t.Entries).ThenInclude(e => e.Account).FirstAsync(t => t.IdempotencyKey == key);
-                if (!MatchesPayment(posted, dto, merchant.Id)) throw new InvalidOperationException("مفتاح الدفعة مستخدم لعملية أخرى.");
-                var oldDriver = await _balanceService.GetBalance(dto.ByUserId);
-                await _balanceService.UpdateAppBalance(new BalanceDto { Amount = payment.NewBalance, PendingAmount = oldDriver?.PendingAmount ?? 0m, Id = dto.ByUserId, Name = driver.FullName });
-                var ownerMerchantIds = await _merchantService.GetMerchantIds(dto.ToUserId);
-                decimal ownerBalance = 0m;
-                foreach (var id in ownerMerchantIds ?? Array.Empty<int>()) ownerBalance += await _ledgerService.GetMerchantPayableBalanceAsync(id);
-                var oldOwner = await _balanceService.GetBalance(dto.ToUserId);
-                await _balanceService.UpdateAppBalance(new BalanceDto { Amount = ownerBalance, PendingAmount = oldOwner?.PendingAmount ?? 0m, Id = dto.ToUserId, Name = recipient.FullName });
                 await _auow.SaveChangesAsync();
                 if (transaction != null) await transaction.CommitAsync();
                 try {
                     if (_auditService != null) await _auditService.LogAsync(new AdminAuditLogEntry
                     {
                         Module = "Settlements", Action = "Pay", EntityType = "Payment", EntityId = payment.Id.ToString(),
-                        Description = $"تسليم {dto.Amount:N2} ل.س للمتجر {merchant.Title} من المندوب {driver.FullName}", Result = "Success",
-                        AfterState = new { payment.Id, payment.Amount, payment.ByUserId, payment.ToUserId, MerchantId = merchant.Id, payment.NewBalance }
+                        Description = $"إنشاء دفعة {dto.Amount:N2} ل.س للمتجر {merchant.Title} عبر المندوب {driver.FullName} بانتظار تأكيد التاجر", Result = "Success",
+                        AfterState = new { payment.Id, payment.Amount, payment.ByUserId, payment.ToUserId, MerchantId = merchant.Id, Status = "PendingMerchantConfirmation" }
                     });
-                } catch { /* The committed journal records the financial operation. */ }
+                } catch { /* The payment record itself is the source of truth. */ }
                 return Ok(true);
             }
             catch (InvalidOperationException ex) { if (transaction != null) await transaction.RollbackAsync(); return BadRequest(ApiErr.Create(ex.Message)); }
@@ -218,16 +208,20 @@ namespace App.ApiControllers.V1.Admin
             }
         }
 
-        private static bool MatchesPayment(JournalTransaction transaction, PaymentDto dto, int merchantId) =>
-            transaction.ReferenceType == "CaptainToMerchantPayment" && transaction.Entries.Count == 2 &&
-            transaction.Entries.Any(e => e.Account.OwnerUserId == dto.ByUserId && e.Account.AccountCode.StartsWith(SystemAccountCodes.CaptainCashFloatPrefix) && e.Credit == dto.Amount && e.Debit == 0m) &&
-            transaction.Entries.Any(e => e.Account.OwnerMerchantId == merchantId && e.Account.AccountCode.StartsWith(SystemAccountCodes.VendorPayablePrefix) && e.Debit == dto.Amount && e.Credit == 0m);
-
         private async Task<decimal> MerchantAvailableAsync(int merchantId)
         {
             if (_ordersDb != null && await _ordersDb.Orders.AnyAsync(o => o.AccountingStatus == Modules.Orders.Entities.OrderAccountingStatus.PendingAccounting && o.OrderDetails.Any(d => d.MerchantId == merchantId))) return 0m;
             var reserved = await _auow.Context.SettlementRequestMerchantAllocations.Where(a => a.MerchantId == merchantId && a.SettlementRequest.Currency == "SYP" &&
                 (a.SettlementRequest.Status == SettlementRequestStatus.Pending || a.SettlementRequest.Status == SettlementRequestStatus.Approved)).SumAsync(a => (decimal?)a.Amount) ?? 0m;
+            // Courier payments awaiting the merchant's confirmation are not deducted yet, but are reserved.
+            var merchant = await _merchantService.Queryable().AsNoTracking().Where(m => m.Id == merchantId).Select(m => new { m.OwnerId, m.Title }).FirstOrDefaultAsync();
+            if (merchant != null)
+            {
+                var ownerStores = await _merchantService.Queryable().AsNoTracking().CountAsync(m => m.OwnerId == merchant.OwnerId);
+                var safety = new DriverFinancialSafetyService(_auow.Context, _ledgerService, _uow?.Context as AppDbContext, _ordersDb);
+                reserved += (await safety.GetUnconfirmedMerchantPaymentsAsync(merchantOwnerId: merchant.OwnerId))
+                    .Where(p => ownerStores <= 1 || p.ToUser == merchant.Title).Sum(p => p.Amount);
+            }
             return Math.Max(0m, await _ledgerService.GetMerchantPayableBalanceAsync(merchantId) - reserved);
         }
 

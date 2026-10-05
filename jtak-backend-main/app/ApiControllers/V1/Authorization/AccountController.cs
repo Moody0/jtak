@@ -36,6 +36,7 @@ namespace App.ApiControllers.V1.Authorization
         private readonly ISmsLogService _smsLogService;
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
+        private readonly App.Catalog.Data.CatalogDbContext _catalog;
 
         private bool IsTemporaryOtpEnabled =>
             bool.TryParse(_configuration?["Authentication:TemporaryOtpEnabled"], out var enabled) && enabled;
@@ -58,7 +59,8 @@ namespace App.ApiControllers.V1.Authorization
             ISmsLogService smsLogService,
             IEmailService emailService,
             INotificationService notificationService,
-            IConfiguration configuration = null)
+            IConfiguration configuration = null,
+            App.Catalog.Data.CatalogDbContext catalog = null)
         {
             _unitOfWork = unitOfWorkAsync;
             _userManager = userManager;
@@ -68,6 +70,7 @@ namespace App.ApiControllers.V1.Authorization
             _emailService = emailService;
             _notificationService = notificationService;
             _configuration = configuration;
+            _catalog = catalog;
         }
 
         /// <summary>
@@ -670,6 +673,28 @@ namespace App.ApiControllers.V1.Authorization
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded) return BadRequest(result);
             await _unitOfWork.SaveChangesAsync();
+
+            if (_catalog != null && !string.IsNullOrWhiteSpace(user.FullName))
+            {
+                try
+                {
+                    var ownedMerchants = await _catalog.Merchants
+                        .Where(m => m.OwnerId == user.Id && m.DeletionDate == null)
+                        .ToListAsync();
+                    if (ownedMerchants.Any())
+                    {
+                        foreach (var m in ownedMerchants)
+                        {
+                            m.OwnerName = user.FullName;
+                        }
+                        await _catalog.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Failed to sync merchant owner name: {ex.Message}");
+                }
+            }
             return "OK";
         }
 

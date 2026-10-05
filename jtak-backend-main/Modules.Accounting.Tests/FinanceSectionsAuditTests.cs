@@ -24,6 +24,7 @@ using Modules.Orders.Entities;
 using Moq;
 using Solf.Models;
 using AdminPayments=App.ApiControllers.V1.Admin.PaymentsController;
+using WarehousePayments=App.ApiControllers.V1.Warehouse.PaymentsController;
 using Merchant=Modules.Catalog.Entities.Merchant;
 
 namespace Modules.Accounting.Tests;
@@ -71,6 +72,8 @@ public class FinanceSectionsAuditTests
         }
         public AdminPayments Controller()=>new(new AppUnitOfWork(App),new AccountingUnitOfWork(Db),null,Users.Object,Merchants.Object,null,Payments,null,Balances.Object,Ledger,new SettlementHistoryService(Db),null,ordersDb:Orders);
         public PaymentDto Request(decimal amount=400m)=>new(){ByUserId=Driver,ToUserId=Owner,MerchantId=31,Amount=amount,RequestKey="operation-1"};
+        public WarehousePayments Warehouse()=>new(null,new AccountingUnitOfWork(Db),new Mock<global::App.Shared.Services.INotificationService>().Object,Users.Object,Merchants.Object,null,Payments,null,Balances.Object,Ledger,null){ControllerContext=new(){HttpContext=new DefaultHttpContext{User=new ClaimsPrincipal(new ClaimsIdentity(new[]{new Claim(ClaimTypes.NameIdentifier,Owner.ToString())},"test"))}}};
+        public DriverFinancialSafetyService Safety()=>new(Db,Ledger,App,Orders);
         public CaptainSettlementsController Captain()=>new(Orders,Db,Users.Object,Ledger,appDb:App){ControllerContext=new(){HttpContext=new DefaultHttpContext{User=new ClaimsPrincipal(new ClaimsIdentity(new[]{new Claim(ClaimTypes.NameIdentifier,Admin.ToString())},"test"))}}};
         public void Dispose(){Db.Dispose();App.Dispose();Catalog.Dispose();Orders.Dispose();}
     }
@@ -112,20 +115,38 @@ public class FinanceSectionsAuditTests
             Assert.Equal(nameof(AppPermissionKey.AdminPermission),type.GetCustomAttributes(typeof(AuthorizeAttribute),true).Cast<AuthorizeAttribute>().Single().Policy);
     }
     [Fact]
-    public async Task MerchantPaymentUsesSelectedStoreAndReplayCannotDebitTwice() {
+    public async Task MerchantPaymentStaysPendingUntilMerchantConfirmsThenDebitsOnce() {
         using var f=new Fixture();await f.Seed();var c=f.Controller();var request=f.Request();
         Assert.IsType<OkObjectResult>((await c.Create(request)).Result);Assert.IsType<OkObjectResult>((await c.Create(request)).Result);
-        Assert.Single(f.Db.Payments);Assert.NotNull(f.Db.Payments.Single().HandoverDate);
+        var payment=Assert.Single(f.Db.Payments);Assert.Null(payment.HandoverDate);
+        // Admin created it, but nothing has moved yet: courier, merchant and app balances are untouched.
+        Assert.Equal(1100m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));Assert.Equal(900m,await f.Ledger.GetMerchantPayableBalanceAsync(30));Assert.Equal(500m,await f.Ledger.GetMerchantPayableBalanceAsync(31));
+        Assert.Empty(await f.Db.JournalTransactions.Where(t=>t.ReferenceType=="CaptainToMerchantPayment").ToListAsync());
+        f.Balances.Verify(b=>b.UpdateAppBalance(It.IsAny<BalanceDto>()),Times.Never);
+        // The amount is reserved on both sides so it cannot be spent or withdrawn twice.
+        Assert.Equal(700m,(await f.Safety().GetPositionAsync(f.Driver)).SpendableCash);
+        var available=Json(Assert.IsType<OkObjectResult>((await c.AvailableBalances(f.Driver,31)).Result).Value!);
+        Assert.Equal(700m,available.GetProperty("deliveryBalance").GetDecimal());Assert.Equal(100m,available.GetProperty("merchantBalance").GetDecimal());
+        // Merchant confirms receipt: only now are the accounts updated, and only once.
+        var merchantSide=f.Warehouse();Assert.True((await merchantSide.RecivePayment(payment.Id)).Value);Assert.True((await merchantSide.RecivePayment(payment.Id)).Value);
+        Assert.NotNull(f.Db.Payments.Single().HandoverDate);
         Assert.Equal(700m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));Assert.Equal(900m,await f.Ledger.GetMerchantPayableBalanceAsync(30));Assert.Equal(100m,await f.Ledger.GetMerchantPayableBalanceAsync(31));
         Assert.Single(await f.Db.JournalTransactions.Where(t=>t.ReferenceType=="CaptainToMerchantPayment").ToListAsync());
-        await f.Ledger.PostCaptainToMerchantPaymentAsync(f.Driver,31,400m,$"Payment-{f.Db.Payments.Single().Id}");
-        Assert.Equal(700m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));
-        f.Balances.Verify(b=>b.UpdateAppBalance(It.Is<BalanceDto>(b=>b.Id==f.Owner && b.Amount==1000m)),Times.Once);
+        Assert.Equal(700m,(await f.Safety().GetPositionAsync(f.Driver)).SpendableCash);
     }
     [Fact]
-    public async Task ReusedOperationKeyWithDifferentAmountIsRejected() {
+    public async Task PendingPaymentReservesCourierCashAgainstASecondPayment() {
         using var f=new Fixture();await f.Seed();var c=f.Controller();Assert.IsType<OkObjectResult>((await c.Create(f.Request())).Result);
-        Assert.IsType<ConflictObjectResult>((await c.Create(f.Request(10m))).Result);Assert.Single(f.Db.Payments);
+        var second=f.Request(800m);second.RequestKey="operation-2";
+        Assert.IsType<BadRequestObjectResult>((await c.Create(second)).Result);Assert.Single(f.Db.Payments);
+    }
+    [Fact]
+    public async Task MerchantCannotWithdrawDuesReservedByPendingCourierPayment() {
+        using var f=new Fixture();await f.Seed();Assert.IsType<OkObjectResult>((await f.Controller().Create(f.Request())).Result);
+        var source=new[]{new MerchantSettlementSource{MerchantId=31,MerchantTitle="Second store"}};
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Settlements.CreateMerchantRequestAsync(f.Owner,"Owner","",source,new(){Amount=300m}));
+        Assert.Empty(f.Db.SettlementRequests);
+        await f.Settlements.CreateMerchantRequestAsync(f.Owner,"Owner","",source,new(){Amount=100m});
     }
     [Theory][InlineData(0)][InlineData(-1)][InlineData(1.005)][InlineData(1000000001)]
     public async Task InvalidPaymentAmountsNeverCreateRecords(decimal amount) {
@@ -144,12 +165,13 @@ public class FinanceSectionsAuditTests
     }
     [Fact]
     public async Task CorrectMerchantPaymentCannotBeReallocatedAgainFromTreasury() {
-        using var f=new Fixture();await f.Seed();var c=f.Controller();await c.Create(f.Request());var count=f.Db.JournalTransactions.Count();
+        using var f=new Fixture();await f.Seed();var c=f.Controller();await c.Create(f.Request());Assert.True((await f.Warehouse().RecivePayment(f.Db.Payments.Single().Id)).Value);var count=f.Db.JournalTransactions.Count();
         Assert.IsType<OkObjectResult>((await c.ReconcileToMerchant(f.Db.Payments.Single().Id)).Result);Assert.Equal(count,f.Db.JournalTransactions.Count());
     }
     [Fact]
     public async Task CreatedPaymentsAppearInHistoryAndGlobalSummaryDoesNotDependOnPage() {
         using var f=new Fixture();await f.Seed();var c=f.Controller();await c.Create(f.Request(100m));var second=f.Request(50.25m);second.RequestKey="operation-2";await c.Create(second);
+        foreach(var pending in f.Db.Payments.ToList())Assert.True((await f.Warehouse().RecivePayment(pending.Id)).Value);
         var a=Json(Assert.IsType<OkObjectResult>((await c.DataTable(new(){PageNumber=1,PageSize=1})).Result).Value!);
         var b=Json(Assert.IsType<OkObjectResult>((await c.DataTable(new(){PageNumber=2,PageSize=1})).Result).Value!);
         Assert.Equal(2,a.GetProperty("totalRecords").GetInt32());Assert.Equal(150.25m,a.GetProperty("summary").GetProperty("totalPaid").GetDecimal());Assert.Equal(a.GetProperty("summary").ToString(),b.GetProperty("summary").ToString());Assert.Single(a.GetProperty("items").EnumerateArray());

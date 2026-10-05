@@ -49,6 +49,10 @@ public sealed class DriverFinancialSafetyService
             (x.Status == SettlementRequestStatus.Pending || x.Status == SettlementRequestStatus.Approved))
             .Select(x => x.Amount).ToListAsync();
         var handovers = handoverAmounts.Sum();
+        // Cash handed to a merchant is only deducted from the courier once the merchant
+        // confirms receipt. Until then it is reserved so it cannot be spent twice.
+        if (string.Equals(currency, "SYP", StringComparison.OrdinalIgnoreCase))
+            handovers += (await GetUnconfirmedMerchantPaymentsAsync(driverId: driverId)).Sum(x => x.Amount);
         decimal purchases = 0m, collections = 0m;
         var unfinished = false;
         if (_app != null) {
@@ -87,6 +91,23 @@ public sealed class DriverFinancialSafetyService
         }
         return new DriverCashPosition { Cash = cash, ReservedForHandover = handovers,
             ReservedForPurchases = purchases, ExpectedCollections = collections, HasUnfinishedAccounting = unfinished };
+    }
+
+    /// <summary>Merchant payments created by admin that the merchant has not confirmed yet
+    /// (no HandoverDate and no ledger posting). Nothing has been deducted for them.</summary>
+    public async Task<System.Collections.Generic.List<Payment>> GetUnconfirmedMerchantPaymentsAsync(
+        Guid? driverId = null, Guid? merchantOwnerId = null)
+    {
+        var query = _accounting.Payments.AsNoTracking().Where(p => p.HandoverDate == null && p.Amount > 0);
+        if (driverId.HasValue) query = query.Where(p => p.ByUserId == driverId.Value);
+        if (merchantOwnerId.HasValue) query = query.Where(p => p.ToUserId == merchantOwnerId.Value);
+        var pending = await query.ToListAsync();
+        if (pending.Count == 0) return pending;
+        var references = pending.Select(p => $"Payment-{p.Id}").ToList();
+        var posted = await _accounting.JournalTransactions.AsNoTracking()
+            .Where(t => t.ReferenceType == "CaptainToMerchantPayment" && references.Contains(t.ReferenceId))
+            .Select(t => t.ReferenceId).ToListAsync();
+        return pending.Where(p => !posted.Contains($"Payment-{p.Id}")).ToList();
     }
 
     public async Task<T> WithDriverLockAsync<T>(Guid driverId, Func<Task<T>> action)
