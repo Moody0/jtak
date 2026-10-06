@@ -4,9 +4,11 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SubSink } from 'subsink';
 import { interval, Subject, forkJoin } from 'rxjs';
 import { takeUntil, finalize } from 'rxjs/operators';
+import { ActivatedRoute } from '@angular/router';
 import {
   CaptainSettlementSummary,
   CaptainShiftDetails,
+  CaptainDeliveredOrderItem,
   DailySettlementBatch,
   SettleCaptainShiftRequest,
   SettlementResult,
@@ -153,14 +155,34 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
   statementDetails: CaptainShiftDetails | null = null;
   isLoadingStatement: boolean = false;
 
+  // Captain Orders Breakdown State inside Statement Modal
+  captainStatementActiveTab: 'statement' | 'orders' = 'statement';
+  captainOrdersList: CaptainDeliveredOrderItem[] = [];
+  isLoadingCaptainOrders: boolean = false;
+  captainOrdersSearchTerm: string = '';
+
   constructor(
     private reconciliationService: ReconciliationService,
     private modalService: NgbModal,
     private cdr: ChangeDetectorRef,
-    private notificationSummaryService: NotificationSummaryService
+    private notificationSummaryService: NotificationSummaryService,
+    private route?: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
+    this.route?.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      if (params && params['tab']) {
+        const tab = params['tab'].toLowerCase();
+        if (tab === 'couriers' || tab === 'captains' || tab === 'fleet') {
+          this.activeTab = 'couriers';
+        } else if (tab === 'history') {
+          this.activeTab = 'history';
+        } else if (tab === 'merchants') {
+          this.activeTab = 'merchants';
+        }
+      }
+    });
+
     this.loadMerchantSummary();
     this.loadMerchants();
     this.loadCaptains();
@@ -743,6 +765,9 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
     this.selectedCaptain = captain;
     this.isLoadingStatement = true;
     this.statementDetails = null;
+    this.captainStatementActiveTab = 'statement';
+    this.captainOrdersList = [];
+    this.captainOrdersSearchTerm = '';
 
     this.modalService.open(content, { size: 'xl', centered: true });
 
@@ -758,6 +783,49 @@ export class ReconciliationListComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
     });
+
+    this.loadCaptainOrdersData(captain.captainUserId);
+  }
+
+  loadCaptainOrdersData(captainId: string): void {
+    this.isLoadingCaptainOrders = true;
+    this.reconciliationService.getCaptainOrders(captainId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (orders) => {
+        this.captainOrdersList = orders || [];
+        this.isLoadingCaptainOrders = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load captain delivered orders', err);
+        this.isLoadingCaptainOrders = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  get filteredCaptainOrders(): CaptainDeliveredOrderItem[] {
+    if (!this.captainOrdersSearchTerm?.trim()) {
+      return this.captainOrdersList;
+    }
+    const q = this.captainOrdersSearchTerm.toLowerCase().trim();
+    return this.captainOrdersList.filter(o =>
+      o.orderId.toString().includes(q) ||
+      (o.customerName && o.customerName.toLowerCase().includes(q)) ||
+      (o.customerPhone && o.customerPhone.includes(q)) ||
+      (o.settlementBatchId && o.settlementBatchId.toLowerCase().includes(q))
+    );
+  }
+
+  get captainOrdersTotalCash(): number {
+    return this.filteredCaptainOrders.reduce((sum, o) => sum + (o.cashCollected || 0), 0);
+  }
+
+  get captainOrdersTotalFees(): number {
+    return this.filteredCaptainOrders.reduce((sum, o) => sum + (o.customerDeliveryFee || 0), 0);
+  }
+
+  get captainOrdersTotalEarnings(): number {
+    return this.filteredCaptainOrders.reduce((sum, o) => sum + (o.captainEarning || 0), 0);
   }
 
   formatPhoneNumber(phone?: string): string {

@@ -36,6 +36,23 @@ export interface SettlementResult {
   settledAt: string;
 }
 
+export interface CaptainDeliveredOrderItem {
+  orderId: number;
+  customerName: string;
+  customerPhone?: string;
+  deliveredAt?: string;
+  distanceInKm?: number;
+  customerDeliveryFee: number;
+  originalDeliveryFee?: number;
+  captainEarning: number;
+  cashCollected: number;
+  productsTotal: number;
+  paymentMethod?: number;
+  isSettled: boolean;
+  settledAt?: string;
+  settlementBatchId?: string;
+}
+
 export interface AccountStatementItem {
   entryId: number;
   transactionId: string;

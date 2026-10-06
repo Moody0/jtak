@@ -20,6 +20,7 @@ import {
   SettlementHistorySummary,
   SettlementReceipt,
   SettlementHistoryItem,
+  CaptainDeliveredOrderItem,
 } from '../models/reconciliation.model';
 
 @Injectable({
@@ -84,6 +85,13 @@ export class ReconciliationService {
     return this.http.get<CaptainShiftDetails>(
       `${this.baseUrl}/Captain/${captainId}/Statement`
     );
+  }
+
+  getCaptainOrders(captainId: string, fromDate?: string, toDate?: string, settlementStatus: string = 'all'): Observable<CaptainDeliveredOrderItem[]> {
+    let url = `${this.baseUrl}/Captain/${captainId}/Orders?settlementStatus=${settlementStatus}`;
+    if (fromDate) url += `&fromDate=${encodeURIComponent(fromDate)}`;
+    if (toDate) url += `&toDate=${encodeURIComponent(toDate)}`;
+    return this.http.get<CaptainDeliveredOrderItem[]>(url);
   }
 
   settleShift(request: SettleCaptainShiftRequest): Observable<SettlementResult> {

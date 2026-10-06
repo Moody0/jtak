@@ -55,11 +55,6 @@ export const ApplicationMenu = [
     icon: 'fas fa-cash-register',
   },
   {
-    path: ApplicationRoutes.CaptainSettlements,
-    label: 'MENU.CAPTAIN_SETTLEMENTS',
-    icon: 'fas fa-hand-holding-usd',
-  },
-  {
     path: ApplicationRoutes.Products,
     label: 'MENU.PRODUCTS',
     icon: 'fas fa-box-open',
@@ -206,7 +201,7 @@ export const ApplicationMenuGroups = [
     label: 'MENU.GROUPS.FINANCE',
     description: 'MENU.GROUP_DESCRIPTIONS.FINANCE',
     icon: 'fas fa-wallet',
-    items: [menuItem(ApplicationRoutes.CaptainSettlements), menuItem(ApplicationRoutes.Reconciliation), menuItem(ApplicationRoutes.Bills), menuItem(ApplicationRoutes.Payments)],
+    items: [menuItem(ApplicationRoutes.Reconciliation), menuItem(ApplicationRoutes.Bills), menuItem(ApplicationRoutes.Payments)],
   },
   {
     id: 'people',

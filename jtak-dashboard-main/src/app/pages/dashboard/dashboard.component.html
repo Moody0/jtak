@@ -230,8 +230,8 @@
 
         <div *ngIf="driverPricingLoadError" class="alert alert-danger">تعذر تحميل تسعير التوصيل. أعد التحميل قبل الحفظ. <button type="button" class="btn btn-sm btn-light" (click)="loadDriverPricing()">إعادة المحاولة</button></div>
         <div class="ops-config-footer">
-          <a routerLink="/captain-settlements" class="text-muted" style="font-size: 0.75rem; text-decoration: underline;">
-            تسويات الكباتن الفردية
+          <a routerLink="/reconciliation" [queryParams]="{ tab: 'couriers' }" class="text-muted" style="font-size: 0.75rem; text-decoration: underline;">
+            تسويات المناديب والأسطول
           </a>
           <button type="button" class="ops-btn-action ops-btn-primary" (click)="saveDriverPricing()" [disabled]="isSavingDriverPricing || driverPricingLoading || !driverPricingLoaded">
             <span *ngIf="isSavingDriverPricing" class="spinner-border spinner-border-sm"></span>
@@ -531,8 +531,8 @@
           </div>
           <h2 class="ops-panel-title">{{ 'DASHBOARD.DRIVER_BALANCES' | translate }}</h2>
         </div>
-        <a routerLink="/captain-settlements" class="ops-panel-link">
-          <span>شاشة التسويات</span>
+        <a routerLink="/reconciliation" [queryParams]="{ tab: 'couriers' }" class="ops-panel-link">
+          <span>تسويات الصندوق والعهد</span>
           <i class="fas fa-arrow-left"></i>
         </a>
       </div>

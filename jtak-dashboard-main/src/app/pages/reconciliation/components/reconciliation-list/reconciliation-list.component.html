@@ -666,8 +666,8 @@
                     </button>
                   </ng-container>
                   <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue >= 0">
-                    <button type="button" class="btn btn-sm ops-btn-settle-disabled" disabled title="يجب أن يرسل المندوب طلب تسوية أولاً">
-                      <i class="fas fa-hourglass-half me-1"></i>بانتظار طلب المندوب
+                    <button type="button" class="btn btn-sm btn-warning ops-btn-settle text-dark fw-bold" (click)="openSettleModal(settleModal, cap)" title="تسوية عهدة الوردية وتوريد المبلغ للخزينة مباشرة">
+                      <i class="fas fa-hand-holding-usd me-1"></i>تسوية الوردية
                     </button>
                   </ng-container>
                   <ng-container *ngIf="!isSettled(cap) && cap.expectedNetCashDue < 0">
@@ -1583,66 +1583,172 @@
         </div>
       </div>
 
-      <h6 class="font-weight-bolder text-primary mb-2">كشف حساب العهدة النقدية (الأموال المحصلة في عهدة السائق)</h6>
-      <div class="table-responsive mb-2">
-        <table class="table table-bordered table-sm font-size-sm">
-          <thead class="thead-light">
-            <tr>
-              <th style="width: 14%;">{{ 'COMMON.DATE' | translate }}</th>
-              <th style="width: 22%;">رقم الحركة</th>
-              <th style="width: 12%;">النوع</th>
-              <th style="width: 10%;" class="text-end">مدين (المحصل)</th>
-              <th style="width: 10%;" class="text-end">دائن (المسدد)</th>
-              <th style="width: 12%;" class="text-end">الرصيد التراكمي</th>
-              <th style="width: 20%;">البيان</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngIf="statementDetails.floatStatement.length === 0">
-              <td colspan="7" class="text-center py-3 text-muted">{{ 'COMMON.NO_RECORDS' | translate }}</td>
-            </tr>
-            <tr *ngFor="let entry of statementDetails.floatStatement">
-              <td>{{ entry.postedDate | date: 'short' }}</td>
-              <td><code>{{ entry.transactionNumber }}</code></td>
-              <td><span class="badge badge-light-primary">{{ entry.referenceType }}</span></td>
-              <td class="text-end text-success font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-2') : '-' }}</td>
-              <td class="text-end text-danger font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-2') : '-' }}</td>
-              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-2' }}</td>
-              <td>{{ entry.memo }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Modal Internal Tabs (Screen only) -->
+      <div class="ops-modal-tabs mb-4 no-print">
+        <button type="button" class="ops-modal-tab" [class.active]="captainStatementActiveTab === 'statement'" (click)="captainStatementActiveTab = 'statement'">
+          <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+          <span>كشف الحركات المالية (دفتر الأستاذ)</span>
+        </button>
+        <button type="button" class="ops-modal-tab" [class.active]="captainStatementActiveTab === 'orders'" (click)="captainStatementActiveTab = 'orders'">
+          <i class="fas fa-boxes text-info me-2"></i>
+          <span>سجل الطلبات المسلمة (تفاصيل العمليات)</span>
+          <span class="ops-modal-tab-badge ops-modal-tab-badge--blue ms-2" *ngIf="captainOrdersList.length > 0">{{ captainOrdersList.length }}</span>
+        </button>
       </div>
 
-      <h6 class="font-weight-bolder text-info mb-2">كشف أجور واستحقاقات السائق (الأجور المستحقة للسائق)</h6>
-      <div class="table-responsive mb-2">
-        <table class="table table-bordered table-sm font-size-sm">
-          <thead class="thead-light">
-            <tr>
-              <th style="width: 14%;">{{ 'COMMON.DATE' | translate }}</th>
-              <th style="width: 22%;">رقم الحركة</th>
-              <th style="width: 12%;">النوع</th>
-              <th style="width: 10%;" class="text-end">مدين (المدفوع)</th>
-              <th style="width: 10%;" class="text-end">دائن (المستحق)</th>
-              <th style="width: 12%;" class="text-end">الرصيد التراكمي</th>
-              <th style="width: 20%;">البيان</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngIf="statementDetails.earningsStatement.length === 0">
-              <td colspan="7" class="text-center py-3 text-muted">{{ 'COMMON.NO_RECORDS' | translate }}</td>
-            </tr>
-            <tr *ngFor="let entry of statementDetails.earningsStatement">
-              <td>{{ entry.postedDate | date: 'short' }}</td>
-              <td><code>{{ entry.transactionNumber }}</code></td>
-              <td><span class="badge badge-light-info">{{ entry.referenceType }}</span></td>
-              <td class="text-end text-danger font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-2') : '-' }}</td>
-              <td class="text-end text-success font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-2') : '-' }}</td>
-              <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-2' }}</td>
-              <td>{{ entry.memo }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- TAB 1: LEDGER STATEMENT (Screen & Print) -->
+      <div *ngIf="captainStatementActiveTab === 'statement'" [class.d-print-block]="true">
+        <h6 class="font-weight-bolder text-primary mb-2">كشف حساب العهدة النقدية (الأموال المحصلة في عهدة السائق)</h6>
+        <div class="table-responsive mb-2">
+          <table class="table table-bordered table-sm font-size-sm">
+            <thead class="thead-light">
+              <tr>
+                <th style="width: 14%;">{{ 'COMMON.DATE' | translate }}</th>
+                <th style="width: 22%;">رقم الحركة</th>
+                <th style="width: 12%;">النوع</th>
+                <th style="width: 10%;" class="text-end">مدين (المحصل)</th>
+                <th style="width: 10%;" class="text-end">دائن (المسدد)</th>
+                <th style="width: 12%;" class="text-end">الرصيد التراكمي</th>
+                <th style="width: 20%;">البيان</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="statementDetails.floatStatement.length === 0">
+                <td colspan="7" class="text-center py-3 text-muted">{{ 'COMMON.NO_RECORDS' | translate }}</td>
+              </tr>
+              <tr *ngFor="let entry of statementDetails.floatStatement">
+                <td>{{ entry.postedDate | date: 'short' }}</td>
+                <td><code>{{ entry.transactionNumber }}</code></td>
+                <td><span class="badge badge-light-primary">{{ entry.referenceType }}</span></td>
+                <td class="text-end text-success font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-2') : '-' }}</td>
+                <td class="text-end text-danger font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-2') : '-' }}</td>
+                <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-2' }}</td>
+                <td>{{ entry.memo }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h6 class="font-weight-bolder text-info mb-2 mt-4">كشف أجور واستحقاقات السائق (الأجور المستحقة للسائق)</h6>
+        <div class="table-responsive mb-2">
+          <table class="table table-bordered table-sm font-size-sm">
+            <thead class="thead-light">
+              <tr>
+                <th style="width: 14%;">{{ 'COMMON.DATE' | translate }}</th>
+                <th style="width: 22%;">رقم الحركة</th>
+                <th style="width: 12%;">النوع</th>
+                <th style="width: 10%;" class="text-end">مدين (المدفوع)</th>
+                <th style="width: 10%;" class="text-end">دائن (المستحق)</th>
+                <th style="width: 12%;" class="text-end">الرصيد التراكمي</th>
+                <th style="width: 20%;">البيان</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="statementDetails.earningsStatement.length === 0">
+                <td colspan="7" class="text-center py-3 text-muted">{{ 'COMMON.NO_RECORDS' | translate }}</td>
+              </tr>
+              <tr *ngFor="let entry of statementDetails.earningsStatement">
+                <td>{{ entry.postedDate | date: 'short' }}</td>
+                <td><code>{{ entry.transactionNumber }}</code></td>
+                <td><span class="badge badge-light-info">{{ entry.referenceType }}</span></td>
+                <td class="text-end text-danger font-weight-bold">{{ entry.debit > 0 ? (entry.debit | number: '1.0-2') : '-' }}</td>
+                <td class="text-end text-success font-weight-bold">{{ entry.credit > 0 ? (entry.credit | number: '1.0-2') : '-' }}</td>
+                <td class="text-end font-weight-bolder">{{ entry.runningBalance | number: '1.0-2' }}</td>
+                <td>{{ entry.memo }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 2: DELIVERED ORDERS BREAKDOWN (Screen only) -->
+      <div *ngIf="captainStatementActiveTab === 'orders'" class="no-print">
+        <div class="row g-2 mb-3">
+          <div class="col-md-3 col-6">
+            <div class="p-2 border rounded bg-white text-center">
+              <span class="text-muted d-block fs-9">إجمالي الطلبات</span>
+              <strong class="text-dark fs-7">{{ filteredCaptainOrders.length }} طلب</strong>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-2 border rounded bg-white text-center">
+              <span class="text-muted d-block fs-9">المحصل من الزبائن</span>
+              <strong class="text-success fs-7">{{ captainOrdersTotalCash | number:'1.0-2' }} ل.س</strong>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-2 border rounded bg-white text-center">
+              <span class="text-muted d-block fs-9">أجور التوصيل</span>
+              <strong class="text-primary fs-7">{{ captainOrdersTotalFees | number:'1.0-2' }} ل.س</strong>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-2 border rounded bg-white text-center">
+              <span class="text-muted d-block fs-9">عمولات / أرباح الكابتن</span>
+              <strong class="text-info fs-7">{{ captainOrdersTotalEarnings | number:'1.0-2' }} ل.س</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="input-group input-group-sm w-50">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input type="text" class="form-control" placeholder="بحث برقم الطلب، اسم الزبون، أو الهاتف..." [(ngModel)]="captainOrdersSearchTerm" />
+            <button class="btn btn-outline-secondary" type="button" *ngIf="captainOrdersSearchTerm" (click)="captainOrdersSearchTerm = ''">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <button class="btn btn-sm btn-light-primary" (click)="loadCaptainOrdersData(statementDetails.captainUserId)" [disabled]="isLoadingCaptainOrders">
+            <i class="fas fa-sync-alt me-1" [class.fa-spin]="isLoadingCaptainOrders"></i> تحديث الطلبات
+          </button>
+        </div>
+
+        <div *ngIf="isLoadingCaptainOrders" class="text-center py-4">
+          <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+          <p class="mt-2 text-muted fs-8">جاري تحميل سجل الطلبات المسلمة...</p>
+        </div>
+
+        <div *ngIf="!isLoadingCaptainOrders" class="table-responsive">
+          <table class="table table-bordered table-sm align-middle fs-8">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 80px;">رقم الطلب</th>
+                <th>الزبون والهاتف</th>
+                <th>وقت التسليم</th>
+                <th class="text-end">قيمة المنتجات</th>
+                <th class="text-end">أجر التوصيل</th>
+                <th class="text-end">المحصل نقداً</th>
+                <th class="text-end">استحقاق الكابتن</th>
+                <th class="text-center">حالة التسوية</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="filteredCaptainOrders.length === 0">
+                <td colspan="8" class="text-center py-3 text-muted">لا توجد طلبات مسلمة مسجلة للكابتن</td>
+              </tr>
+              <tr *ngFor="let order of filteredCaptainOrders">
+                <td><strong>#{{ order.orderId }}</strong></td>
+                <td>
+                  <div class="fw-bold">{{ order.customerName }}</div>
+                  <small class="text-muted" dir="ltr" *ngIf="order.customerPhone">{{ order.customerPhone }}</small>
+                </td>
+                <td>{{ order.deliveredAt ? (order.deliveredAt | date:'short') : '-' }}</td>
+                <td class="text-end">{{ order.productsTotal | number:'1.0-2' }} ل.س</td>
+                <td class="text-end text-primary">{{ order.customerDeliveryFee | number:'1.0-2' }} ل.س</td>
+                <td class="text-end text-success fw-bold">{{ order.cashCollected | number:'1.0-2' }} ل.س</td>
+                <td class="text-end text-info fw-bold">{{ order.captainEarning | number:'1.0-2' }} ل.س</td>
+                <td class="text-center">
+                  <span *ngIf="order.isSettled" class="badge badge-light-success text-success" [title]="'دفعة: ' + (order.settlementBatchId || '')">
+                    <i class="fas fa-check-circle me-1"></i> مسوّى
+                  </span>
+                  <span *ngIf="!order.isSettled" class="badge badge-light-warning text-warning">
+                    <i class="fas fa-clock me-1"></i> غير مسوّى
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Official Driver Statement Signatures Footer (Visible ONLY when printed) -->
