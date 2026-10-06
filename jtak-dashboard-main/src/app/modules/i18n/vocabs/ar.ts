@@ -54,6 +54,7 @@ export const locale = {
       POPULAR_PRODUCTS: 'الأكثر طلباً (الرئيسية)',
       MARKET_BEST_SELLING: 'الأكثر مبيعاً (السوبرماركت)',
       HOME_CATEGORIES: 'فئات الصفحة الرئيسية',
+      TEDALLAL_CARD: 'خدمة تدلل',
       RESTAURANT_CATEGORIES: 'تصنيفات المطاعم (صفحة المطاعم)',
       BANNERS: 'الإعلانات والبنرات',
       ORDERS: 'الطلبات والتوصيل',

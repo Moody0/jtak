@@ -31,6 +31,7 @@ export const ApplicationRoutes = Object.freeze({
   PaymentTerms: 'pages/PaymentPolicy',
   AuditLogs: 'audit-logs',
   ContactSettings: 'settings/contact',
+  TedallalSettings: 'settings/tedallal',
 });
 
 export const ApplicationMenu = [
@@ -135,6 +136,11 @@ export const ApplicationMenu = [
     icon: 'fas fa-headset',
   },
   {
+    path: ApplicationRoutes.TedallalSettings,
+    label: 'MENU.TEDALLAL_CARD',
+    icon: 'fas fa-gift',
+  },
+  {
   path: ApplicationRoutes.AuditLogs,
     label: 'MENU.AUDIT_LOGS',
     icon: 'fas fa-shield-alt',
@@ -194,7 +200,7 @@ export const ApplicationMenuGroups = [
     label: 'MENU.GROUPS.CONTENT',
     description: 'MENU.GROUP_DESCRIPTIONS.CONTENT',
     icon: 'fas fa-mobile-alt',
-    items: [menuItem(ApplicationRoutes.HomeCategories), menuItem(ApplicationRoutes.PopularProducts), menuItem(ApplicationRoutes.MarketBestSelling), menuItem(ApplicationRoutes.Banners)],
+    items: [menuItem(ApplicationRoutes.HomeCategories), menuItem(ApplicationRoutes.TedallalSettings), menuItem(ApplicationRoutes.PopularProducts), menuItem(ApplicationRoutes.MarketBestSelling), menuItem(ApplicationRoutes.Banners)],
   },
   {
     id: 'finance',

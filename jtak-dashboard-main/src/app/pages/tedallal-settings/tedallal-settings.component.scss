@@ -1,0 +1,19 @@
+.tedallal-settings-page {
+  .mobile-frame-mockup {
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  }
+
+  .preview-card {
+    transition: all 0.2s ease-in-out;
+    border-radius: 16px !important;
+
+    &:hover {
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06) !important;
+    }
+  }
+
+  .logo-box {
+    border-radius: 12px !important;
+  }
+}

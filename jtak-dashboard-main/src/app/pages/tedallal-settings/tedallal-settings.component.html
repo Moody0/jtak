@@ -1,0 +1,204 @@
+<div class="tedallal-settings-page">
+  <!-- Header Card -->
+  <div class="card card-custom mb-5 border-0 shadow-none">
+    <div class="card-body p-5 d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div>
+        <h2 class="fs-3 fw-bold text-dark mb-1">
+          <i class="fas fa-gift text-primary me-2"></i>
+          إعدادات كارت خدمة تدلل
+        </h2>
+        <p class="text-muted fs-7 mb-0">
+          التحكم الكامل في ظهور الكارت وعنوان القسم وعنوان ووصف الكارت والشعار المخصص في الصفحة الرئيسية للتطبيق
+        </p>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-light btn-active-light-primary fw-bold"
+          (click)="loadSettings()"
+          [disabled]="isLoading || isSaving"
+        >
+          <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+          <span class="ms-1">{{ 'COMMON.REFRESH' | translate }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-sm btn-light-secondary fw-bold"
+          (click)="resetDefaults()"
+          [disabled]="isLoading || isSaving || !hasLoaded"
+        >
+          <i class="fas fa-undo"></i>
+          <span class="ms-1">استعادة الافتراضي</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-sm btn-primary fw-bold"
+          (click)="save()"
+          [disabled]="isLoading || isSaving || !hasLoaded || form.invalid"
+        >
+          <i class="fas fa-save" *ngIf="!isSaving"></i>
+          <span class="spinner-border spinner-border-sm me-1" *ngIf="isSaving"></span>
+          <span class="ms-1">{{ 'COMMON.SAVE' | translate }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="loadError" class="alert alert-danger" role="alert">
+    تعذر تحميل الإعدادات. اضغط تحديث لإعادة المحاولة قبل الحفظ.
+  </div>
+
+  <div *ngIf="isLoading" class="text-center py-10">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="text-muted fs-7 mt-3">{{ 'COMMON.LOADING' | translate }}</div>
+  </div>
+
+  <form *ngIf="!isLoading" [formGroup]="form" (ngSubmit)="save()">
+    <div class="row g-5">
+      <!-- Settings Form (Left/Main Col) -->
+      <div class="col-lg-7">
+        <div class="card card-custom border-0 shadow-sm">
+          <div class="card-header border-0 pt-5">
+            <h3 class="card-title align-items-start flex-column">
+              <span class="card-label fw-bold fs-4 text-dark">بيانات ونصوص الكارت</span>
+              <span class="text-muted mt-1 fw-semibold fs-7">قم بتعديل النصوص والتحكم في ظهور الكارت للعملاء</span>
+            </h3>
+          </div>
+
+          <div class="card-body pt-3">
+            <!-- Enabled Switch -->
+            <div class="d-flex align-items-center justify-content-between p-4 mb-5 bg-light-primary rounded border border-primary border-dashed">
+              <div>
+                <h5 class="fw-bold text-dark mb-1">تفعيل الكارت في الصفحة الرئيسية</h5>
+                <p class="text-muted fs-7 mb-0">عند الإلغاء، سيتم إخفاء قسم وكارت خدمة تدلل تماماً من الصفحة الرئيسية للعميل</p>
+              </div>
+              <div class="form-check form-switch form-check-custom form-check-solid">
+                <input class="form-check-input h-25px w-45px" type="checkbox" formControlName="enabled" id="cardEnabledToggle" />
+              </div>
+            </div>
+
+            <!-- Section Title -->
+            <div class="mb-5">
+              <label class="form-label required fw-bold fs-6">عنوان القسم الرئيسي (Section Title)</label>
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="sectionTitle"
+                placeholder="خدمة تدلل"
+              />
+              <div class="form-text text-muted fs-8">العنوان الذي يظهر أعلى الكارت في الصفحة الرئيسية (افتراضياً: خدمة تدلل)</div>
+            </div>
+
+            <!-- Card Title -->
+            <div class="mb-5">
+              <label class="form-label required fw-bold fs-6">عنوان الكارت (Card Title)</label>
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="cardTitle"
+                placeholder="طلبات خاصة وعروض الأسعار"
+              />
+              <div class="form-text text-muted fs-8">العنوان العريض داخل حاوية الكارت (افتراضياً: طلبات خاصة وعروض الأسعار)</div>
+            </div>
+
+            <!-- Subtitle -->
+            <div class="mb-5">
+              <label class="form-label required fw-bold fs-6">الوصف التوضيحي (Subtitle)</label>
+              <textarea
+                class="form-control form-control-solid"
+                formControlName="subtitle"
+                rows="2"
+                placeholder="اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية"
+              ></textarea>
+              <div class="form-text text-muted fs-8">النص التوضيحي الأصغر حجماً أسفل العنوان داخل الكارت</div>
+            </div>
+
+            <!-- Logo URL -->
+            <div class="mb-3">
+              <label class="form-label fw-bold fs-6">رابط الشعار / الأيقونة المخصصة (اختياري)</label>
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="logoUrl"
+                placeholder="https://example.com/logo.png"
+              />
+              <div class="form-text text-muted fs-8">اتركه فارغاً لاستخدام أيقونة حقيبة التسوق البرتقالية الافتراضية</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Preview (Right Col) -->
+      <div class="col-lg-5">
+        <div class="card card-custom border-0 shadow-sm sticky-top" style="top: 80px;">
+          <div class="card-header border-0 pt-5">
+            <h3 class="card-title align-items-start flex-column">
+              <span class="card-label fw-bold fs-4 text-dark">
+                <i class="fas fa-mobile-alt text-primary me-2"></i>
+                معاينة حية في تطبيق العميل
+              </span>
+              <span class="text-muted mt-1 fw-semibold fs-7">الشكل التفاعلي المباشر كما يظهر للعميل في الصفحة الرئيسية</span>
+            </h3>
+          </div>
+
+          <div class="card-body pt-3 pb-8">
+            <div class="mobile-frame-mockup p-4 rounded-4 bg-light">
+              <!-- Section Title Header in App -->
+              <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+                <h4 class="fw-bolder fs-5 text-dark mb-0">{{ form.value.sectionTitle || 'خدمة تدلل' }}</h4>
+                <span *ngIf="!form.value.enabled" class="badge badge-light-danger fw-bold fs-8">معطل حالياً</span>
+              </div>
+
+              <!-- The Card Container -->
+              <div
+                class="preview-card bg-white p-3 rounded-3 shadow-sm border border-secondary border-opacity-10 d-flex align-items-center justify-content-between"
+                [class.opacity-50]="!form.value.enabled"
+              >
+                <!-- Right (Icon / Logo) -->
+                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                  <div
+                    class="logo-box rounded-3 bg-light-warning d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0"
+                    style="width: 44px; height: 44px; border: 1px solid #FFD8BF;"
+                  >
+                    <img
+                      *ngIf="form.value.logoUrl"
+                      [src]="form.value.logoUrl"
+                      alt="Logo"
+                      style="width: 100%; height: 100%; object-fit: cover;"
+                      (error)="form.patchValue({ logoUrl: '' })"
+                    />
+                    <i *ngIf="!form.value.logoUrl" class="fas fa-shopping-bag text-warning fs-3"></i>
+                  </div>
+
+                  <!-- Text (Title + Subtitle) -->
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="fw-bolder text-dark fs-6 text-truncate mb-1">
+                      {{ form.value.cardTitle || 'طلبات خاصة وعروض الأسعار' }}
+                    </div>
+                    <div class="text-muted fs-8 text-truncate">
+                      {{ form.value.subtitle || 'اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية' }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Left (Arrow flipped horizontally) -->
+                <div class="ms-2 flex-shrink-0">
+                  <i class="fas fa-chevron-left text-muted fs-6" style="transform: scaleX(-1);"></i>
+                </div>
+              </div>
+
+              <div *ngIf="!form.value.enabled" class="text-center mt-3 text-danger fs-8 fw-semibold">
+                ⚠️ الكارت مخفي ولن يظهر للعملاء في الصفحة الرئيسية
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>

@@ -1,4 +1,4 @@
-﻿import { Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 
 const Routing: Routes = [
   {
@@ -113,6 +113,11 @@ const Routing: Routes = [
     path: 'settings/contact',
     loadChildren: () =>
       import('./contact-settings/contact-settings.module').then((m) => m.ContactSettingsModule),
+  },
+  {
+    path: 'settings/tedallal',
+    loadChildren: () =>
+      import('./tedallal-settings/tedallal-settings.module').then((m) => m.TedallalSettingsModule),
   },
   {
     path: 'crafted/pages/profile',

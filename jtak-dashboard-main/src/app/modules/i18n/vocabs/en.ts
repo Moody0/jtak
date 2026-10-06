@@ -54,6 +54,7 @@ export const locale = {
       POPULAR_PRODUCTS: 'Most Popular (Home)',
       MARKET_BEST_SELLING: 'Best Selling (Market)',
       HOME_CATEGORIES: 'Home Categories',
+      TEDALLAL_CARD: 'Tedallal Service',
       RESTAURANT_CATEGORIES: 'Restaurant Categories (Restaurants Page)',
       BANNERS: 'Banners & Ads',
       ORDERS: 'Orders & Dispatches',
