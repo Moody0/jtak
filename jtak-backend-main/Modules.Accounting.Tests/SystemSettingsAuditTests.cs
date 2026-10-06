@@ -23,6 +23,7 @@ namespace Modules.Accounting.Tests;
 
 public class SystemSettingsAuditTests
 {
+
  sealed class Fixture : IDisposable
  {
   public SqliteConnection Connection = new("Data Source=:memory:");

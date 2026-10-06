@@ -74,6 +74,37 @@ namespace App.ApiControllers.V1
             }
         }
 
+        [HttpGet("DiagFileCenter")]
+        [AllowAnonymous]
+        public IActionResult DiagFileCenter()
+        {
+            var result = new System.Collections.Generic.Dictionary<string, object>();
+            result["ContentRootPath"] = _env.ContentRootPath;
+            result["WebRootPath"] = _env.WebRootPath;
+            var fileCenter = _env.ContentRootPath + SiteOptions.FileCenterPath.Replace("/", "\\");
+            result["FileCenterExpected"] = fileCenter;
+            result["FileCenterExists"] = Directory.Exists(fileCenter);
+            if (Directory.Exists(fileCenter))
+            {
+                result["FileCenterDirectories"] = Directory.GetDirectories(fileCenter).Select(Path.GetFileName).ToArray();
+                result["FileCenterFilesCount"] = Directory.GetFiles(fileCenter).Length;
+                result["FileCenterSampleFiles"] = Directory.GetFiles(fileCenter).Take(10).Select(Path.GetFileName).ToArray();
+            }
+            var parentFileCenter = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "..", "FileCenter"));
+            result["ParentFileCenter"] = parentFileCenter;
+            result["ParentFileCenterExists"] = Directory.Exists(parentFileCenter);
+            if (Directory.Exists(parentFileCenter))
+            {
+                result["ParentFileCenterDirectories"] = Directory.GetDirectories(parentFileCenter).Select(Path.GetFileName).ToArray();
+                result["ParentFileCenterFilesCount"] = Directory.GetFiles(parentFileCenter).Length;
+                result["ParentFileCenterSampleFiles"] = Directory.GetFiles(parentFileCenter).Take(10).Select(Path.GetFileName).ToArray();
+            }
+            var testBarcode = "6210210355461.png";
+            result["TestBarcodePath"] = FileHelper.GetPhysicalPath(_env, testBarcode);
+            result["TestBarcodeExists"] = System.IO.File.Exists(FileHelper.GetPhysicalPath(_env, testBarcode));
+            return Ok(result);
+        }
+
         // Receipts are internal accounting evidence. Never serve them through
         // anonymous media routes, even if a customer retained an old token.
         [HttpGet("ErrandReceipt/{id:int}")]
@@ -195,7 +226,8 @@ namespace App.ApiControllers.V1
                 else
                 {
                     var cleanNameWithoutExt = Path.GetFileNameWithoutExtension(cleanId);
-                    thumbPhysicalPath = FileHelper.GetPhysicalPath(_env, cleanNameWithoutExt) + $"{w}x{h}{(crop ? "c" : "")}" + ext;
+                    var dir = Path.GetDirectoryName(physicalPath) ?? Path.Combine(_env.ContentRootPath, "FileCenter");
+                    thumbPhysicalPath = Path.Combine(dir, $"{cleanNameWithoutExt}_{w}x{h}{(crop ? "c" : "")}.webp");
                 }
                 var resizeOptions = new ResizeOptions { Size = new Size(w, h), Mode = crop ? ResizeMode.Crop : ResizeMode.Min };
 

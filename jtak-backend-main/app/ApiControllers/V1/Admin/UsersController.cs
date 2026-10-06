@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,6 +56,7 @@ namespace App.ApiControllers.V1.Admin
         private readonly OrdersDbContext _orders;
         private readonly CatalogDbContext _catalog;
         private readonly ILedgerService _ledger;
+        private readonly IMemoryCache _cache;
         private Guid? _disableNotice;
 
         public UsersController(UserManager<AppUser> userManager, IUserService service, ITagService tagService, IAppUnitOfWork uow, IMapper mapper, IWebHostEnvironment env, ILogger<UsersController> logger,
@@ -64,7 +66,7 @@ namespace App.ApiControllers.V1.Admin
                                     IAdminAuditService auditService = null,
                                     INotificationService notificationService = null,
                                     AccountingDbContext accounting = null, OrdersDbContext orders = null,
-                                    CatalogDbContext catalog = null, ILedgerService ledger = null)
+                                    CatalogDbContext catalog = null, ILedgerService ledger = null, IMemoryCache cache = null)
         {
             _env = env;
             _service = service;
@@ -78,7 +80,7 @@ namespace App.ApiControllers.V1.Admin
             _userRoleRepo = userRoleRepo;
             _auditService = auditService;
             _notificationService = notificationService;
-            _accounting = accounting; _orders = orders; _catalog = catalog; _ledger = ledger;
+            _accounting = accounting; _orders = orders; _catalog = catalog; _ledger = ledger; _cache = cache;
         }
 
         /// <summary>
@@ -373,6 +375,44 @@ namespace App.ApiControllers.V1.Admin
             return await IdentityTransactionAsync(()=>EditCore(id,item));
         }
 
+        
+        private async Task SyncMerchantProfileAsync(Guid userId, string fullName, string phoneNumber, bool isActive)
+        {
+            if (_catalog == null) return;
+            try
+            {
+                var ownedMerchants = await _catalog.Merchants
+                    .Where(m => m.OwnerId == userId && m.DeletionDate == null)
+                    .ToListAsync();
+                if (ownedMerchants.Any())
+                {
+                    foreach (var m in ownedMerchants)
+                    {
+                        if (!string.IsNullOrWhiteSpace(fullName))
+                        {
+                            m.OwnerName = fullName.Trim();
+                        }
+                        if (!string.IsNullOrWhiteSpace(phoneNumber))
+                        {
+                            m.Phone1 = phoneNumber.Trim();
+                        }
+                        m.Active = isActive;
+
+                        _cache?.Remove($"ActiveMerchantPrices_{m.Id}");
+                        _cache?.Remove($"AllMerchantPrices_{m.Id}");
+                    }
+                    await _catalog.SaveChangesAsync();
+
+                    _cache?.Remove("RestaurantCategoriesCustomerCache");
+                    _cache?.Remove("GetValidMerchants");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to sync merchant profile from user {0}", userId);
+            }
+        }
+
         private async Task<ActionResult<Guid>> EditCore(Guid id, UserDto item)
         {
             var entity = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
@@ -530,6 +570,7 @@ namespace App.ApiControllers.V1.Admin
                 });
             }
 
+            await SyncMerchantProfileAsync(entity.Id, entity.FullName, fullPhone, entity.IsActive);
             if(wasActive && !entity.IsActive) _disableNotice=entity.Id;
             return entity.Id;
         }
@@ -646,6 +687,7 @@ namespace App.ApiControllers.V1.Admin
             user.IsActive = true;
             var update=await _userManager.UpdateAsync(user);
             if(!update.Succeeded) return BadRequest(ApiErr.Create(string.Join("، ", update.Errors.Select(e=>e.Description))));
+            await SyncMerchantProfileAsync(user.Id, user.FullName, user.PhoneNumber, true);
 
             if (_auditService != null)
             {
@@ -677,6 +719,7 @@ namespace App.ApiControllers.V1.Admin
             user.IsActive = false;
             var update = await _userManager.UpdateAsync(user);
             if (!update.Succeeded) return BadRequest(ApiErr.Create(string.Join("، ", update.Errors.Select(e=>e.Description))));
+            await SyncMerchantProfileAsync(user.Id, user.FullName, user.PhoneNumber, false);
 
             // Foreground clients can leave immediately. The API check remains
             // authoritative when FCM is delayed or unavailable.

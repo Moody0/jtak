@@ -44,23 +44,67 @@ namespace App.Helpers
             try
             {
                 var directFile = Path.Combine(fileCenterPath, token);
-                if (token.Count(x => x == '_') < 3) return directFile;
-                var parts = token.Split('_');
-                var directory = Path.Combine(fileCenterPath, parts[0], parts[1], parts[2]);
-                var fileNamewithExtension = parts[3];
+                if (File.Exists(directFile)) return directFile;
 
-                //Check File Path nd create if not exist
-                if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+                if (token.Count(x => x == '_') >= 3)
+                {
+                    var parts = token.Split('_');
+                    var directory = Path.Combine(fileCenterPath, parts[0], parts[1], parts[2]);
+                    var fileNamewithExtension = parts[3];
 
-                //Get Full Virtual And Physical Paths
-                var fullPhysicalPath = Path.Combine(directory, fileNamewithExtension);
-                return fullPhysicalPath;
+                    // Check File Path and create if not exist
+                    if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+
+                    var fullPhysicalPath = Path.Combine(directory, fileNamewithExtension);
+                    if (File.Exists(fullPhysicalPath)) return fullPhysicalPath;
+                    return fullPhysicalPath;
+                }
+
+                // Resilient search for flat assets (e.g. barcode images)
+                // 1. Check direct & nested subdirectories inside fileCenterPath (e.g. "صور منتجات مع باركود")
+                if (Directory.Exists(fileCenterPath))
+                {
+                    foreach (var subDir in Directory.EnumerateDirectories(fileCenterPath))
+                    {
+                        var candidate = Path.Combine(subDir, token);
+                        if (File.Exists(candidate)) return candidate;
+
+                        foreach (var nested in Directory.EnumerateDirectories(subDir))
+                        {
+                            var nestedCandidate = Path.Combine(nested, token);
+                            if (File.Exists(nestedCandidate)) return nestedCandidate;
+                        }
+                    }
+                }
+
+                // 2. Check parent FileCenter (if uploaded in api.jtak.app/FileCenter instead of httpdocs/FileCenter)
+                var parentFileCenter = Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "FileCenter"));
+                if (Directory.Exists(parentFileCenter))
+                {
+                    var pDirect = Path.Combine(parentFileCenter, token);
+                    if (File.Exists(pDirect)) return pDirect;
+
+                    foreach (var subDir in Directory.EnumerateDirectories(parentFileCenter))
+                    {
+                        var candidate = Path.Combine(subDir, token);
+                        if (File.Exists(candidate)) return candidate;
+
+                        foreach (var nested in Directory.EnumerateDirectories(subDir))
+                        {
+                            var nestedCandidate = Path.Combine(nested, token);
+                            if (File.Exists(nestedCandidate)) return nestedCandidate;
+                        }
+                    }
+                }
+
+                return directFile;
             }
             catch (Exception)
             {
                 return $"{fileCenterPath}\\";
             }
         }
+
         public static string GetVirtualPath(string dbField)
         {
             try

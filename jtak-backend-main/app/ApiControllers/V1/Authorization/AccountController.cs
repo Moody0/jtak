@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -37,6 +38,7 @@ namespace App.ApiControllers.V1.Authorization
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
         private readonly App.Catalog.Data.CatalogDbContext _catalog;
+        private readonly IMemoryCache _cache;
 
         private bool IsTemporaryOtpEnabled =>
             bool.TryParse(_configuration?["Authentication:TemporaryOtpEnabled"], out var enabled) && enabled;
@@ -60,7 +62,8 @@ namespace App.ApiControllers.V1.Authorization
             IEmailService emailService,
             INotificationService notificationService,
             IConfiguration configuration = null,
-            App.Catalog.Data.CatalogDbContext catalog = null)
+            App.Catalog.Data.CatalogDbContext catalog = null,
+            IMemoryCache cache = null)
         {
             _unitOfWork = unitOfWorkAsync;
             _userManager = userManager;
@@ -71,6 +74,7 @@ namespace App.ApiControllers.V1.Authorization
             _notificationService = notificationService;
             _configuration = configuration;
             _catalog = catalog;
+            _cache = cache;
         }
 
         /// <summary>
@@ -685,9 +689,26 @@ namespace App.ApiControllers.V1.Authorization
                     {
                         foreach (var m in ownedMerchants)
                         {
-                            m.OwnerName = user.FullName;
+                            if (!string.IsNullOrWhiteSpace(user.FullName))
+                            {
+                                m.OwnerName = user.FullName;
+                            }
+                            if (!string.IsNullOrWhiteSpace(user.PhoneNumber))
+                            {
+                                m.Phone1 = user.PhoneNumber;
+                            }
+                            if (!string.IsNullOrWhiteSpace(user.ProfilePhoto) && string.IsNullOrWhiteSpace(m.Photo))
+                            {
+                                m.Photo = $"{user.ProfilePhoto},{user.ProfilePhoto}";
+                            }
+
+                            _cache?.Remove($"ActiveMerchantPrices_{m.Id}");
+                            _cache?.Remove($"AllMerchantPrices_{m.Id}");
                         }
                         await _catalog.SaveChangesAsync();
+
+                        _cache?.Remove("RestaurantCategoriesCustomerCache");
+                        _cache?.Remove("GetValidMerchants");
                     }
                 }
                 catch (Exception ex)

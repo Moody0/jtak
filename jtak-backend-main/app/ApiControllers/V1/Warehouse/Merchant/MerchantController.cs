@@ -1,3 +1,7 @@
+using App.Shared.Services;
+using Microsoft.AspNetCore.Identity;
+using App.Shared.Entities;
+using Solf.Identity;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -28,17 +32,20 @@ namespace App.ApiControllers.V1.Warehouse
         private readonly ICatalogUnitOfWork _uow;
         private readonly IMemoryCache _cache;
         private readonly ILogger<MerchantController> _logger;
+        private readonly UserManager<AppUser> _userManager;
 
         public MerchantController(
             IMerchantService merchantService,
             ICatalogUnitOfWork uow,
             IMemoryCache cache,
-            ILogger<MerchantController> logger)
+            ILogger<MerchantController> logger,
+            UserManager<AppUser> userManager = null)
         {
             _merchantService = merchantService;
             _uow = uow;
             _cache = cache;
             _logger = logger;
+            _userManager = userManager;
         }
 
         /// <summary>
@@ -155,10 +162,50 @@ namespace App.ApiControllers.V1.Warehouse
             }
 
             await _uow.SaveChangesAsync();
+            if (!string.IsNullOrWhiteSpace(dto.Phone1) && _userManager != null)
+            {
+                var cleanPhone = dto.Phone1.Trim();
+                try
+                {
+                    var ownerUser = await _userManager.FindByIdAsync(uid.Value.ToString());
+                    if (ownerUser != null && SyrianPhoneIdentity.TryNormalize(cleanPhone, out var canonicalPhone))
+                    {
+                        var isPhoneTaken = false;
+                        try
+                        {
+                            if (_userManager.Users != null)
+                            {
+                                var phoneMatch = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+                                isPhoneTaken = phoneMatch.Ambiguous || (phoneMatch.User != null && phoneMatch.User.Id != ownerUser.Id);
+                            }
+                        }
+                        catch
+                        {
+                            isPhoneTaken = false;
+                        }
+
+                        if (!isPhoneTaken)
+                        {
+                            if (ownerUser.PhoneNumber != canonicalPhone)
+                            {
+                                ownerUser.PhoneNumber = canonicalPhone;
+                                ownerUser.UserName = canonicalPhone;
+                                await _userManager.UpdateAsync(ownerUser);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to sync merchant Phone1 to owner account {0}", uid.Value);
+                }
+            }
 
             // Clear active caches for this merchant
             _cache.Remove($"ActiveMerchantPrices_{entity.Id}");
             _cache.Remove($"AllMerchantPrices_{entity.Id}");
+            _cache.Remove("RestaurantCategoriesCustomerCache");
+            _cache.Remove("GetValidMerchants");
 
             _logger.LogInformation("Merchant profile updated for MerchantId={0}, OwnerId={1}", entity.Id, uid.Value);
 
@@ -190,6 +237,8 @@ namespace App.ApiControllers.V1.Warehouse
 
             _cache.Remove($"ActiveMerchantPrices_{entity.Id}");
             _cache.Remove($"AllMerchantPrices_{entity.Id}");
+            _cache.Remove("RestaurantCategoriesCustomerCache");
+            _cache.Remove("GetValidMerchants");
 
             _logger.LogInformation("Merchant active status toggled to {0} for MerchantId={1}", entity.Active, entity.Id);
 

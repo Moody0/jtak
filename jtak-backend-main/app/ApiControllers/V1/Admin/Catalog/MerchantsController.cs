@@ -264,6 +264,9 @@ namespace App.ApiControllers.V1.Admin
 
             await _service.SetMerchantPercent(entity.Id, item.ProfitOutOfMerchantPricePercent);
 
+            _cache.Remove("RestaurantCategoriesCustomerCache");
+            _cache.Remove("GetValidMerchants");
+
             if (_auditService != null)
             {
                 await _auditService.LogAsync(new AdminAuditLogEntry
@@ -344,12 +347,89 @@ namespace App.ApiControllers.V1.Admin
             await _uow.SaveChangesAsync();
 
             await _service.SetMerchantPercent(entity.Id, item.ProfitOutOfMerchantPricePercent);
+            if (ownerId != Guid.Empty)
+            {
+                try
+                {
+                    var ownerUser = await _userManager.FindByIdAsync(ownerId.ToString());
+                    if (ownerUser != null && ownerUser.DeletionDate == null)
+                    {
+                        var userChanged = false;
+                        if (!string.IsNullOrWhiteSpace(entity.OwnerName) && ownerUser.FullName != entity.OwnerName.Trim())
+                        {
+                            ownerUser.FullName = entity.OwnerName.Trim();
+                            var spaceIdx = ownerUser.FullName.IndexOf(' ');
+                            if (spaceIdx > 0)
+                            {
+                                ownerUser.FirstName = ownerUser.FullName.Substring(0, spaceIdx).Trim();
+                                ownerUser.LastName = ownerUser.FullName.Substring(spaceIdx + 1).Trim();
+                            }
+                            else
+                            {
+                                ownerUser.FirstName = ownerUser.FullName;
+                                ownerUser.LastName = "";
+                            }
+                            userChanged = true;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(entity.Phone1))
+                        {
+                            var rawPhone = entity.Phone1.Trim();
+                            if (SyrianPhoneIdentity.TryNormalize(rawPhone, out var canonicalPhone))
+                            {
+                                var isPhoneTaken = false;
+                                try
+                                {
+                                    if (_userManager.Users != null)
+                                    {
+                                        var phoneMatch = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
+                                        isPhoneTaken = phoneMatch.Ambiguous || (phoneMatch.User != null && phoneMatch.User.Id != ownerUser.Id);
+                                    }
+                                }
+                                catch
+                                {
+                                    isPhoneTaken = false;
+                                }
+
+                                if (!isPhoneTaken)
+                                {
+                                    if (ownerUser.PhoneNumber != canonicalPhone)
+                                    {
+                                        ownerUser.PhoneNumber = canonicalPhone;
+                                        ownerUser.UserName = canonicalPhone;
+                                        userChanged = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (ownerUser.IsActive != entity.Active)
+                        {
+                            ownerUser.IsActive = entity.Active;
+                            userChanged = true;
+                        }
+
+                        if (userChanged)
+                        {
+                            await _userManager.UpdateAsync(ownerUser);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to sync merchant changes to owner account {0}", ownerId);
+                }
+            }
+
+
+            _cache.Remove($"ActiveMerchantPrices_{id}");
+            _cache.Remove($"AllMerchantPrices_{id}");
+            _cache.Remove("RestaurantCategoriesCustomerCache");
+            _cache.Remove("GetValidMerchants");
 
             // Cached product prices also carry the merchant kind used by checkout.
             if (merchantActiveChanged || merchantKindChanged)
             {
-                _cache.Remove($"ActiveMerchantPrices_{id}");
-                _cache.Remove($"AllMerchantPrices_{id}");
                 var mpIds = (await _service.GetAllMerchantPrices(id)).Select(x=>x.Key).ToArray();
                 foreach (var mpId in mpIds)
                 {
