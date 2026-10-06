@@ -441,5 +441,45 @@ namespace App.ApiControllers.V1.Admin
             }
             return Ok(true);
         }
+
+        /// <summary>
+        /// Get Tedallal card configuration for the customer home page.
+        /// </summary>
+        [HttpGet("TedallalCard")]
+        public async Task<ActionResult<TedallalCardSetting>> GetTedallalCard()
+        {
+            var setting = await _genericSetting.GetValue<TedallalCardSetting>(TedallalCardSetting.Key);
+            setting ??= new TedallalCardSetting();
+            setting.Normalize();
+            return Ok(setting);
+        }
+
+        /// <summary>
+        /// Update Tedallal card configuration (section title, card title, subtitle, logo URL, enabled).
+        /// </summary>
+        [HttpPut("TedallalCard")]
+        public async Task<ActionResult<bool>> SetTedallalCard([FromBody] TedallalCardSetting model)
+        {
+            if (model == null) return BadRequest(ApiErr.Create("بيانات الإعدادات غير صالحة."));
+            model.Normalize();
+            var before = await _genericSetting.GetValue<TedallalCardSetting>(TedallalCardSetting.Key);
+            await _genericSetting.SetValue(TedallalCardSetting.Key, model);
+
+            if (_auditService != null)
+            {
+                await AuditSafely(new AdminAuditLogEntry
+                {
+                    Module = "Settings",
+                    Action = "UpdateTedallalCardSetting",
+                    EntityType = "TedallalCardSetting",
+                    EntityId = TedallalCardSetting.Key,
+                    Description = $"تحديث إعدادات كارت خدمة تدلل (العنوان: {model.SectionTitle} - {model.CardTitle})",
+                    Result = "Success",
+                    BeforeState = before,
+                    AfterState = model
+                });
+            }
+            return Ok(true);
+        }
     }
 }

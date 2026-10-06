@@ -24,5 +24,6 @@ namespace App.ApiModels
         public int HomeCategoriesMaxItems { get; set; } = 8;
         public string HomeCategoriesTitle { get; set; }
         public string HomeCategoriesTitleEn { get; set; }
+        public TedallalCardSetting TedallalCard { get; set; }
     }
 }

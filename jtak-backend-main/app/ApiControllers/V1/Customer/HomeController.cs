@@ -148,6 +148,10 @@ namespace App.ApiControllers.V1.Customer
                 }
             }
 
+            var tedallalSetting = await _genericSetting.GetValue<TedallalCardSetting>(TedallalCardSetting.Key)
+                ?? new TedallalCardSetting();
+            tedallalSetting.Normalize();
+
             return new HomeVm
             {
                 User = u,
@@ -159,8 +163,21 @@ namespace App.ApiControllers.V1.Customer
                 HomeCategoriesEnabled = homeCategoriesEnabled,
                 HomeCategoriesMaxItems = homeCategoriesMaxItems,
                 HomeCategoriesTitle = homeConfig?.SectionTitle,
-                HomeCategoriesTitleEn = homeConfig?.SectionTitleEn
+                HomeCategoriesTitleEn = homeConfig?.SectionTitleEn,
+                TedallalCard = tedallalSetting
             };
+        }
+
+        /// <summary>
+        /// Configuration for the "خدمة تدلل" card on the customer home page.
+        /// </summary>
+        [HttpGet, Route("TedallalCard"), AllowAnonymous]
+        public async Task<ActionResult<TedallalCardSetting>> GetTedallalCard()
+        {
+            var setting = await _genericSetting.GetValue<TedallalCardSetting>(TedallalCardSetting.Key)
+                ?? new TedallalCardSetting();
+            setting.Normalize();
+            return Ok(setting);
         }
 
         /// <summary>
