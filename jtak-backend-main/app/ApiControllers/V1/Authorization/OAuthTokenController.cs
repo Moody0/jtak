@@ -265,12 +265,8 @@ namespace App.ApiControllers.V1.Authorization
 
                     var isCodeValid = false;
                     var normalizedCode = request.Code?.Replace(" ", "").Trim() ?? "";
-                    var configuredTemporaryCode = _configuration?["Authentication:TemporaryOtpCode"]?.Trim();
-                    if (!string.IsNullOrEmpty(configuredTemporaryCode) &&
-                        configuredTemporaryCode.Length == 6 &&
-                        configuredTemporaryCode.All(char.IsDigit) &&
-                        bool.TryParse(_configuration?["Authentication:TemporaryOtpEnabled"], out var temporaryOtpEnabled) &&
-                        temporaryOtpEnabled &&
+                    var configuredTemporaryCode = TemporaryOtpPolicy.Code;
+                    if (TemporaryOtpPolicy.IsEnabled(_configuration) &&
                         string.Equals(normalizedCode, configuredTemporaryCode, StringComparison.Ordinal))
                     {
                         isCodeValid = true;
@@ -291,7 +287,7 @@ namespace App.ApiControllers.V1.Authorization
                         // 1. Try VerifyChangePhoneNumberTokenAsync
                         foreach (var phone in candidatePhones)
                         {
-                            if (await _userManager.VerifyChangePhoneNumberTokenAsync(user, request.Code, phone))
+                            if (await _userManager.VerifyChangePhoneNumberTokenAsync(user, normalizedCode, phone))
                             {
                                 isCodeValid = true;
                                 break;
@@ -303,7 +299,7 @@ namespace App.ApiControllers.V1.Authorization
                         {
                             foreach (var phone in candidatePhones)
                             {
-                                var changeRes = await _userManager.ChangePhoneNumberAsync(user, phone, request.Code);
+                                var changeRes = await _userManager.ChangePhoneNumberAsync(user, phone, normalizedCode);
                                 if (changeRes.Succeeded)
                                 {
                                     isCodeValid = true;
@@ -317,7 +313,7 @@ namespace App.ApiControllers.V1.Authorization
                         {
                             var cutoff = DateTime.UtcNow.AddMinutes(-30);
                             var matchingLog = await _smsLogService.Queryable()
-                                .Where(x => x.UserId == user.Id && x.Code == request.Code && x.CreatedDate >= cutoff)
+                                .Where(x => x.UserId == user.Id && x.Code == normalizedCode && x.CreatedDate >= cutoff)
                                 .OrderByDescending(x => x.CreatedDate)
                                 .FirstOrDefaultAsync();
 

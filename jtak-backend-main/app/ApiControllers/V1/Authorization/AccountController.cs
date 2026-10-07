@@ -22,6 +22,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
+using App.Helpers.Authorization;
 
 namespace App.ApiControllers.V1.Authorization
 {
@@ -41,18 +42,9 @@ namespace App.ApiControllers.V1.Authorization
         private readonly IMemoryCache _cache;
 
         private bool IsTemporaryOtpEnabled =>
-            bool.TryParse(_configuration?["Authentication:TemporaryOtpEnabled"], out var enabled) && enabled;
+            TemporaryOtpPolicy.IsEnabled(_configuration);
 
-        private string TemporaryOtpCode
-        {
-            get
-            {
-                var configuredCode = _configuration?["Authentication:TemporaryOtpCode"]?.Trim();
-                return !string.IsNullOrEmpty(configuredCode) && configuredCode.Length == 6 && configuredCode.All(char.IsDigit)
-                    ? configuredCode
-                    : "123456";
-            }
-        }
+        private string TemporaryOtpCode => TemporaryOtpPolicy.Code;
 
         public AccountController(IAppUnitOfWork unitOfWorkAsync,
             UserManager<AppUser> userManager,
