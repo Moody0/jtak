@@ -6,12 +6,13 @@ export function merchantDiscountQuote(baseUsd: number, rate: number, markupPerce
   const merchantPrice = local(exactBase);
   const gross = exactBase * (1 + markupPercent / 100);
   const price = local(gross);
-  const discounted = local(gross * (1 - requestedPercent / 100));
+  const appliedBasePercent = Math.min(requestedPercent, markupPercent);
+  const discounted = local(exactBase * (1 + (markupPercent - appliedBasePercent) / 100));
   const finalPrice = Math.max(merchantPrice, discounted);
   const discount = Math.max(0, price - finalPrice);
   return {
-    merchantPrice, price, finalPrice, discount,
+    merchantPrice, price, finalPrice, discount, markupPercent, appliedBasePercent,
     effectivePercent: price > 0 ? Math.round(discount / price * 10000) / 100 : 0,
-    limited: requestedPercent > 0 && discounted < merchantPrice,
+    limited: requestedPercent > markupPercent,
   };
 }

@@ -68,6 +68,8 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   merchantsLoadError = false;
   exchangeRate = 15000;
   private syncingPriceInputs = false;
+  private originalBaseUsd: number | null = null;
+  private initialDisplayedPriceUsd: number | null = null;
 
   // Quick Unit Presets
   unitPresets = ['قطعة', 'كغ', 'علبة', 'وجبة', 'لتر', 'صندوق', 'حبة'];
@@ -132,7 +134,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   }
 
   private initializeDiscountInputs(): void {
-    if (!this.formGroup || this.formGroup.dirty) return;
+    if (!this.formGroup || this.formGroup.get('priceUsd')?.dirty) return;
 
     const storedDiscount = this.normalizeNumber(this.item?.discount, 0) || 0;
     const storedPriceUsd = this.normalizeNumber(this.item?.priceUsd, 0) || 0;
@@ -174,10 +176,24 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       }
     }
 
+    // A two-decimal USD display must not overwrite the precise supplier quote.
+    // For example, 550 / 135 is 4.074074..., not 4.07 (549.45 local).
+    this.originalBaseUsd = oldPriceUsd;
+    this.initialDisplayedPriceUsd = oldPriceUsd !== null ? this.roundUsd(oldPriceUsd) : null;
     this.formGroup.patchValue({
-      priceUsd: oldPriceUsd !== null ? this.roundUsd(oldPriceUsd) : null,
-      discountPercent: percentage,
+      priceUsd: this.initialDisplayedPriceUsd,
+      ...(this.formGroup.get('discountPercent')?.dirty ? {} : { discountPercent: percentage }),
     }, { emitEvent: false });
+  }
+
+  private get preservedBasePrice(): boolean {
+    return !!this.item?.id && this.originalBaseUsd !== null &&
+      this.normalizeNumber(this.formGroup?.get('priceUsd')?.value, null) === this.initialDisplayedPriceUsd;
+  }
+
+  private get basePriceUsd(): number | null {
+    const entered = this.normalizeNumber(this.formGroup?.get('priceUsd')?.value, null);
+    return this.preservedBasePrice ? this.originalBaseUsd : entered !== null ? this.roundUsd(entered) : null;
   }
 
   roundUsd(value: number): number {
@@ -212,7 +228,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
 
   private get pricingQuote() {
     if (!this.formGroup) return null;
-    const baseUsd = this.roundUsd(this.normalizeNumber(this.formGroup.get('priceUsd')?.value, 0) || 0);
+    const baseUsd = this.basePriceUsd || 0;
     const requestedPercent = this.normalizeNumber(this.formGroup.get('discountPercent')?.value, 0) || 0;
     const merchantId = this.normalizeNumber(this.formGroup.get('merchantId')?.value, null);
     const selected = this.merchantsList.find((merchant) => merchant.id === merchantId);
@@ -234,12 +250,14 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       requestedPercentage: requested,
       limited: quote.limited,
       merchantPrice: quote.merchantPrice,
+      appliedBasePercentage: quote.appliedBasePercent,
+      markupPercentage: quote.markupPercent,
     };
   }
 
   get customerPricePreview() {
     const quote = this.pricingQuote;
-    return quote ? { oldPrice: quote.price, salePrice: quote.finalPrice,
+    return quote ? { merchantPrice: quote.merchantPrice, oldPrice: quote.price, salePrice: quote.finalPrice,
       discountPercent: quote.effectivePercent } : null;
   }
 
@@ -472,8 +490,10 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     const photosArray = raw.photos || [];
     const photosStr = Array.isArray(photosArray) ? photosArray.join(',') : (photosArray || '');
 
-    const enteredPriceUsd = this.normalizeNumber(raw.priceUsd, null);
-    const preDiscountPriceUsd = enteredPriceUsd !== null ? this.roundUsd(enteredPriceUsd) : null;
+    const preDiscountPriceUsd = this.basePriceUsd;
+    // Editing only a discount must also preserve local-currency pricing.
+    const storedPriceUsd = this.preservedBasePrice && !(Number(this.item.priceUsd) > 0)
+      ? null : preDiscountPriceUsd;
     const discountPercent = this.normalizeNumber(raw.discountPercent, 0) || 0;
     const catId = this.normalizeNumber(raw.productCategoryId, null);
     const merchantId = this.normalizeNumber(raw.merchantId, null);
@@ -485,9 +505,9 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
 
     if (preDiscountPriceUsd !== null && preDiscountPriceUsd > 0) {
       const quote = this.pricingQuote;
-      if (!quote) return;
-      salePriceUsd = preDiscountPriceUsd;
-      originalPriceUsd = discountPercent > 0 ? preDiscountPriceUsd : null;
+      if (!quote) { this.isSaving = false; return; }
+      salePriceUsd = storedPriceUsd;
+      originalPriceUsd = discountPercent > 0 ? storedPriceUsd : null;
       salePriceLocal = quote.merchantPrice;
       discountAmount = quote.discount;
     }
@@ -502,8 +522,8 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       photos: photosStr,
       productCategoryId: catId || this.item.productCategoryId,
       merchantId: merchantId ? Number(merchantId) : undefined,
-      price: preDiscountPriceUsd !== null ? this.toLocalPrice(preDiscountPriceUsd) : 0,
-      priceUsd: preDiscountPriceUsd,
+      price: salePriceLocal,
+      priceUsd: storedPriceUsd,
       originalPrice: originalPriceUsd,
       discountPercent,
       discount: discountAmount,
@@ -537,7 +557,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
     const preview = this.discountPreview;
     if (preview?.limited) {
       this.toasterService.warning(
-        `تم حفظ المنتج. الخصم المطلوب ${preview.requestedPercentage}%، والمطبّق فعلياً ${preview.percentage}% لأن سعر العميل لا يمكن أن يقل عن حصة التاجر (${preview.merchantPrice} ل.س).`
+        `تم حفظ المنتج. الخصم من السعر الأساسي محدود بعمولة جيتك: ${preview.appliedBasePercentage}% بدلاً من ${preview.requestedPercentage}%. حصة التاجر محفوظة (${preview.merchantPrice} ل.س).`
       );
     } else {
       this.toasterService.success(message);

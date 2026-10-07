@@ -257,10 +257,11 @@
                 </div>
                 <div id="productPriceUsdHelp" class="d-flex flex-column align-items-start gap-1 mt-2">
                   <span class="fs-9 text-muted">أدخل السعر بالدولار، بحد أقصى رقمين بعد الفاصلة (مثال: 0.41).</span>
-                  <span class="fs-9 text-muted" *ngIf="formGroup.get('priceUsd')?.value as pUsd">
-                    ما يعادله بالسعر الأساسي: نحو {{ toLocalPrice(pUsd) | number:'1.0-0' }} ل.س
+                  <span class="fs-9 text-muted" *ngIf="customerPricePreview as basePreview">
+                    السعر الأساسي للتاجر: {{ basePreview.merchantPrice | number:'1.0-0' }} ل.س
                     (سعر الصرف: 1 دولار = {{ exchangeRate | number:'1.0-2' }} ل.س)
                   </span>
+                  <span class="fs-9 text-muted" *ngIf="item.id">قيمة الدولار مقربة للعرض؛ يُحفظ السعر الأصلي بدقته ما لم تغيّره.</span>
                   <span class="badge badge-light-primary fs-9" *ngIf="customerPricePreview as pricePreview">
                     السعر المتوقع للعميل بعد العمولة والخصم إن وُجد: {{ pricePreview.salePrice | number:'1.0-0' }} ل.س
                   </span>
@@ -270,7 +271,7 @@
               <!-- Discount Percentage -->
               <div class="col-md-6">
                 <label for="productDiscount" class="form-label fw-bold mb-2">
-                  نسبة الخصم
+                  نسبة الخصم من سعر التاجر الأساسي
                 </label>
                 <div class="input-group" dir="ltr">
                   <span class="input-group-text bg-light fw-bold text-dark">%</span>
@@ -356,9 +357,12 @@
                     <strong class="d-block text-dark fs-7">
                       <i class="fas fa-tags text-success me-1"></i> معاينة تسعير العرض في التطبيق
                     </strong>
-                    <small class="text-muted">السعر الذي سيدفعه العميل بعد تطبيق الخصم</small>
+                    <small class="text-muted">العمولة والخصم يُحسبان على السعر الأساسي نفسه؛ ثم يُقرّب سعر العميل لأقرب ليرة.</small>
+                    <small class="d-block text-muted">
+                      الخصم من السعر الأساسي {{ preview.appliedBasePercentage | number:'1.0-2' }}%؛ التوفير للعميل {{ preview.percentage | number:'1.0-2' }}% من السعر المعروض قبل الخصم.
+                    </small>
                     <small class="d-block text-warning" *ngIf="preview.limited">
-                      الخصم المطلوب {{ preview.requestedPercentage | number:'1.0-2' }}%، لكن المطبّق فعلياً {{ preview.percentage | number:'1.0-2' }}%.
+                      الخصم الأساسي المطلوب {{ preview.requestedPercentage | number:'1.0-2' }}% يتجاوز عمولة جيتك {{ preview.markupPercentage | number:'1.0-2' }}%، لذلك حُدّد عند {{ preview.appliedBasePercentage | number:'1.0-2' }}%.
                       سعر العميل لا يمكن أن يقل عن حصة التاجر: {{ preview.merchantPrice | number:'1.0-0' }} ل.س. الخصم من ربح جيتك فقط.
                     </small>
                   </div>
@@ -370,7 +374,7 @@
                     <span class="text-success fw-bold fs-7">
                       بعد الخصم: ${{ preview.salePriceUsd | number:'1.2-2' }} ({{ preview.salePriceLocal | number:'1.0-0' }} ل.س)
                     </span>
-                    <span class="badge badge-light-danger fw-bolder fs-8">خصم {{ preview.percentage | number:'1.0-2' }}%</span>
+                    <span class="badge badge-light-danger fw-bolder fs-8">توفير للعميل {{ preview.percentage | number:'1.0-2' }}%</span>
                   </div>
                 </div>
               </div>
@@ -521,7 +525,7 @@
 
                 <!-- Discount Ribbon -->
                 <span class="customer-discount-ribbon" *ngIf="customerPricePreview && customerPricePreview.discountPercent > 0">
-                  <i class="fas fa-bolt me-1"></i> خصم {{ customerPricePreview.discountPercent | number:'1.0-0' }}%
+                  <i class="fas fa-bolt me-1"></i> خصم {{ customerPricePreview.discountPercent | number:'1.0-2' }}%
                 </span>
 
                 <!-- Status Pill -->
