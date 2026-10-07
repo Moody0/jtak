@@ -171,6 +171,26 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
     return this.formGroup?.get('photo')?.value || null;
   }
 
+  getLogoBackgroundColor(): string {
+    const color = String(this.formGroup?.get('logoBackgroundColor')?.value ?? '');
+    return /^#[0-9a-f]{6}$/i.test(color) ? color : '#FFFFFF';
+  }
+
+  getStoreLogoUrl(): string | null {
+    const photo = this.getStorePhoto()?.split(',')[0].trim();
+    if (!photo) return null;
+    if (/^(https?:\/\/|\.?\/assets\/|assets\/)/i.test(photo)) return photo;
+    return this.filesService.downloadFile(photo);
+  }
+
+  getLogoForegroundColor(): string {
+    const color = this.getLogoBackgroundColor().substring(1);
+    const r = parseInt(color.substring(0, 2), 16);
+    const g = parseInt(color.substring(2, 4), 16);
+    const b = parseInt(color.substring(4, 6), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 < 128 ? '#FFFFFF' : '#182230';
+  }
+
   getSelectedMerchantOwner(): User | undefined {
     const ownerId = this.formGroup?.get('ownerId')?.value || this.item?.ownerId;
     return ownerId ? this.merchantUsers.find((user) => user.id === ownerId) : undefined;
@@ -382,7 +402,9 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
       ownerName: [this.item.ownerName || this.item.owner || ''],
       owner: [this.item.ownerName || this.item.owner || ''],
       ownerId: [this.item.ownerId && this.item.ownerId !== '-' ? this.item.ownerId : null, [Validators.required]],
-      photo: [this.item.photo || '']
+      photo: [this.item.photo || ''],
+      logoBackgroundColor: [this.item.logoBackgroundColor || '#FFFFFF',
+        [Validators.required, Validators.pattern(/^#[0-9a-fA-F]{6}$/)]]
     });
 
     ['phone1', 'phone2'].forEach((phoneControlName) => {

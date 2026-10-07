@@ -613,6 +613,26 @@
                   uploaderTitle="اختر شعار أو صورة المتجر"
                   (fileUploaded)="onFileUploaded($event, 'photo')"
                 ></app-file-uploader>
+                <small class="text-muted d-block mt-2">
+                  لبطاقات المتاجر والصيدليات، ارفع الشعار وحده بصيغة PNG أو WebP بخلفية شفافة. الخلفية الموجودة داخل الصورة لن تتغير عند اختيار لون.
+                </small>
+
+                <div class="mt-4" *ngIf="formGroup.get('merchantKind')?.value !== 0 && !isWarehouseRecord">
+                  <label for="logoBackgroundColor" class="form-label fw-bold">لون خلفية الشعار في تطبيق العملاء</label>
+                  <div class="d-flex align-items-center gap-3">
+                    <input id="logoBackgroundColor" type="color" formControlName="logoBackgroundColor"
+                           class="form-control form-control-color" aria-label="اختيار لون خلفية الشعار" />
+                    <input id="logoBackgroundHex" type="text" formControlName="logoBackgroundColor" dir="ltr"
+                           class="form-control" style="max-width: 150px" maxlength="7"
+                           placeholder="#FFFFFF" aria-label="كود لون خلفية الشعار" />
+                    <button type="button" class="btn btn-light btn-sm"
+                            (click)="formGroup.patchValue({ logoBackgroundColor: '#FFFFFF' })">إعادة للأبيض</button>
+                  </div>
+                  <div class="text-danger small mt-2" *ngIf="formGroup.get('logoBackgroundColor')?.invalid">
+                    أدخل لونًا من 6 خانات، مثل #FFFFFF.
+                  </div>
+                  <small class="text-muted d-block mt-2">يتغير لون مساحة الشعار فقط. ستظهر النتيجة في المعاينة.</small>
+                </div>
 
                 <div class="edit-image-grid mt-4" *ngIf="formGroup.get('photo')?.value">
                   <app-uploaded-image
@@ -675,6 +695,20 @@
 
           <!-- Customer Store Card Mockup -->
           <div class="preview-card-viewport">
+            <div class="customer-store-horizontal-card" *ngIf="formGroup.get('merchantKind')?.value !== 0; else restaurantPreview">
+              <div class="customer-store-logo-panel" [style.background-color]="getLogoBackgroundColor()">
+                <img *ngIf="getStoreLogoUrl() as logoUrl" [src]="logoUrl"
+                     [alt]="formGroup.get('title')?.value || 'شعار المتجر'" />
+                <i *ngIf="!getStoreLogoUrl()" [class]="getKindInfo().icon"
+                   [style.color]="getLogoForegroundColor()" aria-hidden="true"></i>
+              </div>
+              <div class="customer-store-horizontal-details">
+                <strong>{{ formGroup.get('title')?.value || 'اسم المتجر' }}</strong>
+                <span>{{ formGroup.get('shortDescription')?.value }}</span>
+                <small>{{ formGroup.get('deliveryTime')?.value || '20-30 دقيقة' }}</small>
+              </div>
+            </div>
+            <ng-template #restaurantPreview>
             <div class="customer-store-card">
               <!-- Store Media -->
               <div class="customer-store-media">
@@ -744,6 +778,7 @@
                 </div>
               </div>
             </div>
+            </ng-template>
           </div>
 
           <!-- Bottom Meta Note -->

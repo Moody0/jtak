@@ -24,4 +24,5 @@ export interface Merchant extends BaseModel {
   ownerName?: string;
   owner: string;
   photo: string;
+  logoBackgroundColor?: string;
 }
