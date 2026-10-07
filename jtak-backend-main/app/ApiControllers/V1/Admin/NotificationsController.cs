@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using App.ApiModels;
 using App.Shared.Services;
 using AutoMapper;
@@ -25,7 +26,7 @@ namespace App.ApiControllers.V1.Admin
 {
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiErr))]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     [ApiVersion("1")]
     public class NotificationsController : SolApiController
     {
@@ -57,7 +58,20 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<AdminNotificationSummaryDto>> Summary()
         {
             var summary = await _summaryService.GetSummaryAsync();
-            return Ok(summary);
+            var access = await HttpContext.RequestServices.GetRequiredService<App.Helpers.Authorization.DashboardAccessService>().CurrentAsync(User);
+            // Copy the summary; never alter a shared/cached instance for another administrator.
+            var visible = new AdminNotificationSummaryDto
+            {
+                Orders = access.Has("orders.view") ? summary.Orders : 0,
+                ErrandRequests = access.Has("orders.view") ? summary.ErrandRequests : 0,
+                SupportMessages = access.Has("support.view") ? summary.SupportMessages : 0,
+                DriverSettlements = access.Has("finance.view") ? summary.DriverSettlements : 0,
+                MerchantSettlements = access.Has("finance.view") ? summary.MerchantSettlements : 0,
+                Reconciliation = access.Has("finance.view") ? summary.Reconciliation : 0,
+                Users = access.Has("users.view") ? summary.Users : 0
+            };
+            visible.TotalActionable = visible.Orders + visible.ErrandRequests + visible.SupportMessages + visible.Reconciliation + visible.Users;
+            return Ok(visible);
         }
 
         [HttpGet]

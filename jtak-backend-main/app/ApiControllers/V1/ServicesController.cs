@@ -112,7 +112,7 @@ namespace App.ApiControllers.V1
         // Receipts are internal accounting evidence. Never serve them through
         // anonymous media routes, even if a customer retained an old token.
         [HttpGet("ErrandReceipt/{id:int}")]
-        [Authorize(Policy = nameof(AppPermissionKey.AdminPermission))]
+        [Authorize(Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
         public async Task<IActionResult> ErrandReceipt(int id)
         {
             var receiptToken = await _app.SupportMessages.AsNoTracking()

@@ -57,7 +57,7 @@ namespace App.ApiControllers.V1.Admin
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiErr))]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     public class FleetReconciliationController : SolApiController
     {
         private readonly IEodReconciliationService _reconciliationService;

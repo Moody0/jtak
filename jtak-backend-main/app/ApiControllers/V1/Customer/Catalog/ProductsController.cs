@@ -19,7 +19,6 @@ using App.Shared.Services.eCommerce;
 using MerchantDto = Modules.Catalog.Entities.MerchantDto;
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using Solf.Base;
 using URF.Core.Abstractions.Trackable;
 
@@ -470,33 +469,20 @@ namespace App.ApiControllers.V1.Customer
                                                              m.Merchant.Active && m.Merchant.DeletionDate == null));
             }
 
-            int[] mids = null;
-            // Restaurants are limited to their delivery coverage, markets are not.
-            if (vm.Lat.HasValue && vm.Lng.HasValue)
-            {
-                mids = await _merchantService.GetSearchableMerchants(vm.Lat.Value, vm.Lng.Value);
-                if (vm.OnlyOffers && (mids == null || mids.Length == 0))
-                    return Array.Empty<ProductLiteDto>();
-                // An unpriced row means the merchant does not actually stock the
-                // product. Excluding those here keeps this filter in step with
-                // the priced-only check applied to the results below, so a page
-                // of results cannot silently come back part empty.
-                if (mids != null && mids.Length > 0)
-                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) && (m.MerchantPrice > 0 || (m.PriceUsd.HasValue && m.PriceUsd.Value > 0))));
-                if (vm.OnlyOffers)
-                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) &&
-                                     m.Discount > 0m && m.MerchantPrice > 0m &&
-                                     m.Merchant.Active && m.Merchant.DeletionDate == null));
-            }
-            else
-            {
-                _logger.LogError("قم بتحديد مكانك أولا!");
-                _logger.LogError(JsonSerializer.Serialize(vm));
-                return BadRequest("قم بتحديد مكانك أولا!");
-            }
+            // Browsing does not require a delivery pin. Checkout validates
+            // coverage separately; a missing pin must not hide the catalog.
+            var mids = await GetSearchMerchantIds(vm);
+            if (mids.Length == 0) return Array.Empty<ProductLiteDto>();
+            // Match the eligibility rules used by GetProductPrices before
+            // pagination, rather than filling a page with unpriced products.
+            q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) &&
+                             m.MerchantPrice > 0m && (!vm.OnlyOffers || m.Discount > 0m)));
+            vm.Page = Math.Max(0, vm.Page);
+            vm.Take = Math.Clamp(vm.Take, 1, 60);
 
             // Fetch next page for products
             var productsPage = await q.OrderBy(x => x.ProductCategory.Order)
+                                      .ThenBy(x => x.Id)
                                       .Skip(vm.Page * vm.Take)
                                       .Take(vm.Take)
                                       .Select(x => new ProductLiteDto
@@ -605,26 +591,10 @@ namespace App.ApiControllers.V1.Customer
                                                              m.Merchant.Active && m.Merchant.DeletionDate == null));
             }
 
-            int[] mids = null;
-            // Restaurants are limited to their delivery coverage, markets are not.
-            if (vm.Lat.HasValue && vm.Lng.HasValue)
-            {
-                mids = await _merchantService.GetSearchableMerchants(vm.Lat.Value, vm.Lng.Value);
-                if (vm.OnlyOffers && (mids == null || mids.Length == 0))
-                    return Array.Empty<ProductCategoryLiteDto>();
-                if (mids != null && mids.Length > 0)
-                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) && m.MerchantPrice > 0));
-                if (vm.OnlyOffers)
-                    q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) &&
-                                     m.Discount > 0m && m.MerchantPrice > 0m &&
-                                     m.Merchant.Active && m.Merchant.DeletionDate == null));
-            }
-            else
-            {
-                _logger.LogError("قم بتحديد مكانك أولا!");
-                _logger.LogError(JsonSerializer.Serialize(vm));
-                return BadRequest("قم بتحديد مكانك أولا!");
-            }
+            var mids = await GetSearchMerchantIds(vm);
+            if (mids.Length == 0) return Array.Empty<ProductCategoryLiteDto>();
+            q = q.Where(x => x.MerchantProducts.Any(m => mids.Contains(m.MerchantId) &&
+                             m.MerchantPrice > 0m && (!vm.OnlyOffers || m.Discount > 0m)));
 
             // Fetch next page for products
             var products = await q.OrderBy(x => x.ProductCategory.Order)
@@ -683,6 +653,17 @@ namespace App.ApiControllers.V1.Customer
                            })
                            .ToArray();
             //return products.Where(x => x.MerchantId != 0 && x.FinalPrice != 0).ToArray();
+        }
+
+        private async Task<int[]> GetSearchMerchantIds(ProductSearchVm vm)
+        {
+            if (vm.Lat.HasValue && vm.Lng.HasValue)
+                return await _merchantService.GetSearchableMerchants(vm.Lat.Value, vm.Lng.Value);
+
+            return await _merchantService.Queryable().AsNoTracking()
+                .Where(x => x.Active && x.DeletionDate == null)
+                .Select(x => x.Id)
+                .ToArrayAsync();
         }
 
         private async Task<int[]> GetActiveCategoryTreeIds(int rootId)

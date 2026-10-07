@@ -1,4 +1,4 @@
-﻿using App.ApiModels;
+using App.ApiModels;
 using App.Shared.Services;
 using App.Shared.Entities.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -13,7 +13,7 @@ namespace App.ApiControllers.V1.Admin
 {
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     public class PagesController : SolApiController
     {
         private readonly IGenericSettingService _service;

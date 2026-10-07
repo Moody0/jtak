@@ -22,7 +22,7 @@ namespace App.ApiControllers.V1.Admin
 {
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiErr))]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     [ApiVersion("1")]
     public class ProductReviewsController : SolApiController
     {

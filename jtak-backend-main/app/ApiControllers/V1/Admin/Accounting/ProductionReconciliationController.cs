@@ -21,7 +21,7 @@ namespace App.ApiControllers.V1.Admin
     [Route("api/v{version:apiVersion}/Admin/Reconciliation/Production")]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ApiErr))]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     public class ProductionReconciliationController : SolApiController
     {
         private readonly IProductionReconciliationService _reconciliationService;

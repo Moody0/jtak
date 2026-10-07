@@ -26,7 +26,7 @@ namespace App.ApiControllers.V1.Admin
 {
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     public class SettingsController : SolApiController
     {
         private readonly IProductService _service;
@@ -321,6 +321,15 @@ namespace App.ApiControllers.V1.Admin
             settings.HomeFeaturedProducts = settings.HomeFeaturedProductIds?.Any() == true ? await _service.Queryable().Where(x => settings.HomeFeaturedProductIds.Contains(x.Id) && x.Active).Select(x => _mapper.Map<ProductDto>(x)).ToArrayAsync() : Array.Empty<ProductDto>();
 
             return settings;
+        }
+
+        [HttpGet("CatalogDefaults")]
+        public async Task<IActionResult> GetCatalogDefaults()
+        {
+            // Product editors only need the rate, not system/contact/driver settings.
+            var rate = await _genericSetting.GetValue<UsdExchangeRateSetting>(UsdExchangeRateSetting.Key);
+            var settings = await _genericSetting.GetValue<SettingsVm>(nameof(SettingsVm), CultureInfo.CurrentCulture.TwoLetterISOLanguageName);
+            return Ok(new { usdToSypExchangeRate = rate != null && rate.Rate > 0 ? rate.Rate : (settings ?? new SettingsVm()).UsdToSypExchangeRate });
         }
 
         /// <summary>

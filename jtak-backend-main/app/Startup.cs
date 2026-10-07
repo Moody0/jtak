@@ -64,7 +64,10 @@ namespace App
             services.AddRazorPages()
                     .AddRazorRuntimeCompilation();
 
-            services.AddControllersWithViews()
+            services.AddScoped<App.Helpers.Authorization.DashboardAccessService>();
+            services.AddScoped<IDashboardAccessEvaluator>(provider => provider.GetRequiredService<App.Helpers.Authorization.DashboardAccessService>());
+            services.AddScoped<App.Helpers.Authorization.DashboardPermissionFilter>();
+            services.AddControllersWithViews(options => options.Filters.AddService<App.Helpers.Authorization.DashboardPermissionFilter>(-3000))
                     .AddJsonOptions(o =>
                     {
                         o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
@@ -147,6 +150,7 @@ namespace App
 
             services.AddAuthorization(options =>
             {
+                options.AddPolicy(App.Helpers.Authorization.DashboardAccessService.Policy, policy => policy.RequireAuthenticatedUser());
                 foreach (var permission in Enum.GetValues<AppPermissionKey>())
                 {
                     if (permission == AppPermissionKey.CustomerPermission)

@@ -30,7 +30,7 @@ namespace App.ApiControllers.V1.Admin
 {
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     public class ProductsController : SolApiController
     {
         private readonly IProductService _service;
@@ -746,7 +746,7 @@ namespace App.ApiControllers.V1.Admin
         /// <returns></returns>
         [HttpPost]
         [Route("DeleteSelected")]
-        [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+        [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
         public async Task<ActionResult<bool>> DeleteSelected([FromBody] int[] ids)
         {
             if (ids == null || ids.Length == 0)

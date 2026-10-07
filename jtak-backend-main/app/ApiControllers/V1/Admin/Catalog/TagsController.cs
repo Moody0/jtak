@@ -1,4 +1,4 @@
-﻿namespace App.ApiControllers.V1.Admin
+namespace App.ApiControllers.V1.Admin
 {
     //[Route("api/v{version:apiVersion}/Admin/[controller]")]
     //[ApiVersion("1")]

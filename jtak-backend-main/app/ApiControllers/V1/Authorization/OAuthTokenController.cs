@@ -226,6 +226,9 @@ namespace App.ApiControllers.V1.Authorization
                     // when the user password/roles change, use the following line instead:
                     // var user = _signInManager.ValidateSecurityStampAsync(info.Principal);
                     var user = await _userManager.GetUserAsync(principal);
+                    if (user != null && (await _userManager.GetClaimsAsync(user)).Any(c => c.Type == DashboardAccessService.AccountMarker && c.Value == "1") &&
+                        principal.FindFirst(DashboardAccessService.SessionClaim)?.Value != DashboardAccessService.SessionFingerprint(user.SecurityStamp))
+                        return ForbidInvalidToken();
                     //if (user == null)
                     //    user = _userManager.Users.FirstOrDefault(x => x.PhoneNumber == request.Username);
 
@@ -262,6 +265,11 @@ namespace App.ApiControllers.V1.Authorization
 
                     if (!user.IsActive)
                         return ForbidInactive();
+
+                    // Dashboard accounts must authenticate with their password, never the mobile placeholder OTP.
+                    if (await _userManager.IsInRoleAsync(user, "Admin") ||
+                        (await _userManager.GetClaimsAsync(user)).Any(c => c.Type == DashboardAccessService.AccountMarker && c.Value == "1"))
+                        return ForbidInvalidUsernamePassword();
 
                     var isCodeValid = false;
                     var normalizedCode = request.Code?.Replace(" ", "").Trim() ?? "";
@@ -374,6 +382,8 @@ namespace App.ApiControllers.V1.Authorization
 
             // Create a new ClaimsPrincipal containing the claims that will be used to create an id_token, a token or a code.
             var claimsPrincipal = await _signInManager.CreateUserPrincipalAsync(user);
+            if ((await _userManager.GetClaimsAsync(user)).Any(c => c.Type == DashboardAccessService.AccountMarker && c.Value == "1"))
+                ((System.Security.Claims.ClaimsIdentity)claimsPrincipal.Identity).AddClaim(new System.Security.Claims.Claim(DashboardAccessService.SessionClaim, DashboardAccessService.SessionFingerprint(user.SecurityStamp)));
 
             // Set the list of scopes granted to the client application.
             claimsPrincipal.SetScopes(new[] { Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.Roles, Scopes.Phone, Scopes.OfflineAccess }.Intersect(request.GetScopes()));

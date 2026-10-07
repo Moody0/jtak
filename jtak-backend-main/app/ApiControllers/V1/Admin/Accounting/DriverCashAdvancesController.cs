@@ -23,7 +23,7 @@ namespace App.ApiControllers.V1.Admin.Accounting
     [Route("api/v{version:apiVersion}/Admin/DriverCashAdvances")]
     [ApiVersion("1")]
     [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
-        Policy = nameof(AppPermissionKey.AdminPermission))]
+        Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     public class DriverCashAdvancesController : ControllerBase
     {
         private const string Currency = "SYP";

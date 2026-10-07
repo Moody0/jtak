@@ -16,10 +16,12 @@ namespace App.Shared.Services.Hubs
     public class TrackingHub : Hub
     {
         private readonly OrdersDbContext _ordersDbContext;
+        private readonly IDashboardAccessEvaluator _dashboardAccess;
 
-        public TrackingHub(OrdersDbContext ordersDbContext)
+        public TrackingHub(OrdersDbContext ordersDbContext, IDashboardAccessEvaluator dashboardAccess)
         {
             _ordersDbContext = ordersDbContext;
+            _dashboardAccess = dashboardAccess;
         }
 
         public const string CourierDispatchGroup = "courier_dispatch";
@@ -40,13 +42,14 @@ namespace App.Shared.Services.Hubs
             }
 
             // Admins can track any order
-            if (user.IsInRole(nameof(AppRoleName.Admin)))
+            if (await _dashboardAccess.HasAsync(user, "orders.view"))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"order_{orderId}");
                 return;
             }
 
             var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value;
+            if (!Guid.TryParse(userIdStr, out _)) throw new HubException("Unauthorized to track this order.");
             if (!string.IsNullOrEmpty(userIdStr) && Guid.TryParse(userIdStr, out var userId))
             {
                 var order = await _ordersDbContext.Set<Order>()
@@ -73,22 +76,23 @@ namespace App.Shared.Services.Hubs
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"order_{orderId}");
         }
 
-        [Authorize(Policy = nameof(AppPermissionKey.AdminPermission))]
+        [Authorize]
         public async Task JoinCourierRadar()
         {
+            if (Context.User == null || !await _dashboardAccess.HasAsync(Context.User, "orders.view")) throw new HubException("Unauthorized to track couriers.");
             await Groups.AddToGroupAsync(Context.ConnectionId, CourierDispatchGroup);
         }
 
-        [Authorize(Policy = nameof(AppPermissionKey.AdminPermission))]
+        [Authorize]
         public async Task LeaveCourierRadar()
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, CourierDispatchGroup);
         }
 
-        [Authorize(Policy = nameof(AppPermissionKey.AdminPermission))]
+        [Authorize]
         public async Task JoinFleetRadar() => await JoinCourierRadar();
 
-        [Authorize(Policy = nameof(AppPermissionKey.AdminPermission))]
+        [Authorize]
         public async Task LeaveFleetRadar() => await LeaveCourierRadar();
 
         public override async Task OnDisconnectedAsync(Exception? exception)

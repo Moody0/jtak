@@ -23,7 +23,7 @@ namespace App.ApiControllers.V1.Admin
     /// </summary>
     [Route("api/v{version:apiVersion}/Admin/[controller]")]
     [ApiVersion("1")]
-    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = nameof(AppPermissionKey.AdminPermission))]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = App.Helpers.Authorization.DashboardAccessService.Policy)]
     public class HomeCategoriesController : SolApiController
     {
         private readonly IHomeCategoriesService _service;
