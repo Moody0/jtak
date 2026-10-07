@@ -28,6 +28,7 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
   private subs = new SubSink();
   @Input() item: Category;
   parentCategories: Category[] = [];
+  availableParents: Category[] = [];
   isLoading$: Observable<boolean>;
   formGroup: UntypedFormGroup;
   isSaving = false;
@@ -52,6 +53,7 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
   loadItem(): void {
     this.subs.sink = this.service.getAll(true, true).subscribe((cats) => {
       this.parentCategories = cats || [];
+      this.availableParents = this.parentCategories.filter((c) => c.id !== this.item?.id);
     });
     if (!this.item) {
       this.item = { ...EMPTY_Item };
@@ -67,12 +69,6 @@ export class EditCategoryModalComponent implements OnInit, OnDestroy {
       active: [this.item?.active ?? true, [Validators.required]],
       icon: [this.item?.icon || ''],
     });
-  }
-
-  getAvailableParents(): Category[] {
-    if (!this.parentCategories) return [];
-    if (!this.item?.id) return this.parentCategories;
-    return this.parentCategories.filter((c) => c.id !== this.item.id);
   }
 
   getParentTitle(): string | null {

@@ -13,6 +13,8 @@ interface HistoryItemView {
 
 interface HistoryDetailsView {
   items: HistoryItemView[];
+  subtotal?: number;
+  deliveryFee?: number;
   total?: number;
   note?: string;
 }
@@ -132,7 +134,8 @@ export class OrderStatusHistoryModalComponent implements OnInit {
         const title = record.ProductTitle || record.productTitle || record.Name || record.name;
         if (!title) return null;
         const quantity = Number(record.Quantity ?? record.quantity ?? 1) || 1;
-        const totalPrice = Number(record.TotalPrice ?? record.totalPrice ?? record.totalFinalPrice ?? 0) || undefined;
+        const price = record.TotalPrice ?? record.totalPrice ?? record.TotalFinalPrice ?? record.totalFinalPrice;
+        const totalPrice = price != null && Number.isFinite(Number(price)) ? Number(price) : undefined;
         return { title, quantity, totalPrice };
       })
       .filter((item: HistoryItemView | null): item is HistoryItemView => !!item);
@@ -143,8 +146,14 @@ export class OrderStatusHistoryModalComponent implements OnInit {
       return view;
     }
 
-    const total = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || undefined;
-    const view = { items, total };
+    const subtotal = items.some(item => item.totalPrice != null)
+      ? items.reduce((sum, item) => sum + (item.totalPrice ?? 0), 0)
+      : undefined;
+    // Use the saved customer fee, including zero for free delivery; do not reprice historical orders.
+    const fee = Number(historyItem.deliveryFee ?? this.order?.deliveryFee ?? 0);
+    const deliveryFee = Number.isFinite(fee) && fee >= 0 ? fee : 0;
+    const total = subtotal != null ? subtotal + deliveryFee : undefined;
+    const view = { items, subtotal, deliveryFee, total };
     this.detailsCache.set(historyItem.id, view);
     return view;
   }

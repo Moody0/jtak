@@ -75,7 +75,7 @@ import { DashboardService } from './services/dashboard.service';
                 </div>
 
                 <!-- Action Button -->
-                <button class="btn btn-primary w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2"
+                <button appDashboardWrite="settings" class="btn btn-primary w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2"
                   type="button" (click)="save()" [disabled]="loading || saving || !validRadius">
                   <i *ngIf="saving" class="fas fa-spinner fa-spin"></i>
                   <i *ngIf="!saving" class="fas fa-save"></i>

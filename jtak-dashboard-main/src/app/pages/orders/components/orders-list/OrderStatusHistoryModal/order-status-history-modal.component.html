@@ -58,12 +58,22 @@
             <div class="history-item" *ngFor="let item of detailView.items">
               <span class="history-item-quantity">{{ item.quantity }}×</span>
               <span class="history-item-name">{{ item.title }}</span>
-              <span *ngIf="item.totalPrice" class="history-item-price">{{ item.totalPrice | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+              <span *ngIf="item.totalPrice != null" class="history-item-price">{{ item.totalPrice | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
             </div>
-            <div *ngIf="detailView.total" class="history-total">
-              <span>{{ 'ORDERS_PAGE.HISTORY_TOTAL' | translate }}</span>
-              <strong>{{ detailView.total | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
-            </div>
+            <ng-container *ngIf="detailView.total != null">
+              <div class="history-total">
+                <span>{{ 'ORDERS_PAGE.HISTORY_SUBTOTAL' | translate }}</span>
+                <span>{{ detailView.subtotal | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+              </div>
+              <div class="history-total">
+                <span>{{ 'ORDERS_PAGE.HISTORY_DELIVERY_FEE' | translate }}</span>
+                <span>{{ detailView.deliveryFee | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</span>
+              </div>
+              <div class="history-total">
+                <span>{{ 'ORDERS_PAGE.HISTORY_TOTAL' | translate }}</span>
+                <strong>{{ detailView.total | number }} {{ 'COMMON.CURRENCY_SYP' | translate }}</strong>
+              </div>
+            </ng-container>
           </div>
 
           <div *ngIf="detailView.note" class="history-note">

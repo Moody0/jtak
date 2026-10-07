@@ -375,6 +375,8 @@ export const locale = {
       HISTORY_DRIVER: 'المندوب',
       HISTORY_ITEMS: 'منتجات الطلب في هذه المرحلة',
       HISTORY_TOTAL: 'إجمالي المرحلة',
+      HISTORY_SUBTOTAL: 'مجموع المنتجات',
+      HISTORY_DELIVERY_FEE: 'أجور التوصيل',
       HISTORY_CHANGE_RECORDED: 'تم تسجيل تغيير في حالة الطلب.',
       MODAL_CURRENT_CAPTAIN: 'المندوب المعيّن حالياً:',
       MODAL_NO_CAPTAIN: 'لم يتم تعيين مندوب بعد (في حوض الانتظار)',

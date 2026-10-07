@@ -33,7 +33,7 @@ export class DeleteCategoryModalComponent implements OnInit {
         error: (error) => {
           this.deleting = false;
           const body = error?.error;
-          this.toaster.error(Array.isArray(body?.errors) ? body.errors.join('، ') : 'تعذر الحذف. حاول مرة أخرى.');
+          this.toaster.error(Array.isArray(body?.errors) ? body.errors.join('، ') : body?.message || body?.errorDescription || 'تعذر الحذف. حاول مرة أخرى.');
         },
       });
     }

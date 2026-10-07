@@ -110,7 +110,7 @@
   </section>
 
   <!-- 3. Operations & Pricing Configuration Hub -->
-  <app-delivery-coverage></app-delivery-coverage>
+  <app-delivery-coverage *ngIf="auth.can('settings.view')"></app-delivery-coverage>
   <section *ngIf="auth.can('settings.view')" class="ops-config-hub" aria-label="إعدادات التشغيل والأسعار">
     <div *ngIf="auth.can('settings.view')" class="ops-config-grid">
       <!-- Card A: USD/SYP Exchange Rate -->

@@ -91,4 +91,5 @@ export interface OrderStatusHistoryItem {
     driverId?: string;
     driverName?: string;
     details?: string;
+    deliveryFee?: number;
 }

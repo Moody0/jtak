@@ -1,7 +1,7 @@
 <app-delete-modal
   moduleName="Category"
-  confirmationText="هل أنت متأكد من رغبتك في حذف هذا التصنيف؟ (تنبيه: التصنيفات المرتبطة بمنتجات أو تصنيفات فرعية لا يمكن حذفها، ويمكنك تعطيلها بدلاً من ذلك لإخفائها عن العملاء)."
-  [isLoading]="isLoading$ | async"
+  confirmationText="هل أنت متأكد من حذف هذا التصنيف وكل تصنيفاته الفرعية الفارغة؟ لن يتم الحذف إذا وُجد أي منتج مرتبط به أو بأحد تصنيفاته الفرعية، حتى لو كان المنتج معطلاً. انقل المنتجات إلى تصنيف آخر أولاً أو عطّل التصنيف لإخفائه عن العملاء."
+  [isLoading]="deleting || (isLoading$ | async)"
   (cancelClicked)="modal.dismiss()"
   (deleteClicked)="delete()"
 >

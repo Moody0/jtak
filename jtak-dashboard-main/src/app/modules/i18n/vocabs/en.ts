@@ -375,6 +375,8 @@ export const locale = {
       HISTORY_DRIVER: 'Captain',
       HISTORY_ITEMS: 'Order items at this step',
       HISTORY_TOTAL: 'Step total',
+      HISTORY_SUBTOTAL: 'Items subtotal',
+      HISTORY_DELIVERY_FEE: 'Delivery fee',
       HISTORY_CHANGE_RECORDED: 'A status change was recorded for this order.',
       MODAL_CURRENT_CAPTAIN: 'Currently Assigned Courier:',
       MODAL_NO_CAPTAIN: 'No courier assigned yet (in general pool)',
