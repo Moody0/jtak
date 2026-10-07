@@ -9,6 +9,8 @@ namespace App.Shared.Entities.Domain
     public class TedallalCardSetting
     {
         public const string Key = "TedallalCardSetting";
+        public const string DefaultSubtitle = "اطلب ما تحتاجه، نراجع طلبك ونرسل لك السعر للموافقة";
+        private const string LegacySubtitle = "اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية";
 
         /// <summary>
         /// Whether the card is visible on the home page.
@@ -28,7 +30,7 @@ namespace App.Shared.Entities.Domain
         /// <summary>
         /// Subtitle / hint text inside the card.
         /// </summary>
-        public string Subtitle { get; set; } = "اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية";
+        public string Subtitle { get; set; } = DefaultSubtitle;
 
         /// <summary>
         /// Optional custom icon or logo image URL. If empty, falls back to default app icon.
@@ -39,7 +41,8 @@ namespace App.Shared.Entities.Domain
         {
             SectionTitle = string.IsNullOrWhiteSpace(SectionTitle) ? "خدمة تدلل" : SectionTitle.Trim();
             CardTitle = string.IsNullOrWhiteSpace(CardTitle) ? "طلبات خاصة وعروض الأسعار" : CardTitle.Trim();
-            Subtitle = string.IsNullOrWhiteSpace(Subtitle) ? "اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية" : Subtitle.Trim();
+            Subtitle = string.IsNullOrWhiteSpace(Subtitle) || Subtitle.Trim() == LegacySubtitle
+                ? DefaultSubtitle : Subtitle.Trim();
             LogoUrl = (LogoUrl ?? "").Trim();
         }
     }

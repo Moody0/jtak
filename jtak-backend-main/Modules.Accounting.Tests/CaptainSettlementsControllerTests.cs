@@ -195,7 +195,7 @@ namespace Modules.Accounting.Tests
         }
 
         [Fact]
-        public async Task ConfirmSettlement_LocksOrdersWithBatchCode_AndGeneratesReceipt()
+        public async Task RetiredSettlementRejectsWritesButHistoricalReceiptRemainsReadable()
         {
             using var ordersDb = CreateInMemoryOrdersContext();
             using var accountingDb = CreateInMemoryAccountingContext();
@@ -280,32 +280,32 @@ namespace Modules.Accounting.Tests
             };
 
             var actionResult = await controller.ConfirmSettlement(confirmRequest);
-            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
-            var receipt = Assert.IsType<SettlementBatchReceiptDto>(okResult.Value);
+            Assert.Equal(StatusCodes.Status410Gone, Assert.IsType<ObjectResult>(actionResult.Result).StatusCode);
+            Assert.False(order.IsSettled);
+            Assert.Empty(accountingDb.DailySettlementBatches);
+            Assert.Empty(accountingDb.Payments);
+            Assert.Single(accountingDb.JournalTransactions);
+            Assert.Equal(2680m, await ledger.GetUserCashFloatBalanceAsync(captain.Id));
+            Assert.Equal(100m, await ledger.GetUserEarningsBalanceAsync(captain.Id));
 
-            Assert.NotNull(receipt.BatchId);
-            Assert.StartsWith("SETTLE-", receipt.BatchId);
-            Assert.Equal(1, receipt.OrdersCount);
-            Assert.Equal(2680m, receipt.TotalCashCollected);
-            Assert.Equal(100m, receipt.TotalCaptainEarnings);
-            Assert.Equal(2580m, receipt.NetDueToCompany);
-
-            // Verify order in database is settled
-            var updatedOrder = await ordersDb.Set<Order>().FindAsync(42);
-            Assert.True(updatedOrder.IsSettled);
-            Assert.NotNull(updatedOrder.SettledAt);
-            Assert.Equal(receipt.BatchId, updatedOrder.SettlementBatchId);
-
-            // Verify daily batch is stored in AccountingDbContext
-            var storedBatch = await accountingDb.DailySettlementBatches.FirstOrDefaultAsync(b => b.BatchCode == receipt.BatchId);
-            Assert.NotNull(storedBatch);
-            Assert.Equal(2580m, storedBatch.NetCashRemitted);
-
-            // Test GetBatchReceipt retrieves same data
-            var receiptActionResult = await controller.GetBatchReceipt(receipt.BatchId);
+            // Retiring new writes must not make an existing receipt inaccessible.
+            const string batchCode = "SETTLE-HISTORICAL-42";
+            order.IsSettled = true;
+            order.SettledAt = DateTime.UtcNow;
+            order.SettlementBatchId = batchCode;
+            await ordersDb.SaveChangesAsync();
+            accountingDb.DailySettlementBatches.Add(new DailySettlementBatch
+            {
+                Id = Guid.NewGuid(), BatchCode = batchCode, CaptainUserId = captain.Id,
+                HandledByAdminId = admin.Id, BatchDate = order.SettledAt.Value,
+                TotalCashCollected = 2680m, TotalWagesEarned = 100m, NetCashRemitted = 2580m,
+                IsLocked = true,
+            });
+            await accountingDb.SaveChangesAsync();
+            var receiptActionResult = await controller.GetBatchReceipt(batchCode);
             var receiptOkResult = Assert.IsType<OkObjectResult>(receiptActionResult.Result);
             var fetchedReceipt = Assert.IsType<SettlementBatchReceiptDto>(receiptOkResult.Value);
-            Assert.Equal(receipt.BatchId, fetchedReceipt.BatchId);
+            Assert.Equal(batchCode, fetchedReceipt.BatchId);
             Assert.Equal(2580m, fetchedReceipt.NetDueToCompany);
         }
     }

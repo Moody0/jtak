@@ -98,7 +98,7 @@ public class FinanceSectionsAuditTests
 
     [Theory]
     [InlineData("purchase")][InlineData("handover")][InlineData("earnings")][InlineData("unfinished")][InlineData("selection")]
-    public async Task CaptainSettlementCannotUseReservedMoneyOrSilentlyChangeSelection(string scenario) {
+    public async Task RetiredCaptainSettlementCannotUseReservedMoneyOrSelections(string scenario) {
         using var f=new Fixture();await f.Seed(1000m,40m);
         f.Orders.Orders.Add(new Order{Id=1,DeliveryId=f.Driver,DeliveredAt=DateTime.UtcNow,OrderStatus=OrderStatus.Success,ActualCashCollected=1000m,CaptainEarning=40m,CaptainCompensationType=CaptainCompensationType.Percentage,
             AccountingStatus=scenario=="unfinished" ? OrderAccountingStatus.PendingAccounting : OrderAccountingStatus.Posted,
@@ -106,7 +106,7 @@ public class FinanceSectionsAuditTests
         if(scenario=="purchase") { f.App.SupportMessages.Add(new(){ErrandDriverUserId=f.Driver,ErrandStatus=ErrandStatus.Assigned,ErrandItemPrice=1m});await f.App.SaveChangesAsync(); }
         if(scenario=="handover" || scenario=="earnings") { f.Db.SettlementRequests.Add(new(){Id=Guid.NewGuid(),RequestedByUserId=f.Driver,PartyType=scenario=="handover" ? SettlementPartyType.Captain : SettlementPartyType.CaptainEarnings,Amount=scenario=="handover" ? 0m : 1m,Currency="SYP",Status=SettlementRequestStatus.Pending,RequestNumber="reserved"});await f.Db.SaveChangesAsync(); }
         var result=await f.Captain().ConfirmSettlement(new(){CaptainId=f.Driver,OrderIds=scenario=="selection" ? new(){1,999} : new(){1}});
-        Assert.IsType<BadRequestObjectResult>(result.Result);Assert.False(f.Orders.Orders.Single().IsSettled);Assert.Empty(f.Db.DailySettlementBatches);Assert.Equal(1000m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));
+        Assert.Equal(410,Assert.IsType<ObjectResult>(result.Result).StatusCode);Assert.False(f.Orders.Orders.Single().IsSettled);Assert.Empty(f.Db.DailySettlementBatches);Assert.Equal(1000m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));
     }
 
     [Fact]
@@ -119,6 +119,7 @@ public class FinanceSectionsAuditTests
         using var f=new Fixture();await f.Seed();var c=f.Controller();var request=f.Request();
         Assert.IsType<OkObjectResult>((await c.Create(request)).Result);Assert.IsType<OkObjectResult>((await c.Create(request)).Result);
         var payment=Assert.Single(f.Db.Payments);Assert.Null(payment.HandoverDate);
+        Assert.Equal(500m,payment.NewBalance); // Actual merchant balance, not a simulated deduction.
         // Admin created it, but nothing has moved yet: courier, merchant and app balances are untouched.
         Assert.Equal(1100m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));Assert.Equal(900m,await f.Ledger.GetMerchantPayableBalanceAsync(30));Assert.Equal(500m,await f.Ledger.GetMerchantPayableBalanceAsync(31));
         Assert.Empty(await f.Db.JournalTransactions.Where(t=>t.ReferenceType=="CaptainToMerchantPayment").ToListAsync());
@@ -130,6 +131,7 @@ public class FinanceSectionsAuditTests
         // Merchant confirms receipt: only now are the accounts updated, and only once.
         var merchantSide=f.Warehouse();Assert.True((await merchantSide.RecivePayment(payment.Id)).Value);Assert.True((await merchantSide.RecivePayment(payment.Id)).Value);
         Assert.NotNull(f.Db.Payments.Single().HandoverDate);
+        Assert.Equal(100m,f.Db.Payments.Single().NewBalance); // Updated only after receipt.
         Assert.Equal(700m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));Assert.Equal(900m,await f.Ledger.GetMerchantPayableBalanceAsync(30));Assert.Equal(100m,await f.Ledger.GetMerchantPayableBalanceAsync(31));
         Assert.Single(await f.Db.JournalTransactions.Where(t=>t.ReferenceType=="CaptainToMerchantPayment").ToListAsync());
         Assert.Equal(700m,(await f.Safety().GetPositionAsync(f.Driver)).SpendableCash);
@@ -207,27 +209,27 @@ public class FinanceSectionsAuditTests
         Assert.Equal(1,(await service.GetDataTableAsync(new(),null,null,false)).TotalRecords);
     }
     [Fact]
-    public async Task PartialCaptainSettlementsHaveUniqueReferencesAndClearBothAmounts() {
+    public async Task RetiredOrderSelectionsCannotCreatePartialSettlements() {
         using var f=new Fixture();await f.Seed(2000m,0m);
         for(var id=1;id<=2;id++)f.Orders.Orders.Add(new Order{Id=id,DeliveryId=f.Driver,DeliveredAt=DateTime.UtcNow,OrderStatus=OrderStatus.Success,ActualCashCollected=1000m,DeliveryFee=100m,CaptainCompensationType=CaptainCompensationType.SalariedEmployee,
             OrderDetails=new List<OrderDetail>{new(){Quantity=1,SingleFinalPrice=900m,OrderDetailStatus=OrderDetailStatus.Delivered}}});
         await f.Orders.SaveChangesAsync();var c=f.Captain();
-        var a=Assert.IsType<SettlementBatchReceiptDto>(Assert.IsType<OkObjectResult>((await c.ConfirmSettlement(new(){CaptainId=f.Driver,OrderIds=new(){1}})).Result).Value);
-        var b=Assert.IsType<SettlementBatchReceiptDto>(Assert.IsType<OkObjectResult>((await c.ConfirmSettlement(new(){CaptainId=f.Driver,OrderIds=new(){2}})).Result).Value);
-        Assert.NotEqual(a.BatchId,b.BatchId);Assert.Matches("-[0-9a-f]{32}$",b.BatchId);Assert.Equal(0m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));
-        Assert.Equal(1000m,f.Db.Payments.First().NewBalance);Assert.Equal(2,await f.Db.JournalTransactions.CountAsync(t=>t.ReferenceType=="CaptainSettlement"));
-        var history=Json(Assert.IsType<OkObjectResult>((await f.Controller().DataTable(new(){PageNumber=1,PageSize=10})).Result).Value!);
-        Assert.Equal(2,history.GetProperty("totalRecords").GetInt32());Assert.Equal(2000m,history.GetProperty("summary").GetProperty("totalPaid").GetDecimal());
+        foreach(var id in new[]{1,2})
+            Assert.Equal(410,Assert.IsType<ObjectResult>((await c.ConfirmSettlement(new(){CaptainId=f.Driver,OrderIds=new(){id}})).Result).StatusCode);
+        Assert.Equal(2000m,await f.Ledger.GetUserCashFloatBalanceAsync(f.Driver));
+        Assert.Empty(f.Db.Payments);Assert.Empty(f.Db.DailySettlementBatches);
+        Assert.All(f.Orders.Orders,o=>Assert.False(o.IsSettled));
     }
     [Fact]
-    public async Task PrepaidOrderReceiptKeepsUnpaidEarningsSeparateFromCashOffset() {
+    public async Task HistoricalPrepaidOrderReceiptKeepsUnpaidEarningsSeparateFromCashOffset() {
         using var f=new Fixture();await f.Seed(0m,40m);
         f.Orders.Orders.Add(new Order{Id=1,DeliveryId=f.Driver,DeliveredAt=DateTime.UtcNow,ActualCashCollected=0m,DeliveryFee=100m,CaptainEarning=40m,CaptainCompensationType=CaptainCompensationType.Percentage,
             OrderStatus=OrderStatus.Success,OrderDetails=new List<OrderDetail>{new(){Quantity=1,SingleFinalPrice=900m,OrderDetailStatus=OrderDetailStatus.Delivered}}});await f.Orders.SaveChangesAsync();
-        var c=f.Captain();var first=Assert.IsType<SettlementBatchReceiptDto>(Assert.IsType<OkObjectResult>((await c.ConfirmSettlement(new(){CaptainId=f.Driver,OrderIds=new(){1}})).Result).Value);
-        var later=Assert.IsType<SettlementBatchReceiptDto>(Assert.IsType<OkObjectResult>((await c.GetBatchReceipt(first.BatchId)).Result).Value);
-        Assert.Equal(40m,first.TotalCaptainEarnings);Assert.Equal(0m,first.WagesOffset);Assert.Equal(first.WagesOffset,later.WagesOffset);Assert.Equal(first.TotalCaptainEarnings,later.TotalCaptainEarnings);
-        Assert.Equal(0m,first.NetDueToCompany);Assert.Equal(40m,await f.Ledger.GetUserEarningsBalanceAsync(f.Driver));Assert.Equal(0m,f.Db.Payments.Single().Amount);
+        var order=f.Orders.Orders.Single();order.IsSettled=true;order.SettledAt=DateTime.UtcNow;order.SettlementBatchId="PREPAID-HISTORY";await f.Orders.SaveChangesAsync();
+        f.Db.DailySettlementBatches.Add(new(){Id=Guid.NewGuid(),BatchCode=order.SettlementBatchId,CaptainUserId=f.Driver,HandledByAdminId=f.Admin,BatchDate=order.SettledAt.Value,TotalCashCollected=0m,TotalWagesEarned=0m,NetCashRemitted=0m,IsLocked=true});await f.Db.SaveChangesAsync();
+        var receipt=Assert.IsType<SettlementBatchReceiptDto>(Assert.IsType<OkObjectResult>((await f.Captain().GetBatchReceipt(order.SettlementBatchId)).Result).Value);
+        Assert.Equal(40m,receipt.TotalCaptainEarnings);Assert.Equal(0m,receipt.WagesOffset);Assert.Equal(0m,receipt.NetDueToCompany);
+        Assert.Equal(40m,await f.Ledger.GetUserEarningsBalanceAsync(f.Driver));Assert.Empty(f.Db.Payments);
     }
     [Fact]
     public async Task MerchantReceiptCannotFinishWhileAccountingIsPending() {

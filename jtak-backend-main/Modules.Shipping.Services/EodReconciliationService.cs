@@ -9,6 +9,7 @@ using Modules.Accounting.Data;
 using Modules.Accounting.Entities;
 using App.Shared.Entities;
 using App.Shared.Entities.Enums;
+using App.Orders.Data;
 
 namespace Modules.Accounting.Services
 {
@@ -19,18 +20,21 @@ namespace Modules.Accounting.Services
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger<EodReconciliationService> _logger;
         private readonly DriverFinancialSafetyService _safety;
+        private readonly OrdersDbContext _ordersContext;
 
         public EodReconciliationService(
             AccountingDbContext context,
             ILedgerService ledgerService,
             UserManager<AppUser> userManager,
-            ILogger<EodReconciliationService> logger, DriverFinancialSafetyService safety = null)
+            ILogger<EodReconciliationService> logger, DriverFinancialSafetyService safety = null,
+            OrdersDbContext ordersContext = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _ledgerService = ledgerService ?? throw new ArgumentNullException(nameof(ledgerService));
             _userManager = userManager;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _safety = safety ?? new DriverFinancialSafetyService(context, ledgerService);
+            _ordersContext = ordersContext;
         }
 
         public async Task<List<CaptainSettlementSummaryDto>> GetFleetSettlementSummariesAsync()
@@ -98,9 +102,16 @@ namespace Modules.Accounting.Services
                     .OrderByDescending(b => b.BatchDate)
                     .FirstOrDefaultAsync();
 
-                var orderCount = floatAcc != null
-                    ? await _context.LedgerEntries.CountAsync(e => e.AccountId == floatAcc.Id && e.Debit > 0)
-                    : 0;
+                // Count deliveries, not deposits into custody. Cash advances,
+                // merchant payments and reversals are financial movements, not orders.
+                var orderCount = _ordersContext != null
+                    ? await _ordersContext.Orders.CountAsync(o => o.DeliveryId == cid && o.DeliveredAt != null)
+                    : await _context.LedgerEntries
+                        .Where(e => e.Account.OwnerUserId == cid &&
+                            (e.Account.AccountCode.StartsWith(SystemAccountCodes.CaptainCashFloatPrefix) ||
+                             e.Account.AccountCode.StartsWith(SystemAccountCodes.CaptainEarningsPrefix)) &&
+                            e.Transaction.ReferenceType == "OrderDelivery")
+                        .Select(e => e.Transaction.ReferenceId).Distinct().CountAsync();
 
                 list.Add(new CaptainSettlementSummaryDto
                 {

@@ -175,6 +175,7 @@ namespace App.ApiControllers.V1.Customer
                 .ToArrayAsync();
             var dtos = requests.Select(ToDto).ToArray();
             await AttachStatusEvents(dtos);
+            await AttachDriverDetails(requests, dtos);
             return dtos;
         }
 
@@ -189,6 +190,7 @@ namespace App.ApiControllers.V1.Customer
             if (request == null) return NotFound();
             var dto = ToDto(request);
             await AttachStatusEvents(new[] { dto });
+            await AttachDriverDetails(new[] { request }, new[] { dto });
             return dto;
         }
 
@@ -302,6 +304,31 @@ namespace App.ApiControllers.V1.Customer
             });
         }
 
+        private async Task AttachDriverDetails(SupportMessage[] requests, ErrandRequestDto[] dtos)
+        {
+            // These requests have already been restricted to the signed-in customer.
+            // Share the assigned driver's contact only while fulfilling the request.
+            var assignedRequests = requests.Where(x => x.ErrandDriverUserId.HasValue &&
+                (x.ErrandStatus == ErrandStatus.Assigned || x.ErrandStatus == ErrandStatus.Purchased ||
+                 x.ErrandStatus == ErrandStatus.PurchasePending || x.ErrandStatus == ErrandStatus.DeliveryPending))
+                .ToDictionary(x => x.Id, x => x.ErrandDriverUserId.Value);
+            if (assignedRequests.Count == 0) return;
+            var driverIds = assignedRequests.Values.Distinct().ToArray();
+            var drivers = await _userManager.Users.AsNoTracking()
+                .Where(x => driverIds.Contains(x.Id) && x.IsActive && x.DeletionDate == null)
+                .ToDictionaryAsync(x => x.Id);
+            foreach (var dto in dtos)
+            {
+                if (!assignedRequests.TryGetValue(dto.Id, out var driverId) ||
+                    !drivers.TryGetValue(driverId, out var driver)) continue;
+                var name = driver.FullName?.Trim();
+                if (string.IsNullOrWhiteSpace(name))
+                    name = $"{driver.FirstName} {driver.LastName}".Trim();
+                dto.DriverName = string.IsNullOrWhiteSpace(name) ? "مندوب التوصيل" : name;
+                dto.DriverPhoneNumber = driver.PhoneNumber?.Trim();
+            }
+        }
+
         private async Task AttachStatusEvents(ErrandRequestDto[] dtos)
         {
             if (_db == null || dtos.Length == 0) return;
@@ -363,6 +390,8 @@ namespace App.ApiControllers.V1.Customer
         public ErrandRequestItemDto[] ItemDetails { get; set; }
         public ErrandStatusEventDto[] StatusEvents { get; set; }
         public string DeliveryCode { get; set; }
+        public string DriverName { get; set; }
+        public string DriverPhoneNumber { get; set; }
         public DateTime CreatedDate { get; set; }
     }
 }

@@ -186,7 +186,9 @@ namespace App.ApiControllers.V1.Admin
                 // merchant confirms receipt (Warehouse/Payments/RecivePayment). Meanwhile the amount is
                 // reserved on both sides so it cannot be spent or paid out twice.
                 var payment = new Payment { ByUserId = dto.ByUserId, ByUser = driver.FullName, ToUserId = dto.ToUserId, ToUser = merchant.Title,
-                    Amount = dto.Amount, NewBalance = Math.Max(0m, available - dto.Amount), HandoverDate = null };
+                    // Record the actual balance at creation, not a hypothetical
+                    // balance after deduction. Receipt confirmation updates it later.
+                    Amount = dto.Amount, NewBalance = await _ledgerService.GetMerchantPayableBalanceAsync(merchant.Id), HandoverDate = null };
                 _service.Insert(payment);
                 await _auow.SaveChangesAsync();
                 if (transaction != null) await transaction.CommitAsync();
