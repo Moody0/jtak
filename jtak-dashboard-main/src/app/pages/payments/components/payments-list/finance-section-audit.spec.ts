@@ -2,7 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { TemplateRef } from '@angular/core';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { locale as arLocale } from 'src/app/modules/i18n/vocabs/ar';
+import { locale as enLocale } from 'src/app/modules/i18n/vocabs/en';
 import { NgbActiveModal, NgbModal, NgbConfig } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
@@ -47,6 +49,48 @@ describe('Finance sections, rendered pages and every modal',()=>{
     ]}).compileComponents();TestBed.inject(NgbConfig).animation=false;
   });
   afterEach(()=>{TestBed.inject(NgbModal).dismissAll();});
+  for(const state of [
+    {name:'pending receipt',status:'Pending',handoverDate:null,received:false},
+    {name:'legacy missing status',status:undefined,handoverDate:null,received:false},
+    {name:'confirmed receipt',status:'Completed',handoverDate:'2026-10-07T10:00:00Z',received:true},
+    {name:'posted completion without a date',status:'Completed',handoverDate:null,received:true},
+  ]){
+    it(`shows the post-receipt balance only for ${state.name} when confirmed`,()=>{
+      const translate=TestBed.inject(TranslateService);translate.setTranslation('ar',arLocale.data);translate.use('ar');
+      pay.items$=of([{id:8,amount:470,newBalance:1234,status:state.status,handoverDate:state.handoverDate,isSettlement:false}]);
+      const f=TestBed.createComponent(PaymentsListComponent);f.detectChanges();
+      const cell=f.nativeElement.querySelector('.ops-table tbody tr').querySelectorAll('td')[5];
+      expect(cell.querySelector('.amount-val')!==null).toBe(state.received);
+      expect(cell.textContent.includes('بانتظار تأكيد التاجر — لم يُخصم بعد')).toBe(!state.received);
+      if(!state.received)expect(cell.textContent).not.toContain('1,234');
+      f.destroy();
+    });
+  }
+  it('updates the pending balance cell after confirmation and preserves a zero balance',()=>{
+    const items=new BehaviorSubject<any[]>([{id:8,amount:470,newBalance:999,status:'Pending',handoverDate:null}]);pay.items$=items;
+    const f=TestBed.createComponent(PaymentsListComponent);f.detectChanges();
+    const balanceCell=()=>f.nativeElement.querySelector('.ops-table tbody tr').querySelectorAll('td')[5];
+    expect(balanceCell().querySelector('.amount-val')).toBeNull();
+    items.next([{id:8,amount:470,newBalance:0,status:'Completed',handoverDate:'2026-10-07T10:00:00Z'}]);f.detectChanges();
+    expect(balanceCell().querySelector('.amount-val').textContent.trim()).toBe('0');
+    expect(balanceCell().querySelector('.badge')).toBeNull();f.destroy();
+  });
+  it('does not invent a balance for a settlement request',()=>{
+    pay.items$=of([{id:8,amount:470,newBalance:1234,status:'Completed',handoverDate:'2026-10-07T10:00:00Z',isSettlement:true}]);
+    const f=TestBed.createComponent(PaymentsListComponent);f.detectChanges();
+    expect(f.nativeElement.querySelector('.ops-table tbody tr').querySelectorAll('td')[5].textContent.trim()).toBe('—');f.destroy();
+  });
+  for(const locale of [arLocale,enLocale]){
+    it(`explains merchant confirmation and available balances in the ${locale.lang} creation modal`,()=>{
+      const translate=TestBed.inject(TranslateService);translate.setTranslation(locale.lang,locale.data);translate.use(locale.lang);
+      const f=TestBed.createComponent(CreatePaymentModalComponent);f.detectChanges();
+      expect(f.nativeElement.textContent).toContain(locale.data.PAYMENTS_PAGE.CREATE_HELP);
+      const help=locale.data.PAYMENTS_PAGE.CREATE_HELP;
+      expect(help).toContain(locale.lang==='ar' ? 'بعد أن يضغط التاجر' : 'only after the merchant');
+      expect(locale.data.PAYMENTS_PAGE.MERCHANT_BALANCE).toContain(locale.lang==='ar' ? 'المتاحة' : 'Available');
+      f.destroy();
+    });
+  }
   for(const component of [PaymentsListComponent,BillsListComponent,CaptainSettlementsListComponent,ReconciliationListComponent,CreatePaymentModalComponent,DriverCashAdvanceModalComponent]){
     it(`renders ${component.name} and every embedded modal`,()=>{
       const fixture=TestBed.createComponent(component as any);fixture.detectChanges();

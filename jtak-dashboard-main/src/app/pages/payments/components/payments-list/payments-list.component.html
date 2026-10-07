@@ -236,8 +236,9 @@
               <!-- Remaining Balance -->
               <td class="text-end">
                 <div class="ops-amount-cell">
-                  <span *ngIf="!payment.isSettlement" class="amount-val fw-bold text-dark">{{ payment.newBalance | number }}</span>
-                  <span *ngIf="!payment.isSettlement" class="currency-tag">{{ payment.currency || ('COMMON.CURRENCY_SYP' | translate) }}</span>
+                  <span *ngIf="!payment.isSettlement && (payment.handoverDate || payment.status === 'Completed')" class="amount-val fw-bold text-dark">{{ payment.newBalance | number }}</span>
+                  <span *ngIf="!payment.isSettlement && (payment.handoverDate || payment.status === 'Completed')" class="currency-tag">{{ payment.currency || ('COMMON.CURRENCY_SYP' | translate) }}</span>
+                  <span *ngIf="!payment.isSettlement && !payment.handoverDate && payment.status !== 'Completed'" class="badge badge-light-warning fs-8">{{ 'PAYMENTS_PAGE.AWAITING_MERCHANT_RECEIPT' | translate }}</span>
                   <span *ngIf="payment.isSettlement" class="text-muted">—</span>
                 </div>
               </td>

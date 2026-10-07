@@ -16,13 +16,14 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
   isSaving = false;
   hasLoaded = false;
   loadError = false;
+  failedLogoUrl = '';
   private subs = new SubSink();
 
   readonly defaultValues: TedallalCardSetting = {
     enabled: true,
     sectionTitle: 'خدمة تدلل',
     cardTitle: 'طلبات خاصة وعروض الأسعار',
-    subtitle: 'اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية',
+    subtitle: 'اطلب ما تحتاجه، نراجع طلبك ونرسل لك السعر للموافقة',
     logoUrl: '',
   };
 
@@ -49,6 +50,7 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
   }
 
   loadSettings(): void {
+    this.failedLogoUrl = '';
     this.isLoading = true;
     this.loadError = false;
     this.subs.sink = this.tedallalService.getSettings().subscribe({
@@ -59,7 +61,8 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
           enabled: data?.enabled ?? this.defaultValues.enabled,
           sectionTitle: data?.sectionTitle || this.defaultValues.sectionTitle,
           cardTitle: data?.cardTitle || this.defaultValues.cardTitle,
-          subtitle: data?.subtitle || this.defaultValues.subtitle,
+          subtitle: !data?.subtitle || data.subtitle.trim() === 'اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية'
+            ? this.defaultValues.subtitle : data.subtitle,
           logoUrl: data?.logoUrl || '',
         });
         this.cdr.markForCheck();
@@ -76,6 +79,11 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
   resetDefaults(): void {
     this.form.patchValue(this.defaultValues);
     this.form.markAsDirty();
+    this.cdr.markForCheck();
+  }
+
+  onLogoPreviewError(event: Event): void {
+    this.failedLogoUrl = (event.target as HTMLImageElement).getAttribute('src') || '';
     this.cdr.markForCheck();
   }
 

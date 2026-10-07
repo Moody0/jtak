@@ -86,8 +86,8 @@ const Routing: Routes = [
   },
   {
     path: 'captain-settlements',
-    loadChildren: () =>
-      import('./captain-settlements/captain-settlements.module').then((m) => m.CaptainSettlementsModule),
+    redirectTo: '/reconciliation?tab=couriers',
+    pathMatch: 'full',
   },
   {
     path: 'audit-logs',

@@ -113,9 +113,11 @@
                 class="form-control form-control-solid"
                 formControlName="subtitle"
                 rows="2"
-                placeholder="اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية"
+                maxlength="250"
+                placeholder="اطلب ما تحتاجه، نراجع طلبك ونرسل لك السعر للموافقة"
               ></textarea>
-              <div class="form-text text-muted fs-8">النص التوضيحي الأصغر حجماً أسفل العنوان داخل الكارت</div>
+              <div class="form-text text-muted fs-8">يظهر تحت عنوان الكارت في سطرين بحد أقصى. النص الطويل يُختصر في الكارت ويظهر كاملاً داخل صفحة الطلب.</div>
+              <div class="text-muted fs-8 mt-1">{{ (form.value.subtitle || '').length }} / 250 حرف</div>
             </div>
 
             <!-- Logo URL -->
@@ -156,40 +158,45 @@
 
               <!-- The Card Container -->
               <div
-                class="preview-card bg-white p-3 rounded-3 shadow-sm border border-secondary border-opacity-10 d-flex align-items-center justify-content-between"
+                class="preview-card bg-white p-3 rounded-3 border border-secondary border-opacity-10 d-flex align-items-center justify-content-between"
                 [class.opacity-50]="!form.value.enabled"
               >
                 <!-- Right (Icon / Logo) -->
                 <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
                   <div
                     class="logo-box rounded-3 bg-light-warning d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0"
-                    style="width: 44px; height: 44px; border: 1px solid #FFD8BF;"
+                    style="width: 56px; height: 56px; padding: 6px; border: 1px solid #FFD8BF;"
                   >
                     <img
-                      *ngIf="form.value.logoUrl"
+                      *ngIf="form.value.logoUrl && failedLogoUrl !== form.value.logoUrl"
                       [src]="form.value.logoUrl"
                       alt="Logo"
-                      style="width: 100%; height: 100%; object-fit: cover;"
-                      (error)="form.patchValue({ logoUrl: '' })"
+                      style="width: 100%; height: 100%; object-fit: contain;"
+                      (error)="onLogoPreviewError($event)"
                     />
-                    <i *ngIf="!form.value.logoUrl" class="fas fa-shopping-bag text-warning fs-3"></i>
+                    <i *ngIf="!form.value.logoUrl || failedLogoUrl === form.value.logoUrl" class="fas fa-shopping-bag text-warning fs-3"></i>
                   </div>
 
                   <!-- Text (Title + Subtitle) -->
                   <div class="flex-grow-1 min-w-0">
-                    <div class="fw-bolder text-dark fs-6 text-truncate mb-1">
+                    <div class="preview-title fw-bolder text-dark fs-6 mb-1">
                       {{ form.value.cardTitle || 'طلبات خاصة وعروض الأسعار' }}
                     </div>
-                    <div class="text-muted fs-8 text-truncate">
-                      {{ form.value.subtitle || 'اطلب أي شيء غير متوفر في التطبيق مع عروض أسعار فورية' }}
+                    <div class="preview-subtitle text-muted fs-7">
+                      {{ form.value.subtitle || 'اطلب ما تحتاجه، نراجع طلبك ونرسل لك السعر للموافقة' }}
                     </div>
+                    <div class="text-primary fw-bold fs-8 mt-2">ابدأ طلبك</div>
                   </div>
                 </div>
 
-                <!-- Left (Arrow flipped horizontally) -->
+                <!-- Navigation arrow for the Arabic preview -->
                 <div class="ms-2 flex-shrink-0">
-                  <i class="fas fa-chevron-left text-muted fs-6" style="transform: scaleX(-1);"></i>
+                  <i class="fas fa-chevron-right text-primary fs-6"></i>
                 </div>
+              </div>
+
+              <div *ngIf="form.value.logoUrl && failedLogoUrl === form.value.logoUrl" class="text-warning fs-8 mt-3" role="status">
+                تعذر عرض الصورة. راجع الرابط؛ سيستخدم التطبيق الأيقونة الافتراضية إذا لم تتحمل الصورة.
               </div>
 
               <div *ngIf="!form.value.enabled" class="text-center mt-3 text-danger fs-8 fw-semibold">

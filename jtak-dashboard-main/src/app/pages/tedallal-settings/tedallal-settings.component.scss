@@ -6,14 +6,28 @@
 
   .preview-card {
     transition: all 0.2s ease-in-out;
-    border-radius: 16px !important;
+    border-radius: 20px !important;
+    border-color: #ffe2cc !important;
+    padding: 16px !important;
 
-    &:hover {
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06) !important;
-    }
   }
 
   .logo-box {
-    border-radius: 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .min-w-0 {
+    min-width: 0;
+  }
+
+  .preview-title,
+  .preview-subtitle {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
   }
 }

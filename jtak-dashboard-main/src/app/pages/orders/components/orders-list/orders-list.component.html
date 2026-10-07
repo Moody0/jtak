@@ -390,7 +390,7 @@
 
             <div class="d-flex align-items-center gap-1">
               <button *ngIf="canLiveTrack(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--radar"
-                (click)="openLiveTrack(o)" title="رادار التتبع">
+                (click)="openLiveTrack(o)" [title]="'ORDERS_PAGE.LIVE_RADAR' | translate">
                 <i class="fas fa-satellite-dish"></i>
               </button>
               <!-- 3-Dot Kebab Menu -->
