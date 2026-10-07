@@ -42,6 +42,10 @@ extends TableService<Balance> implements OnDestroy {
     return this.http.get<any>(environment.apiUrl + '/Admin/Settings');
   }
 
+  getCatalogDefaults(): Observable<{ usdToSypExchangeRate: number }> {
+    return this.http.get<{ usdToSypExchangeRate: number }>(environment.apiUrl + '/Admin/Settings/CatalogDefaults');
+  }
+
   saveSettings(settings: any): Observable<any> {
     return this.http.put<any>(environment.apiUrl + '/Admin/Settings', settings);
   }

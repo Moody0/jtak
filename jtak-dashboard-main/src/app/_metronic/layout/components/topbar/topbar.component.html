@@ -1,13 +1,13 @@
 <div class="d-flex align-items-center gap-2">
   <!-- Quick Shortcuts -->
   <div class="d-none d-md-flex align-items-center gap-1 me-1">
-    <a routerLink="/orders" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_ORDERS' | translate" routerLinkActive="active">
+    <a *ngIf="auth.canRoute('orders')" routerLink="/orders" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_ORDERS' | translate" routerLinkActive="active">
       <i class="fas fa-shopping-bag"></i>
     </a>
-    <a routerLink="/products" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_PRODUCTS' | translate" routerLinkActive="active">
+    <a *ngIf="auth.canRoute('products')" routerLink="/products" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_PRODUCTS' | translate" routerLinkActive="active">
       <i class="fas fa-box"></i>
     </a>
-    <a routerLink="/reconciliation" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_RECONCILIATION' | translate" routerLinkActive="active">
+    <a *ngIf="auth.canRoute('reconciliation')" routerLink="/reconciliation" class="btn btn-icon btn-sm jtak-topbar-action-btn" [title]="'HEADER.QUICK_RECONCILIATION' | translate" routerLinkActive="active">
       <i class="fas fa-cash-register"></i>
     </a>
     <button type="button" class="btn btn-icon btn-sm jtak-topbar-action-btn" (click)="toggleFullscreen()" [title]="'HEADER.FULLSCREEN' | translate">
@@ -28,7 +28,7 @@
       <span class="jtak-user-avatar" aria-hidden="true">{{ user.fullName ? user.fullName.charAt(0) : 'J' }}</span>
       <div class="jtak-user-copy">
         <span class="jtak-user-name">{{ user.fullName || ('TOPBAR.ADMIN_USER' | translate) }}</span>
-        <span class="jtak-user-role-badge">{{ 'TOPBAR.ADMINISTRATOR' | translate }}</span>
+        <span class="jtak-user-role-badge">{{ user.dashboardAccess?.isSuperAdmin ? ('TOPBAR.ADMINISTRATOR' | translate) : user.dashboardAccess?.roleNames?.join(' / ') }}</span>
       </div>
       <i class="fas fa-chevron-down jtak-user-chevron" aria-hidden="true"></i>
     </div>

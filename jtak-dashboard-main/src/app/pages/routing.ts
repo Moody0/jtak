@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 
 const Routing: Routes = [
+  { path: 'staff', loadChildren: () => import('./staff/staff.module').then(m => m.StaffModule) },
+  { path: 'no-access', loadComponent: () => import('./staff/no-access.component').then(m => m.NoAccessComponent) },
   {
     path: 'dashboard',
     loadChildren: () =>

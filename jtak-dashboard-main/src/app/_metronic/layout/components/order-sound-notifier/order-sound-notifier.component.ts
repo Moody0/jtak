@@ -109,7 +109,7 @@ export class OrderSoundNotifierComponent implements OnInit, OnDestroy {
 
     this.pollSub = timer(1000, this.pollIntervalMs)
       .pipe(
-        filter(() => !!(this.authService.getAuthFromSessionStorage() || this.authService.getAuthFromLocalStorage())),
+        filter(() => !!this.authService.getToken() && this.authService.can('orders.view')),
         switchMap(() => this.checkOrdersObservable())
       )
       .subscribe();
@@ -122,7 +122,7 @@ export class OrderSoundNotifierComponent implements OnInit, OnDestroy {
     const isInitial = this.lastSeenId === 0;
     const url = `${environment.apiUrl}/Admin/Orders/Latest?since_id=${this.lastSeenId}&_t=${Date.now()}`;
 
-    return this.http.get<LatestOrdersResponse>(url).pipe(
+    return this.http.get<LatestOrdersResponse>(url, { headers: { 'X-Silent-Error': '1' } }).pipe(
       catchError(() => of(null)),
       switchMap((res) => {
         this.isPolling = false;

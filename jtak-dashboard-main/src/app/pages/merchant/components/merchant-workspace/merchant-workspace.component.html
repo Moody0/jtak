@@ -48,12 +48,12 @@
       </div>
 
       <div class="merchant-header-actions">
-        <button type="button" class="btn btn-sm btn-light" (click)="editMerchant()">
+        <button appDashboardWrite type="button" class="btn btn-sm btn-light" (click)="editMerchant()">
           <i class="fas fa-pen me-1"></i> تعديل بيانات المتجر
         </button>
         <span class="unsaved-indicator" *ngIf="hasChanges"><i></i> {{ 'MERCHANT_WORKSPACE.UNSAVED_CHANGES' | translate }}</span>
         <button type="button" class="btn btn-sm btn-light" *ngIf="hasChanges" (click)="resetChanges()">{{ 'MERCHANT_WORKSPACE.DISCARD' | translate }}</button>
-        <button type="button" class="btn btn-sm btn-primary" [disabled]="!hasChanges || isSaving" (click)="saveCatalog()">
+        <button appDashboardWrite type="button" class="btn btn-sm btn-primary" [disabled]="!hasChanges || isSaving" (click)="saveCatalog()">
           <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-1"></span>
           <i *ngIf="!isSaving" class="fas fa-check me-1"></i>
           {{ isSaving ? ('COMMON.SAVING' | translate) : ('MERCHANT_WORKSPACE.SAVE_CATALOG' | translate) }}
@@ -167,7 +167,7 @@
                   <p>المعلومات الأساسية والمسؤول المعتمد والموقع الجغرافي</p>
                 </div>
               </div>
-              <button type="button" class="btn btn-sm btn-light" (click)="editMerchant()">
+              <button appDashboardWrite type="button" class="btn btn-sm btn-light" (click)="editMerchant()">
                 <i class="fas fa-pen me-1"></i> {{ 'MERCHANT_WORKSPACE.EDIT_DETAILS' | translate }}
               </button>
             </div>
@@ -223,7 +223,7 @@
               <div class="desc-empty" *ngIf="!merchant.description">
                 <i class="fas fa-align-right text-muted"></i>
                 <span>{{ 'MERCHANT_WORKSPACE.NO_DESCRIPTION' | translate }}</span>
-                <button type="button" class="btn btn-sm btn-link text-primary p-0" (click)="editMerchant()">+ أضف وصفاً الآن</button>
+                <button appDashboardWrite type="button" class="btn btn-sm btn-link text-primary p-0" (click)="editMerchant()">+ أضف وصفاً الآن</button>
               </div>
             </div>
           </article>
@@ -310,7 +310,7 @@
             <option value="">{{ 'MERCHANT_WORKSPACE.ALL_CATEGORIES' | translate }}</option>
             <option *ngFor="let category of categoryNames" [value]="category">{{ category }}</option>
           </select>
-          <button type="button" class="btn btn-primary" (click)="createProduct()">
+          <button appDashboardWrite type="button" class="btn btn-primary" (click)="createProduct()">
             <i class="fas fa-plus me-1"></i>{{ 'MERCHANT_WORKSPACE.ADD_PRODUCT' | translate }}
           </button>
         </div>
@@ -333,14 +333,14 @@
           </button>
         </div>
         <div class="bulk-bar-actions">
-          <button type="button" class="btn btn-sm btn-light-success" (click)="bulkEnableInMerchant()">
+          <button appDashboardWrite type="button" class="btn btn-sm btn-light-success" (click)="bulkEnableInMerchant()">
             <i class="fas fa-check-circle me-1"></i> تفعيل في المتجر
           </button>
-          <button type="button" class="btn btn-sm btn-light-warning" (click)="bulkRemoveFromMerchant()">
+          <button appDashboardWrite type="button" class="btn btn-sm btn-light-warning" (click)="bulkRemoveFromMerchant()">
             <i class="fas fa-ban me-1"></i> تعطيل في المتجر
           </button>
 
-          <button type="button" class="btn btn-sm btn-danger" (click)="deleteSelectedProducts()">
+          <button appDashboardWrite type="button" class="btn btn-sm btn-danger" (click)="deleteSelectedProducts()">
             <i class="fas fa-trash me-1"></i> حذف المحدد
           </button>
 
@@ -485,7 +485,7 @@
               </td>
               <td class="text-end col-actions">
                 <div class="workspace-row-actions justify-content-end">
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="btn btn-sm btn-icon btn-light"
                     (click)="editProduct(item)"
@@ -493,7 +493,7 @@
                   >
                     <i class="fas fa-pen text-muted"></i>
                   </button>
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="btn btn-sm btn-icon btn-light-danger"
                     [attr.aria-label]="'Delete ' + item.product"
@@ -537,7 +537,7 @@
           <p>{{ 'MERCHANT_WORKSPACE.CATEGORIES_DESC' | translate }}</p>
         </div>
         <div class="toolbar-actions-box">
-          <button type="button" class="btn btn-primary" (click)="createCategory()">
+          <button appDashboardWrite type="button" class="btn btn-primary" (click)="createCategory()">
             <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
           </button>
         </div>
@@ -658,13 +658,13 @@
                 </div>
 
                 <div class="category-actions mt-2">
-                  <button type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(mainCat)">
+                  <button appDashboardWrite type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(mainCat)">
                     <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
                   </button>
-                  <button *ngIf="mainCat.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(mainCat)">
+                  <button appDashboardWrite *ngIf="mainCat.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(mainCat)">
                     <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
                   </button>
-                  <button *ngIf="mainCat.id && !mainCat.totalProducts && !mainCat.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(mainCat)">
+                  <button appDashboardWrite *ngIf="mainCat.id && !mainCat.totalProducts && !mainCat.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(mainCat)">
                     <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
                   </button>
                 </div>
@@ -713,10 +713,10 @@
                     <span [style.width.%]="sub.total ? (sub.enabled / sub.total * 100) : 0"></span>
                   </div>
                   <div class="category-actions">
-                    <button *ngIf="sub.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(sub)">
+                    <button appDashboardWrite *ngIf="sub.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(sub)">
                       <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
                     </button>
-                    <button *ngIf="sub.id && !sub.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(sub)">
+                    <button appDashboardWrite *ngIf="sub.id && !sub.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(sub)">
                       <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
                     </button>
                   </div>
@@ -739,7 +739,7 @@
             <!-- Empty Subcategories in Main Category -->
             <div class="empty-subcategories-placeholder" *ngIf="!mainCat.subcategories.length">
               <span>لم يتم إنشاء تصنيفات فرعية تحت <strong>{{ mainCat.name }}</strong> بعد.</span>
-              <button type="button" class="btn btn-sm btn-light-primary mt-2" (click)="createSubcategory(mainCat)">
+              <button appDashboardWrite type="button" class="btn btn-sm btn-light-primary mt-2" (click)="createSubcategory(mainCat)">
                 <i class="fas fa-plus me-1"></i> إضافة أول تصنيف فرعي
               </button>
             </div>
@@ -781,13 +781,13 @@
               <button *ngIf="category.subcategories.length > 0" type="button" class="btn btn-sm btn-link category-edit-link" (click)="focusMainCategory(category.id)">
                 <i class="fas fa-tags me-1"></i> عرض {{ category.subcategories.length }} تصنيفات فرعية
               </button>
-              <button type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
+              <button appDashboardWrite type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
                 <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
               </button>
-              <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
+              <button appDashboardWrite *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
                 <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
               </button>
-              <button *ngIf="category.id && !category.totalProducts && !category.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
+              <button appDashboardWrite *ngIf="category.id && !category.totalProducts && !category.subcategories.length" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
                 <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
               </button>
             </div>
@@ -841,10 +841,10 @@
               <span [style.width.%]="category.total ? (category.enabled / category.total * 100) : 0"></span>
             </div>
             <div class="category-actions">
-              <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
+              <button appDashboardWrite *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
                 <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
               </button>
-              <button *ngIf="category.id && !category.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
+              <button appDashboardWrite *ngIf="category.id && !category.total" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
                 <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
               </button>
             </div>
@@ -903,13 +903,13 @@
               <span [style.width.%]="category.isMain ? (category.totalProducts ? category.enabledProducts / category.totalProducts * 100 : 0) : (category.total ? category.enabled / category.total * 100 : 0)"></span>
             </div>
             <div class="category-actions">
-              <button *ngIf="category.isMain" type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
+              <button appDashboardWrite *ngIf="category.isMain" type="button" class="btn btn-sm btn-link category-edit-link" (click)="createSubcategory(category)">
                 <i class="fas fa-plus me-1"></i> {{ 'MERCHANT_WORKSPACE.ADD_CATEGORY' | translate }}
               </button>
-              <button *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
+              <button appDashboardWrite *ngIf="category.id" type="button" class="btn btn-sm btn-link category-edit-link" (click)="editCategory(category)">
                 <i class="fas fa-pen me-1"></i> {{ 'COMMON.EDIT' | translate }}
               </button>
-              <button *ngIf="category.id && !(category.isMain ? category.totalProducts : category.total)" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
+              <button appDashboardWrite *ngIf="category.id && !(category.isMain ? category.totalProducts : category.total)" type="button" class="btn btn-sm btn-link text-danger category-edit-link" (click)="deleteCategory(category)">
                 <i class="fas fa-trash me-1"></i> {{ 'COMMON.DELETE' | translate }}
               </button>
             </div>

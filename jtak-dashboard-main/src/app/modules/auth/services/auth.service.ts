@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
 import { Observable, BehaviorSubject, of, Subscription } from 'rxjs';
-import { map, finalize, tap, switchMap, catchError } from 'rxjs/operators';
+import { map, finalize, switchMap, catchError } from 'rxjs/operators';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { AuthModel } from '../models/auth.model';
 import { environment } from 'src/environments/environment';
 import { GRANT_TYPES } from '../enums/grant-types.enum';
 import { UserModel } from '..';
+import { DashboardAccess, dashboardSection } from '../models/dashboard-access.model';
 
 import { Router } from '@angular/router';
 
@@ -136,6 +137,7 @@ export class AuthService {
         }),
         catchError((err) => {
           console.error('Login error', err);
+          this.logout();
           return of(undefined);
         }),
         finalize(() => this.isLoadingSubject.next(false))
@@ -195,10 +197,6 @@ export class AuthService {
   fetchUserData(): Observable<any> {
     this.isLoadingSubject.next(true);
     return this.httpClient.get(environment.apiUrl + '/Authorization/Account').pipe(
-      tap((res: any) => {
-        this.userSubject.next(res.user);
-        this.setUserToSessionStorage(res.user);
-      }),
       finalize(() => {
         this.isLoadingSubject.next(false);
       })
@@ -217,9 +215,17 @@ export class AuthService {
 
     this.isLoadingSubject.next(true);
     return this.fetchUserData().pipe(
-      map((user: UserModel) => {
+      switchMap((res: any) => {
+        const user: UserModel | undefined = res?.user;
+        if (!user) return of(undefined);
+        return this.httpClient.get<DashboardAccess>(environment.apiUrl + '/Admin/Staff/Access', { headers: { 'X-Silent-Error': '1' } }).pipe(
+          map(access => access.canAccess ? { ...user, dashboardAccess: access } : undefined)
+        );
+      }),
+      map((user: UserModel | undefined) => {
         if (user) {
           this.userSubject.next(user);
+          this.setUserToSessionStorage(user);
         } else {
           this.logout();
         }
@@ -227,6 +233,25 @@ export class AuthService {
       }),
       finalize(() => this.isLoadingSubject.next(false))
     );
+  }
+
+  can(permission: string): boolean {
+    const access = this.userSubject.value?.dashboardAccess;
+    return !!access?.canAccess && (access.isSuperAdmin || access.permissions.includes(permission));
+  }
+
+  canRoute(url: string): boolean {
+    const path = url.replace(/^\//, '').split(/[?#]/)[0];
+    const access = this.userSubject.value?.dashboardAccess;
+    if (!access?.canAccess) return false;
+    if (path === 'staff' || path.startsWith('staff/')) return access.isSuperAdmin;
+    if (path === '' || path === 'no-access' || path.startsWith('crafted/')) return true;
+    const section = dashboardSection(url);
+    return !!section && this.can(section + (/\/(create|edit)(\/|$)/.test(path) ? '.manage' : '.view'));
+  }
+
+  get landingRoute(): string {
+    return ['dashboard', 'orders', 'support-messages', 'products', 'home-categories', 'reconciliation', 'users', 'notifications', 'settings/contact', 'audit-logs'].find(path => this.canRoute(path)) || 'no-access';
   }
 
   public getAuthFromSessionStorage(): AuthModel | undefined {

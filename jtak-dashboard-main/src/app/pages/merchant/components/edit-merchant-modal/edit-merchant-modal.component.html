@@ -1,4 +1,4 @@
-﻿<app-edit-modal
+<app-edit-modal
   [item]="item"
   [itemName]="item.title || ''"
   [moduleName]="isWarehouseRecord ? 'Warehouse' : 'Merchant'"
@@ -82,7 +82,7 @@
                     <div class="col-md-6"><label class="form-label">الاسم الأخير</label><input class="form-control" [value]="accountLastName" (input)="accountLastName = $any($event.target).value" /></div>
                     <div class="col-md-6"><label class="form-label">رقم الموبايل</label><input class="form-control" type="tel" placeholder="09xxxxxxxx" [value]="accountPhone" (input)="accountPhone = $any($event.target).value" /></div>
                     <div class="col-md-6"><label class="form-label">كلمة مرور تطبيق التاجر</label><input class="form-control" type="password" autocomplete="new-password" [value]="accountPassword" (input)="accountPassword = $any($event.target).value" /></div>
-                    <div class="col-12"><button type="button" class="btn btn-primary" [disabled]="creatingMerchantAccount" (click)="createMerchantAccount()">{{ creatingMerchantAccount ? 'جارٍ إنشاء الحساب…' : 'إنشاء وربط الحساب' }}</button></div>
+                    <div class="col-12"><button appDashboardWrite type="button" class="btn btn-primary" [disabled]="creatingMerchantAccount" (click)="createMerchantAccount()">{{ creatingMerchantAccount ? 'جارٍ إنشاء الحساب…' : 'إنشاء وربط الحساب' }}</button></div>
                   </div>
                 </div>
               </div>
@@ -147,7 +147,7 @@
 
                     <div class="merchant-password-actions">
                       <span>لا تظهر كلمة المرور الحالية في لوحة الإدارة.</span>
-                      <button
+                      <button appDashboardWrite
                         type="button"
                         class="btn btn-primary"
                         [disabled]="passwordResetting || newMerchantPassword.trim().length < 6 || newMerchantPassword !== confirmMerchantPassword"

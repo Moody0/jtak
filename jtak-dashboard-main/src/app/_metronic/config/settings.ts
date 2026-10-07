@@ -1,6 +1,7 @@
 export const ApplicationRoutes = Object.freeze({
   Empty: '',
   Root: '/',
+  Staff: 'staff',
   Users: 'users',
   Merchants: 'merchants',
   Products: 'products',
@@ -35,6 +36,7 @@ export const ApplicationRoutes = Object.freeze({
 });
 
 export const ApplicationMenu = [
+  { path: ApplicationRoutes.Staff, label: 'MENU.STAFF', icon: 'fas fa-user-shield' },
   {
     path: ApplicationRoutes.Dashboard,
     label: 'MENU.DASHBOARD',
@@ -214,7 +216,7 @@ export const ApplicationMenuGroups = [
     label: 'MENU.GROUPS.USERS',
     description: 'MENU.GROUP_DESCRIPTIONS.USERS',
     icon: 'fas fa-users',
-    items: [menuItem(ApplicationRoutes.Users), menuItem(ApplicationRoutes.Reviews), menuItem(ApplicationRoutes.Notifications)],
+    items: [menuItem(ApplicationRoutes.Staff), menuItem(ApplicationRoutes.Users), menuItem(ApplicationRoutes.Reviews), menuItem(ApplicationRoutes.Notifications)],
   },
   {
     id: 'system',

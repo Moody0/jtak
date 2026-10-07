@@ -1,3 +1,4 @@
+import { DashboardWriteDirective } from 'src/app/modules/shared/directives/dashboard-write.directive';
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Routes } from '@angular/router';
@@ -14,7 +15,7 @@ const routes: Routes = [
 
 @NgModule({
   declarations: [TedallalSettingsComponent],
-  imports: [
+  imports: [DashboardWriteDirective, 
     CommonModule,
     FormsModule,
     ReactiveFormsModule,

@@ -110,7 +110,7 @@
         <button type="button" class="btn btn-sm btn-light-primary me-2" (click)="selection.exportSelected(items, 'orders')">
           <i class="fas fa-file-export me-1"></i> {{ 'COMMON.EXPORT' | translate }}
         </button>
-        <button type="button" class="btn btn-sm btn-light-danger me-2" (click)="bulkCancel(items)">
+        <button appDashboardWrite type="button" class="btn btn-sm btn-light-danger me-2" (click)="bulkCancel(items)">
           <i class="fas fa-ban me-1"></i> {{ 'ORDERS_PAGE.CANCEL_SELECTED' | translate }}
         </button>
         <button type="button" class="btn btn-sm btn-secondary" (click)="selection.clear()">
@@ -257,12 +257,12 @@
                         <i class="fas fa-motorcycle text-primary"></i>
                         <strong class="ops-driver-name text-truncate">{{ getCleanDriverName(o.deliveryUser) }}</strong>
                       </div>
-                      <button *ngIf="canAssignDriver(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
+                      <button appDashboardWrite *ngIf="canAssignDriver(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
                         <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
                       </button>
                     </ng-container>
                     <ng-template #unassignedDriver>
-                      <button *ngIf="canAssignDriver(o); else staticUnassigned" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
+                      <button appDashboardWrite *ngIf="canAssignDriver(o); else staticUnassigned" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
                         <i class="fas fa-user-plus me-1"></i>{{ 'ORDERS_PAGE.ASSIGN_CAPTAIN' | translate }}
                       </button>
                       <ng-template #staticUnassigned>
@@ -276,19 +276,19 @@
               <!-- 5. Actions -->
               <td class="ops-actions-col text-center">
                 <div class="ops-actions-cluster">
-                  <button *ngIf="canApprove(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
+                  <button appDashboardWrite *ngIf="canApprove(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
                     (click)="approve(o)" [title]="'ORDERS_PAGE.APPROVE_TOOLTIP' | translate">
                     <i class="fas fa-check me-1"></i><span>{{ 'ORDERS_PAGE.APPROVE' | translate }}</span>
                   </button>
-                  <button *ngIf="!canApprove(o) && canMarkReady(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
+                  <button appDashboardWrite *ngIf="!canApprove(o) && canMarkReady(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
                     (click)="markReady(o)" [title]="'ORDERS_PAGE.MARK_READY' | translate">
                     <i class="fas fa-box-check me-1"></i><span>{{ 'ORDERS_PAGE.MARK_READY' | translate }}</span>
                   </button>
-                  <button *ngIf="!canApprove(o) && !canMarkReady(o) && canConfirmPickup(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
+                  <button appDashboardWrite *ngIf="!canApprove(o) && !canMarkReady(o) && canConfirmPickup(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
                     (click)="confirmPickup(o)" [title]="'ORDERS_PAGE.CONFIRM_PICKUP' | translate">
                     <i class="fas fa-shipping-fast me-1"></i><span>{{ 'ORDERS_PAGE.CONFIRM_PICKUP' | translate }}</span>
                   </button>
-                  <button *ngIf="!canApprove(o) && !canMarkReady(o) && !canConfirmPickup(o) && canDeliver(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
+                  <button appDashboardWrite *ngIf="!canApprove(o) && !canMarkReady(o) && !canConfirmPickup(o) && canDeliver(o)" type="button" class="btn btn-sm ops-btn-act ops-btn-act--approve ops-btn-act--primary"
                     (click)="openDeliverModal(o)" [title]="'ORDERS_PAGE.ADMIN_DELIVERY' | translate">
                     <i class="fas fa-check-double me-1"></i><span>{{ 'ORDERS_PAGE.ADMIN_DELIVERY' | translate }}</span>
                   </button>
@@ -310,44 +310,44 @@
 
                       <div class="dropdown-divider my-1"></div>
 
-                      <button *ngIf="canAccept(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="acceptOrder(o)">
+                      <button appDashboardWrite *ngIf="canAccept(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="acceptOrder(o)">
                         <i class="fas fa-check text-success me-2"></i>
                         <span>{{ 'ORDERS_PAGE.ACCEPT_ORDER' | translate }}</span>
                       </button>
 
-                      <button *ngIf="canPrepare(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="startPreparing(o)">
+                      <button appDashboardWrite *ngIf="canPrepare(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="startPreparing(o)">
                         <i class="fas fa-utensils text-info me-2"></i>
                         <span>{{ 'ORDERS_PAGE.START_PREPARING' | translate }}</span>
                       </button>
 
-                      <button *ngIf="canMarkReady(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="markReady(o)">
+                      <button appDashboardWrite *ngIf="canMarkReady(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="markReady(o)">
                         <i class="fas fa-box-open text-primary me-2"></i>
                         <span>{{ 'ORDERS_PAGE.MARK_READY' | translate }}</span>
                       </button>
 
-                      <button *ngIf="canAssignDriver(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                      <button appDashboardWrite *ngIf="canAssignDriver(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
                         <i class="fas fa-motorcycle text-primary me-2"></i>
                         <span>{{ hasAssignedDriver(o) ? ('ORDERS_PAGE.ASSIGN_OR_REASSIGN' | translate) : ('ORDERS_PAGE.ASSIGN_CAPTAIN' | translate) }}</span>
                       </button>
 
-                      <button *ngIf="canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="confirmPickup(o)">
+                      <button appDashboardWrite *ngIf="canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="confirmPickup(o)">
                         <i class="fas fa-shipping-fast text-info me-2"></i>
                         <span>{{ 'ORDERS_PAGE.CONFIRM_PICKUP' | translate }}</span>
                       </button>
 
-                      <button *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
+                      <button appDashboardWrite *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
                         <i class="fas fa-check-double text-success me-2"></i>
                         <span>{{ 'ORDERS_PAGE.ADMIN_DELIVERY' | translate }}</span>
                       </button>
 
                       <div class="dropdown-divider my-1" *ngIf="canReject(o) || canCancel(o)"></div>
 
-                      <button *ngIf="canReject(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="rejectOrder(o)">
+                      <button appDashboardWrite *ngIf="canReject(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="rejectOrder(o)">
                         <i class="fas fa-times-circle text-danger me-2"></i>
                         <span>{{ 'ORDERS_PAGE.REJECT_ORDER' | translate }}</span>
                       </button>
 
-                      <button *ngIf="canCancel(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="confirmCancel(o)">
+                      <button appDashboardWrite *ngIf="canCancel(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="confirmCancel(o)">
                         <i class="fas fa-ban text-danger me-2"></i>
                         <span>{{ 'ORDERS_PAGE.CANCEL' | translate }}</span>
                       </button>
@@ -355,12 +355,12 @@
                       <!-- Archive / Restore actions -->
                       <div class="dropdown-divider my-1"></div>
 
-                      <button *ngIf="o.isArchived || o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="restoreOrder(o)">
+                      <button appDashboardWrite *ngIf="o.isArchived || o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="restoreOrder(o)">
                         <i class="fas fa-trash-restore text-success me-2"></i>
                         <span>{{ 'ORDERS_PAGE.RESTORE_ORDER' | translate }}</span>
                       </button>
 
-                      <button *ngIf="canArchive(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
+                      <button appDashboardWrite *ngIf="canArchive(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
                         <i class="fas fa-archive text-danger me-2"></i>
                         <span>{{ 'ORDERS_PAGE.ARCHIVE_ORDER' | translate }}</span>
                       </button>
@@ -406,49 +406,49 @@
 
                   <div class="dropdown-divider my-1"></div>
 
-                  <button *ngIf="canApprove(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="approve(o)">
+                  <button appDashboardWrite *ngIf="canApprove(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="approve(o)">
                     <i class="fas fa-check text-success me-2"></i>
                     <span>{{ 'ORDERS_PAGE.APPROVE' | translate }}</span>
                   </button>
 
-                  <button *ngIf="canAccept(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="acceptOrder(o)">
+                  <button appDashboardWrite *ngIf="canAccept(o)" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="acceptOrder(o)">
                     <i class="fas fa-check text-success me-2"></i>
                     <span>قبول الطلب وتجهيزه</span>
                   </button>
 
-                  <button *ngIf="canPrepare(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="startPreparing(o)">
+                  <button appDashboardWrite *ngIf="canPrepare(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="startPreparing(o)">
                     <i class="fas fa-utensils text-info me-2"></i>
                     <span>بدء التجهيز</span>
                   </button>
 
-                  <button *ngIf="canMarkReady(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="markReady(o)">
+                  <button appDashboardWrite *ngIf="canMarkReady(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="markReady(o)">
                     <i class="fas fa-box-open text-primary me-2"></i>
                     <span>جاهز للاستلام</span>
                   </button>
 
-                  <button *ngIf="canAssignDriver(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
+                  <button appDashboardWrite *ngIf="canAssignDriver(o)" type="button" class="dropdown-item py-2 px-3 text-primary d-flex align-items-center" (click)="edit(o)">
                     <i class="fas fa-motorcycle text-primary me-2"></i>
                     <span>{{ hasAssignedDriver(o) ? 'تعيين / إعادة تعيين مندوب' : 'تعيين مندوب توصيل' }}</span>
                   </button>
 
-                  <button *ngIf="canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="confirmPickup(o)">
+                  <button appDashboardWrite *ngIf="canConfirmPickup(o)" type="button" class="dropdown-item py-2 px-3 text-info d-flex align-items-center" (click)="confirmPickup(o)">
                     <i class="fas fa-shipping-fast text-info me-2"></i>
                     <span>تأكيد استلام المندوب</span>
                   </button>
 
-                  <button *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
+                  <button appDashboardWrite *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
                     <i class="fas fa-check-double text-success me-2"></i>
                     <span>تسليم إداري</span>
                   </button>
 
                   <div class="dropdown-divider my-1" *ngIf="canReject(o) || canCancel(o)"></div>
 
-                  <button *ngIf="canReject(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="rejectOrder(o)">
+                  <button appDashboardWrite *ngIf="canReject(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="rejectOrder(o)">
                     <i class="fas fa-times-circle text-danger me-2"></i>
                     <span>رفض الطلب</span>
                   </button>
 
-                  <button *ngIf="canCancel(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="confirmCancel(o)">
+                  <button appDashboardWrite *ngIf="canCancel(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="confirmCancel(o)">
                     <i class="fas fa-ban text-danger me-2"></i>
                     <span>إلغاء الطلب</span>
                   </button>
@@ -456,12 +456,12 @@
                   <!-- Archive / Restore actions -->
                   <div class="dropdown-divider my-1"></div>
 
-                  <button *ngIf="o.isArchived || o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="restoreOrder(o)">
+                  <button appDashboardWrite *ngIf="o.isArchived || o.deletionDate" type="button" class="dropdown-item py-2 px-3 text-success d-flex align-items-center" (click)="restoreOrder(o)">
                     <i class="fas fa-trash-restore text-success me-2"></i>
                     <span>{{ 'ORDERS_PAGE.RESTORE_ORDER' | translate }}</span>
                   </button>
 
-                  <button *ngIf="canArchive(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
+                  <button appDashboardWrite *ngIf="canArchive(o)" type="button" class="dropdown-item py-2 px-3 text-danger d-flex align-items-center" (click)="archiveOrder(o)">
                     <i class="fas fa-archive text-danger me-2"></i>
                     <span>{{ 'ORDERS_PAGE.ARCHIVE_ORDER' | translate }}</span>
                   </button>
@@ -524,12 +524,12 @@
                   <i class="fas fa-motorcycle text-primary fs-8"></i>
                   <span class="ops-driver-name">{{ getCleanDriverName(o.deliveryUser) }}</span>
                 </div>
-                <button *ngIf="canAssignDriver(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
+                <button appDashboardWrite *ngIf="canAssignDriver(o)" type="button" class="btn btn-link btn-sm ops-driver-action p-0" (click)="edit(o)">
                   <i class="fas fa-user-edit me-1"></i>{{ 'ORDERS_PAGE.CHANGE_CAPTAIN' | translate }}
                 </button>
               </ng-container>
               <ng-template #unassignedDriverMobile>
-                <button *ngIf="isDeliveryEditable(o); else staticUnassignedMobile" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
+                <button appDashboardWrite *ngIf="isDeliveryEditable(o); else staticUnassignedMobile" type="button" class="btn btn-sm ops-btn-assign" (click)="edit(o)">
                   <i class="fas fa-user-plus me-1"></i>{{ 'ORDERS_PAGE.ASSIGN_CAPTAIN' | translate }}
                 </button>
                 <ng-template #staticUnassignedMobile>

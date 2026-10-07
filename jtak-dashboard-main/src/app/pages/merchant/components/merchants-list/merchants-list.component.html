@@ -22,7 +22,7 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>{{ 'MERCHANTS_PAGE.REFRESH' | translate }}</span>
       </button>
-      <button type="button" class="btn btn-primary merchants-btn-add" (click)="create()">
+      <button appDashboardWrite type="button" class="btn btn-primary merchants-btn-add" (click)="create()">
         <i class="fas fa-plus text-white"></i>
         <span class="text-white">{{ 'MERCHANTS_PAGE.ADD_MERCHANT' | translate }}</span>
       </button>
@@ -198,21 +198,21 @@
           >
             <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
           </button>
-          <button
+          <button appDashboardWrite
             type="button"
             class="btn btn-sm merchants-bulk-btn btn-enable"
             (click)="bulkSetStatus(items, true)"
           >
             <i class="fas fa-check-circle me-1"></i> {{ 'MERCHANTS_PAGE.ENABLE' | translate }}
           </button>
-          <button
+          <button appDashboardWrite
             type="button"
             class="btn btn-sm merchants-bulk-btn btn-disable"
             (click)="bulkSetStatus(items, false)"
           >
             <i class="fas fa-ban me-1"></i> {{ 'MERCHANTS_PAGE.DISABLE' | translate }}
           </button>
-          <button
+          <button appDashboardWrite
             type="button"
             class="btn btn-sm merchants-bulk-btn btn-delete"
             (click)="bulkDelete(items)"
@@ -406,7 +406,7 @@
                   </a>
 
                   <!-- Toggle Status -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="merchants-btn-action"
                     [class.btn-toggle-disable]="merchant.active"
@@ -418,7 +418,7 @@
                   </button>
 
                   <!-- Edit -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="merchants-btn-action btn-edit"
                     (click)="edit(merchant)"
@@ -428,7 +428,7 @@
                   </button>
 
                   <!-- Delete -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="merchants-btn-action btn-delete"
                     (click)="delete(merchant.id)"

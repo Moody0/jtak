@@ -54,7 +54,7 @@
       </button>
 
       <!-- Save Changes -->
-      <button
+      <button appDashboardWrite
         type="button"
         class="btn btn-header-save"
         (click)="save()"
@@ -268,7 +268,7 @@
         <strong>تنبيه: لديك تعديلات غير محفوظة</strong>
       </div>
       <span class="unsaved-hint">لن تظهر التغييرات التي أجريتها للعملاء حتى تضغط على زر «حفظ التغييرات» في أعلى الصفحة.</span>
-      <button type="button" class="btn btn-sm btn-quick-save" (click)="save()" [disabled]="saving">
+      <button appDashboardWrite type="button" class="btn btn-sm btn-quick-save" (click)="save()" [disabled]="saving">
         <i class="fas fa-save me-1"></i> حفظ الآن
       </button>
     </div>
@@ -345,7 +345,7 @@
           <div class="tile-header-actions">
             <!-- Reorder Buttons -->
             <div class="tile-order-btn-group" role="group" aria-label="ترتيب الفئة">
-              <button
+              <button appDashboardWrite
                 type="button"
                 class="btn btn-order"
                 (click)="moveUp(i)"
@@ -355,7 +355,7 @@
               >
                 <i class="fas fa-arrow-up"></i>
               </button>
-              <button
+              <button appDashboardWrite
                 type="button"
                 class="btn btn-order"
                 (click)="moveDown(i)"

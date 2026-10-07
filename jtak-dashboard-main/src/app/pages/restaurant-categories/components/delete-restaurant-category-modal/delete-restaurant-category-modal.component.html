@@ -50,7 +50,7 @@
   <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isDeleting">
     إلغاء
   </button>
-  <button type="button" class="btn btn-danger" (click)="confirm()" [disabled]="isDeleting">
+  <button appDashboardWrite type="button" class="btn btn-danger" (click)="confirm()" [disabled]="isDeleting">
     <i class="fas fa-spinner fa-spin me-1" *ngIf="isDeleting"></i>
     <i class="fas fa-trash-alt me-1" *ngIf="!isDeleting"></i>
     تأكيد الحذف

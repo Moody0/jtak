@@ -230,7 +230,7 @@
                   </button>
 
                   <!-- Quick Resolve -->
-                  <button
+                  <button appDashboardWrite
                     *ngIf="item.status !== SupportMessageStatus.Resolved"
                     type="button"
                     class="btn btn-icon btn-sm support-table-action support-table-action--success"
@@ -241,7 +241,7 @@
                   </button>
 
                   <!-- Delete -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="btn btn-icon btn-sm support-table-action support-table-action--danger"
                     title="حذف الرسالة"

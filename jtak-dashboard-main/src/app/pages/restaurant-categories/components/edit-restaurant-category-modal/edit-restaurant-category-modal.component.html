@@ -201,7 +201,7 @@
   <button type="button" class="btn btn-light" (click)="modal.dismiss()" [disabled]="isSaving">
     إلغاء
   </button>
-  <button type="button" class="btn btn-primary rc-btn-submit" (click)="save()" [disabled]="isSaving || formGroup.invalid">
+  <button appDashboardWrite type="button" class="btn btn-primary rc-btn-submit" (click)="save()" [disabled]="isSaving || formGroup.invalid">
     <i class="fas fa-spinner fa-spin text-white me-1" *ngIf="isSaving"></i>
     <i class="fas fa-check text-white me-1" *ngIf="!isSaving"></i>
     <span class="text-white">{{ isEdit ? 'حفظ التعديلات' : 'إضافة التصنيف' }}</span>

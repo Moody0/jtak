@@ -102,10 +102,10 @@
     <div class="mt-2">الصفحة التي ستفتح: <strong>{{ destinationLabel }}</strong></div>
   </div>
   <button type="button" class="btn btn-light" (click)="!isSending && modal.dismiss()" [disabled]="isSending">إلغاء</button>
-  <button *ngIf="!confirming" type="button" class="btn btn-primary" (click)="reviewSend()" [disabled]="isSending || statsLoading || !audiences?.pushConfigured">
+  <button appDashboardWrite *ngIf="!confirming" type="button" class="btn btn-primary" (click)="reviewSend()" [disabled]="isSending || statsLoading || !audiences?.pushConfigured">
     <i class="fas fa-paper-plane me-1"></i> مراجعة الإرسال
   </button>
-  <button *ngIf="confirming" type="button" class="btn btn-primary" (click)="send()" [disabled]="isSending">
+  <button appDashboardWrite *ngIf="confirming" type="button" class="btn btn-primary" (click)="send()" [disabled]="isSending">
     <i class="fas" [ngClass]="isSending ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
     {{ isSending ? 'جارٍ الإرسال...' : 'تأكيد الإرسال الآن' }}
   </button>

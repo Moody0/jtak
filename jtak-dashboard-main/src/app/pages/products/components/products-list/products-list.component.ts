@@ -127,7 +127,7 @@ export class ProductsListComponent
     this.service.setDefaults();
     this.searchForm();
     this.loadLookups();
-    this.subs.sink = this.dashboardService.getSettings().pipe(catchError(() => of(null))).subscribe((settings) => {
+    this.subs.sink = this.dashboardService.getCatalogDefaults().pipe(catchError(() => of(null))).subscribe((settings) => {
       const rate = Number(settings?.usdToSypExchangeRate);
       if (Number.isFinite(rate) && rate > 0) this.exchangeRate = rate;
     });

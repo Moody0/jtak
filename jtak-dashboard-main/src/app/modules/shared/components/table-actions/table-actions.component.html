@@ -1,8 +1,8 @@
-<button *ngIf="showEditButton" type="button" aria-label="Edit" title="Edit"
+<button appDashboardWrite *ngIf="showEditButton" type="button" aria-label="Edit" title="Edit"
   class="btn btn-icon btn-light btn-sm" (click)="onEditClicked()">
   <span class="fas fa-edit" aria-hidden="true"></span>
 </button>
-<button *ngIf="showDeleteButton" type="button" aria-label="Delete" title="Delete"
+<button appDashboardWrite *ngIf="showDeleteButton" type="button" aria-label="Delete" title="Delete"
   class="btn btn-icon btn-light btn-hover-danger btn-sm" (click)="onDeleteClicked()">
   <span class="fas fa-trash" aria-hidden="true"></span>
 </button>

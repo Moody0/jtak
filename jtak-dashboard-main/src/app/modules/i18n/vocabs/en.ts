@@ -2,6 +2,7 @@
 export const locale = {
   lang: 'en',
   data: {
+    STAFF_READ_ONLY: 'You have view access to this section. Changes and actions require Manage permission.',
     TRANSLATOR: {
       SELECT: 'Select your language',
     },
@@ -44,6 +45,7 @@ export const locale = {
       ADMIN_YEAR: 'JTAK Platform • 2026',
     },
     MENU: {
+      STAFF: 'Staff & Roles',
       SHOW_PAGES: 'Show pages',
       HIDE_PAGES: 'Hide pages',
       DASHBOARD: 'Dashboard',

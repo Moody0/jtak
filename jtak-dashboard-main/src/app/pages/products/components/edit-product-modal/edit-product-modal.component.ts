@@ -124,7 +124,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   }
 
   private loadExchangeRate(): void {
-    this.subs.sink = this.dashboardService.getSettings().pipe(catchError(() => of(null))).subscribe((settings) => {
+    this.subs.sink = this.dashboardService.getCatalogDefaults().pipe(catchError(() => of(null))).subscribe((settings) => {
       const rate = Number(settings?.usdToSypExchangeRate);
       if (Number.isFinite(rate) && rate > 0) this.exchangeRate = rate;
       this.initializeDiscountInputs();

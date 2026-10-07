@@ -49,7 +49,7 @@ export class NotificationSummaryService implements OnDestroy {
 
     this.pollingSub = timer(0, this.pollingIntervalMs)
       .pipe(
-        filter(() => !!(this.authService.getAuthFromSessionStorage() || this.authService.getAuthFromLocalStorage())),
+        filter(() => !!this.authService.getToken() && !!this.authService.userSubject.value?.dashboardAccess?.canAccess),
         switchMap(() => this.fetchSummaryObservable())
       )
       .subscribe();
@@ -59,7 +59,7 @@ export class NotificationSummaryService implements OnDestroy {
    * Trigger an immediate on-demand refresh (e.g. after order actions, ticket resolution, or settlement decisions)
    */
   public refresh(): void {
-    if (!(this.authService.getAuthFromSessionStorage() || this.authService.getAuthFromLocalStorage())) {
+    if (!this.authService.getToken() || !this.authService.userSubject.value?.dashboardAccess?.canAccess) {
       return;
     }
     this.fetchSummaryObservable().subscribe();
@@ -67,7 +67,7 @@ export class NotificationSummaryService implements OnDestroy {
 
   private fetchSummaryObservable(): Observable<NotificationSummary | null> {
     const url = `${environment.apiUrl}/Admin/Notifications/Summary`;
-    return this.http.get<NotificationSummary>(url).pipe(
+    return this.http.get<NotificationSummary>(url, { headers: { 'X-Silent-Error': '1' } }).pipe(
       tap((data) => {
         if (data) {
           this.summarySubject.next(data);

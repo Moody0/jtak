@@ -19,11 +19,11 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>تحديث</span>
       </button>
-      <button type="button" class="btn btn-primary rc-btn-add" (click)="openAddModal()" [disabled]="isLoading">
+      <button appDashboardWrite type="button" class="btn btn-primary rc-btn-add" (click)="openAddModal()" [disabled]="isLoading">
         <i class="fas fa-plus text-white"></i>
         <span class="text-white">إضافة تصنيف جديد</span>
       </button>
-      <button type="button" class="btn rc-btn-save" (click)="saveConfig(true)" [disabled]="isSaving">
+      <button appDashboardWrite type="button" class="btn rc-btn-save" (click)="saveConfig(true)" [disabled]="isSaving">
         <i class="fas fa-check-circle text-white" *ngIf="!isSaving"></i>
         <i class="fas fa-spinner fa-spin text-white" *ngIf="isSaving"></i>
         <span class="text-white">حفظ التغييرات</span>
@@ -102,7 +102,7 @@
             <!-- Home Strip Toggle Card -->
             <div class="rc-toggle-pill" (click)="showOnHome = !showOnHome; saveConfig()">
               <div class="form-check form-switch m-0">
-                <input
+                <input appDashboardWrite
                   class="form-check-input"
                   type="checkbox"
                   [(ngModel)]="showOnHome"
@@ -114,9 +114,9 @@
             </div>
 
             <!-- Master Active Toggle Card -->
-            <div class="rc-toggle-pill" (click)="toggleSectionEnabled()">
+            <div appDashboardWrite class="rc-toggle-pill" (click)="toggleSectionEnabled()">
               <div class="form-check form-switch m-0">
-                <input
+                <input appDashboardWrite
                   class="form-check-input"
                   type="checkbox"
                   [checked]="enabled"
@@ -130,7 +130,7 @@
             </div>
 
             <!-- Quick Save Button -->
-            <button
+            <button appDashboardWrite
               type="button"
               class="btn rc-btn-quick-save"
               (click)="saveConfig(true)"
@@ -272,7 +272,7 @@
             <!-- Order Controls -->
             <td class="text-center">
               <div class="rc-rank-controls">
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="rc-btn-rank"
                   [disabled]="idx === 0 || hasSearchFilter || isSaving"
@@ -284,7 +284,7 @@
                 <span class="rc-rank-chip" [class.top3]="item.order <= 3">
                   #{{ item.order }}
                 </span>
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="rc-btn-rank"
                   [disabled]="idx === items.length - 1 || hasSearchFilter || isSaving"
@@ -367,7 +367,7 @@
             <td class="text-center">
               <div class="rc-status-cell">
                 <label class="form-check form-switch form-check-custom form-check-solid m-0 d-inline-block">
-                  <input
+                  <input appDashboardWrite
                     class="form-check-input"
                     type="checkbox"
                     [checked]="item.active"
@@ -384,7 +384,7 @@
             <!-- Actions -->
             <td class="text-center">
               <div class="rc-actions-group">
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="rc-btn-action btn-edit"
                   (click)="openEditModal(item)"
@@ -392,7 +392,7 @@
                 >
                   <i class="fas fa-pen"></i>
                 </button>
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="rc-btn-action btn-delete"
                   (click)="openDeleteModal(item)"
@@ -416,7 +416,7 @@
                 <p class="rc-empty-desc">
                   {{ hasSearchFilter ? 'جرب البحث بكلمة أخرى أو مسح حقل البحث' : 'لم يتم إضافة أي تصنيفات مطاعم حتى الآن' }}
                 </p>
-                <button
+                <button appDashboardWrite
                   *ngIf="!hasSearchFilter"
                   type="button"
                   class="btn btn-primary rc-btn-add"

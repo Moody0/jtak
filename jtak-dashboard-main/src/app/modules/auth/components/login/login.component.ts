@@ -80,7 +80,9 @@ export class LoginComponent implements OnInit, OnDestroy {
       .subscribe((res) => {
         if (res !== undefined) {
           //this.router.navigate(['/']);
-          this.router.navigate([this.returnUrl]);
+          const destination = this.returnUrl?.startsWith('/') && !this.returnUrl.startsWith('//') && this.authService.canRoute(this.returnUrl)
+            ? this.returnUrl : '/' + this.authService.landingRoute;
+          this.router.navigateByUrl(destination);
         } else {
           this.hasError = true;
         }

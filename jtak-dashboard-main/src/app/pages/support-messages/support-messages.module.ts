@@ -1,3 +1,4 @@
+import { DashboardWriteDirective } from 'src/app/modules/shared/directives/dashboard-write.directive';
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -12,7 +13,7 @@ import { ErrandRequestsListComponent } from './components/errand-requests-list/e
 
 @NgModule({
   declarations: [SupportMessagesListComponent, ViewMessageModalComponent, ErrandRequestsListComponent],
-  imports: [
+  imports: [DashboardWriteDirective, 
     CommonModule,
     FormsModule,
     ReactiveFormsModule,

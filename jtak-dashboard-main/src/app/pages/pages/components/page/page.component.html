@@ -59,7 +59,7 @@
           </div>
         </div>
         <div class="text-end mt-4">
-          <button type="submit" class="btn btn-primary font-weight-bold" [disabled]="isSaving || isCopying || !hasLoaded || isPageBodyEmpty || formGroup.invalid">
+          <button appDashboardWrite type="submit" class="btn btn-primary font-weight-bold" [disabled]="isSaving || isCopying || !hasLoaded || isPageBodyEmpty || formGroup.invalid">
             <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-2" role="status"></span>
             {{ 'COMMON.SAVE' | translate }}
           </button>

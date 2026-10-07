@@ -1,4 +1,5 @@
 export interface UserModel {
+  dashboardAccess?: import('./dashboard-access.model').DashboardAccess;
   id: string;
   firstName: string;
   lastName: string;

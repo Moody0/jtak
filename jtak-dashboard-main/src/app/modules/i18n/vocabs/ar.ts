@@ -2,6 +2,7 @@
 export const locale = {
   lang: 'ar',
   data: {
+    STAFF_READ_ONLY: 'هذا القسم متاح لك للعرض فقط. تعديل البيانات وتنفيذ الإجراءات يحتاج صلاحية الإدارة.',
     TRANSLATOR: {
       SELECT: 'اختر لغتك',
     },
@@ -44,6 +45,7 @@ export const locale = {
       ADMIN_YEAR: 'منصة جيتك • 2026',
     },
     MENU: {
+      STAFF: 'الموظفون والصلاحيات',
       SHOW_PAGES: 'عرض الصفحات',
       HIDE_PAGES: 'إخفاء الصفحات',
       DASHBOARD: 'لوحة التحكم',

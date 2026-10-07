@@ -1,3 +1,4 @@
+import { AuthService } from 'src/app/modules/auth';
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { NavigationEnd, Router } from '@angular/router';
@@ -23,10 +24,15 @@ export class AsideMenuComponent implements OnInit, OnDestroy {
   constructor(
     private notificationSummaryService: NotificationSummaryService,
     private cdr: ChangeDetectorRef,
-    private router: Router
+    private router: Router,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
+    this.sub.add(this.auth.user$.subscribe(() => {
+      this.applicationMenuGroups = ApplicationMenuGroups.map(group => ({ ...group, items: group.items.filter(item => this.auth.canRoute(item.path)) })).filter(group => group.items.length > 0);
+      this.syncNavigation();
+    }));
     this.syncNavigation();
     this.sub.add(this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) this.syncNavigation();

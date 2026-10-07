@@ -29,7 +29,7 @@
           <span class="text-muted">{{ 'ORDERS_PAGE.MODAL_CURRENT_CAPTAIN' | translate }}</span>
           <strong class="text-dark ms-1">{{ item.deliveryUser || ('ORDERS_PAGE.UNASSIGNED' | translate) }}</strong>
         </div>
-        <button *ngIf="item.deliveryId && item.deliveryId !== '00000000-0000-0000-0000-000000000000'"
+        <button appDashboardWrite *ngIf="item.deliveryId && item.deliveryId !== '00000000-0000-0000-0000-000000000000'"
           type="button" class="btn btn-sm btn-light-danger py-1 px-2 fs-8" [disabled]="isSaving" (click)="unassign()">
           <i class="fas fa-user-minus me-1"></i>{{ 'ORDERS_PAGE.MODAL_UNASSIGN_BTN' | translate }}
         </button>

@@ -1,3 +1,4 @@
+<div *ngIf="readOnly" class="alert alert-info mb-5" role="status"><i class="fas fa-lock me-2" aria-hidden="true"></i>{{ 'STAFF_READ_ONLY' | translate }}</div>
 <section *ngIf="group as workspace" class="workspace-nav-wrapper container-fluid" [attr.aria-label]="workspace.label | translate">
   <div class="workspace-nav-card">
     <div class="workspace-nav-heading">

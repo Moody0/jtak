@@ -1,3 +1,4 @@
+import { DashboardWriteDirective } from 'src/app/modules/shared/directives/dashboard-write.directive';
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -8,7 +9,7 @@ import { ContactSettingsComponent } from './contact-settings.component';
 
 @NgModule({
   declarations: [ContactSettingsComponent],
-  imports: [
+  imports: [DashboardWriteDirective, 
     CommonModule,
     FormsModule,
     ReactiveFormsModule,

@@ -19,7 +19,7 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>{{ 'USERS_PAGE.REFRESH' | translate }}</span>
       </button>
-      <button type="button" class="ops-btn-primary" (click)="create()">
+      <button appDashboardWrite type="button" class="ops-btn-primary" (click)="create()">
         <i class="fas fa-plus"></i>
         <span>{{ 'USERS_PAGE.ADD_USER' | translate }}</span>
       </button>
@@ -170,21 +170,21 @@
           >
             <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
           </button>
-          <button
+          <button appDashboardWrite
             type="button"
             class="btn btn-sm btn-light-success"
             (click)="bulkSetStatus(items, true)" [disabled]="isMutating"
           >
             <i class="fas fa-check-circle me-1"></i> {{ 'PRODUCTS_PAGE.ENABLE' | translate }}
           </button>
-          <button
+          <button appDashboardWrite
             type="button"
             class="btn btn-sm btn-light-warning"
             (click)="bulkSetStatus(items, false)" [disabled]="isMutating"
           >
             <i class="fas fa-ban me-1"></i> {{ 'PRODUCTS_PAGE.DISABLE' | translate }}
           </button>
-          <button
+          <button appDashboardWrite
             type="button"
             class="btn btn-sm btn-light-danger"
             (click)="bulkDelete(items)" [disabled]="isMutating"
@@ -338,7 +338,7 @@
               <td style="text-align: center;">
                 <div class="ops-actions-group">
                   <!-- Toggle Status Button -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="ops-btn-action"
                     [class.btn-toggle-disable]="user.isActive"
@@ -350,7 +350,7 @@
                   </button>
 
                   <!-- Edit Button -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="ops-btn-action btn-edit"
                     (click)="edit(user)"
@@ -360,7 +360,7 @@
                   </button>
 
                   <!-- Delete Button -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="ops-btn-action btn-delete"
                     (click)="delete(user.id)"

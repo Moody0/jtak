@@ -34,11 +34,11 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>تحديث</span>
       </button>
-      <button type="button" class="btn-add-product" (click)="openAddModal()" [disabled]="isLoading">
+      <button appDashboardWrite type="button" class="btn-add-product" (click)="openAddModal()" [disabled]="isLoading">
         <i class="fas fa-plus"></i>
         <span>إضافة منتج للأكثر طلباً</span>
       </button>
-      <button type="button" class="btn-save-config" (click)="saveConfig(true)" [disabled]="isSaving">
+      <button appDashboardWrite type="button" class="btn-save-config" (click)="saveConfig(true)" [disabled]="isSaving">
         <i class="fas fa-check-circle" *ngIf="!isSaving"></i>
         <i class="fas fa-spinner fa-spin" *ngIf="isSaving"></i>
         <span>حفظ التغييرات والترتيب</span>
@@ -125,7 +125,7 @@
 
         <div class="d-flex align-items-center gap-3">
           <label class="form-check form-switch form-check-custom form-check-solid mb-0">
-            <input
+            <input appDashboardWrite
               class="form-check-input h-20px w-35px"
               type="checkbox"
               [checked]="enabled"
@@ -183,7 +183,7 @@
             <!-- Rank / Reorder Controls -->
             <td class="text-center">
               <div class="rank-controls">
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="btn-rank-up"
                   [disabled]="idx === 0 || hasSearchFilter || isSaving"
@@ -195,7 +195,7 @@
                 <span class="rank-badge" [class.rank-top3]="item.order <= 3">
                   #{{ item.order }}
                 </span>
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="btn-rank-down"
                   [disabled]="idx === items.length - 1 || hasSearchFilter || isSaving"
@@ -285,7 +285,7 @@
 
             <!-- Section Status Toggle -->
             <td class="text-center">
-              <button
+              <button appDashboardWrite
                 type="button"
                 class="btn-status-toggle"
                 [class.is-active]="item.active"
@@ -301,7 +301,7 @@
             <!-- Actions -->
             <td class="text-center">
               <div class="actions-group">
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="btn-action-delete"
                   (click)="removeItem(item)"
@@ -321,7 +321,7 @@
                 <i class="fas fa-fire-alt fs-1 text-muted mb-3"></i>
                 <h5 class="fw-bold mb-1">لا توجد منتجات في قائمة الأكثر طلباً</h5>
                 <p class="text-muted fs-7 mb-4">انقر على الزر أدناه لاختيار وإضافة وجبات ومأكولات إلى قسم الأكثر طلباً في الصفحة الرئيسية</p>
-                <button type="button" class="btn btn-primary btn-sm" (click)="openAddModal()">
+                <button appDashboardWrite type="button" class="btn btn-primary btn-sm" (click)="openAddModal()">
                   <i class="fas fa-plus me-1"></i> إضافة منتج الآن
                 </button>
               </div>

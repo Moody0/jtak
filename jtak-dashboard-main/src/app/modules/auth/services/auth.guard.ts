@@ -1,49 +1,22 @@
 import { Injectable } from '@angular/core';
-import {
-  CanActivate,
-  ActivatedRouteSnapshot,
-  RouterStateSnapshot,
-  Router,
-} from '@angular/router';
-import { Observable, map, of } from 'rxjs';
+import { CanActivate, CanActivateChild, ActivatedRouteSnapshot, RouterStateSnapshot, Router } from '@angular/router';
+import { catchError, map, of } from 'rxjs';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
-export class AuthGuard implements CanActivate {
-  constructor(private authService: AuthService, private router: Router) {}
-
-  canActivate(
-    route: ActivatedRouteSnapshot,
-    state: RouterStateSnapshot
-  ): Observable<boolean> | boolean {
-    const auth = this.authService.getAuthFromSessionStorage();
-    if (!auth || !auth.access_token) {
-      this.router.navigate(['auth/login'], {
-        queryParams: { returnUrl: state.url },
-      });
-      return false;
-    }
-
-    const currentUser =
-      this.authService.userSubject.value ||
-      this.authService.getUserFromSessionStorage();
-    if (currentUser) {
-      if (!this.authService.userSubject.value) {
-        this.authService.userSubject.next(currentUser);
-      }
-      return true;
-    }
-
-    return this.authService.user$.pipe(
-      map((user) => {
-        if (!user) {
-          this.router.navigate(['auth/login'], {
-            queryParams: { returnUrl: state.url },
-          });
-          return false;
-        }
-        return true;
-      })
+export class AuthGuard implements CanActivate, CanActivateChild {
+  constructor(private auth: AuthService, private router: Router) {}
+  canActivate(_route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
+    if (!this.auth.getToken()) return this.router.createUrlTree(['/auth/login'], { queryParams: { returnUrl: state.url } });
+    return this.auth.getUserByToken().pipe(
+      map(user => user?.dashboardAccess?.canAccess ? true : this.router.createUrlTree(['/auth/login'])),
+      catchError(() => { this.auth.logout(); return of(this.router.createUrlTree(['/auth/login'])); })
+    );
+  }
+  canActivateChild(_route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
+    return this.auth.getUserByToken().pipe(
+      map(user => !user ? this.router.createUrlTree(['/auth/login']) : this.auth.canRoute(state.url) ? true : this.router.createUrlTree(['/' + this.auth.landingRoute])),
+      catchError(() => { this.auth.logout(); return of(this.router.createUrlTree(['/auth/login'])); })
     );
   }
 }

@@ -88,7 +88,7 @@
   <button type="button" class="btn btn-sm btn-secondary" (click)="modal.dismiss()" [disabled]="isLoading">
     إلغاء
   </button>
-  <button type="button" class="btn btn-sm btn-success" (click)="submit()" [disabled]="isLoading">
+  <button appDashboardWrite type="button" class="btn btn-sm btn-success" (click)="submit()" [disabled]="isLoading">
     <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-1"></span>
     <i *ngIf="!isLoading" class="fas fa-check-double me-1"></i>
     <span>تأكيد التسليم الإداري</span>

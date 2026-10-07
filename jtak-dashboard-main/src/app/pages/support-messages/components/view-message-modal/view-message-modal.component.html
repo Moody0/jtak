@@ -232,7 +232,7 @@
               </div>
             </div>
 
-            <button class="btn errand-btn-action" [disabled]="isSaving" (click)="runErrandAction('quote')">
+            <button appDashboardWrite class="btn errand-btn-action" [disabled]="isSaving" (click)="runErrandAction('quote')">
               <i class="fas fa-paper-plane me-1"></i>
               <span>{{ message.errandStatus === ErrandStatus.Quoted ? 'إرسال عرض سعر جديد' : 'إرسال عرض السعر للعميل' }}</span>
             </button>
@@ -282,7 +282,7 @@
               </ng-container>
             </option>
           </select>
-          <button class="btn errand-btn-action" [disabled]="isSaving || !driverUserId" (click)="runErrandAction('assign')">
+          <button appDashboardWrite class="btn errand-btn-action" [disabled]="isSaving || !driverUserId" (click)="runErrandAction('assign')">
             <i class="fas fa-check-circle me-1"></i>
             <span>تعيين المندوب</span>
           </button>
@@ -307,7 +307,7 @@
               <input class="form-control" maxlength="200" [(ngModel)]="receiptReference" placeholder="اختياري عند وجود صورة إيصال" />
             </div>
           </div>
-          <button class="btn errand-btn-action" [disabled]="isSaving" (click)="runErrandAction('purchase')">
+          <button appDashboardWrite class="btn errand-btn-action" [disabled]="isSaving" (click)="runErrandAction('purchase')">
             <i class="fas fa-receipt me-1"></i>
             <span>تسجيل الشراء من العهدة</span>
           </button>
@@ -345,7 +345,7 @@
             <label class="form-label">سبب الإكمال من لوحة الإدارة</label>
             <textarea class="form-control" rows="2" maxlength="500" [(ngModel)]="recoveryReason" placeholder="مثال: تعطل هاتف المندوب بعد تسليم الطلب"></textarea>
           </div>
-          <button class="btn errand-btn-success" [disabled]="isSaving || !customerReceived || !cashCollected || deliveryCode.length !== 6 || !recoveryReason.trim()" (click)="runErrandAction('deliver')">
+          <button appDashboardWrite class="btn errand-btn-success" [disabled]="isSaving || !customerReceived || !cashCollected || deliveryCode.length !== 6 || !recoveryReason.trim()" (click)="runErrandAction('deliver')">
             <i class="fas fa-check-double me-1"></i>
             <span>استعادة التسليم وتسجيل التحصيل</span>
           </button>
@@ -358,7 +358,7 @@
         <label class="form-label text-danger">سبب إلغاء الطلب قبل الشراء</label>
         <div class="d-flex gap-2">
           <input class="form-control" maxlength="500" [(ngModel)]="returnReason" placeholder="اكتب سبب إلغاء الطلب..." />
-          <button class="btn errand-btn-danger" [disabled]="isSaving || !returnReason.trim()" (click)="runErrandAction('cancel')">
+          <button appDashboardWrite class="btn errand-btn-danger" [disabled]="isSaving || !returnReason.trim()" (click)="runErrandAction('cancel')">
             <span>إلغاء الطلب</span>
           </button>
         </div>
@@ -378,7 +378,7 @@
             <input class="form-control" maxlength="500" [(ngModel)]="returnReason" placeholder="اكتب التفاصيل..." />
           </div>
         </div>
-        <button class="btn errand-btn-danger" [disabled]="isSaving || refundAmount === null || !returnReason.trim()" (click)="runErrandAction('return')">
+        <button appDashboardWrite class="btn errand-btn-danger" [disabled]="isSaving || refundAmount === null || !returnReason.trim()" (click)="runErrandAction('return')">
           <span>تسجيل إرجاع الطلب</span>
         </button>
       </div>
@@ -464,7 +464,7 @@
   <button type="button" class="btn modal-btn-secondary" (click)="modal.dismiss()">
     إغلاق
   </button>
-  <button
+  <button appDashboardWrite
     *ngIf="!isErrand"
     type="button"
     class="btn modal-btn-primary"

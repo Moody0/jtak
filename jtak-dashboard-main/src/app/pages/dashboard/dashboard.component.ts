@@ -1,3 +1,4 @@
+import { AuthService } from 'src/app/modules/auth';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
@@ -49,7 +50,7 @@ driverSearchGroup: UntypedFormGroup;
     public ordersService: OrdersService,
     private categoriesService: CategoriesService,
     private translate: TranslateService,
-    private cdr: ChangeDetectorRef) { }
+    private cdr: ChangeDetectorRef, public auth: AuthService) { }
 
 
   paginator: PaginatorState;
@@ -459,9 +460,11 @@ driverSearchGroup: UntypedFormGroup;
         this.cdr.detectChanges();
       }
     });
-    this.service.fetchPost();
-    this.driverBalancesService.fetchPost();
-    this.ordersService.fetchPost();
+    if (this.auth.can('finance.view')) {
+      this.service.fetchPost();
+      this.driverBalancesService.fetchPost();
+    }
+    if (this.auth.can('orders.view')) this.ordersService.fetchPost();
   }
 
   getTopProductShare(count: number): number {
@@ -532,10 +535,12 @@ driverSearchGroup: UntypedFormGroup;
     this.driverBalancesService.setDefaults();
     this.ordersService.setDefaults();
     this.searchForm();
-    this.loadSettings();
-    this.loadFeaturedCategories();
-    this.loadDriverPricing();
-    this.loadErrandDriverEarning();
+    if (this.auth.can('settings.view')) {
+      this.loadSettings();
+      if (this.auth.can('catalog.view')) this.loadFeaturedCategories();
+      this.loadDriverPricing();
+      this.loadErrandDriverEarning();
+    }
     this.refreshDashboard();
     this.subs.sink = this.service.isLoading$.subscribe(res => this.isLoading = res);
     this.subs.sink = this.driverBalancesService.isLoading$.subscribe(res => this.isDriverLoading = res);

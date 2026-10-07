@@ -21,7 +21,7 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>{{ 'CATEGORIES_PAGE.REFRESH' | translate }}</span>
       </button>
-      <button type="button" class="btn btn-primary categories-btn-add" (click)="create()">
+      <button appDashboardWrite type="button" class="btn btn-primary categories-btn-add" (click)="create()">
         <i class="fas fa-plus text-white"></i>
         <span class="text-white">{{ 'CATEGORIES_PAGE.ADD_CATEGORY' | translate }}</span>
       </button>
@@ -190,7 +190,7 @@
           >
             <i class="fas fa-download me-1"></i> {{ 'COMMON.EXPORT' | translate }}
           </button>
-          <button
+          <button appDashboardWrite
             type="button"
             class="btn btn-sm categories-bulk-btn btn-delete"
             (click)="bulkDelete(items)"
@@ -361,7 +361,7 @@
               <td style="text-align: center;">
                 <div class="categories-actions-group">
                   <!-- Toggle Status -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="categories-btn-action"
                     [ngClass]="category.active ? 'btn-status-active' : 'btn-status-disabled'"
@@ -373,7 +373,7 @@
                   </button>
 
                   <!-- Edit -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="categories-btn-action btn-edit"
                     (click)="edit(category)"
@@ -383,7 +383,7 @@
                   </button>
 
                   <!-- Delete -->
-                  <button
+                  <button appDashboardWrite
                     type="button"
                     class="categories-btn-action btn-delete"
                     (click)="delete(category.id)"

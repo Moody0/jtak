@@ -15,6 +15,7 @@ import { EditModalComponent } from './components/edit-modal/edit-modal.component
 import { StarRatingComponent } from './components/star-rating/star-rating.component';
 import { BulkConfirmModalComponent } from './components/bulk-confirm-modal/bulk-confirm-modal.component';
 import { TranslationModule } from '../i18n/translation.module';
+import { DashboardWriteDirective } from './directives/dashboard-write.directive';
 
 @NgModule({
   declarations: [
@@ -30,8 +31,9 @@ import { TranslationModule } from '../i18n/translation.module';
     StarRatingComponent,
     BulkConfirmModalComponent,
   ],
-  imports: [CommonModule, InlineSVGModule, MaterialModule, NgbModalModule, TranslationModule],
+  imports: [CommonModule, InlineSVGModule, MaterialModule, NgbModalModule, TranslationModule, DashboardWriteDirective],
   exports: [
+    DashboardWriteDirective,
     SubmitButtonComponent,
     InputContainerComponent,
     TableActionsComponent,

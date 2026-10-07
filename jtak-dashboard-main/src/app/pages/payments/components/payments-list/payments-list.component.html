@@ -19,11 +19,11 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>{{ 'PAYMENTS_PAGE.REFRESH' | translate }}</span>
       </button>
-      <button type="button" class="ops-btn-cash-advance" (click)="createDriverCashAdvance()">
+      <button appDashboardWrite type="button" class="ops-btn-cash-advance" (click)="createDriverCashAdvance()">
         <i class="fas fa-hand-holding-usd"></i>
         <span>إضافة عهدة مندوب</span>
       </button>
-      <button type="button" class="ops-btn-primary" (click)="create()">
+      <button appDashboardWrite type="button" class="ops-btn-primary" (click)="create()">
         <i class="fas fa-plus"></i>
         <span>{{ 'PAYMENTS_PAGE.ADD_PAYMENT' | translate }}</span>
       </button>

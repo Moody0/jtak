@@ -34,11 +34,11 @@
         <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
         <span>تحديث</span>
       </button>
-      <button type="button" class="btn-add-product" (click)="openAddModal()" [disabled]="isLoading">
+      <button appDashboardWrite type="button" class="btn-add-product" (click)="openAddModal()" [disabled]="isLoading">
         <i class="fas fa-plus"></i>
         <span>إضافة صنف للأكثر مبيعًا</span>
       </button>
-      <button type="button" class="btn-save-config" (click)="saveConfig(true)" [disabled]="isSaving">
+      <button appDashboardWrite type="button" class="btn-save-config" (click)="saveConfig(true)" [disabled]="isSaving">
         <i class="fas fa-check-circle" *ngIf="!isSaving"></i>
         <i class="fas fa-spinner fa-spin" *ngIf="isSaving"></i>
         <span>حفظ التغييرات والترتيب</span>
@@ -134,7 +134,7 @@
         <div class="config-field-wrapper">
           <label class="form-label d-block text-muted fs-7 mb-1">ظهور القسم في التطبيق</label>
           <div class="form-check form-switch form-check-custom form-check-solid">
-            <input
+            <input appDashboardWrite
               class="form-check-input"
               type="checkbox"
               id="sectionEnabledSwitch"
@@ -328,7 +328,7 @@
             <!-- Active in Section Toggle -->
             <td class="text-center">
               <div class="form-check form-switch form-check-custom form-check-solid d-inline-block">
-                <input
+                <input appDashboardWrite
                   class="form-check-input"
                   type="checkbox"
                   [checked]="item.active"
@@ -343,7 +343,7 @@
             <td class="text-end pe-4">
               <div class="btn-group btn-group-sm">
                 <!-- Move Up -->
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="btn btn-icon btn-light btn-sm"
                   [disabled]="hasSearchFilter || idx === 0"
@@ -354,7 +354,7 @@
                 </button>
 
                 <!-- Move Down -->
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="btn btn-icon btn-light btn-sm"
                   [disabled]="hasSearchFilter || idx === displayedItems.length - 1"
@@ -365,7 +365,7 @@
                 </button>
 
                 <!-- Remove -->
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="btn btn-icon btn-light-danger btn-sm"
                   (click)="removeItem(item)"
@@ -385,7 +385,7 @@
                 <div class="text-muted fw-bold fs-6">
                   {{ hasSearchFilter ? 'لا توجد أصناف تطابق عبارة البحث' : 'لم يتم إضافة أصناف مخصصة لقسم الأكثر مبيعًا بعد' }}
                 </div>
-                <button
+                <button appDashboardWrite
                   type="button"
                   class="btn btn-sm btn-primary mt-3"
                   (click)="openAddModal()"
@@ -407,7 +407,7 @@
         <i class="fas fa-info-circle me-1 text-primary"></i>
         يمكنك استخدام أسهم التحريك لتغيير ترتيب ظهور الأصناف على شاشات الزبائن مباشرة.
       </div>
-      <button
+      <button appDashboardWrite
         type="button"
         class="btn btn-sm btn-success"
         (click)="saveConfig(true)"

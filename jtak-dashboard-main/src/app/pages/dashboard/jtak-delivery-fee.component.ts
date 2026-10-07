@@ -29,7 +29,7 @@ import { DashboardService } from './services/dashboard.service';
       </div>
       <div class="ops-config-footer">
         <button *ngIf="!loaded && !loading" type="button" class="ops-btn-action" (click)="load()">إعادة المحاولة</button>
-        <button type="button" class="ops-btn-action ops-btn-primary" (click)="save()" [disabled]="!loaded || saving || !valid">
+        <button appDashboardWrite="settings" type="button" class="ops-btn-action ops-btn-primary" (click)="save()" [disabled]="!loaded || saving || !valid">
           {{ saving ? 'جارٍ الحفظ…' : 'حفظ أجرة جيتك ماركت' }}
         </button>
       </div>

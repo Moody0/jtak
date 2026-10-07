@@ -26,11 +26,13 @@ import { OrderSoundNotifierComponent } from './components/order-sound-notifier/o
 import { DrawersModule, DropdownMenusModule, ModalsModule} from '../partials';
 import { LanguageSelectorComponent } from '../partials/layout/extras/dropdown-inner/language-selector-inner/language-selector-inner.component';
 import { WorkspaceNavComponent } from './components/workspace-nav/workspace-nav.component';
+import { AuthGuard } from '../../modules/auth/services/auth.guard';
 
 const routes: Routes = [
   {
     path: '',
     component: LayoutComponent,
+    canActivateChild: [AuthGuard],
     children: Routing,
   },
 ];
