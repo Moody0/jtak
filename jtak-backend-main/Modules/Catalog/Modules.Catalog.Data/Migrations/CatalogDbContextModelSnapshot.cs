@@ -337,6 +337,12 @@ namespace Modules.Catalog.Data.Migrations
                     b.Property<string>("Phone2")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("LogoBackgroundColor")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)")
+                        .HasDefaultValue("#FFFFFF");
+
                     b.Property<string>("Photo")
                         .HasColumnType("longtext");
 

@@ -95,6 +95,7 @@ namespace App.ApiControllers.V1.Customer
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
+                    LogoBackgroundColor = x.LogoBackgroundColor,
                     Photo = x.Photo
                 })
                 .ToArrayAsync();
@@ -140,6 +141,7 @@ namespace App.ApiControllers.V1.Customer
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
+                    LogoBackgroundColor = x.LogoBackgroundColor,
                     Photo = x.Photo
                 })
                 .ToArrayAsync();
@@ -178,6 +180,7 @@ namespace App.ApiControllers.V1.Customer
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
+                    LogoBackgroundColor = x.LogoBackgroundColor,
                     Photo = x.Photo
                 })
                 .FirstOrDefaultAsync();
@@ -254,6 +257,7 @@ namespace App.ApiControllers.V1.Customer
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
+                    LogoBackgroundColor = x.LogoBackgroundColor,
                     Photo = x.Photo
                 })
                 .ToArrayAsync();
@@ -305,6 +309,7 @@ namespace App.ApiControllers.V1.Customer
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
+                    LogoBackgroundColor = x.LogoBackgroundColor,
                     Photo = x.Photo
                 })
                 .ToArrayAsync();

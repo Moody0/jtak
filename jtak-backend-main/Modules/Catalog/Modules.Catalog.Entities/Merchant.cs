@@ -57,6 +57,8 @@ namespace Modules.Catalog.Entities
         public Guid OwnerId { get; set; }
 
         public string Photo { get; set; }
+        [StringLength(7)]
+        public string LogoBackgroundColor { get; set; } = "#FFFFFF";
         public virtual ICollection<MerchantProduct> MerchantProducts { get; set; }
     }
 
@@ -108,6 +110,9 @@ namespace Modules.Catalog.Entities
         public string Owner { get => OwnerName; set => OwnerName = value; }
 
         public string Photo { get; set; }
+        [StringLength(7)]
+        [RegularExpression("^#[0-9A-Fa-f]{6}$", ErrorMessage = "اختر لون خلفية صالحًا مثل #FFFFFF.")]
+        public string LogoBackgroundColor { get; set; }
         //public ProductCategoryDto[] ProductCategories { get; set; }
         //public ProductDto[] FeaturedProducts { get; set; }
     }

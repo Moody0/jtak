@@ -40,6 +40,7 @@ namespace App.Catalog.Data
             builder.Entity<ProductCategory>().HasIndex(b => b.Order);
 
             builder.Entity<Merchant>().ToTable("Catalog_Merchant");
+            builder.Entity<Merchant>().Property(x => x.LogoBackgroundColor).HasMaxLength(7).HasDefaultValue("#FFFFFF");
             builder.Entity<Merchant>().HasIndex(b => b.Lat);
             builder.Entity<Merchant>().HasIndex(b => b.Lng);
 

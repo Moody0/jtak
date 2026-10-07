@@ -59,6 +59,10 @@ namespace App.ApiControllers.V1
         [AllowAnonymous]
         public async Task<IActionResult> Download(string id, string token = "")
         {
+            if (id != null && (id.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || id.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                return Redirect(id);
+            }
             if (!IsSafeFileToken(id) || await IsPrivateReceipt(id)) return NotFound();
             try
             {
@@ -189,6 +193,10 @@ namespace App.ApiControllers.V1
                 if (string.IsNullOrWhiteSpace(id)) return NotFound();
 
                 var cleanId = id.Split(',')[0].Trim();
+                if (cleanId.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || cleanId.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Redirect(cleanId);
+                }
                 if (!IsSafeFileToken(cleanId) || await IsPrivateReceipt(cleanId)) return NotFound();
                 var physicalPath = FileHelper.GetPhysicalPath(_env, cleanId);
                 var ext = Path.GetExtension(cleanId)?.ToLower() ?? "";

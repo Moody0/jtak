@@ -95,7 +95,8 @@ namespace App.ApiControllers.V1.Admin
                 MinOrderAmount = x.MinOrderAmount,
                 WorkingHours = x.WorkingHours,
                 Address = x.Address,
-                Photo = x.Photo
+                LogoBackgroundColor = x.LogoBackgroundColor,
+                    Photo = x.Photo
             }, x => x.DeletionDate == null && (!kind.HasValue || x.MerchantKind == kind.Value) && (!active.HasValue || x.Active == active.Value));
             return list;
         }
@@ -161,6 +162,7 @@ namespace App.ApiControllers.V1.Admin
                     MinOrderAmount = x.MinOrderAmount,
                     WorkingHours = x.WorkingHours,
                     Address = x.Address,
+                    LogoBackgroundColor = x.LogoBackgroundColor,
                     Photo = x.Photo
                 })
                 .ToArrayAsync();
@@ -212,7 +214,8 @@ namespace App.ApiControllers.V1.Admin
                 MinOrderAmount = x.MinOrderAmount,
                 WorkingHours = x.WorkingHours,
                 Address = x.Address,
-                Photo = x.Photo
+                LogoBackgroundColor = x.LogoBackgroundColor,
+                    Photo = x.Photo
             });
         }
 
@@ -240,6 +243,7 @@ namespace App.ApiControllers.V1.Admin
                 ShortDescription = item.ShortDescription,
                 Description = item.Description,
                 Photo = item.Photo,
+                LogoBackgroundColor = item.LogoBackgroundColor?.ToUpperInvariant() ?? "#FFFFFF",
                 OwnerName = !string.IsNullOrWhiteSpace(item.OwnerName) ? item.OwnerName : item.Owner,
                 IBAN1Title = item.IBAN1Title,
                 IBAN1 = item.IBAN1,
@@ -323,6 +327,8 @@ namespace App.ApiControllers.V1.Admin
             entity.ShortDescription = item.ShortDescription;
             entity.Description = item.Description;
             entity.Photo = item.Photo;
+            if (item.LogoBackgroundColor != null)
+                entity.LogoBackgroundColor = item.LogoBackgroundColor.ToUpperInvariant();
             entity.OwnerName = !string.IsNullOrWhiteSpace(item.OwnerName) ? item.OwnerName : (item.Owner ?? entity.OwnerName);
             entity.IBAN1Title = item.IBAN1Title ?? entity.IBAN1Title;
             entity.IBAN1 = item.IBAN1;
@@ -471,6 +477,9 @@ namespace App.ApiControllers.V1.Admin
         private static string ValidateMerchant(MerchantDto item)
         {
             if (string.IsNullOrWhiteSpace(item?.Title)) return "اسم المتجر مطلوب.";
+            if (item.LogoBackgroundColor != null &&
+                !System.Text.RegularExpressions.Regex.IsMatch(item.LogoBackgroundColor, "^#[0-9A-Fa-f]{6}$"))
+                return "اختر لون خلفية صالحًا مثل #FFFFFF.";
             if (item.DeliveryFee < 0 || item.MinOrderAmount < 0 || item.ProfitOutOfMerchantPricePercent < 0)
                 return "رسوم التوصيل والحد الأدنى ونسبة جيتك لا يمكن أن تكون سالبة.";
             if (item.Lat < -90 || item.Lat > 90 || item.Lng < -180 || item.Lng > 180)
