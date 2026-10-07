@@ -27,7 +27,7 @@
 </section>
 
 <ng-template #roleModal>
-  <form [formGroup]="roleForm" (ngSubmit)="saveRole()">
+  <form class="staff-modal-form" [formGroup]="roleForm" (ngSubmit)="saveRole()">
     <div class="modal-header"><h2 class="modal-title">{{ editingId ? t('تعديل الدور والصلاحيات', 'Edit role & permissions') : t('إنشاء دور جديد', 'Create role') }}</h2><button type="button" class="btn-close" [attr.aria-label]="t('إغلاق', 'Close')" [disabled]="saving" (click)="close()"></button></div>
     <div class="modal-body staff-modal">
       <div class="alert alert-danger" role="alert" *ngIf="modalError">{{ modalError }}</div>
@@ -42,7 +42,7 @@
 </ng-template>
 
 <ng-template #accountModal>
-  <form [formGroup]="accountForm" (ngSubmit)="saveAccount()">
+  <form class="staff-modal-form" [formGroup]="accountForm" (ngSubmit)="saveAccount()">
     <div class="modal-header"><h2 class="modal-title">{{ editingId ? t('تعديل حساب الموظف', 'Edit staff account') : t('إضافة موظف', 'Add staff member') }}</h2><button type="button" class="btn-close" [disabled]="saving" (click)="close()" [attr.aria-label]="t('إغلاق', 'Close')"></button></div>
     <div class="modal-body staff-modal"><div class="alert alert-danger" role="alert" *ngIf="modalError">{{ modalError }}</div>
       <label for="staff-name">{{ t('اسم الموظف', 'Full name') }} *</label><input id="staff-name" class="form-control" formControlName="fullName" maxlength="120" autocomplete="name" [class.is-invalid]="accountForm.controls.fullName.touched && accountForm.controls.fullName.invalid"><div class="invalid-feedback">{{ t('اسم الموظف مطلوب.', 'Full name is required.') }}</div>
