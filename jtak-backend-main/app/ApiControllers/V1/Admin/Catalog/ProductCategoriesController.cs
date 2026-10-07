@@ -218,15 +218,32 @@ namespace App.ApiControllers.V1.Admin
         [Route("{id}")]
         public async Task<ActionResult<bool>> Delete(int id)
         {
-            var entity = await _service.Queryable().Include(x => x.Products).FirstOrDefaultAsync(x => x.Id == id);
+            using var transaction = await _unitOfWork.Context.Database
+                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            var entity = await _service.Queryable().FirstOrDefaultAsync(x => x.Id == id);
             if (entity == null)
                 return BadRequest(ApiErr.Create("Not Found"));
 
-            if (await _service.Queryable().AnyAsync(x => x.ParentId == id && x.DeletionDate == null))
-                return BadRequest(ApiErr.Create("انقل أو احذف التصنيفات الفرعية أولاً قبل حذف التصنيف الرئيسي."));
-
-            if (entity.Products.Any(x => x.DeletionDate == null))
+            // Include deleted descendants when checking references: deleting a
+            // category must never hide a remaining product in its subtree.
+            var rows = await _service.Queryable().Select(x => new { x.Id, x.ParentId }).ToArrayAsync();
+            var ids = new System.Collections.Generic.HashSet<int> { id };
+            bool added;
+            do
             {
+                added = false;
+                foreach (var row in rows)
+                    if (row.ParentId.HasValue && ids.Contains(row.ParentId.Value)) added |= ids.Add(row.Id);
+            } while (added);
+
+            var blockingCategories = await _service.Queryable().Where(x => ids.Contains(x.Id))
+                .Select(x => new { x.Title, ProductCount = x.Products.Count(p => p.DeletionDate == null) })
+                .Where(x => x.ProductCount > 0).ToArrayAsync();
+            if (blockingCategories.Length > 0)
+            {
+                var reason = "لا يمكن حذف التصنيف لوجود منتجات مرتبطة به أو بتصنيفاته الفرعية: " +
+                    string.Join("، ", blockingCategories.Select(x => $"{x.Title} ({x.ProductCount})")) +
+                    ". يشمل ذلك المنتجات المعطلة أو غير الظاهرة للعملاء. انقلها إلى تصنيف آخر أولاً.";
                 if (_auditService != null)
                 {
                     await _auditService.LogAsync(new AdminAuditLogEntry
@@ -237,14 +254,17 @@ namespace App.ApiControllers.V1.Admin
                         EntityId = id.ToString(),
                         Description = $"فشل حذف التصنيف {entity.Title} لاحتوائه على منتجات",
                         Result = "Failed",
-                        FailureReason = "يجب حذف المنتجات المرتبطة بالتصنيف أولاً."
+                        FailureReason = reason
                     });
                 }
-                return BadRequest(ApiErr.Create("Delete Products First"));
+                return BadRequest(ApiErr.Create(reason));
             }
 
-            _service.Delete(entity);
+            var categoriesToDelete = await _service.Queryable()
+                .Where(x => ids.Contains(x.Id) && x.DeletionDate == null).ToArrayAsync();
+            foreach (var category in categoriesToDelete) _service.Delete(category);
             await _unitOfWork.SaveChangesAsync();
+            await transaction.CommitAsync();
             _logger.LogInformation("Deleted ProductCategory {0} #{1}", entity.GetType().Name, entity.Id);
 
             _cache.Remove("ProductCategories");
@@ -259,8 +279,9 @@ namespace App.ApiControllers.V1.Admin
                     Action = "DeleteCategory",
                     EntityType = "ProductCategory",
                     EntityId = id.ToString(),
-                    Description = $"حذف التصنيف: {entity.Title}",
-                    Result = "Success"
+                    Description = $"حذف التصنيف وتصنيفاته الفرعية الفارغة: {entity.Title}",
+                    Result = "Success",
+                    BeforeState = categoriesToDelete.Select(x => new { x.Id, x.Title, x.ParentId }).ToArray()
                 });
             }
 

@@ -1643,6 +1643,10 @@ namespace App.ApiControllers.V1.Admin
         public async Task<ActionResult<List<OrderStatusHistoryDto>>> GetHistory(int id)
         {
             var logs = await _service.GetLogs(id);
+            var deliveryFee = await _service.Queryable().AsNoTracking()
+                .Where(x => x.Id == id)
+                .Select(x => x.DeliveryFee)
+                .FirstOrDefaultAsync();
             var result = new List<OrderStatusHistoryDto>();
             foreach (var l in logs)
             {
@@ -1664,7 +1668,8 @@ namespace App.ApiControllers.V1.Admin
                     CreatedBy = l.CreatedBy ?? "System",
                     DriverId = l.DriverId,
                     DriverName = driverName,
-                    Details = l.OrdreDetails
+                    Details = l.OrdreDetails,
+                    DeliveryFee = deliveryFee
                 });
             }
             return Ok(result);
@@ -2108,5 +2113,6 @@ namespace App.ApiControllers.V1.Admin
         public Guid? DriverId { get; set; }
         public string DriverName { get; set; }
         public string Details { get; set; }
+        public decimal DeliveryFee { get; set; }
     }
 }

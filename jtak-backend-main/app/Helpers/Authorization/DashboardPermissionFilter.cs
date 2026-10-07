@@ -46,7 +46,10 @@ namespace App.Helpers.Authorization
                 allowed |= access.Has("orders.view") || access.Has("finance.view") || access.Has("catalog.view");
             if (access.CanAccess && read && controller == "Settings" && name == "GetCatalogDefaults")
                 allowed |= access.Has("catalog.view");
-            if (access.CanAccess && read && ((controller == "Merchants" && name == "GetAll") || (controller == "ProductCategories" && name == "Get")))
+            // Storefront editors need reference data for tile/banner targets, but cannot edit the catalog.
+            if (access.CanAccess && read && ((controller == "Merchants" && name == "GetAll") ||
+                (controller == "ProductCategories" && name == "Get") ||
+                (controller == "RestaurantCategories" && name == "GetConfig")))
                 allowed |= access.Has("storefront.view");
 
             if (!allowed) { context.Result = new ObjectResult(new { message = "ليس لديك الصلاحية للوصول إلى هذا القسم أو تنفيذ هذا الإجراء." }) { StatusCode = 403 }; return; }
@@ -76,7 +79,7 @@ namespace App.Helpers.Authorization
             "Orders" or "ErrandRequests" => "orders",
             "SupportMessages" or "ProductReviews" or "MerchantReviews" => "support",
             "Products" or "Merchants" or "ProductCategories" or "RestaurantCategories" or "Batches" or "Tags" => "catalog",
-            "HomeCategories" or "PopularProducts" or "MarketBestSelling" or "Banners" or "Testimonials" => "storefront",
+            "HomeCategories" or "PopularProducts" or "MarketBestSelling" or "Banner" or "Banners" or "Testimonials" => "storefront",
             "Bills" or "Balances" or "Payments" or "CaptainSettlements" or "FleetReconciliation" or "MerchantReconciliation" or "DriverCashAdvances" or "SettlementRequests" or "SettlementHistory" or "ProductionReconciliation" => "finance",
             "Users" => "users",
             "Notifications" => "communications",
