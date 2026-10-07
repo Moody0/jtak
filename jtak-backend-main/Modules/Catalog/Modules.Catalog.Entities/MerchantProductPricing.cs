@@ -14,7 +14,11 @@ namespace Modules.Catalog.Entities
             // Keep all precision until conversion to the final local amounts.
             var gross = exactBaseLocal * (1m + markupPercent / 100m);
             var price = Local(gross);
-            var finalPrice = Math.Max(merchantPrice, Local(gross * (1m - discountPercent / 100m)));
+            // Both percentages use the supplier's base. Discounts consume only
+            // platform markup; a 10% markup on 550 is 55, not 10% of 605.
+            var appliedDiscountPercent = Math.Min(discountPercent, markupPercent);
+            var finalPrice = Math.Max(merchantPrice,
+                Local(exactBaseLocal * (1m + (markupPercent - appliedDiscountPercent) / 100m)));
             return (merchantPrice, price, finalPrice, Math.Max(0m, price - finalPrice));
         }
     }

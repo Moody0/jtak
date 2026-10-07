@@ -21,7 +21,8 @@ namespace App.Shared.Services.Pricing
             decimal captainEarning = 0m,
             string currency = "SYP",
             bool commissionIsMarkup = false,
-            bool commissionIsPercentageOfGross = false)
+            bool commissionIsPercentageOfGross = false,
+            bool commissionUsesMerchantBase = false)
         {
             var dtos = (orderDetails ?? Enumerable.Empty<OrderDetail>())
                 .Select(d => d.ToDto())
@@ -37,7 +38,8 @@ namespace App.Shared.Services.Pricing
                 captainEarning,
                 currency,
                 commissionIsMarkup,
-                commissionIsPercentageOfGross);
+                commissionIsPercentageOfGross,
+                commissionUsesMerchantBase);
         }
 
         public CanonicalOrderMoneyDto CalculateOrderMoney(
@@ -50,7 +52,8 @@ namespace App.Shared.Services.Pricing
             decimal captainEarning = 0m,
             string currency = "SYP",
             bool commissionIsMarkup = false,
-            bool commissionIsPercentageOfGross = false)
+            bool commissionIsPercentageOfGross = false,
+            bool commissionUsesMerchantBase = false)
         {
             currency = string.IsNullOrWhiteSpace(currency) ? "SYP" : currency.ToUpperInvariant();
             var isSyp = currency == "SYP";
@@ -114,6 +117,13 @@ namespace App.Shared.Services.Pricing
                     merchantComm = merchantGross;
                     merchantPayable = 0m;
                 }
+                else if (commissionUsesMerchantBase)
+                {
+                    merchantPayable = mg.Sum(d => RoundCurrency(d.Quantity *
+                        MerchantBasePrice(d.SingleMerchantProfit, d.SinglePrice, commRate), currency));
+                    merchantPayable = Math.Min(merchantGross, Math.Max(0m, merchantPayable));
+                    merchantComm = merchantGross - merchantPayable;
+                }
                 else if (commissionIsPercentageOfGross)
                 {
                     // The merchant contract is a percentage of the billed sale
@@ -157,7 +167,7 @@ namespace App.Shared.Services.Pricing
 
             return new CanonicalOrderMoneyDto
             {
-                Version = commissionIsPercentageOfGross ? 3 : commissionIsMarkup ? 2 : 1,
+                Version = commissionUsesMerchantBase ? 4 : commissionIsPercentageOfGross ? 3 : commissionIsMarkup ? 2 : 1,
                 ProductSubtotal = productSubtotal,
                 DeliveryFee = roundedDeliveryFee,
                 OtherCharges = 0m,
@@ -185,7 +195,8 @@ namespace App.Shared.Services.Pricing
             PaymentMethod paymentMethod,
             string currency = "SYP",
             bool commissionIsMarkup = false,
-            bool commissionIsPercentageOfGross = false)
+            bool commissionIsPercentageOfGross = false,
+            bool commissionUsesMerchantBase = false)
         {
             currency = string.IsNullOrWhiteSpace(currency) ? "SYP" : currency.ToUpperInvariant();
 
@@ -206,6 +217,9 @@ namespace App.Shared.Services.Pricing
             bool isPlatformOwned = active.Count > 0 && active.All(d => d.IsPlatformOwnedSnapshot);
             decimal payable = isPlatformOwned
                 ? 0m
+                : commissionUsesMerchantBase
+                    ? Math.Min(gross, Math.Max(0m, active.Sum(d => RoundCurrency(d.Quantity *
+                        MerchantBasePrice(d.SingleMerchantProfit, d.SinglePrice, commissionRatePercent), currency))))
                 : commissionIsPercentageOfGross
                     ? gross - Math.Min(gross, RoundCommission(
                         gross * (Math.Max(0m, commissionRatePercent) / 100m)))
@@ -236,6 +250,14 @@ namespace App.Shared.Services.Pricing
 
             // Standard decimal currencies (USD, EUR, TRY): 2 decimal places
             return Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal MerchantBasePrice(decimal savedBase, decimal priceBeforeDiscount, decimal markupPercent)
+        {
+            // The immutable checkout quote wins. Only recover a missing base
+            // from the pre-discount product price; delivery fees are excluded.
+            return savedBase > 0m ? savedBase :
+                priceBeforeDiscount / (1m + Math.Max(0m, markupPercent) / 100m);
         }
 
         private static decimal RoundCommission(decimal amount)

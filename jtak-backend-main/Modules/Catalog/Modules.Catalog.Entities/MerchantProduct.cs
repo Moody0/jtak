@@ -30,7 +30,7 @@ namespace Modules.Catalog.Entities
         /// </summary>
         public decimal Discount { get; set; }
 
-        /// <summary>Requested customer discount, funded only from platform markup.</summary>
+        /// <summary>Discount percent of the supplier base, funded only from platform markup.</summary>
         public decimal? DiscountPercent { get; set; }
 
         /// <summary>

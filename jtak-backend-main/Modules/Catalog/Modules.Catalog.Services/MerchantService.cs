@@ -262,7 +262,6 @@ namespace Modules.Catalog.Services
                 products = Array.Empty<MerchantProductAssignDto>();
 
             var usdRate = await GetUsdRate();
-
             foreach (var mid in mids)
             {
                 var merchant = await Queryable().FirstOrDefaultAsync(x => x.Id == mid);
@@ -336,12 +335,16 @@ namespace Modules.Catalog.Services
         /// Reconciles a row's dollar base with its stored local price after a
         /// write. A caller that supplies a dollar price is quoting in dollars,
         /// so the local price is derived from it. A caller that only supplies a
-        /// local price for a row that was already dollar-quoted is overriding it
-        /// by hand, and the base is recomputed from that figure so the next
-        /// exchange rate change does not silently undo the override.
+        /// local price is quoting in SYP, so the USD reference is cleared and
+        /// subsequent exchange-rate changes leave that local quote alone.
         /// </summary>
         private static void ApplyUsdPricing(MerchantProduct mp, decimal? priceUsd, decimal usdRate)
         {
+            if (!priceUsd.HasValue)
+            {
+                mp.PriceUsd = null;
+                return;
+            }
             if (usdRate <= 0)
                 return;
 
@@ -349,10 +352,6 @@ namespace Modules.Catalog.Services
             {
                 mp.PriceUsd = priceUsd;
                 mp.MerchantPrice = ToLocalPrice(priceUsd.Value, usdRate);
-            }
-            else if (mp.PriceUsd.HasValue)
-            {
-                mp.PriceUsd = mp.MerchantPrice / usdRate;
             }
         }
 
@@ -438,7 +437,6 @@ namespace Modules.Catalog.Services
                 newProducts = Array.Empty<MerchantProductPriceDto>();
 
             var merchantProducts = await _merchantProductRepo.Queryable().Where(x => mids.Contains(x.MerchantId)).ToArrayAsync();
-            var usdRate = await GetUsdRate();
 
             foreach (var mid in mids)
             {
@@ -451,15 +449,19 @@ namespace Modules.Catalog.Services
                     var existing = midMerchantProducts.FirstOrDefault(x => x.ProductId == np.ProductId);
                     if (existing != null)
                     {
-                        if (existing.MerchantPrice != np.MerchantPrice)
+                        if (existing.MerchantPrice != np.MerchantPrice || existing.PriceUsd.HasValue)
                         {
                             existing.MerchantPrice = np.MerchantPrice;
-                            ApplyUsdPricing(existing, null, usdRate);
+                            // This endpoint receives an explicit SYP quote from
+                            // the merchant app. It must not be repriced with USD.
+                            existing.PriceUsd = null;
+                            existing.OriginalPrice = null;
                             _cache.InvalidateValue($"ProductPrices_{np.ProductId}");
                             _cache.InvalidateValue($"MerchantProduct_{mid}_{np.ProductId}");
                         }
                         existing.ProfitOutOfMerchantPricePercent = commissionRate;
                         existing.AdditionalProfitPercent = 0m;
+                        existing.DiscountPercent ??= 0m;
                         existing.MaxOrderQuantity = np.MaxOrderQuantity;
                     }
                     else
@@ -471,6 +473,7 @@ namespace Modules.Catalog.Services
                             MerchantPrice = np.MerchantPrice,
                             ProfitOutOfMerchantPricePercent = commissionRate,
                             AdditionalProfitPercent = 0m,
+                            DiscountPercent = 0m,
                             MaxOrderQuantity = np.MaxOrderQuantity
                         });
                         _cache.InvalidateValue($"ProductPrices_{np.ProductId}");

@@ -111,7 +111,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             var dtos = orderDetails.Select(x => x.ToDto()).ToArray();
             var money = CalculateCanonicalMoney(dtos, deliveryFee, Modules.Orders.Entities.PaymentMethod.PayOnDelivery,
                 captainEarning: captainEarning,
-                commissionIsPercentageOfGross: true);
+                commissionUsesMerchantBase: true);
             if (money != null)
             {
                 money.OriginalDeliveryFee = deliveryQuote.OriginalDeliveryFee;
@@ -192,7 +192,8 @@ namespace App.ApiControllers.V1.Customer.Orders
                             : null;
                         var ordMoney = OrderMoneySnapshot.Deserialize(ord.MoneySnapshotJson)
                             ?? CalculateCanonicalMoney(ordDetails, ord.DeliveryFee, ord.PaymentMethod, ord.CaptainEarning,
-                                ord.MoneySnapshotVersion == 2, ord.MoneySnapshotVersion >= 3);
+                                ord.MoneySnapshotVersion == 2, ord.MoneySnapshotVersion == 3,
+                                commissionUsesMerchantBase: ord.MoneySnapshotVersion >= 4);
 
                         orderDtos.Add(new OrderDto
                         {
@@ -330,7 +331,7 @@ namespace App.ApiControllers.V1.Customer.Orders
             var detailDtos = orderDetails.Select(x => x.ToDto()).ToArray();
             var money = CalculateCanonicalMoney(detailDtos, deliveryFee, m.PaymentMethod,
                 captainEarning: captainEarning,
-                commissionIsPercentageOfGross: true);
+                commissionUsesMerchantBase: true);
             if (money != null)
             {
                 money.OriginalDeliveryFee = deliveryQuote.OriginalDeliveryFee;
@@ -357,7 +358,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                 var restDetailDtos = restDetails.Select(x => x.ToDto()).ToArray();
                 var restMoney = CalculateCanonicalMoney(restDetailDtos, restDeliveryFee, m.PaymentMethod,
                     captainEarning: restCaptainEarning,
-                    commissionIsPercentageOfGross: true);
+                    commissionUsesMerchantBase: true);
                 if (restMoney != null)
                 {
                     restMoney.OriginalDeliveryFee = restDeliveryQuote.OriginalDeliveryFee;
@@ -375,7 +376,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                 var marketDetailDtos = marketDetails.Select(x => x.ToDto()).ToArray();
                 var marketMoney = CalculateCanonicalMoney(marketDetailDtos, marketDeliveryFee, m.PaymentMethod,
                     captainEarning: marketCaptainEarning,
-                    commissionIsPercentageOfGross: true);
+                    commissionUsesMerchantBase: true);
                 if (marketMoney != null)
                 {
                     marketMoney.OriginalDeliveryFee = marketDeliveryQuote.OriginalDeliveryFee;
@@ -399,7 +400,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                     CustomerRatePerKm = restDeliveryQuote.CustomerRatePerKm,
                     OriginalDeliveryFee = restDeliveryQuote.OriginalDeliveryFee,
                     CaptainEarning = restMoney?.CaptainEarning ?? restCaptainEarning,
-                    MoneySnapshotVersion = restMoney?.Version ?? 3,
+                    MoneySnapshotVersion = restMoney?.Version ?? 4,
                     MoneySnapshotJson = OrderMoneySnapshot.Serialize(restMoney),
                     OrderStatus = OrderStatus.Success,
                     PurchaseDate = DateTime.UtcNow,
@@ -422,7 +423,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                     CustomerRatePerKm = marketDeliveryQuote.CustomerRatePerKm,
                     OriginalDeliveryFee = marketDeliveryQuote.OriginalDeliveryFee,
                     CaptainEarning = marketMoney?.CaptainEarning ?? marketCaptainEarning,
-                    MoneySnapshotVersion = marketMoney?.Version ?? 3,
+                    MoneySnapshotVersion = marketMoney?.Version ?? 4,
                     MoneySnapshotJson = OrderMoneySnapshot.Serialize(marketMoney),
                     OrderStatus = OrderStatus.Success,
                     PurchaseDate = DateTime.UtcNow,
@@ -593,7 +594,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                 CustomerRatePerKm = deliveryQuote.CustomerRatePerKm,
                 OriginalDeliveryFee = deliveryQuote.OriginalDeliveryFee,
                 CaptainEarning = money?.CaptainEarning ?? captainEarning,
-                MoneySnapshotVersion = money?.Version ?? 3,
+                MoneySnapshotVersion = money?.Version ?? 4,
                 MoneySnapshotJson = OrderMoneySnapshot.Serialize(money),
                 OrderStatus = OrderStatus.Success,
                 PurchaseDate = DateTime.UtcNow,
@@ -707,8 +708,8 @@ namespace App.ApiControllers.V1.Customer.Orders
                         var existingDetails = existingOrder.OrderDetails?.Select(d => d.ToDto()).ToArray() ?? Array.Empty<OrderDetailDto>();
                         var existingMoney = OrderMoneySnapshot.Deserialize(existingOrder.MoneySnapshotJson)
                             ?? CalculateCanonicalMoney(existingDetails, existingOrder.DeliveryFee, existingOrder.PaymentMethod,
-                                existingOrder.CaptainEarning, existingOrder.MoneySnapshotVersion == 2,
-                                existingOrder.MoneySnapshotVersion >= 3);
+                                existingOrder.CaptainEarning, existingOrder.MoneySnapshotVersion == 2, existingOrder.MoneySnapshotVersion == 3,
+                                commissionUsesMerchantBase: existingOrder.MoneySnapshotVersion >= 4);
                         var existingMerchant = existingDetails.Length > 0
                             ? await _merchantService.FindAsync(existingDetails[0].MerchantId) : null;
 
@@ -1005,7 +1006,8 @@ namespace App.ApiControllers.V1.Customer.Orders
             Modules.Orders.Entities.PaymentMethod paymentMethod,
             decimal? captainEarning = null,
             bool? commissionIsMarkup = null,
-            bool commissionIsPercentageOfGross = false)
+            bool commissionIsPercentageOfGross = false,
+            bool commissionUsesMerchantBase = false)
         {
             var materialized = (details ?? Enumerable.Empty<OrderDetailDto>()).ToArray();
             var merchantContracts = materialized
@@ -1019,7 +1021,7 @@ namespace App.ApiControllers.V1.Customer.Orders
                 })
                 .ToArray();
 
-            return _moneyCalculationService?.CalculateOrderMoney(
+            return (_moneyCalculationService ?? new OrderMoneyCalculationService()).CalculateOrderMoney(
                 materialized,
                 deliveryFee,
                 paymentMethod,
@@ -1027,7 +1029,8 @@ namespace App.ApiControllers.V1.Customer.Orders
                 captainEarning: captainEarning ?? deliveryFee,
                 currency: "SYP",
                 commissionIsMarkup: commissionIsMarkup ?? true,
-                commissionIsPercentageOfGross: commissionIsPercentageOfGross);
+                commissionIsPercentageOfGross: commissionIsPercentageOfGross,
+                commissionUsesMerchantBase: commissionUsesMerchantBase);
         }
 
         private decimal CalculateCaptainEarningForDetails(

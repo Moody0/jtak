@@ -215,7 +215,8 @@ namespace App.ApiControllers.V1.Delivery
                     CaptainEarning = x.CaptainEarning,
                     CourierMatchingDeadlineAtUtc = x.CourierMatchingDeadlineAtUtc,
                     Money = (!string.IsNullOrWhiteSpace(x.MoneySnapshotJson) ? OrderMoneySnapshot.Deserialize(x.MoneySnapshotJson) : null) ?? x.Money ?? CalculateCanonicalMoney(x.OrderDetails, x.DeliveryFee, x.PaymentMethod,
-                        x.CaptainEarning, x.MoneySnapshotVersion == 2, x.MoneySnapshotVersion >= 3),
+                        x.CaptainEarning, x.MoneySnapshotVersion == 2, x.MoneySnapshotVersion == 3,
+                        commissionUsesMerchantBase: x.MoneySnapshotVersion >= 4),
                     OrderDetails = groupedMerchants
                 };
             }).ToArray();
@@ -442,7 +443,8 @@ namespace App.ApiControllers.V1.Delivery
                     x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).ToArray();
 
                 var money = CalculateCanonicalMoney(details?.Select(x => x.ToDto()), order.DeliveryFee, order.PaymentMethod,
-                    order.CaptainEarning, order.MoneySnapshotVersion == 2, order.MoneySnapshotVersion >= 3);
+                    order.CaptainEarning, order.MoneySnapshotVersion == 2, order.MoneySnapshotVersion == 3,
+                        commissionUsesMerchantBase: order.MoneySnapshotVersion >= 4);
                 projectedCod = money?.CashToCollect ?? details?.Sum(x => x.Quantity * x.SingleFinalPrice) ?? 0m;
             }
 
@@ -767,30 +769,11 @@ namespace App.ApiControllers.V1.Delivery
                 ? merchantShippingStartedOrderDetails.FirstOrDefault()?.CommissionRatePercent ?? 0m
                 : merchant?.ProfitOutOfMerchantPricePercent ?? 0m;
 
-            var billCalc = _moneyCalculationService != null
-                ? _moneyCalculationService.CalculateMerchantBill(merchantShippingStartedOrderDetails, commissionRate,
+            var billCalc = (_moneyCalculationService ?? new OrderMoneyCalculationService())
+                .CalculateMerchantBill(merchantShippingStartedOrderDetails, commissionRate,
                     order.PaymentMethod, commissionIsMarkup: order.MoneySnapshotVersion == 2,
-                    commissionIsPercentageOfGross: order.MoneySnapshotVersion >= 3)
-                : new MerchantSplitCalculation
-                {
-                    GrossAmount = merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity),
-                    PlatformCommission = order.MoneySnapshotVersion >= 3
-                        ? Math.Min(merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity),
-                            Math.Round(merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * Math.Max(0m, commissionRate) / 100m, 2, MidpointRounding.AwayFromZero))
-                        : order.MoneySnapshotVersion == 2
-                        ? (merchantShippingStartedOrderDetails.All(d => d.IsPlatformOwnedSnapshot)
-                            ? merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity)
-                            : merchantShippingStartedOrderDetails.Sum(d => (d.SingleFinalPrice - d.SingleMerchantProfit) * d.Quantity))
-                        : (commissionRate > 0 ? Math.Round(merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * (commissionRate / 100m), 2) : 0m),
-                    MerchantPayable = order.MoneySnapshotVersion >= 3
-                        ? merchantShippingStartedOrderDetails.All(d => d.IsPlatformOwnedSnapshot) ? 0m
-                            : merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity) - Math.Min(
-                                merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity),
-                                Math.Round(merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * Math.Max(0m, commissionRate) / 100m, 2, MidpointRounding.AwayFromZero))
-                        : order.MoneySnapshotVersion == 2
-                        ? (merchantShippingStartedOrderDetails.All(d => d.IsPlatformOwnedSnapshot) ? 0m : merchantShippingStartedOrderDetails.Sum(d => d.SingleMerchantProfit * d.Quantity))
-                        : merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity) - (commissionRate > 0 ? Math.Round(merchantShippingStartedOrderDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * (commissionRate / 100m), 2) : 0m)
-                };
+                    commissionIsPercentageOfGross: order.MoneySnapshotVersion == 3,
+                commissionUsesMerchantBase: order.MoneySnapshotVersion >= 4);
             var totalAmount = billCalc.GrossAmount;
             var jtakAmount = billCalc.PlatformCommission;
             var merchantAmount = billCalc.MerchantPayable;
@@ -1145,7 +1128,8 @@ namespace App.ApiControllers.V1.Delivery
             var priorMoney = OrderMoneySnapshot.Deserialize(currentOrder.MoneySnapshotJson);
             var money = CalculateCanonicalMoney(activeDetails.Select(d => d.ToDto()), currentOrder.DeliveryFee,
                 currentOrder.PaymentMethod, currentOrder.CaptainEarning, currentOrder.MoneySnapshotVersion == 2,
-                currentOrder.MoneySnapshotVersion >= 3, priorMoney?.PromotionDiscount ?? 0m);
+                currentOrder.MoneySnapshotVersion == 3, priorMoney?.PromotionDiscount ?? 0m,
+                commissionUsesMerchantBase: currentOrder.MoneySnapshotVersion >= 4);
 
             decimal canonicalCashToCollect = isCod
                 ? (money?.CashToCollect ?? (activeDetails.Sum(x => x.Quantity * x.SingleFinalPrice) + currentOrder.DeliveryFee))
@@ -1211,7 +1195,7 @@ namespace App.ApiControllers.V1.Delivery
                             : null;
                         var commission = canonicalSplit != null
                             ? canonicalSplit.MerchantCommission
-                            : currentOrder.MoneySnapshotVersion == 2
+                            : currentOrder.MoneySnapshotVersion == 2 || currentOrder.MoneySnapshotVersion >= 4
                             ? (isPlatformOwned ? productGross : Math.Max(0m, productGross - Math.Min(productGross, detailGroup.Sum(x => x.Quantity * x.SingleMerchantProfit))))
                             : detailGroup.Any(x => x.CommissionRatePercent > 0m)
                                 ? Math.Min(productGross, snapshottedCommission)
@@ -1448,9 +1432,9 @@ namespace App.ApiControllers.V1.Delivery
             decimal captainEarning,
             bool commissionIsMarkup = false,
             bool commissionIsPercentageOfGross = false,
-            decimal promotionDiscount = 0m)
+            decimal promotionDiscount = 0m,
+            bool commissionUsesMerchantBase = false)
         {
-            if (_moneyCalculationService == null) return null;
             var items = (details ?? Enumerable.Empty<OrderDetailDto>()).ToArray();
             var contracts = items.GroupBy(x => x.MerchantId).Select(g => new MerchantCommissionInfo
             {
@@ -1459,14 +1443,15 @@ namespace App.ApiControllers.V1.Delivery
                 CommissionRatePercent = g.First().CommissionRatePercent,
                 IsDarkStore = g.First().IsPlatformOwnedSnapshot
             }).ToArray();
-            return _moneyCalculationService.CalculateOrderMoney(
+            return (_moneyCalculationService ?? new OrderMoneyCalculationService()).CalculateOrderMoney(
                 items, deliveryFee, paymentMethod,
                 merchantCommissionInfos: contracts,
                 promotionDiscount: promotionDiscount,
                 captainEarning: captainEarning,
                 currency: "SYP",
                 commissionIsMarkup: commissionIsMarkup,
-                commissionIsPercentageOfGross: commissionIsPercentageOfGross);
+                commissionIsPercentageOfGross: commissionIsPercentageOfGross,
+                commissionUsesMerchantBase: commissionUsesMerchantBase);
         }
 
 

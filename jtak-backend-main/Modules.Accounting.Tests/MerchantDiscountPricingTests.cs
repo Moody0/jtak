@@ -18,12 +18,13 @@ public class MerchantDiscountPricingTests
     [Theory]
     [InlineData(550, 10, 10, 550, 605, 550)]
     [InlineData(550, 10, 50, 550, 605, 550)]
-    [InlineData(550, 10, 5, 550, 605, 575)]
+    [InlineData(550, 10, 5, 550, 605, 578)]
+    [InlineData(550, 10, 9, 550, 605, 556)]
     [InlineData(500, 0, 10, 500, 500, 500)]
     [InlineData(550.49, 10, 0, 550, 606, 606)]
     [InlineData(550.5, 10, 0, 551, 606, 606)]
-    [InlineData(550.49, 10, 5, 550, 606, 575)]
-    public void QuoteRoundsOnlyFinalAmountsAndNeverUndercutsSupplier(decimal exactBase,
+    [InlineData(550.49, 10, 5, 550, 606, 578)]
+    public void QuoteDiscountUsesSupplierBaseAndNeverUndercutsSupplier(decimal exactBase,
         decimal markup, decimal percent, decimal vendor, decimal before, decimal after)
     {
         var quote = MerchantProductPricing.Calculate(exactBase, markup, percent);
@@ -95,7 +96,7 @@ public class MerchantDiscountPricingTests
         await service.RepriceUsdDenominatedProducts(rate);
         await AssertAllReads(service, 1100m, 1210m, 1100m);
         await service.SetMerchantPercent(27, 20m);
-        await AssertAllReads(service, 1100m, 1320m, 1188m);
+        await AssertAllReads(service, 1100m, 1320m, 1210m);
         assigned.MerchantPrice = 1100m; assigned.DiscountPercent = 0m; assigned.Discount = 0m;
         assigned.OriginalPrice = null;
         await service.AssignMerchantProducts(new[] { 27 }, new[] { assigned });

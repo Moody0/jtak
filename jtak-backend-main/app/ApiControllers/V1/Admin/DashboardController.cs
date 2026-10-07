@@ -72,6 +72,11 @@ namespace App.ApiControllers.V1.Admin
                 prod.ProductName = titles.TryGetValue(prod.ProductId, out var title) ? title : string.Empty;
             }
 
+            // Pickup creates a provisional invoice; a sale/payable is earned
+            // only after delivery. Match the finance and merchant summaries.
+            var earnedBills = _billService.Queryable().AsNoTracking()
+                .Where(x => x.IsAddedToDues);
+
             return new DashboardVm
             {
                 ProductsCount = await _service.Queryable().AsNoTracking()
@@ -79,10 +84,10 @@ namespace App.ApiControllers.V1.Admin
                 UsersCount = await _userManager.Users.AsNoTracking().CountAsync(x => x.IsActive),
                 OrdersCount = await _orderService.Queryable().AsNoTracking().CountAsync(x => x.OrderStatus == OrderStatus.Success),
                 BillsCount = await _billService.Queryable().AsNoTracking().CountAsync(),
-                TotalOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.TotalAmount)),
-                JTakOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.JTakAmount)),
-                JTakAdditionalOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.JTakAdditionalAmount)),
-                MerchantOrdersValue = ToAmount(await _billService.Queryable().AsNoTracking().SumAsync(x => (decimal?)x.MerchantAmount)),
+                TotalOrdersValue = ToAmount(await earnedBills.SumAsync(x => (decimal?)x.TotalAmount)),
+                JTakOrdersValue = ToAmount(await earnedBills.SumAsync(x => (decimal?)x.JTakAmount)),
+                JTakAdditionalOrdersValue = ToAmount(await earnedBills.SumAsync(x => (decimal?)x.JTakAdditionalAmount)),
+                MerchantOrdersValue = ToAmount(await earnedBills.SumAsync(x => (decimal?)x.MerchantAmount)),
                 TopProducts = topProds
 
             };

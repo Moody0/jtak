@@ -705,7 +705,7 @@ namespace Modules.Accounting.Tests
 
         [Theory]
         [InlineData(550, 10, 10, 605, 550, 55)]
-        [InlineData(10000, 10, 5, 11000, 10450, 550)]
+        [InlineData(10000, 10, 5, 11000, 10500, 500)]
         [InlineData(25000, 15, 20, 28750, 25000, 3750)]
         [InlineData(500, 0, 10, 500, 500, 0)]
         [InlineData(1000, 10, 0, 1100, 1100, 0)]

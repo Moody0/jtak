@@ -114,8 +114,9 @@ namespace Modules.Orders.Entities
         public decimal TotalMerchantGross { get; set; }
 
         /// <summary>
-        /// Total platform commission taken from merchant sales. New version-3
-        /// snapshots apply the contracted rate directly to billed merchant gross.
+        /// Platform share after discounts and cash-price rounding. Version 4
+        /// preserves the merchant's base quote and uses gross minus that quote.
+        /// Earlier snapshot versions retain their historical policy.
         /// </summary>
         public decimal TotalMerchantCommission { get; set; }
 

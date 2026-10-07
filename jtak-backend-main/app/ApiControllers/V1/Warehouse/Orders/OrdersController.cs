@@ -398,7 +398,8 @@ namespace App.ApiControllers.V1.Warehouse
                 captainEarning: order.MoneySnapshotVersion > 0 ? order.CaptainEarning : order.DeliveryFee,
                 currency: details.FirstOrDefault()?.Currency.ToString() ?? "SYP",
                 commissionIsMarkup: order.MoneySnapshotVersion == 2,
-                commissionIsPercentageOfGross: order.MoneySnapshotVersion >= 3);
+                commissionIsPercentageOfGross: order.MoneySnapshotVersion == 3,
+                commissionUsesMerchantBase: order.MoneySnapshotVersion >= 4);
         }
 
         /// <summary>

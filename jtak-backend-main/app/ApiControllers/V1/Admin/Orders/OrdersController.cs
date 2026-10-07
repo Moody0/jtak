@@ -495,7 +495,8 @@ namespace App.ApiControllers.V1.Admin
                 merchantCommissionInfos: commissions,
                 captainEarning: order.MoneySnapshotVersion > 0 ? order.CaptainEarning : order.DeliveryFee,
                 commissionIsMarkup: order.MoneySnapshotVersion == 2,
-                commissionIsPercentageOfGross: order.MoneySnapshotVersion >= 3);
+                commissionIsPercentageOfGross: order.MoneySnapshotVersion == 3,
+                commissionUsesMerchantBase: order.MoneySnapshotVersion >= 4);
         }
 
         /// <summary>
@@ -1284,32 +1285,11 @@ namespace App.ApiControllers.V1.Admin
                 var commissionRate = !string.IsNullOrWhiteSpace(order.MoneySnapshotJson)
                     ? midDetails.FirstOrDefault()?.CommissionRatePercent ?? 0m
                     : merchant?.ProfitOutOfMerchantPricePercent ?? 0m;
-                var billCalc = _moneyCalculationService != null
-                    ? _moneyCalculationService.CalculateMerchantBill(midDetails, commissionRate, order.PaymentMethod,
+                var billCalc = (_moneyCalculationService ?? new OrderMoneyCalculationService())
+                    .CalculateMerchantBill(midDetails, commissionRate, order.PaymentMethod,
                         commissionIsMarkup: order.MoneySnapshotVersion == 2,
-                        commissionIsPercentageOfGross: order.MoneySnapshotVersion >= 3)
-                    : new MerchantSplitCalculation
-                    {
-                        GrossAmount = midDetails.Sum(d => d.SingleFinalPrice * d.Quantity),
-                        PlatformCommission = order.MoneySnapshotVersion >= 3
-                            ? (midDetails.All(d => d.IsPlatformOwnedSnapshot)
-                                ? midDetails.Sum(d => d.SingleFinalPrice * d.Quantity)
-                                : Math.Min(midDetails.Sum(d => d.SingleFinalPrice * d.Quantity),
-                                    Math.Round(midDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * Math.Max(0m, commissionRate) / 100m, 2, MidpointRounding.AwayFromZero)))
-                            : order.MoneySnapshotVersion == 2
-                            ? (midDetails.All(d => d.IsPlatformOwnedSnapshot)
-                                ? midDetails.Sum(d => d.SingleFinalPrice * d.Quantity)
-                                : midDetails.Sum(d => (d.SingleFinalPrice - d.SingleMerchantProfit) * d.Quantity))
-                            : (commissionRate > 0 ? Math.Round(midDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * (commissionRate / 100m), 2) : 0m),
-                        MerchantPayable = order.MoneySnapshotVersion >= 3
-                            ? (midDetails.All(d => d.IsPlatformOwnedSnapshot) ? 0m
-                                : midDetails.Sum(d => d.SingleFinalPrice * d.Quantity) - Math.Min(
-                                    midDetails.Sum(d => d.SingleFinalPrice * d.Quantity),
-                                    Math.Round(midDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * Math.Max(0m, commissionRate) / 100m, 2, MidpointRounding.AwayFromZero)))
-                            : order.MoneySnapshotVersion == 2
-                            ? (midDetails.All(d => d.IsPlatformOwnedSnapshot) ? 0m : midDetails.Sum(d => d.SingleMerchantProfit * d.Quantity))
-                            : midDetails.Sum(d => d.SingleFinalPrice * d.Quantity) - (commissionRate > 0 ? Math.Round(midDetails.Sum(d => d.SingleFinalPrice * d.Quantity) * (commissionRate / 100m), 2) : 0m)
-                    };
+                        commissionIsPercentageOfGross: order.MoneySnapshotVersion == 3,
+                commissionUsesMerchantBase: order.MoneySnapshotVersion >= 4);
                 var totalAmount = billCalc.GrossAmount;
                 var jtakAmount = billCalc.PlatformCommission;
                 var merchantAmount = billCalc.MerchantPayable;

@@ -284,7 +284,8 @@ namespace App.ApiControllers.V1.Customer.Orders
                 merchantCommissionInfos: commissions,
                 captainEarning: captainEarning,
                 commissionIsMarkup: order.MoneySnapshotVersion == 2,
-                commissionIsPercentageOfGross: order.MoneySnapshotVersion >= 3);
+                commissionIsPercentageOfGross: order.MoneySnapshotVersion == 3,
+                commissionUsesMerchantBase: order.MoneySnapshotVersion >= 4);
         }
 
         /// <summary>

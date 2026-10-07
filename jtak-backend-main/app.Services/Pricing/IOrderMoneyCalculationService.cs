@@ -15,7 +15,8 @@ namespace App.Shared.Services.Pricing
             decimal captainEarning = 0m,
             string currency = "SYP",
             bool commissionIsMarkup = false,
-            bool commissionIsPercentageOfGross = false);
+            bool commissionIsPercentageOfGross = false,
+            bool commissionUsesMerchantBase = false);
 
         CanonicalOrderMoneyDto CalculateOrderMoney(
             IEnumerable<OrderDetailDto> orderDetails,
@@ -27,7 +28,8 @@ namespace App.Shared.Services.Pricing
             decimal captainEarning = 0m,
             string currency = "SYP",
             bool commissionIsMarkup = false,
-            bool commissionIsPercentageOfGross = false);
+            bool commissionIsPercentageOfGross = false,
+            bool commissionUsesMerchantBase = false);
 
         MerchantSplitCalculation CalculateMerchantBill(
             IEnumerable<OrderDetail> merchantDetails,
@@ -35,7 +37,8 @@ namespace App.Shared.Services.Pricing
             PaymentMethod paymentMethod,
             string currency = "SYP",
             bool commissionIsMarkup = false,
-            bool commissionIsPercentageOfGross = false);
+            bool commissionIsPercentageOfGross = false,
+            bool commissionUsesMerchantBase = false);
 
         decimal RoundCurrency(decimal amount, string currency = "SYP");
     }
