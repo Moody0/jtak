@@ -34,6 +34,7 @@ function appInitializer(authService: AuthService) {
     NgbModule,
     ToastrModule.forRoot({
       positionClass: 'toast-top-right',
+      preventDuplicates: true,
     }),
   ],
   providers: [

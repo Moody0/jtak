@@ -6,14 +6,49 @@
 
   .preview-card {
     transition: all 0.2s ease-in-out;
-    border-radius: 20px !important;
-    border-color: #ffe2cc !important;
-    padding: 16px !important;
-
+    display: flex;
+    min-height: 104px;
+    border-radius: 20px;
+    border: 1px solid #ebebef;
+    overflow: hidden;
   }
 
-  .logo-box {
-    border-radius: 16px !important;
+  .logo-panel {
+    width: 33%;
+    min-width: 76px;
+    max-width: 152px;
+    flex-shrink: 0;
+    border-left: 1px solid #ebebef;
+    padding: 10px;
+
+    img {
+      max-height: 84px;
+    }
+  }
+
+  .preview-details {
+    flex: 1;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .preview-title {
+    font-size: 16.5px;
+    line-height: 1.25;
+    margin-bottom: 6px;
+  }
+
+  .preview-subtitle {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .preview-action {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.2;
   }
 
   .min-w-0 {
@@ -28,6 +63,5 @@
     overflow: hidden;
     white-space: pre-line;
     overflow-wrap: anywhere;
-    line-height: 1.5;
   }
 }

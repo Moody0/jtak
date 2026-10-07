@@ -4,6 +4,10 @@ import { ToastrService } from 'ngx-toastr';
 import { SubSink } from 'subsink';
 import { TedallalSettingsService } from './services/tedallal-settings.service';
 import { TedallalCardSetting } from './models/tedallal-settings.model';
+import { HttpEventType, HttpResponse } from '@angular/common/http';
+import { finalize } from 'rxjs/operators';
+import { FilesService } from 'src/app/modules/shared/services/files.service';
+import { wasHttpErrorNotified } from 'src/app/interceptors/http-error-notifications';
 
 @Component({
   selector: 'app-tedallal-settings',
@@ -17,6 +21,8 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
   hasLoaded = false;
   loadError = false;
   failedLogoUrl = '';
+  isUploading = false;
+  uploadProgress = 0;
   private subs = new SubSink();
 
   readonly defaultValues: TedallalCardSetting = {
@@ -31,7 +37,8 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
     private fb: UntypedFormBuilder,
     private tedallalService: TedallalSettingsService,
     private toastr: ToastrService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private filesService: FilesService
   ) {}
 
   ngOnInit(): void {
@@ -50,6 +57,7 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
   }
 
   loadSettings(): void {
+    if (this.isLoading || this.isSaving || this.isUploading) return;
     this.failedLogoUrl = '';
     this.isLoading = true;
     this.loadError = false;
@@ -67,16 +75,18 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
         });
         this.cdr.markForCheck();
       },
-      error: () => {
+      error: (error) => {
         this.isLoading = false;
         this.loadError = true;
-        this.toastr.error('تعذر تحميل إعدادات خدمة تدلل', 'خطأ');
+        if (!wasHttpErrorNotified(error)) this.toastr.error('تعذر تحميل إعدادات خدمة تدلل', 'خطأ');
         this.cdr.markForCheck();
       },
     });
   }
 
   resetDefaults(): void {
+    if (this.isLoading || this.isSaving || this.isUploading || !this.hasLoaded || this.loadError) return;
+    this.failedLogoUrl = '';
     this.form.patchValue(this.defaultValues);
     this.form.markAsDirty();
     this.cdr.markForCheck();
@@ -87,8 +97,64 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  uploadLogo(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.isUploading || this.isSaving || this.isLoading || !this.hasLoaded || this.loadError) return;
+    if (!/\.(png|jpe?g|webp)$/i.test(file.name) ||
+        (file.type && !['image/png', 'image/jpeg', 'image/webp'].includes(file.type))) {
+      this.toastr.error('اختر صورة بصيغة PNG أو JPG أو WebP.');
+      return;
+    }
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      this.toastr.error('اختر صورة غير فارغة بحجم لا يتجاوز 5 ميجابايت.');
+      return;
+    }
+    const data = new FormData();
+    data.append('file[]', file);
+    this.isUploading = true;
+    this.uploadProgress = 0;
+    this.subs.sink = this.filesService.uploadFile(data, false).pipe(
+      finalize(() => {
+        this.isUploading = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: (uploadEvent) => {
+        if (uploadEvent.type === HttpEventType.UploadProgress) {
+          this.uploadProgress = uploadEvent.total
+            ? Math.round(100 * uploadEvent.loaded / uploadEvent.total) : 0;
+        } else if (uploadEvent instanceof HttpResponse) {
+          const token = typeof uploadEvent.body === 'string' ? uploadEvent.body.split(',')[0].trim() : '';
+          if (!token) {
+            this.toastr.error('تعذر الحصول على الصورة المرفوعة. أعد المحاولة.');
+            return;
+          }
+          this.failedLogoUrl = '';
+          // Store a public download URL, which the customer app already supports.
+          this.form.patchValue({ logoUrl: this.filesService.downloadFile(token) });
+          this.form.markAsDirty();
+          this.toastr.success('تم رفع الصورة. اضغط حفظ لتظهر في التطبيق.');
+        }
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        if (!wasHttpErrorNotified(error)) this.toastr.error('تعذر رفع الصورة. أعد المحاولة.');
+      },
+    });
+  }
+
+  removeLogo(): void {
+    if (this.isUploading || this.isSaving || this.isLoading || !this.hasLoaded || this.loadError) return;
+    this.failedLogoUrl = '';
+    this.form.patchValue({ logoUrl: '' });
+    this.form.markAsDirty();
+    this.cdr.markForCheck();
+  }
+
   save(): void {
-    if (this.form.invalid || this.isSaving) return;
+    if (this.form.invalid || this.isSaving || this.isUploading || this.isLoading || !this.hasLoaded || this.loadError) return;
 
     this.isSaving = true;
     const value: TedallalCardSetting = {
@@ -109,7 +175,7 @@ export class TedallalSettingsComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.isSaving = false;
         const msg = err?.error?.message || 'تعذر حفظ إعدادات خدمة تدلل';
-        this.toastr.error(msg, 'خطأ');
+        if (!wasHttpErrorNotified(err)) this.toastr.error(msg, 'خطأ');
         this.cdr.markForCheck();
       },
     });

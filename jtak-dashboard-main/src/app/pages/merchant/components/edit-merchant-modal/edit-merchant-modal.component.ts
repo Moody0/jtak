@@ -12,6 +12,7 @@ import { UserModel } from 'src/app/modules/auth';
 import { UsersService } from 'src/app/pages/users/services/users.service';
 import { User } from 'src/app/pages/users/models/user.model';
 import { HttpClient } from '@angular/common/http';
+import { wasHttpErrorNotified } from 'src/app/interceptors/http-error-notifications';
 
 import { FilesService } from 'src/app/modules/shared/services/files.service';
 
@@ -225,6 +226,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
         this.cdk.detectChanges();
       }),
       catchError((error) => {
+        if (wasHttpErrorNotified(error)) return of(null);
         const message = error?.error?.errorDescription || error?.error?.error ||
           error?.error?.errors?.[0]?.description || 'تعذر إنشاء حساب التاجر.';
         this.toasterService.error(message);
@@ -263,6 +265,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
           this.cdk.detectChanges();
         }),
         catchError((error) => {
+          if (wasHttpErrorNotified(error)) return of(null);
           const errors = error?.error?.errors;
           const identityErrors = Array.isArray(errors)
             ? errors.map((item) => item?.description).filter(Boolean).join(' ')
@@ -572,11 +575,16 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
 
     this.subs.sink = this.service
       .getAllMerchants()
-      .pipe(catchError(() => of(null)))
+      .pipe(catchError((error) => {
+        this.isSaving = false;
+        if (!wasHttpErrorNotified(error)) {
+          this.toasterService.error('تعذر فحص أرقام المتاجر. أعد المحاولة.');
+        }
+        return of(null);
+      }))
       .subscribe((merchants) => {
         if (merchants === null) {
           this.isSaving = false;
-          this.toasterService.error('تعذر فحص أرقام المتاجر. أعد المحاولة.');
           return;
         }
         const merchantId = Number(formValues.id || this.item?.id || 0);
@@ -622,6 +630,7 @@ export class EditMerchantModalComponent implements OnInit, OnDestroy {
 
   private handleSaveError(error: any): void {
     this.isSaving = false;
+    if (wasHttpErrorNotified(error)) return;
     const message = Array.isArray(error?.error?.errors) ? error.error.errors.join('، ') : typeof error?.error === 'string'
       ? error.error
       : error?.error?.message;

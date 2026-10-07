@@ -12,6 +12,7 @@ import { catchError } from 'rxjs/operators';
 import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../modules/auth';
 import { GRANT_TYPES } from '../modules/auth/enums/grant-types.enum';
+import { markHttpErrorNotified } from './http-error-notifications';
 
 @Injectable()
 export class AppHttpInterceptor implements HttpInterceptor {
@@ -124,6 +125,7 @@ export class AppHttpInterceptor implements HttpInterceptor {
 
             if (msg) {
               this.toasterService.error(msg);
+              markHttpErrorNotified(err);
             }
           }
         }

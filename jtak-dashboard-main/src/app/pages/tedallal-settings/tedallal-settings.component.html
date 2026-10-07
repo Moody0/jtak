@@ -17,7 +17,7 @@
           type="button"
           class="btn btn-sm btn-light btn-active-light-primary fw-bold"
           (click)="loadSettings()"
-          [disabled]="isLoading || isSaving"
+          [disabled]="isLoading || isSaving || isUploading"
         >
           <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
           <span class="ms-1">{{ 'COMMON.REFRESH' | translate }}</span>
@@ -27,7 +27,7 @@
           type="button"
           class="btn btn-sm btn-light-secondary fw-bold"
           (click)="resetDefaults()"
-          [disabled]="isLoading || isSaving || !hasLoaded"
+          [disabled]="isLoading || isSaving || isUploading || !hasLoaded || loadError"
         >
           <i class="fas fa-undo"></i>
           <span class="ms-1">استعادة الافتراضي</span>
@@ -37,7 +37,7 @@
           type="button"
           class="btn btn-sm btn-primary fw-bold"
           (click)="save()"
-          [disabled]="isLoading || isSaving || !hasLoaded || form.invalid"
+          [disabled]="isLoading || isSaving || isUploading || !hasLoaded || loadError || form.invalid"
         >
           <i class="fas fa-save" *ngIf="!isSaving"></i>
           <span class="spinner-border spinner-border-sm me-1" *ngIf="isSaving"></span>
@@ -120,16 +120,41 @@
               <div class="text-muted fs-8 mt-1">{{ (form.value.subtitle || '').length }} / 250 حرف</div>
             </div>
 
-            <!-- Logo URL -->
+            <!-- Upload an image, or optionally use an existing URL. -->
             <div class="mb-3">
-              <label class="form-label fw-bold fs-6">رابط الشعار / الأيقونة المخصصة (اختياري)</label>
-              <input
-                type="text"
-                class="form-control form-control-solid"
-                formControlName="logoUrl"
-                placeholder="https://example.com/logo.png"
-              />
-              <div class="form-text text-muted fs-8">اتركه فارغاً لاستخدام أيقونة حقيبة التسوق البرتقالية الافتراضية</div>
+              <label class="form-label fw-bold fs-6">صورة الشعار / الأيقونة المخصصة (اختياري)</label>
+              <div class="logo-upload-panel p-4 rounded border border-dashed">
+                <input #logoUpload type="file" class="d-none" accept="image/png,image/jpeg,image/webp"
+                  (change)="uploadLogo($event)" />
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                  <button type="button" class="btn btn-light-primary fw-bold" (click)="logoUpload.click()"
+                    [disabled]="isUploading || isSaving || !hasLoaded || loadError">
+                    <i class="fas fa-upload" *ngIf="!isUploading"></i>
+                    <span class="spinner-border spinner-border-sm me-2" *ngIf="isUploading"></span>
+                    {{ isUploading ? 'جارٍ رفع الصورة…' : form.value.logoUrl ? 'تغيير الصورة' : 'رفع صورة من الجهاز' }}
+                  </button>
+                  <button *ngIf="form.value.logoUrl" type="button" class="btn btn-light-danger btn-sm"
+                    (click)="removeLogo()" [disabled]="isUploading || isSaving || !hasLoaded || loadError">
+                    <i class="fas fa-trash-alt"></i> إزالة الصورة
+                  </button>
+                </div>
+                <div class="form-text text-muted mt-3">PNG أو JPG أو WebP، حتى 5 ميجابايت. يفضّل شعار بخلفية شفافة.</div>
+                <div *ngIf="isUploading" class="mt-3" role="status" aria-live="polite">
+                  <div class="progress" style="height: 6px;" role="progressbar" aria-label="تقدم رفع الصورة"
+                    [attr.aria-valuenow]="uploadProgress" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar bg-primary" [style.width.%]="uploadProgress"></div>
+                  </div>
+                  <span class="text-muted fs-8">{{ uploadProgress }}% — انتظر اكتمال الرفع قبل الحفظ.</span>
+                </div>
+              </div>
+              <details class="mt-3">
+                <summary class="text-muted fs-7 cursor-pointer">أو استخدام رابط صورة</summary>
+                <label for="tedallalLogoUrl" class="form-label mt-3">رابط الصورة</label>
+                <input id="tedallalLogoUrl" type="url" dir="ltr" class="form-control form-control-solid"
+                  formControlName="logoUrl" [readonly]="isUploading || isSaving" maxlength="2048"
+                  placeholder="https://example.com/logo.png" />
+              </details>
+              <div class="form-text text-muted fs-8 mt-3">تظهر الصورة في المعاينة فور رفعها. اضغط حفظ لتطبيقها. عند إزالة الصورة تُستخدم أيقونة حقيبة التسوق الافتراضية.</div>
             </div>
           </div>
         </div>
@@ -158,14 +183,13 @@
 
               <!-- The Card Container -->
               <div
-                class="preview-card bg-white p-3 rounded-3 border border-secondary border-opacity-10 d-flex align-items-center justify-content-between"
+                class="preview-card bg-white"
+                dir="rtl"
                 [class.opacity-50]="!form.value.enabled"
               >
                 <!-- Right (Icon / Logo) -->
-                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
                   <div
-                    class="logo-box rounded-3 bg-light-warning d-flex align-items-center justify-content-center overflow-hidden flex-shrink-0"
-                    style="width: 56px; height: 56px; padding: 6px; border: 1px solid #FFD8BF;"
+                    class="logo-panel d-flex align-items-center justify-content-center overflow-hidden"
                   >
                     <img
                       *ngIf="form.value.logoUrl && failedLogoUrl !== form.value.logoUrl"
@@ -178,21 +202,15 @@
                   </div>
 
                   <!-- Text (Title + Subtitle) -->
-                  <div class="flex-grow-1 min-w-0">
-                    <div class="preview-title fw-bolder text-dark fs-6 mb-1">
+                  <div class="preview-details min-w-0">
+                    <div class="preview-title fw-bolder text-dark">
                       {{ form.value.cardTitle || 'طلبات خاصة وعروض الأسعار' }}
                     </div>
-                    <div class="preview-subtitle text-muted fs-7">
+                    <div class="preview-subtitle text-muted">
                       {{ form.value.subtitle || 'اطلب ما تحتاجه، نراجع طلبك ونرسل لك السعر للموافقة' }}
                     </div>
-                    <div class="text-primary fw-bold fs-8 mt-2">ابدأ طلبك</div>
+                    <div class="preview-action text-primary fw-bold">ابدأ طلبك</div>
                   </div>
-                </div>
-
-                <!-- Navigation arrow for the Arabic preview -->
-                <div class="ms-2 flex-shrink-0">
-                  <i class="fas fa-chevron-right text-primary fs-6"></i>
-                </div>
               </div>
 
               <div *ngIf="form.value.logoUrl && failedLogoUrl === form.value.logoUrl" class="text-warning fs-8 mt-3" role="status">
