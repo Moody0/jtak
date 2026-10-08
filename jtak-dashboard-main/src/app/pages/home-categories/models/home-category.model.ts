@@ -67,6 +67,15 @@ export interface HomeCategoriesConfig {
   maxItems: number;
   errandRequestsTileInitialized?: boolean;
   tiles: HomeCategoryTile[];
+  otherStores?: OtherStoresSectionConfig;
+}
+
+export interface OtherStoresSectionConfig {
+  enabled: boolean;
+  title: string;
+  titleEn: string;
+  automatic: boolean;
+  merchantIds: number[];
 }
 
 /** A tile with its destination resolved, as the app receives it. */

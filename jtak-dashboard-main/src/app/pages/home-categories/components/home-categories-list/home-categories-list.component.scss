@@ -39,6 +39,28 @@
   }
 }
 
+.other-stores-add {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+.other-stores-selection {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .shortcut-actions { display: flex; gap: 6px; }
+}
+
 .home-categories-workspace {
   display: flex;
   flex-direction: column;

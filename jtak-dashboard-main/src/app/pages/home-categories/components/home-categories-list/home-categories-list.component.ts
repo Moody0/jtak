@@ -12,6 +12,7 @@ import {
   LINK_TYPE_LABELS,
   MERCHANT_KIND_LABELS,
   ResolvedHomeCategoryTile,
+  OtherStoresSectionConfig,
 } from '../../models/home-category.model';
 import { FilesService } from 'src/app/modules/shared/services/files.service';
 import { HomeCategoriesService } from '../../services/home-categories.service';
@@ -50,6 +51,45 @@ export class HomeCategoriesListComponent implements OnInit, OnDestroy {
   merchantCategoryMap: { [merchantId: number]: number[] } = {};
   private expandedTiles = new Set<HomeCategoryTile>();
   private savedConfigSnapshot = '';
+  otherStoreToAdd: number | null = null;
+  readonly defaultOtherStores: OtherStoresSectionConfig = {
+    enabled: true, title: 'المتاجر الأخرى', titleEn: 'Other stores', automatic: true, merchantIds: [],
+  };
+
+  get otherStores(): OtherStoresSectionConfig {
+    return this.config.otherStores ??= { ...this.defaultOtherStores, merchantIds: [] };
+  }
+
+  availableOtherStores: HomeCategoryMerchant[] = [];
+
+  private refreshOtherStoreChoices(): void {
+    this.availableOtherStores = this.merchants.filter(m => !this.otherStores.merchantIds.includes(m.id));
+  }
+
+  otherStoreLabel(id: number): string {
+    return this.merchants.find(m => m.id === id)?.displayLabel ?? `متجر #${id} (معطّل أو محذوف؛ لن يظهر للعملاء)`;
+  }
+
+  addOtherStore(): void {
+    if (this.saving || !this.otherStoreToAdd || this.otherStores.merchantIds.includes(this.otherStoreToAdd)) return;
+    this.otherStores.merchantIds = [...this.otherStores.merchantIds, this.otherStoreToAdd];
+    this.otherStoreToAdd = null;
+    this.refreshOtherStoreChoices();
+  }
+
+  removeOtherStore(index: number): void {
+    if (this.saving) return;
+    this.otherStores.merchantIds = this.otherStores.merchantIds.filter((_, i) => i !== index);
+    this.refreshOtherStoreChoices();
+  }
+
+  moveOtherStore(index: number, direction: number): void {
+    const target = index + direction;
+    if (this.saving || target < 0 || target >= this.otherStores.merchantIds.length) return;
+    const ids = [...this.otherStores.merchantIds];
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    this.otherStores.merchantIds = ids;
+  }
 
   readonly linkTypes = LINK_TYPE_LABELS;
   readonly LinkType = HomeCategoryLinkType;
@@ -90,6 +130,13 @@ export class HomeCategoriesListComponent implements OnInit, OnDestroy {
         this.expandedTiles.clear();
         this.config = vm.config ?? this.config;
         this.config.tiles = vm.config?.tiles ?? [];
+        this.config.otherStores = {
+          ...this.defaultOtherStores, ...vm.config?.otherStores,
+          title: vm.config?.otherStores?.title ?? this.defaultOtherStores.title,
+          titleEn: vm.config?.otherStores?.titleEn ?? this.defaultOtherStores.titleEn,
+          merchantIds: [...(vm.config?.otherStores?.merchantIds ?? [])],
+        };
+        this.otherStoreToAdd = null;
         this.categories = (vm.availableCategories ?? []).map((cat) => ({
           ...cat,
           displayLabel: cat.parentTitle ? `${cat.parentTitle} > ${cat.title}` : cat.title,
@@ -99,6 +146,7 @@ export class HomeCategoriesListComponent implements OnInit, OnDestroy {
           displayLabel: `${m.title} (${this.merchantKindLabel(m.merchantKind)})`,
         }));
         this.merchantKinds = vm.availableMerchantKinds ?? [];
+        this.refreshOtherStoreChoices();
         this.restaurantCategories = restaurantCategories?.items ?? [];
         this.restaurantCategoriesLoadError = restaurantCategories === null;
         this.merchantCategoryMap = vm.merchantCategoryMap ?? {};
@@ -537,6 +585,13 @@ export class HomeCategoriesListComponent implements OnInit, OnDestroy {
     this.saveError = null;
     this.saveSuccess = false;
 
+    this.otherStores.title = (this.otherStores.title ?? '').trim();
+    this.otherStores.titleEn = (this.otherStores.titleEn ?? '').trim();
+    if (!this.otherStores.title.trim() || this.otherStores.title.length > 120 || this.otherStores.titleEn.length > 120) {
+      this.saveError = 'أدخل عنوان قسم المتاجر الأخرى، بحد أقصى 120 حرفاً.';
+      return;
+    }
+
     if (this.invalidCount > 0) {
       this.saveError = 'بعض الفئات غير مكتملة. أكمل الحقول المطلوبة قبل الحفظ.';
       return;
@@ -586,7 +641,7 @@ export class HomeCategoriesListComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.saving = false;
         this.saveError =
-          typeof err?.error === 'string' ? err.error : 'تعذر حفظ الإعدادات، حاول مرة أخرى';
+          typeof err?.error === 'string' ? err.error : err?.message ?? 'تعذر حفظ الإعدادات، حاول مرة أخرى';
         this.cdr.detectChanges();
       },
     }));

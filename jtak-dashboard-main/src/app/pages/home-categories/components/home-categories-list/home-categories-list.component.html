@@ -119,6 +119,62 @@
 
   <ng-container *ngIf="!loading">
 
+    <section class="section-settings-card other-stores-editor" aria-label="إعدادات قسم المتاجر الأخرى">
+      <div class="settings-card-header">
+        <div class="settings-title-group">
+          <div class="settings-icon"><i class="fas fa-store"></i></div>
+          <div>
+            <h4>قسم المتاجر الأخرى</h4>
+            <p>اختَر المتاجر التي تظهر في البطاقات أسفل الصفحة الرئيسية، بما فيها الصيدليات والمطاعم. التغييرات تُطبّق بعد حفظ التغييرات.</p>
+          </div>
+        </div>
+        <label class="custom-toggle" for="otherStoresEnabled">
+          <input type="checkbox" id="otherStoresEnabled" [(ngModel)]="otherStores.enabled" [disabled]="saving" />
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">{{ otherStores.enabled ? 'القسم ظاهر' : 'القسم مخفي' }}</span>
+        </label>
+      </div>
+      <div class="settings-form-grid">
+        <div class="form-group-field">
+          <label class="field-label" for="otherStoresTitle">عنوان القسم (عربي)</label>
+          <input id="otherStoresTitle" class="form-control field-input" [(ngModel)]="otherStores.title" maxlength="120" [disabled]="saving" />
+        </div>
+        <div class="form-group-field">
+          <label class="field-label" for="otherStoresTitleEn">عنوان القسم (إنجليزي)</label>
+          <input id="otherStoresTitleEn" class="form-control field-input" [(ngModel)]="otherStores.titleEn" maxlength="120" dir="ltr" [disabled]="saving" />
+        </div>
+        <div class="form-group-field">
+          <label class="field-label" for="otherStoresMode">المتاجر المعروضة</label>
+          <select id="otherStoresMode" class="form-select" [(ngModel)]="otherStores.automatic" [disabled]="saving">
+            <option [ngValue]="true">تلقائي: البقالة والمتاجر من نوع أخرى</option>
+            <option [ngValue]="false">اختيار يدوي من جميع أنواع المتاجر</option>
+          </select>
+        </div>
+      </div>
+      <ng-container *ngIf="!otherStores.automatic">
+        <div class="other-stores-add">
+          <div class="flex-grow-1">
+            <label class="field-label" for="otherStoreMerchant">إضافة متجر أو صيدلية</label>
+            <ng-select labelForId="otherStoreMerchant" [items]="availableOtherStores" bindLabel="displayLabel" bindValue="id"
+              [(ngModel)]="otherStoreToAdd" [disabled]="saving" placeholder="ابحث باسم المتجر أو نوعه" appendTo="body"></ng-select>
+          </div>
+          <button appDashboardWrite="storefront" class="btn btn-header-add" type="button" (click)="addOtherStore()"
+            [disabled]="saving || !otherStoreToAdd || otherStores.merchantIds.length >= 100">إضافة</button>
+        </div>
+        <ol class="other-stores-selection">
+          <li *ngFor="let id of otherStores.merchantIds; let i = index">
+            <span>{{ i + 1 }}. {{ otherStoreLabel(id) }}</span>
+            <div class="shortcut-actions">
+              <button appDashboardWrite="storefront" type="button" class="btn btn-header-icon" (click)="moveOtherStore(i, -1)" [disabled]="saving || i === 0" aria-label="تحريك المتجر لأعلى"><i class="fas fa-arrow-up"></i></button>
+              <button appDashboardWrite="storefront" type="button" class="btn btn-header-icon" (click)="moveOtherStore(i, 1)" [disabled]="saving || i === otherStores.merchantIds.length - 1" aria-label="تحريك المتجر لأسفل"><i class="fas fa-arrow-down"></i></button>
+              <button appDashboardWrite="storefront" type="button" class="btn btn-header-icon" (click)="removeOtherStore(i)" [disabled]="saving" aria-label="إزالة المتجر من القسم"><i class="fas fa-trash text-danger"></i></button>
+            </div>
+          </li>
+        </ol>
+        <p class="text-muted small">{{ otherStores.merchantIds.length }} متجر محدد. الاختيار الفارغ يُخفي القسم؛ المتاجر المعطّلة لا تظهر للعملاء. الشعار ولون خلفيته وبيانات البطاقة تُعدّل من بيانات المتجر.</p>
+      </ng-container>
+    </section>
+
     <!-- 4. Section Settings Card (Clean, Compact, Balanced) -->
     <section class="section-settings-card">
       <div class="settings-card-header">
