@@ -25,5 +25,6 @@ namespace App.ApiModels
         public string HomeCategoriesTitle { get; set; }
         public string HomeCategoriesTitleEn { get; set; }
         public TedallalCardSetting TedallalCard { get; set; }
+        public OtherStoresSectionConfig OtherStores { get; set; }
     }
 }

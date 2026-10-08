@@ -58,6 +58,7 @@ namespace Modules.Catalog.Services
                 };
             }
             config.Tiles ??= new List<HomeCategoryTile>();
+            config.OtherStores ??= new OtherStoresSectionConfig();
 
             // Seed only a new configuration. Saved empty/disabled layouts must
             // stay exactly as the administrator configured them.
@@ -90,6 +91,10 @@ namespace Modules.Catalog.Services
         {
             config ??= new HomeCategoriesConfig();
             config.Tiles ??= new List<HomeCategoryTile>();
+            config.OtherStores ??= new OtherStoresSectionConfig();
+            config.OtherStores.MerchantIds ??= new List<int>();
+            config.OtherStores.Title = config.OtherStores.Title?.Trim();
+            config.OtherStores.TitleEn = config.OtherStores.TitleEn?.Trim();
             config.ErrandRequestsTileInitialized = true;
 
             // Give every tile a stable id and a gap-free order so the apps and

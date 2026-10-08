@@ -164,7 +164,8 @@ namespace App.ApiControllers.V1.Customer
                 HomeCategoriesMaxItems = homeCategoriesMaxItems,
                 HomeCategoriesTitle = homeConfig?.SectionTitle,
                 HomeCategoriesTitleEn = homeConfig?.SectionTitleEn,
-                TedallalCard = tedallalSetting
+                TedallalCard = tedallalSetting,
+                OtherStores = homeConfig?.OtherStores ?? new OtherStoresSectionConfig()
             };
         }
 

@@ -340,7 +340,9 @@ ASALocalRun/
 # BeatPulse healthcheck temp database
 healthchecksdb
 /App/Logs
-/app/FileCenter/
+/app/FileCenter/*
+# Pharmacy catalog assets are deployed with Git; other uploaded files stay local.
+!/app/FileCenter/kalima-*.webp
 
 # Secrets & Credentials
 *firebase-adminsdk*.json

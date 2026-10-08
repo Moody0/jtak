@@ -165,6 +165,24 @@ namespace App.ApiControllers.V1.Admin
             if (config == null)
                 return BadRequest("لا توجد إعدادات للحفظ");
             if (config.MaxItems < 0) return BadRequest("عدد الفئات لا يمكن أن يكون سالباً");
+            // Older dashboard clients do not send this section; preserve its saved configuration.
+            config.OtherStores ??= (await _service.GetConfig()).OtherStores ?? new OtherStoresSectionConfig();
+            var otherStores = config.OtherStores;
+            if (string.IsNullOrWhiteSpace(otherStores.Title) || otherStores.Title.Length > 120 ||
+                (otherStores.TitleEn?.Length ?? 0) > 120)
+                return BadRequest("أدخل عنوان قسم المتاجر الأخرى، بحد أقصى 120 حرفاً.");
+            otherStores.MerchantIds ??= new List<int>();
+            if (otherStores.MerchantIds.Count > 100 || otherStores.MerchantIds.Any(id => id <= 0) ||
+                otherStores.MerchantIds.Distinct().Count() != otherStores.MerchantIds.Count)
+                return BadRequest("اختر حتى 100 متجر دون تكرار في قسم المتاجر الأخرى.");
+            if (!otherStores.Automatic && otherStores.MerchantIds.Any())
+            {
+                var merchantIds = otherStores.MerchantIds.ToArray();
+                var existingCount = await _merchantService.Queryable().AsNoTracking()
+                    .CountAsync(x => merchantIds.Contains(x.Id) && x.DeletionDate == null);
+                if (existingCount != merchantIds.Length)
+                    return BadRequest("بعض المتاجر المحددة حُذفت. أزلها من القسم ثم أعد الحفظ.");
+            }
             var ids = (config.Tiles ?? new List<HomeCategoryTile>()).Where(t => t != null && !string.IsNullOrWhiteSpace(t.Id)).Select(t => t.Id).ToArray();
             if (ids.Distinct().Count() != ids.Length) return BadRequest("لا يمكن تكرار معرف الفئة");
 

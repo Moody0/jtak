@@ -96,6 +96,18 @@ namespace Modules.Catalog.Entities
         public int MaxItems { get; set; } = 8;
 
         public List<HomeCategoryTile> Tiles { get; set; } = new List<HomeCategoryTile>();
+        public OtherStoresSectionConfig OtherStores { get; set; }
+    }
+
+    public class OtherStoresSectionConfig
+    {
+        public bool Enabled { get; set; } = true;
+        public string Title { get; set; } = "المتاجر الأخرى";
+        public string TitleEn { get; set; } = "Other stores";
+        // Automatic preserves the existing grocery/general-store selection.
+        // Manual mode uses only this ordered list, including an intentionally empty list.
+        public bool Automatic { get; set; } = true;
+        public List<int> MerchantIds { get; set; } = new List<int>();
     }
 
     /// <summary>
