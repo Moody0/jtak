@@ -362,12 +362,12 @@
   border-collapse: collapse;
   table-layout: fixed;
 
-  th:nth-child(1), td:nth-child(1) { width: 38px; }
-  th:nth-child(2), td:nth-child(2) { width: 240px; }
+  th:nth-child(1), td:nth-child(1) { width: 40px; }
+  th:nth-child(2), td:nth-child(2) { width: 260px; }
   th:nth-child(3), td:nth-child(3) { width: 250px; }
-  th:nth-child(4), td:nth-child(4) { width: 200px; }
+  th:nth-child(4), td:nth-child(4) { width: 210px; }
   th:nth-child(5), td:nth-child(5) { width: 200px; }
-  th:nth-child(6), td:nth-child(6) { width: 172px; }
+  th:nth-child(6), td:nth-child(6) { width: 140px; }
 
   .ops-table-header {
     background: #f8fafc;
@@ -400,6 +400,7 @@
       padding: 8px 12px;
       border: none;
       vertical-align: middle;
+      overflow: hidden;
     }
   }
 }
@@ -507,11 +508,24 @@
   font-size: 0.71rem;
   font-weight: 650;
   white-space: nowrap;
+  max-width: 140px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 
   i, .fas, .far, .fab {
     margin: 0 !important;
     font-size: 0.7rem;
     color: inherit !important;
+    flex-shrink: 0;
+  }
+
+  span, .text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   &--market {
@@ -553,7 +567,7 @@
   align-items: center;
   gap: 5px !important;
   width: auto !important;
-  max-width: max-content !important;
+  max-width: 100% !important;
   align-self: flex-start !important;
   margin-top: 3px;
   padding: 2px 8px;
@@ -564,6 +578,8 @@
   font-size: 0.69rem;
   line-height: 1.3;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   i {
     margin: 0 !important;
@@ -576,6 +592,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
 
   &--attention {
@@ -661,12 +678,14 @@
   padding: 1px 6px;
   text-decoration: none;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.12s ease;
 
   i, .fas {
     margin: 0 !important;
     color: #2563eb !important;
     font-size: 0.7rem;
+    flex-shrink: 0;
   }
 
   &:hover {
@@ -683,6 +702,8 @@
   display: flex;
   align-items: center;
   gap: 6px !important;
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: 100%;
   overflow: hidden;
   font-size: 0.73rem;
@@ -695,6 +716,15 @@
     color: #94a3b8 !important;
     flex-shrink: 0;
     font-size: 0.72rem;
+  }
+
+  span {
+    display: inline-block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
@@ -743,7 +773,10 @@
 
 .ops-item-preview {
   display: block;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
+  flex: 1 1 0%;
   overflow: hidden;
   color: #475569;
   font-size: 0.76rem;
@@ -828,27 +861,34 @@
   display: flex;
   align-items: center;
   gap: 6px !important;
+  min-width: 0;
   max-width: 100%;
   margin-top: 1px;
+  flex-shrink: 1;
 
   i, .fas {
     margin: 0 !important;
     color: #2563eb !important;
     font-size: 0.78rem;
+    flex-shrink: 0;
   }
 }
 
 .ops-captain-cell {
   display: flex;
   flex-direction: column;
-  min-width: 110px;
+  min-width: 100px;
 }
 
 .ops-driver-name {
   font-size: 0.8rem;
   font-weight: 750;
   color: #0f172a;
-  max-width: 120px;
+  max-width: 110px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ops-driver-action {
@@ -859,12 +899,15 @@
   font-weight: 650;
   color: #2563eb !important;
   text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
   padding: 0;
 
   i, .fas {
     margin: 0 !important;
     color: #2563eb !important;
     font-size: 0.7rem;
+    flex-shrink: 0;
   }
 
   &:hover {
@@ -924,8 +967,8 @@
 // Column 5: Actions Column & Cluster
 // -----------------------------------------------------------------------------
 .ops-actions-col {
-  width: 170px;
-  min-width: 160px;
+  width: 140px;
+  min-width: 140px;
   text-align: center;
   position: relative;
 }
@@ -960,7 +1003,7 @@
   }
 
   &--primary {
-    min-width: 95px;
+    min-width: 90px;
     white-space: nowrap;
   }
 
@@ -1223,6 +1266,12 @@
   gap: 6px;
   min-width: 0;
   flex-wrap: nowrap;
+
+  &--wrap,
+  &--badges {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+  }
 }
 
 .ops-accounting-tag {

@@ -179,12 +179,15 @@
                       <span>{{ o.purchaseDate | date:'d MMM y' }}</span>
                     </span>
                   </div>
-                  <div class="ops-cell-row-sub">
+                  <div class="ops-cell-row-sub ops-cell-row-sub--badges">
                     <span class="ops-status-pill" [ngClass]="getOrderOverallStatus(o).badgeClass">
                       <i class="fas me-1" [ngClass]="getOrderOverallStatus(o).icon"></i>{{ getOrderOverallStatus(o).label }}
                     </span>
-                    <span *ngIf="getMerchantBadge(o) as badge" class="ops-merchant-badge" [ngClass]="badge.isMarket ? 'ops-merchant-badge--market' : 'ops-merchant-badge--store'">
-                      <i class="fas me-1" [ngClass]="badge.isMarket ? 'fa-store' : 'fa-utensils'"></i>{{ badge.name }}
+                    <span *ngIf="getMerchantBadge(o) as badge" class="ops-merchant-badge"
+                      [ngClass]="badge.isMarket ? 'ops-merchant-badge--market' : 'ops-merchant-badge--store'"
+                      [title]="badge.name">
+                      <i class="fas me-1" [ngClass]="badge.isMarket ? 'fa-store' : 'fa-utensils'"></i>
+                      <span class="text-truncate">{{ badge.name }}</span>
                     </span>
                     <span *ngIf="o.accountingStatus === 1" class="badge badge-light-warning ops-accounting-tag"
                       [title]="'ORDERS_PAGE.ACCOUNTING_PENDING_DESC' | translate">
@@ -212,7 +215,7 @@
                   <div class="ops-cell-row-sub">
                     <div class="ops-customer-address" [title]="o.address">
                       <i class="fas fa-map-marker-alt me-1 text-danger"></i>
-                      <span>{{ o.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}</span>
+                      <span class="text-truncate">{{ o.address || ('ORDERS_PAGE.NO_ADDRESS' | translate) }}</span>
                     </div>
                     <a *ngIf="o.lat && o.lng" class="ops-micro-link" target="_blank"
                       [href]="'https://www.google.com/maps/search/?api=1&query=' + o.lat + ',' + o.lng" [title]="'ORDERS_PAGE.OPEN_MAP' | translate">

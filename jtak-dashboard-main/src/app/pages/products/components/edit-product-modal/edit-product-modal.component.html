@@ -271,7 +271,7 @@
               <!-- Discount Percentage -->
               <div class="col-md-6">
                 <label for="productDiscount" class="form-label fw-bold mb-2">
-                  نسبة الخصم من سعر التاجر الأساسي
+                  نسبة توفير العميل من السعر قبل الخصم
                 </label>
                 <div class="input-group" dir="ltr">
                   <span class="input-group-text bg-light fw-bold text-dark">%</span>
@@ -279,22 +279,29 @@
                     id="productDiscount"
                     type="number"
                     min="0"
-                    max="99.99"
+                    [max]="maxCustomerSavingPercent"
                     step="0.01"
                     inputmode="decimal"
                     class="form-control text-end fs-6 fw-bold"
-                    formControlName="discountPercent"
+                    formControlName="customerSavingPercent"
                     placeholder="0"
                     (blur)="onDiscountBlur()"
                     aria-describedby="productDiscountHelp"
                   />
                 </div>
+                <small id="productDiscountHelp" class="d-block text-muted mt-2">
+                  الحد الأقصى من حصة جيتك: {{ maxCustomerSavingPercent | number:'1.0-2' }}%.
+                  النسبة تُحفظ بدقتها، وتُعرض للعميل مقربة لأقرب عدد صحيح. حصة التاجر لا تتأثر.
+                </small>
+                <small class="d-block text-danger" *ngIf="formGroup.get('customerSavingPercent')?.invalid && formGroup.get('customerSavingPercent')?.dirty">
+                  أدخل نسبة بين 0 و{{ maxCustomerSavingPercent | number:'1.0-2' }}%.
+                </small>
                 <!-- Quick Discount Preset Chips -->
                 <div class="discount-presets-row">
                   <button
                     type="button"
                     class="discount-preset-pill"
-                    [class.active]="!formGroup.get('discountPercent')?.value || formGroup.get('discountPercent')?.value == 0"
+                    [class.active]="!formGroup.get('customerSavingPercent')?.value || formGroup.get('customerSavingPercent')?.value == 0"
                     (click)="setDiscountPreset(0)"
                   >
                     بدون
@@ -302,7 +309,8 @@
                   <button
                     type="button"
                     class="discount-preset-pill"
-                    [class.active]="formGroup.get('discountPercent')?.value == 10"
+                    [class.active]="formGroup.get('customerSavingPercent')?.value == 10"
+                    [disabled]="maxCustomerSavingPercent < 10"
                     (click)="setDiscountPreset(10)"
                   >
                     10%
@@ -310,7 +318,8 @@
                   <button
                     type="button"
                     class="discount-preset-pill"
-                    [class.active]="formGroup.get('discountPercent')?.value == 15"
+                    [class.active]="formGroup.get('customerSavingPercent')?.value == 15"
+                    [disabled]="maxCustomerSavingPercent < 15"
                     (click)="setDiscountPreset(15)"
                   >
                     15%
@@ -318,7 +327,8 @@
                   <button
                     type="button"
                     class="discount-preset-pill"
-                    [class.active]="formGroup.get('discountPercent')?.value == 20"
+                    [class.active]="formGroup.get('customerSavingPercent')?.value == 20"
+                    [disabled]="maxCustomerSavingPercent < 20"
                     (click)="setDiscountPreset(20)"
                   >
                     20%
@@ -326,7 +336,8 @@
                   <button
                     type="button"
                     class="discount-preset-pill"
-                    [class.active]="formGroup.get('discountPercent')?.value == 25"
+                    [class.active]="formGroup.get('customerSavingPercent')?.value == 25"
+                    [disabled]="maxCustomerSavingPercent < 25"
                     (click)="setDiscountPreset(25)"
                   >
                     25%
@@ -334,7 +345,8 @@
                   <button
                     type="button"
                     class="discount-preset-pill"
-                    [class.active]="formGroup.get('discountPercent')?.value == 30"
+                    [class.active]="formGroup.get('customerSavingPercent')?.value == 30"
+                    [disabled]="maxCustomerSavingPercent < 30"
                     (click)="setDiscountPreset(30)"
                   >
                     30%
@@ -342,10 +354,17 @@
                   <button
                     type="button"
                     class="discount-preset-pill"
-                    [class.active]="formGroup.get('discountPercent')?.value == 50"
+                    [class.active]="formGroup.get('customerSavingPercent')?.value == 50"
+                    [disabled]="maxCustomerSavingPercent < 50"
                     (click)="setDiscountPreset(50)"
                   >
                     50%
+                  </button>
+                  <button type="button" class="discount-preset-pill"
+                    [class.active]="maxCustomerSavingPercent > 0 && formGroup.get('customerSavingPercent')?.value == maxCustomerSavingPercent"
+                    [disabled]="maxCustomerSavingPercent <= 0"
+                    (click)="setDiscountPreset(maxCustomerSavingPercent)">
+                    الحد الأقصى {{ maxCustomerSavingPercent | number:'1.0-2' }}%
                   </button>
                 </div>
               </div>
@@ -525,7 +544,7 @@
 
                 <!-- Discount Ribbon -->
                 <span class="customer-discount-ribbon" *ngIf="customerPricePreview && customerPricePreview.discountPercent > 0">
-                  <i class="fas fa-bolt me-1"></i> خصم {{ customerPricePreview.discountPercent | number:'1.0-2' }}%
+                  <i class="fas fa-bolt me-1"></i> خصم {{ customerPricePreview.discountPercent | number:'1.0-0' }}%
                 </span>
 
                 <!-- Status Pill -->
@@ -567,7 +586,7 @@
                   <div class="customer-card-current-price">
                     <strong>{{ pricePreview.salePrice | number:'1.0-0' }} ل.س</strong>
                     <span class="customer-card-discount" *ngIf="pricePreview.discountPercent > 0">
-                      خصم {{ pricePreview.discountPercent | number:'1.0-2' }}%
+                      خصم {{ pricePreview.discountPercent | number:'1.0-0' }}%
                     </span>
                   </div>
                 </div>

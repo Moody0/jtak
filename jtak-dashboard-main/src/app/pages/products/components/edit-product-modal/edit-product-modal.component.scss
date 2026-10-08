@@ -189,10 +189,15 @@
   cursor: pointer;
   transition: all 0.15s ease;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: #ffffff;
     border-color: #cbd5e1;
     color: #0f172a;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   &.active {

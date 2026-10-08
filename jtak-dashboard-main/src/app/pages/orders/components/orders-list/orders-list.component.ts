@@ -562,12 +562,20 @@ export class OrdersListComponent
     const details = order?.orderDetails || [];
     const firstMerchant = details.find(d => !!d.merchantTitle)?.merchantTitle;
     if (firstMerchant) {
-      const isMarket = firstMerchant.includes('ماركت') || firstMerchant.includes('صيدل') || firstMerchant.includes('سوبر') || firstMerchant.includes('بقالة');
-      return { name: firstMerchant, isMarket };
+      let name = firstMerchant.trim();
+      if (name.includes('جيتك ماركت') || name.toLowerCase().includes('jtak market')) {
+        name = 'جيتك ماركت';
+      }
+      const isMarket = name.includes('ماركت') || name.includes('صيدل') || name.includes('سوبر') || name.includes('بقالة');
+      return { name, isMarket };
     }
     if (order?.description && order.description.trim()) {
-      const isMarket = order.description.includes('ماركت') || order.description.includes('صيدل') || order.description.includes('سوبر') || order.description.includes('بقالة');
-      return { name: order.description, isMarket };
+      let name = order.description.trim();
+      if (name.includes('جيتك ماركت') || name.toLowerCase().includes('jtak market')) {
+        name = 'جيتك ماركت';
+      }
+      const isMarket = name.includes('ماركت') || name.includes('صيدل') || name.includes('سوبر') || name.includes('بقالة');
+      return { name, isMarket };
     }
     return { name: 'طلب مستقل', isMarket: false };
   }

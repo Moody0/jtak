@@ -16,3 +16,16 @@ export function merchantDiscountQuote(baseUsd: number, rate: number, markupPerce
     limited: requestedPercent > markupPercent,
   };
 }
+
+// The admin enters a saving against the customer's compare-at price. Keep the
+// API's supplier-base discount convention and two-decimal storage precision.
+export function merchantBaseDiscountFromSaving(baseUsd: number, rate: number, markupPercent: number, savingPercent: number): number {
+  const maximumBasePercent = Math.min(markupPercent, 99.99);
+  const maximum = merchantDiscountQuote(baseUsd, rate, markupPercent, maximumBasePercent);
+  if (!maximum || !Number.isFinite(savingPercent) || savingPercent <= 0) return 0;
+  if (savingPercent >= maximum.effectivePercent) return maximumBasePercent;
+  const exactBase = baseUsd * rate;
+  const targetPrice = Math.max(maximum.finalPrice, Math.round(maximum.price * (1 - savingPercent / 100)));
+  const basePercent = (exactBase * (1 + markupPercent / 100) - targetPrice) / exactBase * 100;
+  return Math.max(0, Math.min(maximumBasePercent, Math.round(basePercent * 100) / 100));
+}

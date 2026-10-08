@@ -1,4 +1,4 @@
-import { merchantDiscountQuote } from '../../models/merchant-discount-pricing';
+import { merchantBaseDiscountFromSaving, merchantDiscountQuote } from '../../models/merchant-discount-pricing';
 import { Component, OnInit, Input, OnDestroy } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -67,7 +67,6 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   merchantsLoading = false;
   merchantsLoadError = false;
   exchangeRate = 15000;
-  private syncingPriceInputs = false;
   private originalBaseUsd: number | null = null;
   private initialDisplayedPriceUsd: number | null = null;
 
@@ -90,6 +89,10 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.isLoading$ = this.service.isLoading$;
     this.initItemAndForm();
+    for (const field of ['priceUsd', 'merchantId']) {
+      this.subs.sink = this.formGroup.get(field)!.valueChanges.subscribe(() => this.syncCustomerDiscountInput());
+    }
+    this.subs.sink = this.formGroup.get('customerSavingPercent')!.valueChanges.subscribe(() => this.applyCustomerSaving());
     this.loadExchangeRate();
     this.loadLookups();
   }
@@ -120,6 +123,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
           ? this.roundUsd(Number(this.item.priceUsd))
           : null, [Validators.min(0)]],
       discountPercent: [0, [Validators.min(0), Validators.max(99.99)]],
+      customerSavingPercent: [0, [Validators.min(0)]],
     });
 
     this.initializeDiscountInputs();
@@ -130,6 +134,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       const rate = Number(settings?.usdToSypExchangeRate);
       if (Number.isFinite(rate) && rate > 0) this.exchangeRate = rate;
       this.initializeDiscountInputs();
+      this.syncCustomerDiscountInput();
     });
   }
 
@@ -184,6 +189,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
       priceUsd: this.initialDisplayedPriceUsd,
       ...(this.formGroup.get('discountPercent')?.dirty ? {} : { discountPercent: percentage }),
     }, { emitEvent: false });
+    this.syncCustomerDiscountInput();
   }
 
   private get preservedBasePrice(): boolean {
@@ -211,30 +217,51 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
   }
 
   onDiscountBlur(): void {
-    const val = this.formGroup?.get('discountPercent')?.value;
-    if (val !== null && val !== undefined && val !== '') {
-      const num = Number(val);
-      if (!isNaN(num)) {
-        const rounded = Math.round(num * 100) / 100;
-        this.formGroup.get('discountPercent')?.setValue(Math.max(0, Math.min(99.99, rounded)));
-      }
-    }
+    const percent = this.normalizeNumber(this.formGroup?.get('customerSavingPercent')?.value, 0) || 0;
+    this.setDiscountPreset(percent);
+    this.syncCustomerDiscountInput();
   }
 
   setDiscountPreset(percent: number): void {
-    this.formGroup?.get('discountPercent')?.setValue(percent);
+    this.formGroup?.get('customerSavingPercent')?.setValue(Math.max(0,
+      Math.min(this.maxCustomerSavingPercent, Math.round(percent * 100) / 100)));
+    this.formGroup?.get('customerSavingPercent')?.markAsDirty();
     this.formGroup?.get('discountPercent')?.markAsDirty();
+  }
+
+  private get merchantMarkupPercent(): number {
+    const merchantId = this.normalizeNumber(this.formGroup?.get('merchantId')?.value, null);
+    const selected = this.merchantsList.find((merchant) => merchant.id === merchantId);
+    return this.normalizeNumber(selected?.profitOutOfMerchantPricePercent,
+      merchantId === Number(this.item?.merchantId)
+        ? this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0) : 0) || 0;
+  }
+
+  get maxCustomerSavingPercent(): number {
+    return merchantDiscountQuote(this.basePriceUsd || 0, this.exchangeRate, this.merchantMarkupPercent,
+      Math.min(this.merchantMarkupPercent, 99.99))?.effectivePercent || 0;
+  }
+
+  private syncCustomerDiscountInput(): void {
+    const control = this.formGroup?.get('customerSavingPercent');
+    if (!control) return;
+    control.setValidators([Validators.min(0), Validators.max(this.maxCustomerSavingPercent)]);
+    control.setValue(this.pricingQuote?.effectivePercent || 0, { emitEvent: false });
+  }
+
+  private applyCustomerSaving(): void {
+    const requested = this.normalizeNumber(this.formGroup.get('customerSavingPercent')?.value, 0) || 0;
+    const basePercent = merchantBaseDiscountFromSaving(this.basePriceUsd || 0, this.exchangeRate,
+      this.merchantMarkupPercent, Math.min(requested, this.maxCustomerSavingPercent));
+    this.formGroup.get('discountPercent')?.setValue(basePercent, { emitEvent: false });
+    this.formGroup.get('discountPercent')?.markAsDirty();
   }
 
   private get pricingQuote() {
     if (!this.formGroup) return null;
     const baseUsd = this.basePriceUsd || 0;
     const requestedPercent = this.normalizeNumber(this.formGroup.get('discountPercent')?.value, 0) || 0;
-    const merchantId = this.normalizeNumber(this.formGroup.get('merchantId')?.value, null);
-    const selected = this.merchantsList.find((merchant) => merchant.id === merchantId);
-    const markup = this.normalizeNumber(selected?.profitOutOfMerchantPricePercent,
-      this.normalizeNumber(this.item?.profitOutOfMerchantPricePercent, 0)) || 0;
-    return merchantDiscountQuote(baseUsd, this.exchangeRate, markup, requestedPercent);
+    return merchantDiscountQuote(baseUsd, this.exchangeRate, this.merchantMarkupPercent, requestedPercent);
   }
 
   get discountPreview() {
@@ -363,6 +390,7 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
         this.merchantsLoading = false;
 
         this.merchantsLoadError = this.merchantsList.length === 0;
+        this.syncCustomerDiscountInput();
       },
       error: () => {
         this.merchantsLoading = false;
@@ -487,6 +515,8 @@ export class EditProductModalComponent implements OnInit, OnDestroy {
 
     this.isSaving = true;
     const raw = this.formGroup.value;
+    // UI-only customer percentage must not change the API's base-price contract.
+    delete raw.customerSavingPercent;
     const photosArray = raw.photos || [];
     const photosStr = Array.isArray(photosArray) ? photosArray.join(',') : (photosArray || '');
 
