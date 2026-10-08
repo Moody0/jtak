@@ -929,6 +929,34 @@ namespace App.Shared.Data.Migrations
                     b.ToTable("NotificationMessage");
                 });
 
+            modelBuilder.Entity("App.Shared.Entities.CustomerOtpChallenge", b =>
+                {
+                    b.Property<string>("PhoneNumber").HasMaxLength(16).HasColumnType("varchar(16)");
+                    b.Property<Guid>("ChallengeId").HasColumnType("char(36)");
+                    b.Property<Guid?>("UserId").HasColumnType("char(36)");
+                    b.Property<string>("CodeHash").IsRequired().HasMaxLength(64).HasColumnType("varchar(64)");
+                    b.Property<string>("MessageId").HasMaxLength(64).HasColumnType("varchar(64)");
+                    b.Property<DateTime>("CreatedAt").HasColumnType("datetime(6)");
+                    b.Property<DateTime>("ExpiresAt").HasColumnType("datetime(6)");
+                    b.Property<int>("FailedAttempts").HasColumnType("int");
+                    b.Property<DateTime?>("VerifiedAt").HasColumnType("datetime(6)");
+                    b.Property<DateTime?>("ConsumedAt").HasColumnType("datetime(6)");
+                    b.Property<bool>("IsReview").HasColumnType("tinyint(1)");
+                    b.Property<bool>("RequiresProfileCompletion").HasColumnType("tinyint(1)");
+                    b.HasKey("PhoneNumber");
+                    b.HasIndex("ExpiresAt");
+                    b.ToTable("CustomerOtpChallenges");
+                });
+
+            modelBuilder.Entity("App.Shared.Entities.CustomerOtpSendCounter", b =>
+                {
+                    b.Property<string>("Bucket").HasMaxLength(128).HasColumnType("varchar(128)");
+                    b.Property<DateTime>("WindowStart").HasColumnType("datetime(6)");
+                    b.Property<int>("SendCount").HasColumnType("int");
+                    b.HasKey("Bucket", "WindowStart");
+                    b.ToTable("CustomerOtpSendCounters");
+                });
+
             modelBuilder.Entity("App.Shared.Entities.PendingPhoneSignup", b =>
                 {
                     b.Property<string>("PhoneNumber")

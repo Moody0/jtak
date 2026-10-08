@@ -219,31 +219,38 @@ namespace Modules.Catalog.Services
                                .ToDictionary(x => x.MerchantId);
                 });
 
-        public async Task<MerchantProductDto> GetMerchantProductPrice(int mid, int pid) =>
-            await _cache.GetValue($"MerchantProduct_{mid}_{pid}", null,
-                async () =>
+        public async Task<MerchantProductDto> GetMerchantProductPrice(int mid, int pid)
+        {
+            // Checkout must validate current data, including categories imported
+            // directly into the database after the browsing cache was populated.
+            var usdRate = await GetUsdRate();
+            var visibleIds = _categories == null
+                ? null
+                : await CatalogCategoryVisibility.GetIdsAsync(_categories.Queryable());
+            var item = await _merchantProductRepo.Queryable()
+                .AsNoTracking()
+                .Include(x => x.Merchant)
+                .Where(x => x.MerchantId == mid && x.ProductId == pid &&
+                            x.Merchant.Active && x.Merchant.DeletionDate == null &&
+                            x.MerchantPrice > 0 && x.Product.Active && x.Product.DeletionDate == null &&
+                            (visibleIds == null || !x.Product.ProductCategoryId.HasValue ||
+                             visibleIds.Contains(x.Product.ProductCategoryId.Value)))
+                .Select(x => new MerchantProductDto
                 {
-                    var usdRate = await GetUsdRate();
-                    var visibleIds = _categories == null ? null : await _cache.GetValue("VisibleProductCategoryIds", null, async () => await CatalogCategoryVisibility.GetIdsAsync(_categories.Queryable()));
-                    var item = await _merchantProductRepo.Queryable()
-                                                         .AsNoTracking()
-                                                         .Include(x => x.Merchant)
-                                                         .Where(x => x.MerchantId == mid && x.ProductId == pid && x.Merchant.Active && x.Merchant.DeletionDate == null && x.MerchantPrice > 0 && x.Product.Active && x.Product.DeletionDate == null && (visibleIds == null || !x.Product.ProductCategoryId.HasValue || visibleIds.Contains(x.Product.ProductCategoryId.Value)))
-                                                         .Select(x => new MerchantProductDto
-                                                         {
-                                                             MerchantId = x.MerchantId,
-                                                             MerchantKind = (int)x.Merchant.MerchantKind,
-                                                             ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent,
-                                                             MerchantPrice = x.MerchantPrice,
-                                                             OriginalPrice = x.OriginalPrice,
-                                                             PriceUsd = x.PriceUsd,
-                                                             Discount = x.Discount, DiscountPercent = x.DiscountPercent,
-                                                             MaxOrderQuantity = x.MaxOrderQuantity
-                                                         })
-                                                         .FirstOrDefaultAsync();
-                    item?.NormalizePricing(usdRate);
-                    return item;
-                });
+                    MerchantId = x.MerchantId,
+                    MerchantKind = (int)x.Merchant.MerchantKind,
+                    ProfitOutOfMerchantPricePercent = x.ProfitOutOfMerchantPricePercent,
+                    MerchantPrice = x.MerchantPrice,
+                    OriginalPrice = x.OriginalPrice,
+                    PriceUsd = x.PriceUsd,
+                    Discount = x.Discount,
+                    DiscountPercent = x.DiscountPercent,
+                    MaxOrderQuantity = x.MaxOrderQuantity
+                })
+                .FirstOrDefaultAsync();
+            item?.NormalizePricing(usdRate);
+            return item;
+        }
 
         public async Task<MerchantProductDto> GetBestProductPrice(int pid, int[] mids)
         {

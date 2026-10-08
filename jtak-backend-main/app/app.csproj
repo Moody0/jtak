@@ -107,6 +107,7 @@
   <ItemGroup>
     <Content Update="keys\**" CopyToPublishDirectory="PreserveNewest" />
     <Content Update="Views\**" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="FileCenter\kalima-*.webp" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

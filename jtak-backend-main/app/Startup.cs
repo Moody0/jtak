@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -67,7 +68,34 @@ namespace App
             services.AddScoped<App.Helpers.Authorization.DashboardAccessService>();
             services.AddScoped<IDashboardAccessEvaluator>(provider => provider.GetRequiredService<App.Helpers.Authorization.DashboardAccessService>());
             services.AddScoped<App.Helpers.Authorization.DashboardPermissionFilter>();
-            services.AddControllersWithViews(options => options.Filters.AddService<App.Helpers.Authorization.DashboardPermissionFilter>(-3000))
+            services.AddHttpClient<App.Helpers.Authorization.WevlixOtpClient>();
+            services.AddScoped<App.Helpers.Authorization.CustomerOtpService>();
+            services.AddScoped<App.Helpers.Authorization.CustomerOtpSendLimiter>();
+            services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = 429;
+                options.AddPolicy("customer-otp-send", context =>
+                    System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+                        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0
+                        }));
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.StatusCode = 429;
+                    await context.HttpContext.Response.WriteAsJsonAsync(new
+                    {
+                        error = "OTP_RATE_LIMITED",
+                        errorDescription = "تم إرسال طلبات كثيرة لرمز التحقق. يرجى الانتظار دقيقة والمحاولة مجدداً."
+                    }, cancellationToken);
+                };
+            });
+            services.AddControllersWithViews(options =>
+            {
+                options.Filters.AddService<App.Helpers.Authorization.DashboardPermissionFilter>(-3000);
+                options.Filters.Add(new App.Helpers.Authorization.CustomerOtpExceptionFilter());
+            })
                     .AddJsonOptions(o =>
                     {
                         o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
@@ -230,6 +258,13 @@ namespace App
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IOptions<SolAppOptions> solAppOptions)
         {
+            // Plesk's local reverse proxy must not collapse all OTP senders into
+            // one IP bucket. Keep the framework's trusted-proxy defaults.
+            app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+            {
+                ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                    Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+            });
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -265,11 +300,22 @@ namespace App
                     throw;
                 }
                 try { serviceScope.ServiceProvider.EnsureSeedData().Wait(); } catch (Exception ex) { logger?.LogError(ex, "Failed to execute EnsureSeedData"); }
+                try
+                {
+                    serviceScope.ServiceProvider.GetRequiredService<App.Helpers.Authorization.CustomerOtpService>()
+                        .EnsureReviewAccountAsync(App.Helpers.Authorization.CustomerOtpService.ReviewPhone)
+                        .GetAwaiter().GetResult();
+                }
+                catch (App.Helpers.Authorization.CustomerOtpException ex)
+                {
+                    logger?.LogError("Google Play review account setup failed: {Reason}", ex.Message);
+                }
             }
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseRouting();
+            app.UseRateLimiter();
 
             //Best place to call UserCors
             app.UseCors();

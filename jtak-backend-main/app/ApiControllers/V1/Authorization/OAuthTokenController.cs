@@ -47,6 +47,7 @@ namespace App.ApiControllers.V1.Authorization
         private readonly ILogger _logger;
         private readonly IAdminAuditService _auditService;
         private readonly IConfiguration _configuration;
+        private readonly CustomerOtpService _customerOtp;
 
         private const double ConfirmationHour = 48;
 
@@ -61,7 +62,8 @@ namespace App.ApiControllers.V1.Authorization
             SignInManager<AppUser> signInManager,
             UserManager<AppUser> userManager,
             IAdminAuditService auditService = null,
-            IConfiguration configuration = null)
+            IConfiguration configuration = null,
+            CustomerOtpService customerOtp = null)
         {
             _env = env;
             _logger = logger;
@@ -74,6 +76,7 @@ namespace App.ApiControllers.V1.Authorization
             _smsLogService = smsLogService;
             _auditService = auditService;
             _configuration = configuration;
+            _customerOtp = customerOtp;
         }
 
         /// <summary>
@@ -273,14 +276,26 @@ namespace App.ApiControllers.V1.Authorization
 
                     var isCodeValid = false;
                     var normalizedCode = request.Code?.Replace(" ", "").Trim() ?? "";
+                    // Customer OTPs must use the dispatched, expiring challenge.
+                    // The shared legacy mobile grant cannot re-enable 123456 or
+                    // Identity/SmsLog fallbacks for a customer account.
+                    var hasOperationsRole = await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Merchant)) ||
+                        await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Delivery));
+                    var requiresCustomerOtp = !hasOperationsRole ||
+                        await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Customer));
+                    if (requiresCustomerOtp)
+                    {
+                        isCodeValid = _customerOtp != null &&
+                            await _customerOtp.ConsumeAsync(canonicalPhone, user, normalizedCode);
+                    }
                     var configuredTemporaryCode = TemporaryOtpPolicy.Code;
-                    if (TemporaryOtpPolicy.IsEnabled(_configuration) &&
+                    if (!requiresCustomerOtp && TemporaryOtpPolicy.IsEnabled(_configuration) &&
                         string.Equals(normalizedCode, configuredTemporaryCode, StringComparison.Ordinal))
                     {
                         isCodeValid = true;
                     }
 
-                    if (!isCodeValid)
+                    if (!isCodeValid && !requiresCustomerOtp)
                     {
                         var nationalPhone = canonicalPhone.Substring(4);
                         var candidatePhones = new[]
@@ -362,6 +377,10 @@ namespace App.ApiControllers.V1.Authorization
 
                     return await SignIn(user, request, DeviceId);
                 }
+            }
+            catch (CustomerOtpException e)
+            {
+                return StatusCode(e.StatusCode, new { error = "OTP_SERVICE_UNAVAILABLE", errorDescription = e.Message });
             }
             catch (Exception e)
             {

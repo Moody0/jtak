@@ -85,7 +85,7 @@ namespace App.ApiControllers.V1
             var result = new System.Collections.Generic.Dictionary<string, object>();
             result["ContentRootPath"] = _env.ContentRootPath;
             result["WebRootPath"] = _env.WebRootPath;
-            var fileCenter = _env.ContentRootPath + SiteOptions.FileCenterPath.Replace("/", "\\");
+            var fileCenter = _env.GetFileCenterPath();
             result["FileCenterExpected"] = fileCenter;
             result["FileCenterExists"] = Directory.Exists(fileCenter);
             if (Directory.Exists(fileCenter))

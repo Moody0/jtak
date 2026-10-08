@@ -2,8 +2,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace App.Helpers.Authorization
 {
-    // Until an OTP service is configured, challenge creation and token exchange
-    // use this fixed code. Explicitly disable temporary mode to enable real OTP.
+    // Legacy merchant/delivery OTP mode. Customer signup and token exchange
+    // always use CustomerOtpService and never honor this global bypass.
     public static class TemporaryOtpPolicy
     {
         public const string Code = "123456";

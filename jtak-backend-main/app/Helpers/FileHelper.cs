@@ -38,9 +38,17 @@ namespace App.Helpers
             if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
             return dbField;
         }
+        public static string GetFileCenterPath(this IWebHostEnvironment env)
+        {
+            var relativePath = SiteOptions.FileCenterPath.TrimStart('/', '\\')
+                .Replace('/', Path.DirectorySeparatorChar)
+                .Replace('\\', Path.DirectorySeparatorChar);
+            return Path.Combine(env.ContentRootPath, relativePath);
+        }
+
         public static string GetPhysicalPath(this IWebHostEnvironment env, string token)
         {
-            var fileCenterPath = env.ContentRootPath + SiteOptions.FileCenterPath.Replace("/", "\\");
+            var fileCenterPath = env.GetFileCenterPath();
             try
             {
                 var directFile = Path.Combine(fileCenterPath, token);

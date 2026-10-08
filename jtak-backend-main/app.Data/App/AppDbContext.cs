@@ -38,6 +38,8 @@ namespace App.Shared.Data.App
                 b.HasIndex(x => new { x.PushSentAtUtc, x.PushNextAttemptAtUtc, x.PushLockedUntilUtc });
             });
             builder.Entity<FavoriteProduct>().HasKey(c => new { c.UserId, c.ProductId });
+            builder.Entity<CustomerOtpChallenge>().HasIndex(x => x.ExpiresAt);
+            builder.Entity<CustomerOtpSendCounter>().HasKey(x => new { x.Bucket, x.WindowStart });
             builder.Entity<Testimonial>().HasMany(a => a.Translations).WithOne(p => p.Core).HasForeignKey(pt => pt.CoreId).OnDelete(DeleteBehavior.Cascade);
 
             //builder.Entity<AppUser>().ToTable("AppUser");
@@ -219,6 +221,8 @@ namespace App.Shared.Data.App
 
         public DbSet<SmsLog> SmsLogs { get; set; }
         public DbSet<PendingPhoneSignup> PendingPhoneSignups { get; set; }
+        public DbSet<CustomerOtpChallenge> CustomerOtpChallenges { get; set; }
+        public DbSet<CustomerOtpSendCounter> CustomerOtpSendCounters { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<GenericSetting> Settings { get; set; }
         public DbSet<Faq> Faqs { get; set; }

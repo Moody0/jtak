@@ -21,8 +21,8 @@ using App.Shared.Entities.Enums;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-using System.Security.Cryptography;
 using App.Helpers.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace App.ApiControllers.V1.Authorization
 {
@@ -40,6 +40,7 @@ namespace App.ApiControllers.V1.Authorization
         private readonly IConfiguration _configuration;
         private readonly App.Catalog.Data.CatalogDbContext _catalog;
         private readonly IMemoryCache _cache;
+        private readonly CustomerOtpService _customerOtp;
 
         private bool IsTemporaryOtpEnabled =>
             TemporaryOtpPolicy.IsEnabled(_configuration);
@@ -55,7 +56,8 @@ namespace App.ApiControllers.V1.Authorization
             INotificationService notificationService,
             IConfiguration configuration = null,
             App.Catalog.Data.CatalogDbContext catalog = null,
-            IMemoryCache cache = null)
+            IMemoryCache cache = null,
+            CustomerOtpService customerOtp = null)
         {
             _unitOfWork = unitOfWorkAsync;
             _userManager = userManager;
@@ -67,6 +69,7 @@ namespace App.ApiControllers.V1.Authorization
             _configuration = configuration;
             _catalog = catalog;
             _cache = cache;
+            _customerOtp = customerOtp;
         }
 
         /// <summary>
@@ -281,11 +284,12 @@ namespace App.ApiControllers.V1.Authorization
         /// </summary>
         /// <param name="model">The phoneNumber with this Regex format ^\+?[1-9]\d{1,14}$ </param>
         /// <returns>Wait time for the next SMS in seconds</returns>
-        [AllowAnonymous, HttpPost, Route("ResendSmsCode")]
+        [AllowAnonymous, HttpPost, Route("ResendSmsCode"), EnableRateLimiting("customer-otp-send")]
         public async Task<ActionResult<int>> ResendSmsCode(PhoneNumberModel model)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+            await _customerOtp.EnsureReviewAccountAsync(canonicalPhone);
             var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
             if (match.Ambiguous) return StatusCode(409, new { error = "PHONE_ACCOUNT_AMBIGUOUS", errorDescription = "يوجد أكثر من حساب مرتبط بهذا الرقم. يرجى التواصل مع الدعم." });
             var user = match.User;
@@ -303,21 +307,10 @@ namespace App.ApiControllers.V1.Authorization
                 return BadRequest($"You need to wait {waitTimeInSecs}s");
 
             var pending = await _unitOfWork.Context.PendingPhoneSignups.FindAsync(canonicalPhone);
-            if (pending != null && (user == null || !HasCompletedProfileName(user)))
+            if (user == null || pending != null || await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Customer)))
             {
-                pending.Code = CreatePhoneSignupCode();
-                pending.ExpiresAt = DateTime.UtcNow.AddMinutes(10);
-                pending.FailedAttempts = 0;
-                await _unitOfWork.SaveChangesAsync();
-                var pendingMessage = string.Format(_Account.SmsVerification, pending.Code);
-                await SendOtpSmsAsync(canonicalPhone, pendingMessage);
-                return waitTimeInSecs;
-            }
-
-            if (pending != null)
-            {
-                _unitOfWork.Context.PendingPhoneSignups.Remove(pending);
-                await _unitOfWork.SaveChangesAsync();
+                await BeginCustomerSignInAsync(canonicalPhone, user);
+                return 60;
             }
             if (user == null || user.DeletionDate != null) return NotFound();
 
@@ -336,11 +329,12 @@ namespace App.ApiControllers.V1.Authorization
         /// </summary>
         /// <param name="model">The phoneNumber with this Regex format ^\+?[1-9]\d{1,14}$ </param>
         /// <returns>Has display name or not</returns>
-        [AllowAnonymous, HttpPost, Route("RegisterOrSignInByPhoneNumber")]
+        [AllowAnonymous, HttpPost, Route("RegisterOrSignInByPhoneNumber"), EnableRateLimiting("customer-otp-send")]
         public async Task<ActionResult<PhoneSignInStartResponse>> RegisterOrSignInByPhoneNumber(PhoneNumberModel model)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+            await _customerOtp.EnsureReviewAccountAsync(canonicalPhone);
 
             await _unitOfWork.Context.PendingPhoneSignups
                 .Where(x => x.ExpiresAt <= DateTime.UtcNow)
@@ -356,10 +350,14 @@ namespace App.ApiControllers.V1.Authorization
                     errorDescription = "تم تعطيل حسابك. يرجى التواصل مع الدعم الفني."
                 });
 
-            // New signups and legacy accounts without a real name stay outside
-            // AppUsers until profile completion. This keeps abandoned OTP
-            // attempts from becoming nameless customer accounts.
-            if (user == null || !HasCompletedProfileName(user))
+            return await BeginCustomerSignInAsync(canonicalPhone, user);
+        }
+
+        private async Task<PhoneSignInStartResponse> BeginCustomerSignInAsync(string canonicalPhone, AppUser user)
+        {
+            var requiresProfile = user == null || !HasCompletedProfileName(user);
+            await _customerOtp.SendAsync(canonicalPhone, user, requiresProfile);
+            if (requiresProfile)
             {
                 var pending = await _unitOfWork.Context.PendingPhoneSignups.FindAsync(canonicalPhone);
                 if (pending == null)
@@ -367,30 +365,17 @@ namespace App.ApiControllers.V1.Authorization
                     pending = new PendingPhoneSignup { PhoneNumber = canonicalPhone };
                     _unitOfWork.Context.PendingPhoneSignups.Add(pending);
                 }
-                pending.Code = CreatePhoneSignupCode();
-                pending.ExpiresAt = DateTime.UtcNow.AddMinutes(10);
+                // Challenge codes are hashed in CustomerOtpChallenges. This
+                // legacy required field is no longer used for verification.
+                pending.Code = "******";
+                pending.ExpiresAt = DateTime.UtcNow.AddMinutes(5);
                 pending.FailedAttempts = 0;
                 await _unitOfWork.SaveChangesAsync();
-                var msg = string.Format(_Account.SmsVerification, pending.Code);
-                await SendOtpSmsAsync(canonicalPhone, msg);
-
-                return new PhoneSignInStartResponse
-                {
-                    RequiresProfileCompletion = true,
-                    VerificationCode = GetVerificationCodeForClient(pending.Code)
-                };
             }
-
-            var code = await _userManager.GenerateChangePhoneNumberTokenAsync(user, canonicalPhone);
-            var smsMessage = string.Format(_Account.SmsVerification, code);
-            var smsResponse = await SendOtpSmsAsync(canonicalPhone, smsMessage);
-            _smsLogService.Insert(new SmsLog { UserId = user.Id, Code = code, Text = smsMessage, Response = smsResponse });
-            await _unitOfWork.SaveChangesAsync();
-
             return new PhoneSignInStartResponse
             {
-                RequiresProfileCompletion = false,
-                VerificationCode = GetVerificationCodeForClient(code)
+                RequiresProfileCompletion = requiresProfile,
+                VerificationCode = string.Empty
             };
         }
 
@@ -406,7 +391,7 @@ namespace App.ApiControllers.V1.Authorization
             if (pending.FailedAttempts >= 5)
                 return BadRequest("تم تجاوز عدد المحاولات. يرجى طلب رمز جديد.");
 
-            if (!IsPhoneSignupCodeValid(pending, model.Code.Trim()))
+            if (!await _customerOtp.VerifyAsync(canonicalPhone, model.Code.Trim(), signupOnly: true))
             {
                 pending.FailedAttempts++;
                 await _unitOfWork.SaveChangesAsync();
@@ -437,7 +422,7 @@ namespace App.ApiControllers.V1.Authorization
                 return BadRequest("تم تجاوز عدد المحاولات. يرجى طلب رمز جديد.");
 
             var enteredCode = model.Code.Trim();
-            if (!IsPhoneSignupCodeValid(pending, enteredCode))
+            if (!await _customerOtp.VerifyAsync(canonicalPhone, enteredCode, signupOnly: true))
             {
                 pending.FailedAttempts++;
                 await _unitOfWork.SaveChangesAsync();
@@ -503,12 +488,6 @@ namespace App.ApiControllers.V1.Authorization
                 if (!updateResult.Succeeded) return BadRequest(updateResult);
             }
 
-            _smsLogService.Insert(new SmsLog
-            {
-                UserId = user.Id,
-                Code = enteredCode,
-                Text = string.Format(_Account.SmsVerification, enteredCode)
-            });
             _unitOfWork.Context.PendingPhoneSignups.Remove(pending);
             await _unitOfWork.SaveChangesAsync();
             return "OK";
@@ -760,13 +739,6 @@ namespace App.ApiControllers.V1.Authorization
 
             return "OK";
         }
-
-        private static string CreatePhoneSignupCode() =>
-            RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-
-        private bool IsPhoneSignupCodeValid(PendingPhoneSignup pending, string code) =>
-            (IsTemporaryOtpEnabled && string.Equals(TemporaryOtpCode, code, StringComparison.Ordinal)) ||
-            string.Equals(pending.Code, code, StringComparison.Ordinal);
 
         private async Task<string> SendOtpSmsAsync(string phoneNumber, string message)
         {
