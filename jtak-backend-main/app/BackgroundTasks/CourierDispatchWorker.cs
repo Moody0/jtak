@@ -23,10 +23,6 @@ namespace App.BackgroundTasks
     /// </summary>
     public sealed class CourierDispatchWorker : SolScheduledService
     {
-        private const int DriversPerWave = 3;
-        private static readonly TimeSpan OfferDuration = TimeSpan.FromSeconds(25);
-        private static readonly TimeSpan LocationFreshness = TimeSpan.FromMinutes(5);
-
         private readonly IServiceProvider _services;
         private readonly ILogger<CourierDispatchWorker> _logger;
 
@@ -73,7 +69,7 @@ namespace App.BackgroundTasks
         private async Task ProcessOrderAsync(IServiceProvider services, OrdersDbContext db, int orderId,
             DateTime now, CancellationToken cancellationToken)
         {
-            var expiredCount = await db.OrderDispatchOffers
+            await db.OrderDispatchOffers
                 .Where(x => x.OrderId == orderId && x.Status == OrderDispatchOfferStatus.Offered && x.ExpiresAtUtc <= now)
                 .ExecuteUpdateAsync(update => update
                     .SetProperty(x => x.Status, OrderDispatchOfferStatus.TimedOut)
@@ -91,11 +87,6 @@ namespace App.BackgroundTasks
                 return;
             }
 
-            var hasLiveOffer = await db.OrderDispatchOffers.AnyAsync(x =>
-                x.OrderId == orderId && x.MatchingRound == order.CourierMatchingRound &&
-                x.Status == OrderDispatchOfferStatus.Offered && x.ExpiresAtUtc > now, cancellationToken);
-            if (hasLiveOffer) return;
-
             var matchingDetails = order.OrderDetails.Where(x =>
                 x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
                 x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
@@ -105,64 +96,33 @@ namespace App.BackgroundTasks
                     x.OrderDetailStatus != OrderDetailStatus.ReadyForPickup))
                 return;
 
-            var merchantIds = matchingDetails.Select(x => x.MerchantId).Distinct().ToArray();
-            var merchantService = services.GetRequiredService<IMerchantService>();
-            var pickupPoints = await merchantService.GetMerchantStops(merchantIds);
-            if (pickupPoints.Length == 0) return;
-
-            var pickup = pickupPoints[0];
             var deliveryService = services.GetRequiredService<IDeliveryService>();
             var onlineDrivers = await deliveryService.GetOnlineDeliveryIds();
             if (onlineDrivers.Length == 0) return;
-
-            // A leftover route stop is not an active delivery. Count the actual
-            // assigned order lifecycle so delivered/canceled history cannot fill
-            // a driver's capacity indefinitely.
-            var activeDeliveryCounts = await db.Orders.AsNoTracking()
-                .Where(x => x.OrderStatus == OrderStatus.Success && x.DeliveryId.HasValue &&
-                            onlineDrivers.Contains(x.DeliveryId.Value) && x.DeliveredAt == null &&
-                            x.OrderDetails.Any(d => d.OrderDetailStatus != OrderDetailStatus.Delivered &&
-                                d.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
-                                d.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
-                                d.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled))
-                .GroupBy(x => x.DeliveryId.Value)
-                .Select(x => new { DriverId = x.Key, Count = x.Count() })
-                .ToDictionaryAsync(x => x.DriverId, x => x.Count, cancellationToken);
 
             var alreadyOffered = await db.OrderDispatchOffers.AsNoTracking()
                 .Where(x => x.OrderId == orderId && x.MatchingRound == order.CourierMatchingRound)
                 .Select(x => x.DriverId)
                 .ToListAsync(cancellationToken);
             var excluded = alreadyOffered.ToHashSet();
-            var candidates = new System.Collections.Generic.List<(Guid DriverId, double Distance)>();
-            foreach (var driverId in onlineDrivers)
-            {
-                if (excluded.Contains(driverId)) continue;
-                var status = await deliveryService.GetDeliveryStatus(driverId);
-                if (!status.IsOnline || !status.LastLocationUpdatedAt.HasValue ||
-                    status.LastLocationUpdatedAt.Value < now.Subtract(LocationFreshness))
-                    continue;
-
-                var activeOrders = activeDeliveryCounts.TryGetValue(driverId, out var count) ? count : 0;
-                if (activeOrders >= 3) continue;
-                var distance = status.Loc.DistanceInMeters((pickup.Lat, pickup.Lng));
-                candidates.Add((driverId, distance));
-            }
-
-            if (candidates.Count == 0) return; // Retry next tick until the fixed deadline.
+            // Broadcast to every active driver on duty. Distance, GPS freshness,
+            // and other assigned orders do not restrict who sees the offer.
+            // Recheck on every tick so drivers starting a shift later receive it
+            // even while the original recipients still have live offers.
+            var selected = onlineDrivers.Distinct().Where(x => !excluded.Contains(x)).ToArray();
+            if (selected.Length == 0) return;
 
             var wave = await db.OrderDispatchOffers.AsNoTracking()
                 .Where(x => x.OrderId == orderId && x.MatchingRound == order.CourierMatchingRound)
                 .Select(x => (int?)x.WaveNumber)
                 .MaxAsync(cancellationToken) ?? 0;
-            var selected = candidates.OrderBy(x => x.Distance).Take(DriversPerWave).ToArray();
-            var expiresAt = now.Add(OfferDuration);
-            foreach (var candidate in selected)
+            var expiresAt = order.CourierMatchingDeadlineAtUtc.Value;
+            foreach (var driverId in selected)
             {
                 db.OrderDispatchOffers.Add(new OrderDispatchOffer
                 {
                     OrderId = orderId,
-                    DriverId = candidate.DriverId,
+                    DriverId = driverId,
                     MatchingRound = order.CourierMatchingRound,
                     WaveNumber = wave + 1,
                     OfferedAtUtc = now,
@@ -177,7 +137,7 @@ namespace App.BackgroundTasks
             try
             {
                 await services.GetRequiredService<INotificationService>()
-                    .SendDeliveryNewOrderRecived(selected.Select(x => x.DriverId).ToArray(), orderId, matchingDetails, order.CourierMatchingRound);
+                    .SendDeliveryNewOrderRecived(selected, orderId, matchingDetails, order.CourierMatchingRound);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

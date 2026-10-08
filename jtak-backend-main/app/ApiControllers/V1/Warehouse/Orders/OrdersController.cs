@@ -194,15 +194,16 @@ namespace App.ApiControllers.V1.Warehouse
                 await _service.MerchantAccept(id, merchantIds);
             }
 
-            // Matching starts only after every active item from this (single) merchant
-            // has been accepted. The overall matching clock is server-owned.
+            // Matching starts once all active items have been accepted, including
+            // items already prepared by another merchant. The clock is server-owned.
             var acceptedOrder = await _service.FindAsync(id);
             var activeDetails = acceptedOrder?.OrderDetails?.Where(x =>
                 x.OrderDetailStatus != OrderDetailStatus.MerchantRejected &&
                 x.OrderDetailStatus != OrderDetailStatus.CustomerCanceled &&
                 x.OrderDetailStatus != OrderDetailStatus.DeliveryCanceled).ToArray() ?? Array.Empty<OrderDetail>();
             if (acceptedOrder != null && activeDetails.Length > 0 &&
-                activeDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted) &&
+                activeDetails.All(x => x.OrderDetailStatus == OrderDetailStatus.MerchantAccepted ||
+                                       x.OrderDetailStatus == OrderDetailStatus.ReadyForPickup) &&
                 (!acceptedOrder.DeliveryId.HasValue || acceptedOrder.DeliveryId == Guid.Empty) &&
                 !acceptedOrder.CourierMatchingStartedAtUtc.HasValue)
             {
