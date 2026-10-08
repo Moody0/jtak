@@ -1,5 +1,6 @@
 using App.Catalog.Data;
 using App.ApiModels;
+using App.Setup;
 using App.Shared.Services;
 using App.Shared.Data.App;
 using App.Shared.Entities.Enums;
@@ -187,7 +188,7 @@ namespace App.ApiControllers.V1.Admin
             var originalCatalogConnection = rateChanged ? catalogDb.Database.GetDbConnection() : null;
             var appConnection = appDb.Database.GetDbConnection();
             if (rateChanged && (catalogDb.Database.ProviderName != appDb.Database.ProviderName ||
-                !string.Equals(originalCatalogConnection.ConnectionString, appConnection.ConnectionString, StringComparison.Ordinal)))
+                !DatabaseConnectionConfiguration.TargetSameDatabase(originalCatalogConnection, appConnection)))
                 return BadRequest(ApiErr.Create("سعر الصرف والأسعار يجب أن تكون في قاعدة البيانات نفسها."));
             try
             {
