@@ -13,8 +13,8 @@ namespace App.Shared.Data.Migrations
             // Safe after an administrator applies the supplied phpMyAdmin SQL.
             migrationBuilder.Sql(@"CREATE TABLE IF NOT EXISTS `CustomerOtpChallenges` (
                 `PhoneNumber` varchar(16) NOT NULL,
-                `ChallengeId` char(36) CHARACTER SET ascii NOT NULL,
-                `UserId` char(36) CHARACTER SET ascii NULL,
+                `ChallengeId` varchar(36) CHARACTER SET ascii NOT NULL,
+                `UserId` varchar(36) CHARACTER SET ascii NULL,
                 `CodeHash` varchar(64) NOT NULL,
                 `MessageId` varchar(64) NULL,
                 `CreatedAt` datetime(6) NOT NULL,

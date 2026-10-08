@@ -146,6 +146,14 @@ namespace App.Helpers.Authorization
                     .SetProperty(x => x.FailedAttempts, 0)) == 1;
         }
 
+        public Task<bool> HasActiveChallengeAsync(string phone, AppUser user)
+        {
+            var now = DateTime.UtcNow;
+            return _db.CustomerOtpChallenges.AsNoTracking().AnyAsync(x =>
+                x.PhoneNumber == phone && (x.UserId == null || x.UserId == user.Id) &&
+                x.ConsumedAt == null && x.ExpiresAt > now);
+        }
+
         public async Task<bool> ConsumeAsync(string phone, AppUser user, string code)
         {
             var challengeId = await _db.CustomerOtpChallenges.AsNoTracking()

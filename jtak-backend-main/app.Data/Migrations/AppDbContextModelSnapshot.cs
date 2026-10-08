@@ -932,8 +932,8 @@ namespace App.Shared.Data.Migrations
             modelBuilder.Entity("App.Shared.Entities.CustomerOtpChallenge", b =>
                 {
                     b.Property<string>("PhoneNumber").HasMaxLength(16).HasColumnType("varchar(16)");
-                    b.Property<Guid>("ChallengeId").HasColumnType("char(36)");
-                    b.Property<Guid?>("UserId").HasColumnType("char(36)");
+                    b.Property<Guid>("ChallengeId").HasColumnType("varchar(36)");
+                    b.Property<Guid?>("UserId").HasColumnType("varchar(36)");
                     b.Property<string>("CodeHash").IsRequired().HasMaxLength(64).HasColumnType("varchar(64)");
                     b.Property<string>("MessageId").HasMaxLength(64).HasColumnType("varchar(64)");
                     b.Property<DateTime>("CreatedAt").HasColumnType("datetime(6)");

@@ -276,13 +276,19 @@ namespace App.ApiControllers.V1.Authorization
 
                     var isCodeValid = false;
                     var normalizedCode = request.Code?.Replace(" ", "").Trim() ?? "";
-                    // Customer OTPs must use the dispatched, expiring challenge.
+                    // Customer OTPs must use the dispatched, expiring challenge,
+                    // including customers whose existing account is a driver or
+                    // merchant. An active challenge also supports older customer
+                    // APKs that do not send the explicit purpose parameter yet.
                     // The shared legacy mobile grant cannot re-enable 123456 or
                     // Identity/SmsLog fallbacks for a customer account.
                     var hasOperationsRole = await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Merchant)) ||
                         await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Delivery));
-                    var requiresCustomerOtp = !hasOperationsRole ||
-                        await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Customer));
+                    var customerPurpose = string.Equals(request.GetParameter("otp_purpose")?.ToString(),
+                        "customer", StringComparison.Ordinal);
+                    var requiresCustomerOtp = customerPurpose || !hasOperationsRole ||
+                        await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Customer)) ||
+                        (_customerOtp != null && await _customerOtp.HasActiveChallengeAsync(canonicalPhone, user));
                     if (requiresCustomerOtp)
                     {
                         isCodeValid = _customerOtp != null &&
@@ -350,7 +356,7 @@ namespace App.ApiControllers.V1.Authorization
                     if (!isCodeValid)
                     {
                         _logger.LogWarning("SMS code verification failed for user {UserName} ({PhoneNumber})", user.UserName, canonicalPhone);
-                        return ForbidInvalidUsernamePassword();
+                        return requiresCustomerOtp ? ForbidInvalidCustomerOtp() : ForbidInvalidUsernamePassword();
                     }
 
                     if (user.PhoneNumber != canonicalPhone)
@@ -427,6 +433,10 @@ namespace App.ApiControllers.V1.Authorization
         }
         private ForbidResult ForbidInvalidUsernamePassword() =>
             Forbid("ForbidInvalidUsernamePassword", Errors.AccessDenied, _Authorization.InvalidUsernamePassword);
+
+        private ForbidResult ForbidInvalidCustomerOtp() =>
+            Forbid("ForbidInvalidCustomerOtp", Errors.InvalidGrant,
+                "رمز التحقق غير صحيح أو انتهت صلاحيته. يرجى طلب رمز جديد والمحاولة مجدداً.");
 
         private ForbidResult ForbidNotConfirmed() =>
             Forbid("ForbidNotConfirmed", Errors.AccessDenied, _Authorization.UserAccountNotConfirmed);
