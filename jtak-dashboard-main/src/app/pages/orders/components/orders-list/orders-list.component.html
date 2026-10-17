@@ -441,7 +441,7 @@
 
                   <button appDashboardWrite *ngIf="canDeliver(o)" type="button" class="dropdown-item py-2 px-3 text-success fw-bold d-flex align-items-center" (click)="openDeliverModal(o)">
                     <i class="fas fa-check-double text-success me-2"></i>
-                    <span>تسليم إداري</span>
+                    <span>{{ 'ORDERS_PAGE.ADMIN_DELIVERY' | translate }}</span>
                   </button>
 
                   <div class="dropdown-divider my-1" *ngIf="canReject(o) || canCancel(o)"></div>

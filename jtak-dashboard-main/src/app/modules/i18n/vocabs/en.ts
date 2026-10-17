@@ -364,7 +364,7 @@ export const locale = {
       START_PREPARING: 'Start preparing',
       ASSIGN_OR_REASSIGN: 'Assign / reassign captain',
       CONFIRM_PICKUP: 'Confirm captain pickup',
-      ADMIN_DELIVERY: 'Complete delivery manually',
+      ADMIN_DELIVERY: 'Admin delivery',
       REJECT_ORDER: 'Reject order',
       HISTORY_TITLE: 'Order history',
       HISTORY_LOADING: 'Loading order history...',

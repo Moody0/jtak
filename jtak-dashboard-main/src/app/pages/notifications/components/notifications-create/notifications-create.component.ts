@@ -80,26 +80,35 @@ export class NotificationsCreateComponent implements OnInit, OnDestroy {
     this.updateDestination();
   }
 
-  get destinations(): { value: CampaignRequest['destination']; label: string }[] {
-    const common: { value: CampaignRequest['destination']; label: string }[] = [
+  private readonly commonDestinations: { value: CampaignRequest['destination']; label: string }[] = [
       { value: 'home', label: 'الصفحة الرئيسية' },
       { value: 'orders', label: 'الطلبات' },
     ];
-    if (this.selectedTarget === 'customers') return [...common,
+  // Keep native option elements stable while Angular refreshes the preview.
+  private readonly destinationsByTarget: Record<CampaignRequest['target'], { value: CampaignRequest['destination']; label: string }[]> = {
+    customers: [...this.commonDestinations,
       { value: 'merchant', label: 'متجر أو مطعم محدد' },
       { value: 'grocery', label: 'السوبرماركت والبقالة' },
       { value: 'restaurants', label: 'المطاعم' },
       { value: 'favorites', label: 'المفضلة' },
       { value: 'errands', label: 'طلبات الشراء' },
-    ];
-    if (this.selectedTarget === 'delivery') return [...common,
+    ],
+    delivery: [...this.commonDestinations,
       { value: 'errands', label: 'طلبات الشراء' },
       { value: 'finance', label: 'المالية والأرباح' },
-    ];
-    return [...common,
+    ],
+    warehouse: [...this.commonDestinations,
       { value: 'products', label: 'المنتجات' },
       { value: 'finance', label: 'المالية والأرباح' },
-    ];
+    ],
+  };
+
+  get destinations(): { value: CampaignRequest['destination']; label: string }[] {
+    return this.destinationsByTarget[this.selectedTarget];
+  }
+
+  trackDestination(_index: number, destination: { value: CampaignRequest['destination'] }): string {
+    return destination.value;
   }
 
   get destinationLabel(): string {

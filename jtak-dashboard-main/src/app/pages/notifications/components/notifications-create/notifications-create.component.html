@@ -60,7 +60,7 @@
       <div class="mb-5">
         <label for="campaign-destination" class="form-label fw-bold">أي صفحة تفتح عند الضغط على الإشعار؟</label>
         <select id="campaign-destination" class="form-select" formControlName="destination" (change)="updateDestination()">
-          <option *ngFor="let destination of destinations" [value]="destination.value">{{ destination.label }}</option>
+          <option *ngFor="let destination of destinations; trackBy: trackDestination" [value]="destination.value">{{ destination.label }}</option>
         </select>
         <div class="form-text">لو لم تحدد صفحة، سيفتح التطبيق على الصفحة الرئيسية.</div>
         <div *ngIf="formGroup.get('destination')?.value === 'merchant'" class="mt-3">

@@ -364,7 +364,7 @@ export const locale = {
       START_PREPARING: 'بدء التجهيز',
       ASSIGN_OR_REASSIGN: 'تعيين / إعادة تعيين مندوب',
       CONFIRM_PICKUP: 'تأكيد استلام المندوب',
-      ADMIN_DELIVERY: 'تسجيل التسليم يدوياً',
+      ADMIN_DELIVERY: 'تسليم إداري',
       REJECT_ORDER: 'رفض الطلب',
       HISTORY_TITLE: 'سجل الطلب',
       HISTORY_LOADING: 'جاري تحميل سجل الطلب...',

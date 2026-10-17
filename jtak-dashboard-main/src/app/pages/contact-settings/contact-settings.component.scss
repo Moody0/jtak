@@ -3,37 +3,128 @@
 
   .card-custom {
     border: 1px solid #eef2f6 !important;
-    border-radius: 12px;
+    border-radius: 14px;
     background: #ffffff;
   }
 
-  .preview-device {
-    background-color: #f8fafc;
-    border-radius: 14px;
-    border: 1px solid #e2e8f0;
+  /* Sticky live preview card with proper navbar clearance and scrollable content */
+  .preview-sticky-card {
+    position: sticky;
+    top: 90px !important;
+    z-index: 10;
+    max-height: calc(100vh - 110px);
+    display: flex;
+    flex-direction: column;
+
+    .card-body {
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 6px;
+
+      &::-webkit-scrollbar {
+        width: 5px;
+      }
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    }
+  }
+
+  /* Elegant smartphone frame mockup */
+  .preview-phone-shell {
+    max-width: 380px;
+    margin: 0 auto;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 28px;
+    border: 2px solid #e2e8f0;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.07), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+    position: relative;
+    width: 100%;
+  }
+
+  .preview-phone-notch {
+    width: 48px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 4px;
+    margin: 0 auto;
   }
 
   .preview-action-card {
     border: 1px solid #e2e8f0;
-    transition: transform 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
     &:hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border-color: #cbd5e1;
     }
   }
 
   .preview-icon-circle {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+
+    &.hotline-icon {
+      background: rgba(245, 158, 11, 0.12);
+      color: #d97706;
+    }
+
+    &.whatsapp-icon {
+      background: rgba(16, 185, 129, 0.12);
+      color: #059669;
+    }
+
+    &.email-icon {
+      background: rgba(59, 130, 246, 0.12);
+      color: #2563eb;
+    }
   }
 
-  .social-preview-btn {
+  .social-btn {
     width: 36px;
     height: 36px;
     border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff !important;
+    font-size: 15px;
+    text-decoration: none;
+    transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+      transform: translateY(-2px) scale(1.06);
+      color: #ffffff !important;
+      opacity: 0.95;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    &.facebook-btn {
+      background: #1877f2;
+    }
+
+    &.instagram-btn {
+      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    }
+
+    &.youtube-btn {
+      background: #ff0000;
+    }
+
+    &.telegram-btn {
+      background: #229ed9;
+    }
   }
 }

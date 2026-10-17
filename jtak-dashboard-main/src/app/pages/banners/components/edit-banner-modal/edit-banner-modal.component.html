@@ -100,7 +100,7 @@
                   <option value="none">🚫 {{ 'BANNERS_PAGE.TARGET_TYPE_NONE' | translate }}</option>
                   <option value="restaurant">🍽️ {{ 'BANNERS_PAGE.TARGET_TYPE_RESTAURANT' | translate }}</option>
                   <option value="market">🛒 {{ 'BANNERS_PAGE.TARGET_TYPE_MARKET' | translate }}</option>
-                  <option value="category">📂 تصنيف منتجات</option>
+                  <option value="category">🛒 قسم في جيتك ماركت (تصنيف)</option>
                   <option value="offers">🏷️ {{ 'BANNERS_PAGE.TARGET_TYPE_OFFERS' | translate }}</option>
                   <option value="external">🌐 {{ 'BANNERS_PAGE.TARGET_TYPE_EXTERNAL' | translate }}</option>
                 </select>
@@ -109,8 +109,12 @@
               <!-- Contextual Action Details -->
               <div class="col-md-7">
                 <div *ngIf="formGroup.get('targetType')?.value === 'category'">
-                  <label class="form-label fw-bold">التصنيف الذي يفتحه الإعلان</label>
-                  <ng-select [items]="categories" bindLabel="title" bindValue="id" formControlName="targetCategoryId" [loading]="loadingCategories" placeholder="اختر التصنيف"></ng-select>
+                  <label class="form-label fw-bold mb-1">قسم جيتك ماركت الذي يفتحه الإعلان</label>
+                  <ng-select [items]="categories" bindLabel="title" bindValue="id" formControlName="targetCategoryId" [loading]="loadingCategories" placeholder="اختر القسم (مثل: دجاج، لحوم، خضار وفواكه...)"></ng-select>
+                  <div class="form-text text-muted mt-1">
+                    <i class="fas fa-info-circle text-primary me-1"></i>
+                    سيقوم التطبيق بفتح <strong>جيتك ماركت</strong> تلقائياً والانتقال مباشرة إلى هذا القسم.
+                  </div>
                 </div>
                 <!-- If None (Display Only) -->
                 <div *ngIf="formGroup.get('targetType')?.value === 'none'" class="h-100 d-flex align-items-center pt-md-4">

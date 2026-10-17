@@ -60,7 +60,7 @@
   <form *ngIf="!isLoading" [formGroup]="form" (ngSubmit)="save()">
     <div class="row g-5">
       <!-- Left Column: Form Controls -->
-      <div class="col-lg-8">
+      <div class="col-xl-7 col-lg-7">
         <!-- 1. Direct Contact Channels -->
         <div class="card card-custom mb-5 border-0 shadow-none">
           <div class="card-header border-0 pt-5">
@@ -329,71 +329,94 @@
       </div>
 
       <!-- Right Column: Live App Preview & Info Card -->
-      <div class="col-lg-4">
+      <div class="col-xl-5 col-lg-5">
         <!-- Live Apps Preview -->
-        <div class="card card-custom mb-5 border-0 shadow-none sticky-top" style="top: 20px;">
-          <div class="card-header border-0 pt-5">
-            <h3 class="card-title align-items-start flex-column">
-              <span class="card-label fw-bold text-dark fs-6">
+        <div class="card card-custom preview-sticky-card border-0 shadow-sm">
+          <div class="card-header border-0 pt-5 pb-2">
+            <h3 class="card-title align-items-start flex-column mb-0">
+              <span class="card-label fw-bold text-dark fs-5">
                 <i class="fas fa-mobile-alt text-primary me-2"></i>
                 {{ 'CONTACT_SETTINGS_PAGE.PREVIEW_TITLE' | translate }}
               </span>
-              <span class="text-muted mt-1 fs-8">
+              <span class="text-muted mt-1 fs-7">
                 {{ 'CONTACT_SETTINGS_PAGE.PREVIEW_DESC' | translate }}
               </span>
             </h3>
           </div>
-          <div class="card-body pt-2">
-            <!-- Mobile Preview Mockup -->
-            <div class="preview-device p-4 rounded-3 border bg-light">
+          <div class="card-body pt-3 pb-5">
+            <!-- Mobile Preview Mockup Shell -->
+            <div class="preview-phone-shell p-4">
+              <!-- Speaker Notch -->
+              <div class="preview-phone-notch mb-3"></div>
+
               <div class="text-center mb-4">
-                <div class="badge badge-light-primary mb-2">تطبيق العملاء والكباتن</div>
-                <h5 class="fw-bold fs-6 mb-1">خدمة عملاء جيتك</h5>
-                <p class="text-muted fs-8 mb-0">{{ form.get('workingHoursAr')?.value || 'يومياً' }}</p>
+                <span class="badge badge-light-primary fw-semibold px-3 py-2 mb-2">تطبيق العملاء والكباتن</span>
+                <h5 class="fw-bolder fs-6 mb-1 text-dark">خدمة عملاء جيتك</h5>
+                <p class="text-muted fs-8 mb-0">
+                  <i class="far fa-clock text-muted me-1"></i>
+                  {{ form.get('workingHoursAr')?.value || 'يومياً على مدار الساعة' }}
+                </p>
               </div>
 
               <!-- Hotline Card Mockup -->
-              <div class="preview-action-card p-3 rounded-2 bg-white mb-3 border d-flex align-items-center justify-content-between">
+              <div class="preview-action-card p-3 rounded-3 bg-white mb-3 border d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center">
-                  <div class="preview-icon-circle bg-light-primary text-primary me-3">
+                  <div class="preview-icon-circle hotline-icon me-3">
                     <i class="fas fa-phone-alt"></i>
                   </div>
                   <div>
-                    <div class="fs-8 text-muted">الخط الساخن</div>
+                    <div class="fs-8 text-muted fw-semibold">الخط الساخن</div>
                     <div class="fw-bold fs-7 text-dark" dir="ltr">
                       {{ form.get('phoneFormatted')?.value || form.get('phoneNumber')?.value || '0985 615 705' }}
                     </div>
                   </div>
                 </div>
-                <span class="badge badge-primary fs-8">اتصال</span>
+                <span class="badge bg-warning text-white fw-bold px-3 py-2 fs-8">اتصال</span>
               </div>
 
               <!-- WhatsApp Card Mockup -->
-              <div class="preview-action-card p-3 rounded-2 bg-white mb-4 border d-flex align-items-center justify-content-between">
+              <div class="preview-action-card p-3 rounded-3 bg-white mb-3 border d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center">
-                  <div class="preview-icon-circle bg-light-success text-success me-3">
+                  <div class="preview-icon-circle whatsapp-icon me-3">
                     <i class="fab fa-whatsapp fs-5"></i>
                   </div>
                   <div>
-                    <div class="fs-8 text-muted">واتساب مباشر</div>
+                    <div class="fs-8 text-muted fw-semibold">واتساب مباشر</div>
                     <div class="fw-bold fs-7 text-dark" dir="ltr">
-                      +{{ form.get('whatsAppNumber')?.value || '963985615705' }}
+                      {{ form.get('whatsAppNumber')?.value ? ('+' + form.get('whatsAppNumber')?.value) : '+963 985 615 705' }}
                     </div>
                   </div>
                 </div>
-                <span class="badge badge-success fs-8">محادثة</span>
+                <span class="badge bg-success text-white fw-bold px-3 py-2 fs-8">محادثة</span>
+              </div>
+
+              <!-- Email Card Mockup (if email filled) -->
+              <div *ngIf="form.get('email')?.value" class="preview-action-card p-3 rounded-3 bg-white mb-3 border d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center text-truncate">
+                  <div class="preview-icon-circle email-icon me-3 flex-shrink-0">
+                    <i class="fas fa-envelope fs-6"></i>
+                  </div>
+                  <div class="text-truncate">
+                    <div class="fs-8 text-muted fw-semibold">البريد الإلكتروني</div>
+                    <div class="fw-bold fs-8 text-dark text-truncate" dir="ltr">
+                      {{ form.get('email')?.value }}
+                    </div>
+                  </div>
+                </div>
+                <span class="badge bg-light-primary text-primary fw-bold px-2 py-2 fs-8 ms-2 flex-shrink-0">مراسلة</span>
               </div>
 
               <!-- Social Media Strip Mockup -->
-              <div class="text-center pt-2 border-top">
+              <div class="preview-social-strip text-center pt-3 border-top mt-3">
                 <div class="fs-8 fw-bold text-muted mb-2">منصات التواصل الرسمية</div>
-                <div class="d-flex justify-content-center gap-2">
+                <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap">
                   <a
                     *ngIf="form.get('facebookUrl')?.value"
                     [href]="form.get('facebookUrl')?.value"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="social-preview-btn btn btn-icon btn-sm btn-light-primary"
+                    class="social-btn facebook-btn"
+                    title="Facebook"
                   >
                     <i class="fab fa-facebook-f"></i>
                   </a>
@@ -402,7 +425,8 @@
                     [href]="form.get('instagramUrl')?.value"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="social-preview-btn btn btn-icon btn-sm btn-light-danger"
+                    class="social-btn instagram-btn"
+                    title="Instagram"
                   >
                     <i class="fab fa-instagram"></i>
                   </a>
@@ -411,7 +435,8 @@
                     [href]="form.get('youtubeUrl')?.value"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="social-preview-btn btn btn-icon btn-sm btn-light-danger"
+                    class="social-btn youtube-btn"
+                    title="YouTube"
                   >
                     <i class="fab fa-youtube"></i>
                   </a>
@@ -420,21 +445,37 @@
                     [href]="form.get('telegramUrl')?.value"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="social-preview-btn btn btn-icon btn-sm btn-light-info"
+                    class="social-btn telegram-btn"
+                    title="Telegram"
                   >
                     <i class="fab fa-telegram-plane"></i>
                   </a>
+
+                  <span
+                    *ngIf="!form.get('facebookUrl')?.value && !form.get('instagramUrl')?.value && !form.get('youtubeUrl')?.value && !form.get('telegramUrl')?.value"
+                    class="text-muted fs-8 fst-italic"
+                  >
+                    أدخل الروابط في النموذج لتظهر هنا
+                  </span>
+                </div>
+              </div>
+
+              <!-- Address in Mockup (if address filled) -->
+              <div *ngIf="form.get('addressAr')?.value" class="text-center pt-3 mt-3 border-top">
+                <div class="d-inline-flex align-items-center text-muted fs-8">
+                  <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                  <span>{{ form.get('addressAr')?.value }}</span>
                 </div>
               </div>
             </div>
 
             <!-- Sync Note -->
-            <div class="alert alert-light-info mt-4 p-3 mb-0" role="alert">
+            <div class="alert alert-light-primary border border-primary border-opacity-10 mt-4 p-3 mb-0 rounded-3" role="alert">
               <div class="d-flex align-items-start">
-                <i class="fas fa-info-circle text-info fs-5 mt-1 me-2"></i>
-                <div class="fs-8 text-dark">
-                  <strong>مزامنة فورية:</strong>
-                  عند حفظ أي تعديل هنا، يتم تطبيقه تلقائياً ولحظياً على جميع تطبيقات الهواتف الذكية (تطبيق العميل، تطبيق الكابتن، وتطبيق المتجر) دون الحاجة لإعادة إصدار تحديث في متجر التطبيقات.
+                <i class="fas fa-bolt text-primary fs-5 mt-1 me-2 flex-shrink-0"></i>
+                <div class="fs-8 text-dark lh-base">
+                  <strong class="text-primary d-block mb-1">مزامنة فورية وتحديث حي:</strong>
+                  أي تعديل تحفظه يتم تطبيقه فوراً على تطبيقات الهواتف الذكية (العميل، الكابتن، المتجر) دون الحاجة لإعادة رفع تحديث للمتجر.
                 </div>
               </div>
             </div>
