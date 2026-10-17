@@ -394,18 +394,20 @@ namespace App.Shared.Services.Extentions
                                                           int paymentId,
                                                           decimal amount)
         {
-            var desc = $"تم استلام مبلغ وقدره ({amount:0.00})";
+            var descAr = $"تم تسليم مبلغ وقدره ({amount:0.00})";
+            var descEn = $"Payment delivered: ({amount:0.00})";
+            var descTr = $"Teslim edilen miktar: ({amount:0.00})";
             var n = new Notification
             {
-                TitleAr = $"تم استلام مبلغ",
-                TitleEn = $"Amount was recived",
-                TitleTr = $"Alınan miktar",
-                TextAr = desc,
-                TextEn = desc,
-                TextTr = desc,
-                //Topic = $"Order_{orderId}",
+                TitleAr = $"تم تسليم مبلغ",
+                TitleEn = $"Amount was delivered",
+                TitleTr = $"Miktar teslim edildi",
+                TextAr = descAr,
+                TextEn = descEn,
+                TextTr = descTr,
+                AudienceApp = "delivery",
                 Url = $"{AppDomainHelper.DashboardUrl}/Payment/Recived/{paymentId}",
-                NotificationType = NotificationType.Order
+                NotificationType = NotificationType.Payment
             };
             await SendActionAsync(service, n, ids);
         }

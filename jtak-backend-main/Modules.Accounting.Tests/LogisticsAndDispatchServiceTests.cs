@@ -196,6 +196,48 @@ namespace Modules.Accounting.Tests
             Assert.Null(dropoffStop.MerchantId);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task AddOrder_AfterUnassignment_ReopensStopsForSelectedDriver(bool differentDriver)
+        {
+            var (context, _, cache, _, service) = CreateTestContext();
+            var firstDriver = Guid.NewGuid();
+            var selectedDriver = differentDriver ? Guid.NewGuid() : firstDriver;
+            const int orderId = 8810;
+            var pickup = new ShippingOrderDto { OrderId = orderId, MerchantId = 55, Lat = 37.05m, Lng = 37.33m };
+            var dropoff = new ShippingOrderDto { OrderId = orderId, MerchantId = 0, Lat = 37.06m, Lng = 37.34m };
+            await service.AddOrder(firstDriver, orderId, new[] { pickup }, dropoff);
+            var originalIds = (await service.GetOrderStops(orderId)).Select(x => x.Id).ToArray();
+            await service.RemoveOrder(firstDriver, orderId);
+
+            await service.AddOrder(selectedDriver, orderId, new[] { pickup }, dropoff);
+            await service.AddOrder(selectedDriver, orderId, new[] { pickup }, dropoff);
+
+            var stops = await service.GetOrderStops(orderId);
+            Assert.Equal(originalIds, stops.Select(x => x.Id).ToArray());
+            Assert.Equal(2, stops.Count);
+            Assert.All(stops, stop => { Assert.Equal(selectedDriver, stop.DriverId); Assert.Null(stop.CompletedDate); });
+            Assert.Equal(2, (await service.GetDeliveryStatus(selectedDriver)).PendingOrders.Count(x => x.OrderId == orderId));
+            if (differentDriver)
+                Assert.DoesNotContain((await service.GetDeliveryStatus(firstDriver)).PendingOrders, x => x.OrderId == orderId);
+            cache.Remove($"DeliveryStatus_{selectedDriver}");
+            Assert.Equal(2, (await service.GetDeliveryStatus(selectedDriver)).PendingOrders.Count(x => x.OrderId == orderId));
+        }
+
+        [Fact]
+        public async Task AddOrder_RejectsAnotherDriversActiveRoute()
+        {
+            var (_, _, _, _, service) = CreateTestContext();
+            var driver = Guid.NewGuid();
+            var pickup = new ShippingOrderDto { MerchantId = 55, Lat = 37.05m, Lng = 37.33m };
+            var dropoff = new ShippingOrderDto { Lat = 37.06m, Lng = 37.34m };
+            await service.AddOrder(driver, 8811, new[] { pickup }, dropoff);
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.AddOrder(Guid.NewGuid(), 8811, new[] { pickup }, dropoff));
+            Assert.All(await service.GetOrderStops(8811), stop => Assert.Equal(driver, stop.DriverId));
+        }
+
         [Fact]
         public async Task RemoveOrder_CompletesMerchantStopAndKeepsCustomerStopPending()
         {

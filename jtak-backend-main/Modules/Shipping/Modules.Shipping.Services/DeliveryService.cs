@@ -163,14 +163,17 @@ namespace Modules.Shipping.Services
                 .OrderBy(x => x.Index)
                 .ToListAsync();
 
-            if (existingStops.Any())
+            // Unassignment closes the old route. Only unfinished stops represent
+            // a current reservation; closed stops must be reusable on reassignment.
+            var activeStops = existingStops.Where(x => !x.CompletedDate.HasValue).ToList();
+            if (activeStops.Any())
             {
-                if (existingStops.Any(x => x.DriverId != uid))
+                if (activeStops.Any(x => x.DriverId != uid))
                 {
                     throw new InvalidOperationException($"Order #{oid} already has a route assigned to another driver.");
                 }
                 s.PendingOrders.RemoveAll(x => x.OrderId == oid);
-                foreach (var st in existingStops.Where(x => !x.CompletedDate.HasValue))
+                foreach (var st in activeStops)
                 {
                     s.PendingOrders.Add(new ShippingOrderDto
                     {
@@ -203,25 +206,27 @@ namespace Modules.Shipping.Services
             {
                 i += 1;
                 item.Index = i;
-                Insert(new ShippingOrder
+                var stop = existingStops.FirstOrDefault(x =>
+                    x.StopType == item.StopType && x.MerchantId == item.MerchantId);
+                if (stop == null)
                 {
-                    OrderId = oid,
-                    Index = i,
-                    DriverId = uid,
-                    MerchantId = item.MerchantId,
-                    CustomerId = item.CustomerId,
-                    Lat = item.Lat,
-                    Lng = item.Lng,
-                    StopType = item.StopType,
-                    StopTitle = item.StopTitle,
-                    IsDarkStore = item.IsDarkStore,
-                    VerificationCode = item.VerificationCode,
-                    Notes = item.Notes
-                });
+                    stop = new ShippingOrder { OrderId = oid, MerchantId = item.MerchantId, StopType = item.StopType };
+                    Insert(stop);
+                }
+                stop.Index = i;
+                stop.DriverId = uid;
+                stop.CustomerId = item.CustomerId;
+                stop.Lat = item.Lat;
+                stop.Lng = item.Lng;
+                stop.StopTitle = item.StopTitle;
+                stop.IsDarkStore = item.IsDarkStore;
+                stop.VerificationCode = item.VerificationCode;
+                stop.Notes = item.Notes;
+                stop.CompletedDate = null;
+                item.DriverId = uid;
+                item.CompletedDate = null;
             }
 
-            s.PendingOrders.AddRange(bestTripPath);
-            SetDeliveryStatus(uid, s);
             try
             {
                 await _uow.SaveChangesAsync();
@@ -230,14 +235,19 @@ namespace Modules.Shipping.Services
             {
                 // Only a route written by this same driver is an idempotent
                 // retry. Never hide a conflicting route or unrelated DB error.
-                var persisted = await _uow.Context.ShippingOrders
+                var persisted = await _uow.Context.ShippingOrders.AsNoTracking()
                     .Where(x => x.OrderId == oid)
                     .ToListAsync();
-                if (!persisted.Any() || persisted.Any(x => x.DriverId != uid))
+                if (persisted.Any(x => !x.CompletedDate.HasValue && x.DriverId != uid) ||
+                    bestTripPath.Any(item => !persisted.Any(x =>
+                        x.DriverId == uid && !x.CompletedDate.HasValue &&
+                        x.StopType == item.StopType && x.MerchantId == item.MerchantId)))
                 {
                     throw;
                 }
             }
+            s.PendingOrders.AddRange(bestTripPath);
+            SetDeliveryStatus(uid, s);
         }
 
         public async Task CompensateOrderStops(Guid uid, int oid)
