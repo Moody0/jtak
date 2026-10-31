@@ -64,7 +64,7 @@ namespace App.Helpers.Authorization
                 user = new AppUser
                 {
                     Id = reviewId, UserName = phone, PhoneNumber = phone, CountryPhoneCode = "+963",
-                    PhoneNumberConfirmed = true, IsActive = true,
+                    PhoneNumberConfirmed = true, EmailConfirmed = true, IsActive = true,
                     FirstName = "Google Play", LastName = "Reviewer", FullName = "Google Play " + role + " Reviewer"
                 };
                 var created = password == null ? await _users.CreateAsync(user) : await _users.CreateAsync(user, password);
@@ -83,12 +83,35 @@ namespace App.Helpers.Authorization
             }
             if (!await IsReviewAccountAsync(phone, user))
                 throw new CustomerOtpException("حساب المراجعة غير متاح.", 403);
-            // Repair only our exact, validated account if an older deployment
-            // provisioned it without a password. Never reset an existing password.
+            // Only validated, dedicated reviewers can receive configuration-driven repairs.
+            var repairedPassword = false;
             if (password != null && !await _users.HasPasswordAsync(user))
             {
                 if (!(await _users.AddPasswordAsync(user, password)).Succeeded)
                     throw new CustomerOtpException("Could not configure the dedicated reviewer password.", 503);
+                repairedPassword = true;
+            }
+            else if (password != null &&
+                     bool.TryParse(_configuration["Authentication:GooglePlayReview:SynchronizePasswords"], out var synchronize) && synchronize &&
+                     !await _users.CheckPasswordAsync(user, password))
+            {
+                var token = await _users.GeneratePasswordResetTokenAsync(user);
+                if (!(await _users.ResetPasswordAsync(user, token, password)).Succeeded)
+                    throw new CustomerOtpException("Could not update the dedicated reviewer password.", 503);
+                repairedPassword = true;
+            }
+            if (repairedPassword || !user.EmailConfirmed || !user.PhoneNumberConfirmed)
+            {
+                // These fixed review identities use phone sign-in and have no email inbox.
+                user.EmailConfirmed = true;
+                user.PhoneNumberConfirmed = true;
+                if (repairedPassword)
+                {
+                    user.AccessFailedCount = 0;
+                    user.LockoutEnd = null;
+                }
+                if (!(await _users.UpdateAsync(user)).Succeeded)
+                    throw new CustomerOtpException("Could not confirm the dedicated reviewer account.", 503);
             }
             return user;
         }
