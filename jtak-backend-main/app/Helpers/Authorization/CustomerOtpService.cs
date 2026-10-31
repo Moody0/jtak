@@ -51,6 +51,10 @@ namespace App.Helpers.Authorization
             if (!IsReviewPhone(phone) || !ReviewEnabled) return null;
             var reviewId = ReviewIdFor(phone);
             var role = ReviewRoleFor(phone);
+            var password = phone == ReviewPhone ? null : _configuration[
+                "Authentication:GooglePlayReview:" + (role == nameof(AppRoleName.Delivery) ? "DriverPassword" : "MerchantPassword")];
+            if (phone != ReviewPhone && string.IsNullOrWhiteSpace(password))
+                throw new CustomerOtpException("Configure the dedicated reviewer password before provisioning this account.", 503);
             var match = await SyrianPhoneIdentity.FindAsync(_users, phone);
             if (match.Ambiguous || (match.User != null && match.User.Id != reviewId))
                 throw new CustomerOtpException("رقم حساب المراجعة مرتبط بحساب آخر. يرجى التواصل مع الإدارة.", 409);
@@ -63,7 +67,7 @@ namespace App.Helpers.Authorization
                     PhoneNumberConfirmed = true, IsActive = true,
                     FirstName = "Google Play", LastName = "Reviewer", FullName = "Google Play " + role + " Reviewer"
                 };
-                var created = await _users.CreateAsync(user);
+                var created = password == null ? await _users.CreateAsync(user) : await _users.CreateAsync(user, password);
                 if (!created.Succeeded)
                     throw new CustomerOtpException("تعذر إنشاء حساب المراجعة. يرجى التواصل مع الإدارة.", 503);
                 var assigned = await _users.AddToRoleAsync(user, role);
@@ -79,6 +83,13 @@ namespace App.Helpers.Authorization
             }
             if (!await IsReviewAccountAsync(phone, user))
                 throw new CustomerOtpException("حساب المراجعة غير متاح.", 403);
+            // Repair only our exact, validated account if an older deployment
+            // provisioned it without a password. Never reset an existing password.
+            if (password != null && !await _users.HasPasswordAsync(user))
+            {
+                if (!(await _users.AddPasswordAsync(user, password)).Succeeded)
+                    throw new CustomerOtpException("Could not configure the dedicated reviewer password.", 503);
+            }
             return user;
         }
 

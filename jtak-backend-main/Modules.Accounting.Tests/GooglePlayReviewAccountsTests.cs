@@ -15,10 +15,12 @@ namespace Modules.Accounting.Tests;
 public class GooglePlayReviewAccountsTests
 {
     [Theory]
-    [InlineData("+963900000000", "Customer")]
-    [InlineData("+963900000001", "Delivery")]
-    [InlineData("+963900000002", "Merchant")]
-    public async Task ProvisioningIsRoleBoundAndIdempotent(string phone, string role)
+    [InlineData("+963900000000", "Customer", false)]
+    [InlineData("+963900000001", "Delivery", false)]
+    [InlineData("+963900000002", "Merchant", false)]
+    [InlineData("+963900000001", "Delivery", true)]
+    [InlineData("+963900000002", "Merchant", true)]
+    public async Task ProvisioningIsRoleBoundAndIdempotent(string phone, string role, bool existingPasswordless)
     {
         using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
@@ -28,6 +30,13 @@ public class GooglePlayReviewAccountsTests
         var roles = new Dictionary<Guid, List<string>>();
         users.Setup(x => x.CreateAsync(It.IsAny<AppUser>())).Returns<AppUser>(async u =>
         { db.Users.Add(u); await db.SaveChangesAsync(); roles[u.Id] = new(); return IdentityResult.Success; });
+        var hasher = new PasswordHasher<AppUser>();
+        const string password = "Reviewer.TestPassword!456";
+        users.Setup(x => x.CreateAsync(It.IsAny<AppUser>(), It.IsAny<string>())).Returns<AppUser, string>(async (u, p) =>
+        { u.PasswordHash = hasher.HashPassword(u, p); db.Users.Add(u); await db.SaveChangesAsync(); roles[u.Id] = new(); return IdentityResult.Success; });
+        users.Setup(x => x.HasPasswordAsync(It.IsAny<AppUser>())).Returns<AppUser>(u => Task.FromResult(!string.IsNullOrEmpty(u.PasswordHash)));
+        users.Setup(x => x.AddPasswordAsync(It.IsAny<AppUser>(), It.IsAny<string>())).Returns<AppUser, string>(async (u, p) =>
+        { u.PasswordHash = hasher.HashPassword(u, p); await db.SaveChangesAsync(); return IdentityResult.Success; });
         users.Setup(x => x.AddToRoleAsync(It.IsAny<AppUser>(), It.IsAny<string>()))
             .Returns<AppUser, string>((u, r) => { roles[u.Id].Add(r); return Task.FromResult(IdentityResult.Success); });
         users.Setup(x => x.GetRolesAsync(It.IsAny<AppUser>()))
@@ -35,18 +44,46 @@ public class GooglePlayReviewAccountsTests
         users.Setup(x => x.GetClaimsAsync(It.IsAny<AppUser>()))
             .ReturnsAsync(new List<Claim>());
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            { ["Authentication:GooglePlayReview:Enabled"] = "true" }).Build();
+            { ["Authentication:GooglePlayReview:Enabled"] = "true",
+              ["Authentication:GooglePlayReview:DriverPassword"] = password,
+              ["Authentication:GooglePlayReview:MerchantPassword"] = password }).Build();
         var service = new CustomerOtpService(new AppUnitOfWork(db), users.Object, null!, config, null!);
+        if (existingPasswordless)
+        {
+            var id = role == "Delivery" ? GooglePlayReviewIdentity.DriverId : GooglePlayReviewIdentity.MerchantId;
+            db.Users.Add(new AppUser { Id = id, PhoneNumber = phone, UserName = phone, IsActive = true });
+            await db.SaveChangesAsync(); roles[id] = new() { role };
+        }
         var first = await service.EnsureReviewAccountAsync(phone);
+        var savedHash = first.PasswordHash;
+        if (role != "Customer")
+            config["Authentication:GooglePlayReview:" + (role == "Delivery" ? "DriverPassword" : "MerchantPassword")] = "Changed.ConfigPassword!789";
         var second = await service.EnsureReviewAccountAsync(phone);
         Assert.Equal(first.Id, second.Id);
         Assert.Single(await db.Users.ToListAsync());
         Assert.Equal(new[] { role }, roles[first.Id]);
         Assert.Equal(phone, first.PhoneNumber);
         Assert.True(first.IsActive);
+        Assert.Equal(savedHash, second.PasswordHash);
+        if (role != "Customer")
+            Assert.NotEqual(PasswordVerificationResult.Failed, hasher.VerifyHashedPassword(first, first.PasswordHash!, password));
 
         roles[first.Id].Add("Admin");
         await Assert.ThrowsAsync<CustomerOtpException>(() => service.EnsureReviewAccountAsync(phone));
+    }
+
+    [Fact]
+    public async Task OperationsReviewerRequiresPasswordConfigurationBeforeCreation()
+    {
+        using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
+        var users = new Mock<UserManager<AppUser>>(Mock.Of<IUserStore<AppUser>>(), null!, null!, null!, null!, null!, null!, null!, null!);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["Authentication:GooglePlayReview:Enabled"] = "true" }).Build();
+        var service = new CustomerOtpService(new AppUnitOfWork(db), users.Object, null!, config, null!);
+        await Assert.ThrowsAsync<CustomerOtpException>(() => service.EnsureReviewAccountAsync(GooglePlayReviewIdentity.DriverPhone));
+        await Assert.ThrowsAsync<CustomerOtpException>(() => service.EnsureReviewAccountAsync(GooglePlayReviewIdentity.MerchantPhone));
+        Assert.Empty(await db.Users.ToListAsync());
     }
 
     [Fact]
