@@ -37,25 +37,36 @@ namespace App.Helpers.Authorization
 
         private bool ReviewEnabled => bool.TryParse(_configuration["Authentication:GooglePlayReview:Enabled"], out var enabled) && enabled;
 
+        public static bool IsReviewPhone(string phone) => phone == ReviewPhone ||
+            phone == GooglePlayReviewIdentity.DriverPhone || phone == GooglePlayReviewIdentity.MerchantPhone;
+
+        private static Guid ReviewIdFor(string phone) => phone == ReviewPhone ? ReviewUserId :
+            phone == GooglePlayReviewIdentity.DriverPhone ? GooglePlayReviewIdentity.DriverId : GooglePlayReviewIdentity.MerchantId;
+
+        private static string ReviewRoleFor(string phone) => phone == ReviewPhone ? nameof(AppRoleName.Customer) :
+            phone == GooglePlayReviewIdentity.DriverPhone ? nameof(AppRoleName.Delivery) : nameof(AppRoleName.Merchant);
+
         public async Task<AppUser> EnsureReviewAccountAsync(string phone)
         {
-            if (phone != ReviewPhone || !ReviewEnabled) return null;
+            if (!IsReviewPhone(phone) || !ReviewEnabled) return null;
+            var reviewId = ReviewIdFor(phone);
+            var role = ReviewRoleFor(phone);
             var match = await SyrianPhoneIdentity.FindAsync(_users, phone);
-            if (match.Ambiguous || (match.User != null && match.User.Id != ReviewUserId))
+            if (match.Ambiguous || (match.User != null && match.User.Id != reviewId))
                 throw new CustomerOtpException("رقم حساب المراجعة مرتبط بحساب آخر. يرجى التواصل مع الإدارة.", 409);
             var user = match.User;
             if (user == null)
             {
                 user = new AppUser
                 {
-                    Id = ReviewUserId, UserName = ReviewPhone, PhoneNumber = ReviewPhone,
+                    Id = reviewId, UserName = phone, PhoneNumber = phone, CountryPhoneCode = "+963",
                     PhoneNumberConfirmed = true, IsActive = true,
-                    FirstName = "Google Play", LastName = "Reviewer", FullName = "Google Play Reviewer"
+                    FirstName = "Google Play", LastName = "Reviewer", FullName = "Google Play " + role + " Reviewer"
                 };
                 var created = await _users.CreateAsync(user);
                 if (!created.Succeeded)
                     throw new CustomerOtpException("تعذر إنشاء حساب المراجعة. يرجى التواصل مع الإدارة.", 503);
-                var assigned = await _users.AddToRoleAsync(user, nameof(AppRoleName.Customer));
+                var assigned = await _users.AddToRoleAsync(user, role);
                 if (!assigned.Succeeded)
                     throw new CustomerOtpException("تعذر إعداد حساب المراجعة. يرجى التواصل مع الإدارة.", 503);
             }
@@ -63,7 +74,7 @@ namespace App.Helpers.Authorization
                      !(await _users.GetClaimsAsync(user)).Any(c => c.Type == DashboardAccessService.AccountMarker))
             {
                 // Recover only our exact account if a previous role insert failed.
-                if (!(await _users.AddToRoleAsync(user, nameof(AppRoleName.Customer))).Succeeded)
+                if (!(await _users.AddToRoleAsync(user, role)).Succeeded)
                     throw new CustomerOtpException("تعذر إعداد حساب المراجعة.", 503);
             }
             if (!await IsReviewAccountAsync(phone, user))
@@ -73,11 +84,11 @@ namespace App.Helpers.Authorization
 
         private async Task<bool> IsReviewAccountAsync(string phone, AppUser user)
         {
-            if (!ReviewEnabled || phone != ReviewPhone || user?.Id != ReviewUserId ||
-                user.PhoneNumber != ReviewPhone || !user.IsActive || user.DeletionDate != null) return false;
+            if (!ReviewEnabled || !IsReviewPhone(phone) || user?.Id != ReviewIdFor(phone) ||
+                user.PhoneNumber != phone || !user.IsActive || user.DeletionDate != null) return false;
             var roles = await _users.GetRolesAsync(user);
             var claims = await _users.GetClaimsAsync(user);
-            return roles.Count == 1 && roles.Contains(nameof(AppRoleName.Customer)) &&
+            return roles.Count == 1 && roles.Contains(ReviewRoleFor(phone)) &&
                 !claims.Any(c => c.Type == DashboardAccessService.AccountMarker);
         }
 
@@ -86,7 +97,7 @@ namespace App.Helpers.Authorization
             if (user != null && (!user.IsActive || user.DeletionDate != null))
                 throw new CustomerOtpException("حسابك غير متاح. يرجى التواصل مع الدعم.", 403);
             var review = await IsReviewAccountAsync(phone, user);
-            if (phone == ReviewPhone && !review)
+            if (IsReviewPhone(phone) && !review)
                 throw new CustomerOtpException("حساب المراجعة غير متاح.", 403);
             var id = Guid.NewGuid();
             var code = review ? ReviewCode : GenerateCode();
@@ -135,7 +146,7 @@ namespace App.Helpers.Authorization
             if (reserved != 1 || !Matches(challenge, code)) return false;
             if (challenge.IsReview)
             {
-                var reviewer = await _users.FindByIdAsync(ReviewUserId.ToString());
+                var reviewer = await _users.FindByIdAsync(ReviewIdFor(phone).ToString());
                 if (!await IsReviewAccountAsync(phone, reviewer)) return false;
             }
             else if (challenge.VerifiedAt == null &&

@@ -87,7 +87,7 @@ namespace Modules.Catalog.Services
         public async Task<int?> GetJtakMarketMerchantId()
         {
             var merchants = await Queryable().AsNoTracking()
-                .Where(x => x.Active && x.DeletionDate == null)
+                .Where(x => x.Active && x.DeletionDate == null && x.OwnerId != App.Shared.Entities.GooglePlayReviewIdentity.MerchantId)
                 .ToArrayAsync();
 
             return JtakMarketMerchantResolver.Resolve(merchants)?.Id;
@@ -99,7 +99,7 @@ namespace Modules.Catalog.Services
                 return Array.Empty<int>();
 
             return await Queryable().AsNoTracking()
-                .Where(x => x.Active && x.DeletionDate == null)
+                .Where(x => x.Active && x.DeletionDate == null && x.OwnerId != App.Shared.Entities.GooglePlayReviewIdentity.MerchantId)
                 .Select(x => x.Id)
                 .ToArrayAsync();
         }
@@ -111,7 +111,7 @@ namespace Modules.Catalog.Services
         public async Task<int[]> GetSearchableMerchants(decimal lat, decimal lng)
         {
             return await Queryable().AsNoTracking()
-                .Where(x => x.Active && x.DeletionDate == null)
+                .Where(x => x.Active && x.DeletionDate == null && x.OwnerId != App.Shared.Entities.GooglePlayReviewIdentity.MerchantId)
                 .Select(x => x.Id)
                 .ToArrayAsync();
         }

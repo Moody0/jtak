@@ -384,6 +384,8 @@ namespace App.ApiControllers.V1.Delivery
         {
             var uid = User.GetUserId();
             if (!uid.HasValue) return Unauthorized();
+            if (uid.Value == App.Shared.Entities.GooglePlayReviewIdentity.DriverId)
+                return BadRequest(ApiErr.Create("The Google Play reviewer cannot claim live deliveries."));
             var safety = _financialSafety ?? new DriverFinancialSafetyService(_auow.Context, _ledgerService, orders: _ouow.Context);
             try { return await safety.WithDriverLockAsync(uid.Value, () => ClaimOrderCore(id, safety)); }
             catch (InvalidOperationException ex) { return BadRequest(ApiErr.Create(ex.Message)); }

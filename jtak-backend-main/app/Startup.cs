@@ -302,9 +302,28 @@ namespace App
                 try { serviceScope.ServiceProvider.EnsureSeedData().Wait(); } catch (Exception ex) { logger?.LogError(ex, "Failed to execute EnsureSeedData"); }
                 try
                 {
-                    serviceScope.ServiceProvider.GetRequiredService<App.Helpers.Authorization.CustomerOtpService>()
-                        .EnsureReviewAccountAsync(App.Helpers.Authorization.CustomerOtpService.ReviewPhone)
-                        .GetAwaiter().GetResult();
+                    var reviewOtp = serviceScope.ServiceProvider.GetRequiredService<App.Helpers.Authorization.CustomerOtpService>();
+                    foreach (var phone in new[] { App.Helpers.Authorization.CustomerOtpService.ReviewPhone,
+                        App.Shared.Entities.GooglePlayReviewIdentity.DriverPhone, App.Shared.Entities.GooglePlayReviewIdentity.MerchantPhone })
+                        reviewOtp.EnsureReviewAccountAsync(phone).GetAwaiter().GetResult();
+                    var reviewer = serviceScope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<App.Shared.Entities.AppUser>>()
+                        .FindByIdAsync(App.Shared.Entities.GooglePlayReviewIdentity.MerchantId.ToString()).GetAwaiter().GetResult();
+                    if (reviewer != null && reviewer.IsActive && reviewer.DeletionDate == null)
+                    {
+                        var catalog = serviceScope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+                        using var reviewTransaction = catalog.Database.BeginTransaction(System.Data.IsolationLevel.Serializable);
+                        if (!catalog.Merchants.Any(m => m.OwnerId == reviewer.Id))
+                        {
+                            catalog.Merchants.Add(new Modules.Catalog.Entities.Merchant {
+                                Title = "Google Play Review Store", OwnerId = reviewer.Id, OwnerName = reviewer.FullName,
+                                Phone1 = App.Shared.Entities.GooglePlayReviewIdentity.MerchantPhone,
+                                Active = true, Lat = 34.73333m, Lng = 36.71667m,
+                                Address = "Demo review store", ProfitOutOfMerchantPricePercent = 10m
+                            });
+                            catalog.SaveChanges();
+                        }
+                        reviewTransaction.Commit();
+                    }
                 }
                 catch (App.Helpers.Authorization.CustomerOtpException ex)
                 {

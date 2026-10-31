@@ -42,6 +42,21 @@ namespace Modules.Accounting.Tests
         }
 
         [Fact]
+        public async Task ReviewDriverCannotGoOnlineOrReceiveLiveRoute()
+        {
+            var (_, _, cache, userServiceMock, service) = CreateTestContext();
+            var id = GooglePlayReviewIdentity.DriverId;
+            cache.Set($"DeliveryStatus_{id}", new DeliveryStatus { IsOnline = true });
+            userServiceMock.Setup(x => x.ListFromRoles(It.IsAny<string[]>()))
+                .ReturnsAsync(new[] { new AppUser { Id = id, IsActive = true } });
+            await service.SetDutyStatus(id, true);
+            Assert.False((await service.GetDeliveryStatus(id)).IsOnline);
+            Assert.Empty(await service.GetOnlineDeliveryIds());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.AddOrder(id, 10,
+                Array.Empty<ShippingOrderDto>(), new ShippingOrderDto()));
+        }
+
+        [Fact]
         public async Task PickBestDelivery_SelectsDriverWithLowestCombinedScore_DistanceAndLoad()
         {
             var (context, uow, cache, userServiceMock, service) = CreateTestContext();

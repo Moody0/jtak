@@ -44,7 +44,7 @@ namespace Modules.Shipping.Services
         public async Task<(Guid Id, int Distance)> PickBestDelivery((decimal Lat, decimal Lng, int MerchantId)[] allMerchantStops)
         {
             var deliveryUsers = (await _userService.ListFromRoles(AppRoleName.Delivery.ToString()))
-                                                    .Where(x => x.IsActive)
+                                                    .Where(x => x.IsActive && x.Id != App.Shared.Entities.GooglePlayReviewIdentity.DriverId)
                                                     .Select(x => new { x.Id, x.FullName })
                                                     .ToArray();
             if (allMerchantStops == null || allMerchantStops.Length == 0 || deliveryUsers.Length == 0)
@@ -155,6 +155,8 @@ namespace Modules.Shipping.Services
 
         public async Task AddOrder(Guid uid, int oid, ShippingOrderDto[] merchantLocations, ShippingOrderDto customerLoction)
         {
+            if (uid == App.Shared.Entities.GooglePlayReviewIdentity.DriverId)
+                throw new InvalidOperationException("The Google Play reviewer cannot be assigned live deliveries.");
             var s = await GetDeliveryStatus(uid);
 
             // Idempotency: Check if stops already exist in DB for this order
@@ -361,7 +363,7 @@ namespace Modules.Shipping.Services
             if (drivers == null) return Array.Empty<Guid>();
 
             var onlineIds = new List<Guid>();
-            foreach (var driver in drivers.Where(x => x.IsActive))
+            foreach (var driver in drivers.Where(x => x.IsActive && x.Id != App.Shared.Entities.GooglePlayReviewIdentity.DriverId))
             {
                 if ((await GetDeliveryStatus(driver.Id)).IsOnline)
                     onlineIds.Add(driver.Id);
@@ -372,6 +374,7 @@ namespace Modules.Shipping.Services
 
         public async Task SetDutyStatus(Guid uid, bool isOnline)
         {
+            if (uid == App.Shared.Entities.GooglePlayReviewIdentity.DriverId) return;
             var s = await GetDeliveryStatus(uid);
             s.IsOnline = isOnline;
             if (isOnline)
@@ -414,6 +417,9 @@ namespace Modules.Shipping.Services
 
         public async Task<DeliveryStatus> GetDeliveryStatus(Guid uid)
         {
+            // Keep the dedicated reviewer out of real delivery assignment.
+            if (uid == App.Shared.Entities.GooglePlayReviewIdentity.DriverId)
+                return new DeliveryStatus { IsOnline = false };
             if (_cache.TryGetValue($"DeliveryStatus_{uid}", out DeliveryStatus result))
                 return result;
 

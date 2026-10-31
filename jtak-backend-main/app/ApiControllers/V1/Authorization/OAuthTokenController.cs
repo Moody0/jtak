@@ -286,7 +286,7 @@ namespace App.ApiControllers.V1.Authorization
                         await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Delivery));
                     var customerPurpose = string.Equals(request.GetParameter("otp_purpose")?.ToString(),
                         "customer", StringComparison.Ordinal);
-                    var requiresCustomerOtp = customerPurpose || !hasOperationsRole ||
+                    var requiresCustomerOtp = customerPurpose || CustomerOtpService.IsReviewPhone(canonicalPhone) || !hasOperationsRole ||
                         await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Customer)) ||
                         (_customerOtp != null && await _customerOtp.HasActiveChallengeAsync(canonicalPhone, user));
                     if (requiresCustomerOtp)

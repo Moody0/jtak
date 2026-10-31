@@ -307,7 +307,7 @@ namespace App.ApiControllers.V1.Authorization
                 return BadRequest($"You need to wait {waitTimeInSecs}s");
 
             var pending = await _unitOfWork.Context.PendingPhoneSignups.FindAsync(canonicalPhone);
-            if (user == null || pending != null || await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Customer)))
+            if (CustomerOtpService.IsReviewPhone(canonicalPhone) || user == null || pending != null || await _userManager.IsInRoleAsync(user, nameof(AppRoleName.Customer)))
             {
                 await BeginCustomerSignInAsync(canonicalPhone, user);
                 return 60;
@@ -504,6 +504,14 @@ namespace App.ApiControllers.V1.Authorization
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             if (!SyrianPhoneIdentity.TryNormalize(model.PhoneNumber, out var canonicalPhone)) return BadRequest(_Errors.InvalidNumber);
+            if (CustomerOtpService.IsReviewPhone(canonicalPhone))
+            {
+                var reviewer = await _customerOtp.EnsureReviewAccountAsync(canonicalPhone);
+                if (reviewer == null || !await _userManager.IsInRoleAsync(reviewer, nameof(AppRoleName.Merchant)))
+                    return StatusCode(403, new { errorDescription = "Review account unavailable for this app." });
+                await BeginCustomerSignInAsync(canonicalPhone, reviewer);
+                return string.Empty;
+            }
             var match = await SyrianPhoneIdentity.FindAsync(_userManager, canonicalPhone);
             if (match.Ambiguous) return StatusCode(409, new { error = "PHONE_ACCOUNT_AMBIGUOUS", errorDescription = "يوجد أكثر من حساب مرتبط بهذا الرقم. يرجى التواصل مع الدعم." });
             var user = match.User;
